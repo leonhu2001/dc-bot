@@ -3,7 +3,9 @@
 {% set _can_switch_employee = user and (user.is_admin or user.is_customer_service or user.is_manager) %}
 {% if _admin_app_path == '/admin' %}
     {% set _admin_app_title = '客服工作台' %}
-{% elif _admin_app_path.startswith('/admin/orders/history') or _admin_app_path.startswith('/admin/order-workspace') %}
+{% elif _admin_app_path.startswith('/admin/orders/history') %}
+    {% set _admin_app_title = '歷史訂單' %}
+{% elif _admin_app_path.startswith('/admin/order-workspace') %}
     {% set _admin_app_title = '訂單工作區' %}
 {% elif _admin_app_path.startswith('/admin/customer-center') or _admin_app_path.startswith('/admin/customers') or _admin_app_path.startswith('/admin/wallets') or _admin_app_path.startswith('/admin/reviews') %}
     {% set _admin_app_title = '客戶中心' %}
@@ -51,7 +53,7 @@
 {% endif %}
 
 <nav class="admin-app-bottom-nav" aria-label="客服 App 主要導覽">
-    <a class="admin-app-nav-item{% if _admin_app_path == '/admin' or _admin_app_path.startswith('/admin/order-workspace') or _admin_app_path.startswith('/admin/orders/history') %} is-active{% endif %}" href="/admin">
+    <a class="admin-app-nav-item{% if _admin_app_path == '/admin' or _admin_app_path.startswith('/admin/order-workspace') %} is-active{% endif %}" href="/admin">
         <span class="admin-app-nav-icon" aria-hidden="true">⌂</span>
         <span>工作台</span>
     </a>
@@ -67,7 +69,7 @@
         <span class="admin-app-nav-icon" aria-hidden="true">＄</span>
         <span>財務</span>
     </a>
-    <details class="admin-app-more{% if _admin_app_path != '/admin' and not (_admin_app_path.startswith('/admin/order-workspace') or _admin_app_path.startswith('/admin/orders/history') or _admin_app_path.startswith('/admin/customer-center') or _admin_app_path.startswith('/admin/customers') or _admin_app_path.startswith('/admin/wallets') or _admin_app_path.startswith('/admin/reviews') or _admin_app_path.startswith('/admin/support-center') or _admin_app_path.startswith('/admin/tickets') or _admin_app_path.startswith('/admin/support-calls') or _admin_app_path.startswith('/admin/ai-support-knowledge') or _admin_app_path.startswith('/admin/finance-center') or _admin_app_path.startswith('/admin/payment-reviews') or _admin_app_path.startswith('/admin/topups') or _admin_app_path.startswith('/admin/payout') or _admin_app_path.startswith('/admin/accounting-reconciliation')) %} is-active{% endif %}">
+    <details class="admin-app-more{% if _admin_app_path != '/admin' and not (_admin_app_path.startswith('/admin/order-workspace') or _admin_app_path.startswith('/admin/customer-center') or _admin_app_path.startswith('/admin/customers') or _admin_app_path.startswith('/admin/wallets') or _admin_app_path.startswith('/admin/reviews') or _admin_app_path.startswith('/admin/support-center') or _admin_app_path.startswith('/admin/tickets') or _admin_app_path.startswith('/admin/support-calls') or _admin_app_path.startswith('/admin/ai-support-knowledge') or _admin_app_path.startswith('/admin/finance-center') or _admin_app_path.startswith('/admin/payment-reviews') or _admin_app_path.startswith('/admin/topups') or _admin_app_path.startswith('/admin/payout') or _admin_app_path.startswith('/admin/accounting-reconciliation')) %} is-active{% endif %}">
         <summary class="admin-app-nav-item">
             <span class="admin-app-nav-icon" aria-hidden="true">☰</span>
             <span>更多</span>
