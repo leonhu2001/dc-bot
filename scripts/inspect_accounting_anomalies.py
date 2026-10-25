@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
+import sys
 from typing import Any
-
-from web.app.services.accounting_reconciliation import (
-    build_accounting_reconciliation_snapshot,
-)
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from web.app.services.accounting_reconciliation import (  # noqa: E402
+    build_accounting_reconciliation_snapshot,
+)
+
 
 _METADATA_ONLY_CODES = {
     "tip_wallet_reference_mismatch",
