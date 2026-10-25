@@ -25,16 +25,7 @@
     {% set _admin_app_title = '營運管理' %}
 {% endif %}
 
-<link rel="stylesheet" href="/static/css/pages/mobile_app_repair.css?v=20261026-1">
-<link rel="stylesheet" href="/static/css/pages/mobile_app_page_audit.css?v=20261026-1">
-<link rel="stylesheet" href="/static/css/pages/mobile_app_edges.css?v=20261026-1">
-<link rel="stylesheet" href="/static/css/pages/mobile_app_ux_v2.css?v=20261026-1">
-{% if _admin_app_path.startswith('/admin/wallets') %}
-<link rel="stylesheet" href="/static/css/pages/admin_wallet_mobile.css?v=20261026-1">
-{% endif %}
-<script src="/static/js/pages/mobile_app_interactions.js?v=20261026-1" defer></script>
-
-<header class="admin-app-topbar" aria-label="客服行動工作台">
+<header class="admin-app-topbar" aria-label="客服行動後台">
     <a class="admin-app-home" href="/admin" aria-label="返回客服工作台">
         <img class="mobile-app-logo-image" src="/static/img/server_logo.gif" alt="">
     </a>
@@ -47,7 +38,7 @@
 
 {% if _can_switch_employee %}
 <nav class="mobile-app-context-switch" aria-label="工作區切換">
-    <a href="/employee"><span aria-hidden="true">⚡</span>員工工作台</a>
+    <a href="/employee"><span aria-hidden="true">⚡</span>員工後台</a>
     <a class="is-active" href="/admin"><span aria-hidden="true">◈</span>客服後台</a>
 </nav>
 {% endif %}
@@ -86,7 +77,7 @@
                 <div class="admin-app-sheet-group">
                     <small>工作區</small>
                     <div class="admin-app-sheet-links">
-                        <a href="/employee"><span>⚡</span><strong>切到員工工作台</strong><small>接單、報單與薪資</small></a>
+                        <a href="/employee"><span>⚡</span><strong>切到員工後台</strong><small>接單、報單與薪資</small></a>
                     </div>
                 </div>
                 {% endif %}
