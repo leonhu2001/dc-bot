@@ -10,11 +10,15 @@ def _read(path: str) -> str:
 
 def test_employee_workspace_reserves_scrollbar_gutter():
     header = _read("web/app/templates/_site_header.html")
+    layout = _read("web/app/templates/site_layout.html")
     css = _read("web/app/static/css/pages/employee_workspace_viewport.css")
 
-    assert "employee_workspace_viewport.css?v=20261020-1" in header
-    assert "current_path.startswith('/employee')" in header
-    assert "current_path.startswith('/dispatch')" in header
+    # Viewport CSS is now loaded in <head> by site_layout so the employee shell
+    # has its geometry before first paint. The body header partial must not own
+    # stylesheet loads because that caused a desktop-to-mobile flash.
+    assert "employee_workspace_viewport.css?v=20261020-1" in layout
+    assert "employee_workspace_viewport.css?v=20261020-1" not in header
+    assert "employee_workspace_shell|default(false)" in layout
     assert "scrollbar-gutter: stable" in css
     assert "overflow-y: scroll" in css
 
