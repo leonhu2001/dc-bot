@@ -1,0 +1,1014 @@
+/* Mobile visual system v4
+   Final presentation layer for customer, employee, and customer-service apps.
+   Loaded in <head> after the legacy mobile layers so the phone UI has one source
+   of truth for safe areas, navigation, gutters, radii, density, and clipping. */
+
+@media (max-width: 767px) {
+  :root {
+    --m4-bg: #0b0b0d;
+    --m4-bg-elevated: #101013;
+    --m4-surface: #151518;
+    --m4-surface-2: #19191d;
+    --m4-surface-3: #202026;
+    --m4-line: rgba(255, 255, 255, .105);
+    --m4-line-soft: rgba(255, 255, 255, .07);
+    --m4-text: #f6f3ec;
+    --m4-muted: rgba(237, 233, 224, .60);
+    --m4-muted-2: rgba(237, 233, 224, .42);
+    --m4-gold: #f2cf70;
+    --m4-gold-soft: rgba(242, 207, 112, .12);
+    --m4-gold-line: rgba(242, 207, 112, .34);
+    --m4-danger: #ff9d9d;
+    --m4-success: #8ed9ae;
+    --m4-gutter: 14px;
+    --m4-gap: 10px;
+    --m4-radius-xl: 22px;
+    --m4-radius-card: 18px;
+    --m4-radius-control: 14px;
+    --m4-topbar-h: 58px;
+    --m4-switch-h: 56px;
+    --m4-nav-h: 74px;
+    --m4-shadow: 0 14px 34px rgba(0, 0, 0, .22);
+  }
+
+  html {
+    min-width: 0;
+    min-height: 100%;
+    margin: 0;
+    background: var(--m4-bg) !important;
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body.customer-mobile-app-site,
+  body.employee-workspace-site,
+  body:has(.employee-app-topbar),
+  body.mw-r5-admin {
+    min-width: 0 !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: var(--m4-bg) !important;
+    color: var(--m4-text) !important;
+    overflow-x: hidden !important;
+  }
+
+  body.customer-mobile-app-site *,
+  body.employee-workspace-site *,
+  body:has(.employee-app-topbar) *,
+  body.mw-r5-admin * {
+    box-sizing: border-box;
+  }
+
+  body.customer-mobile-app-site img,
+  body.employee-workspace-site img,
+  body:has(.employee-app-topbar) img,
+  body.mw-r5-admin img,
+  body.customer-mobile-app-site svg,
+  body.employee-workspace-site svg,
+  body:has(.employee-app-topbar) svg,
+  body.mw-r5-admin svg {
+    max-width: 100%;
+  }
+
+  /* ---------- App bars ---------- */
+  .customer-app-topbar,
+  .employee-app-topbar,
+  .admin-app-topbar {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    z-index: 1400 !important;
+    width: 100% !important;
+    height: calc(var(--m4-topbar-h) + env(safe-area-inset-top)) !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: env(safe-area-inset-top) max(var(--m4-gutter), env(safe-area-inset-right)) 0 max(var(--m4-gutter), env(safe-area-inset-left)) !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--m4-line) !important;
+    border-radius: 0 !important;
+    background: #0b0b0d !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .customer-app-topbar,
+  .employee-app-topbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+
+  .admin-app-topbar {
+    display: grid !important;
+    grid-template-columns: 44px minmax(0, 1fr) 44px !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  .customer-app-mark,
+  .employee-app-mark,
+  .customer-app-account,
+  .employee-app-profile,
+  .admin-app-home,
+  .admin-app-search {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    flex: 0 0 40px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: 13px !important;
+    background: var(--m4-surface-2) !important;
+    box-shadow: none !important;
+  }
+
+  .customer-app-mark,
+  .employee-app-mark {
+    border-color: rgba(242, 207, 112, .24) !important;
+    background: #171713 !important;
+  }
+
+  .admin-app-title,
+  .customer-app-title-wrap,
+  .employee-app-topbar-copy {
+    min-width: 0 !important;
+  }
+
+  .admin-app-title {
+    text-align: center !important;
+  }
+
+  .admin-app-title small,
+  .customer-app-title-wrap small,
+  .employee-app-topbar-copy small {
+    display: none !important;
+  }
+
+  .admin-app-title strong,
+  .customer-app-title-wrap strong,
+  .employee-app-topbar-copy strong {
+    display: block !important;
+    overflow: hidden !important;
+    color: var(--m4-text) !important;
+    font-size: 18px !important;
+    font-weight: 900 !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .mobile-app-context-switch {
+    display: grid !important;
+    position: fixed !important;
+    top: calc(var(--m4-topbar-h) + env(safe-area-inset-top)) !important;
+    right: 0 !important;
+    left: 0 !important;
+    z-index: 1390 !important;
+    width: 100% !important;
+    height: var(--m4-switch-h) !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    align-items: center !important;
+    margin: 0 !important;
+    padding: 7px max(var(--m4-gutter), env(safe-area-inset-right)) 7px max(var(--m4-gutter), env(safe-area-inset-left)) !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--m4-line) !important;
+    border-radius: 0 !important;
+    background: #0b0b0d !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .mobile-app-context-switch a {
+    display: flex !important;
+    min-width: 0 !important;
+    min-height: 42px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    padding: 0 10px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-control) !important;
+    background: #111114 !important;
+    color: var(--m4-muted) !important;
+    font-size: 13px !important;
+    font-weight: 850 !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+  }
+
+  .mobile-app-context-switch a.is-active {
+    border-color: var(--m4-gold-line) !important;
+    background: var(--m4-gold-soft) !important;
+    color: var(--m4-gold) !important;
+  }
+
+  /* ---------- Content geometry ---------- */
+  body.customer-mobile-app-site .site-main {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding-top: calc(var(--m4-topbar-h) + env(safe-area-inset-top) + 12px) !important;
+    padding-right: max(var(--m4-gutter), env(safe-area-inset-right)) !important;
+    padding-bottom: calc(var(--m4-nav-h) + env(safe-area-inset-bottom) + 14px) !important;
+    padding-left: max(var(--m4-gutter), env(safe-area-inset-left)) !important;
+    overflow: visible !important;
+  }
+
+  body.employee-workspace-site .site-main,
+  body:has(.employee-app-topbar) .site-main {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: calc(var(--m4-topbar-h) + env(safe-area-inset-top) + var(--m4-switch-h) + 12px) 0 calc(var(--m4-nav-h) + env(safe-area-inset-bottom) + 14px) !important;
+    overflow: visible !important;
+  }
+
+  body.employee-workspace-site .employee-workspace-frame,
+  body.employee-workspace-site .employee-workspace-page-content,
+  body:has(.employee-app-topbar) .employee-workspace-frame,
+  body:has(.employee-app-topbar) .employee-workspace-page-content,
+  body.employee-workspace-site .site-main > .ec,
+  body:has(.employee-app-topbar) .site-main > .ec {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  body.employee-workspace-site .employee-workspace-page-content,
+  body:has(.employee-app-topbar) .employee-workspace-page-content,
+  body.employee-workspace-site .site-main > .ec,
+  body:has(.employee-app-topbar) .site-main > .ec {
+    padding-right: max(var(--m4-gutter), env(safe-area-inset-right)) !important;
+    padding-left: max(var(--m4-gutter), env(safe-area-inset-left)) !important;
+  }
+
+  body.mw-r5-admin .mw-r5-shell,
+  body.mw-r5-admin .mw-r5-main-host,
+  body.mw-r5-admin .mw-r5-content,
+  body.mw-r5-admin .mw-r5-legacy-body,
+  body.mw-r5-admin .shell,
+  body.mw-r5-admin .main {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+  }
+
+  body.mw-r5-admin .mw-r5-main-host {
+    padding: calc(var(--m4-topbar-h) + env(safe-area-inset-top) + var(--m4-switch-h) + 12px) 0 calc(var(--m4-nav-h) + env(safe-area-inset-bottom) + 14px) !important;
+  }
+
+  body.mw-r5-admin .mw-r5-content,
+  body.mw-r5-admin .mw-r5-legacy-body,
+  body.mw-r5-admin .main {
+    padding: 0 max(var(--m4-gutter), env(safe-area-inset-right)) 0 max(var(--m4-gutter), env(safe-area-inset-left)) !important;
+  }
+
+  body.mw-r5-admin .mw-r5-page-header,
+  body.mw-r5-admin .mw-admin-searchbar,
+  body.mw-r5-admin .mw-r5-sidebar,
+  body.mw-r5-admin .mw-admin-backbar {
+    display: none !important;
+  }
+
+  body.customer-mobile-app-site .site-main > *,
+  body.employee-workspace-site .employee-workspace-page-content > *,
+  body:has(.employee-app-topbar) .employee-workspace-page-content > *,
+  body.mw-r5-admin .mw-r5-content > *,
+  body.mw-r5-admin .mw-r5-legacy-body > *,
+  body.mw-r5-admin .main > * {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* ---------- Unified bottom dock ---------- */
+  .customer-app-bottom-nav,
+  .employee-app-bottom-nav,
+  .admin-app-bottom-nav {
+    display: grid !important;
+    position: fixed !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 1410 !important;
+    width: 100% !important;
+    height: calc(var(--m4-nav-h) + env(safe-area-inset-bottom)) !important;
+    min-height: 0 !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    align-items: start !important;
+    margin: 0 !important;
+    padding: 8px max(6px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)) !important;
+    border: 0 !important;
+    border-top: 1px solid var(--m4-line) !important;
+    border-radius: 0 !important;
+    background: #101013 !important;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, .28) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .customer-app-nav-item,
+  .employee-app-nav-item,
+  .admin-app-nav-item {
+    display: flex !important;
+    position: relative !important;
+    min-width: 0 !important;
+    min-height: 50px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+    margin: 0 !important;
+    padding: 4px 2px !important;
+    border: 1px solid transparent !important;
+    border-radius: 15px !important;
+    background: transparent !important;
+    color: var(--m4-muted) !important;
+    font-size: 11px !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    text-decoration: none !important;
+  }
+
+  .customer-app-nav-icon,
+  .employee-app-nav-icon,
+  .admin-app-nav-icon {
+    display: grid !important;
+    width: 28px !important;
+    height: 24px !important;
+    place-items: center !important;
+    color: inherit !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+  }
+
+  .customer-app-nav-item.is-active,
+  .employee-app-nav-item.is-active,
+  .employee-app-more.is-active > summary,
+  .employee-app-more[open] > summary,
+  .admin-app-nav-item.is-active,
+  .admin-app-more.is-active > summary,
+  .admin-app-more[open] > summary {
+    border-color: rgba(242, 207, 112, .20) !important;
+    background: rgba(242, 207, 112, .12) !important;
+    color: var(--m4-gold) !important;
+  }
+
+  .customer-app-nav-item::before,
+  .employee-app-nav-item::before,
+  .admin-app-nav-item::before {
+    display: none !important;
+  }
+
+  /* ---------- One card language ---------- */
+  body.customer-mobile-app-site :where(
+    .panel,
+    .card,
+    [class$="-card"],
+    [class$="-panel"],
+    .member-order-card,
+    .staff-card,
+    .vip-card
+  ),
+  body.employee-workspace-site :where(
+    .panel,
+    .ec-card,
+    .ec-stat,
+    .binding-card,
+    .dispatch-panel,
+    .dispatch-order-card,
+    .dispatch-my-card,
+    .report-card,
+    .my-payout-card,
+    .my-payout-total-card,
+    .summary-person-card,
+    .it-card,
+    .it-item,
+    .sbm-panel,
+    .sbm-card
+  ),
+  body:has(.employee-app-topbar) :where(
+    .panel,
+    .ec-card,
+    .ec-stat,
+    .binding-card,
+    .dispatch-panel,
+    .dispatch-order-card,
+    .dispatch-my-card,
+    .report-card,
+    .my-payout-card,
+    .my-payout-total-card,
+    .summary-person-card,
+    .it-card,
+    .it-item,
+    .sbm-panel,
+    .sbm-card
+  ),
+  body.mw-r5-admin :where(
+    .panel,
+    .compact-panel,
+    .stat,
+    .center-stat,
+    .center-row,
+    .center-review,
+    .orders-panel,
+    .queue-row,
+    .history-ledger-panel,
+    .history-ledger-stat,
+    .pay-review-panel,
+    .topup-card,
+    .topup-panel,
+    .admin-order-card,
+    .wallet-card,
+    .vip-timer-card
+  ) {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    border-color: var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    box-shadow: none !important;
+  }
+
+  body.customer-mobile-app-site :where([class$="-card"], [class$="-panel"]),
+  body.employee-workspace-site :where(.ec-card, .binding-card, .dispatch-panel, .report-card, .my-payout-card, .it-card, .sbm-panel, .sbm-card),
+  body:has(.employee-app-topbar) :where(.ec-card, .binding-card, .dispatch-panel, .report-card, .my-payout-card, .it-card, .sbm-panel, .sbm-card),
+  body.mw-r5-admin :where(.panel, .compact-panel, .orders-panel, .history-ledger-panel, .pay-review-panel, .topup-panel) {
+    overflow: visible !important;
+  }
+
+  body.customer-mobile-app-site :where(input, select, textarea, button),
+  body.employee-workspace-site :where(input, select, textarea, button),
+  body:has(.employee-app-topbar) :where(input, select, textarea, button),
+  body.mw-r5-admin :where(input, select, textarea, button) {
+    max-width: 100% !important;
+    font-size: 16px !important;
+  }
+
+  body.customer-mobile-app-site :where(button, .button, a.button),
+  body.employee-workspace-site :where(button, .button, a.button, .ec-btn),
+  body:has(.employee-app-topbar) :where(button, .button, a.button, .ec-btn),
+  body.mw-r5-admin :where(button, .button, a.button) {
+    min-height: 44px;
+    border-radius: var(--m4-radius-control) !important;
+  }
+
+  body.customer-mobile-app-site :where(.table-wrap, [class$="-table-wrap"]),
+  body.employee-workspace-site :where(.table-wrap, [class$="-table-wrap"]),
+  body:has(.employee-app-topbar) :where(.table-wrap, [class$="-table-wrap"]),
+  body.mw-r5-admin :where(.table-wrap, [class$="-table-wrap"]) {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    border-radius: var(--m4-radius-card) !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ---------- Admin home: actually recompose the first screen ---------- */
+  body.mw-r5-admin .admin-dashboard-main,
+  body.mw-r5-admin .main {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub {
+    order: -40 !important;
+    display: grid !important;
+    gap: 10px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-hub-head {
+    padding: 0 2px !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-hub-kicker,
+  body.mw-r5-admin .admin-mobile-task-hub p {
+    display: none !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub h2 {
+    margin: 0 !important;
+    color: var(--m4-text) !important;
+    font-size: 18px !important;
+    line-height: 1.2 !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-action {
+    display: grid !important;
+    min-width: 0 !important;
+    min-height: 78px !important;
+    grid-template-columns: 34px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 12px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+    color: var(--m4-text) !important;
+    text-decoration: none !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-action.is-primary {
+    border-color: var(--m4-gold-line) !important;
+    background: linear-gradient(145deg, rgba(242, 207, 112, .13), rgba(242, 207, 112, .05)) !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-icon {
+    display: grid !important;
+    width: 34px !important;
+    height: 34px !important;
+    place-items: center !important;
+    border-radius: 11px !important;
+    background: rgba(242, 207, 112, .11) !important;
+    color: var(--m4-gold) !important;
+    font-size: 17px !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-copy {
+    min-width: 0 !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-copy strong {
+    display: block !important;
+    overflow: hidden !important;
+    font-size: 14px !important;
+    line-height: 1.25 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-copy small {
+    display: block !important;
+    overflow: hidden !important;
+    margin-top: 4px !important;
+    color: var(--m4-muted) !important;
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  body.mw-r5-admin .queues {
+    order: -30 !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 9px !important;
+    margin: 0 !important;
+  }
+
+  body.mw-r5-admin .queues > .panel {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: var(--m4-surface) !important;
+  }
+
+  body.mw-r5-admin .queues .panel-head {
+    min-height: 48px !important;
+    padding: 11px 13px !important;
+    border-bottom: 1px solid var(--m4-line-soft) !important;
+  }
+
+  body.mw-r5-admin .queues .panel-head strong {
+    font-size: 14px !important;
+  }
+
+  body.mw-r5-admin .queues .count {
+    display: grid !important;
+    min-width: 30px !important;
+    height: 30px !important;
+    place-items: center !important;
+    border: 1px solid rgba(242, 207, 112, .24) !important;
+    border-radius: 999px !important;
+    color: var(--m4-gold) !important;
+  }
+
+  body.mw-r5-admin .queues .empty {
+    min-height: 58px !important;
+    padding: 18px 13px !important;
+    color: var(--m4-muted) !important;
+    font-size: 13px !important;
+    text-align: center !important;
+  }
+
+  body.mw-r5-admin .queue-row {
+    display: grid !important;
+    min-width: 0 !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    gap: 9px !important;
+    align-items: center !important;
+    margin: 0 !important;
+    padding: 11px 13px !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--m4-line-soft) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  body.mw-r5-admin .queue-row:last-child {
+    border-bottom: 0 !important;
+  }
+
+  body.mw-r5-admin .stats,
+  body.mw-r5-admin .admin-dashboard-stats {
+    order: -20 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  body.mw-r5-admin .stats .stat {
+    min-height: 88px !important;
+    padding: 12px !important;
+    border: 1px solid var(--m4-line) !important;
+    background: var(--m4-surface) !important;
+  }
+
+  body.mw-r5-admin .stats .stat span {
+    color: var(--m4-muted) !important;
+    font-size: 11px !important;
+    font-weight: 750 !important;
+  }
+
+  body.mw-r5-admin .stats .stat strong {
+    margin-top: 8px !important;
+    color: var(--m4-gold) !important;
+    font-size: 28px !important;
+    line-height: 1 !important;
+  }
+
+  body.mw-r5-admin .stats .stat:last-child:nth-child(odd) {
+    grid-column: 1 / -1 !important;
+    min-height: 72px !important;
+  }
+
+  body.mw-r5-admin .orders-panel {
+    order: 10 !important;
+    margin: 0 !important;
+    padding: 12px !important;
+    background: var(--m4-surface) !important;
+  }
+
+  body.mw-r5-admin .orders-top {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  body.mw-r5-admin .orders-top h2 {
+    margin: 0 !important;
+    font-size: 18px !important;
+  }
+
+  body.mw-r5-admin .filters {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 7px !important;
+    width: 100% !important;
+  }
+
+  body.mw-r5-admin .filters :is(input, select) {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+  }
+
+  body.mw-r5-admin .order-head {
+    display: none !important;
+  }
+
+  body.mw-r5-admin .order-row {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin-top: 9px !important;
+    padding: 12px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: rgba(255, 255, 255, .018) !important;
+  }
+
+  body.mw-r5-admin .order-row > * {
+    min-width: 0 !important;
+  }
+
+  body.mw-r5-admin .order-row > :not(:first-child):not(:last-child) {
+    grid-column: 1 / -1 !important;
+  }
+
+  body.mw-r5-admin .order-row > :last-child {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+  }
+
+  body.mw-r5-admin .workspace {
+    display: grid !important;
+    width: 40px !important;
+    height: 40px !important;
+    place-items: center !important;
+    border: 1px solid var(--m4-gold-line) !important;
+    border-radius: 12px !important;
+    background: var(--m4-gold-soft) !important;
+    color: var(--m4-gold) !important;
+  }
+
+  body.mw-r5-admin .pagination {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    justify-content: center !important;
+    margin-top: 12px !important;
+  }
+
+  /* ---------- Admin secondary pages ---------- */
+  body.mw-r5-admin .center-grid,
+  body.mw-r5-admin .center-list,
+  body.mw-r5-admin .admin-order-list,
+  body.mw-r5-admin .pay-review-page,
+  body.mw-r5-admin .topup-page,
+  body.mw-r5-admin .history-ledger-page {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    gap: 10px !important;
+  }
+
+  body.mw-r5-admin .section-title-row,
+  body.mw-r5-admin .center-row,
+  body.mw-r5-admin .center-review,
+  body.mw-r5-admin .admin-order-card,
+  body.mw-r5-admin .history-ledger-stat {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  body.mw-r5-admin .section-title-row {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 9px !important;
+  }
+
+  body.mw-r5-admin .section-title-row h2 {
+    margin: 0 !important;
+    font-size: 19px !important;
+  }
+
+  body.mw-r5-admin .section-title-row p,
+  body.mw-r5-admin .muted-text {
+    color: var(--m4-muted) !important;
+  }
+
+  body.mw-r5-admin .center-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 7px !important;
+    width: 100% !important;
+  }
+
+  body.mw-r5-admin .center-actions > *,
+  body.mw-r5-admin .center-actions .button {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  body.mw-r5-admin .center-stats,
+  body.mw-r5-admin .history-ledger-stats {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  body.mw-r5-admin .center-stat,
+  body.mw-r5-admin .history-ledger-stat {
+    min-height: 82px !important;
+    padding: 11px !important;
+    background: var(--m4-surface) !important;
+  }
+
+  body.mw-r5-admin .center-row,
+  body.mw-r5-admin .center-review,
+  body.mw-r5-admin .admin-order-card {
+    padding: 12px !important;
+    background: var(--m4-surface) !important;
+  }
+
+  /* ---------- Employee secondary pages ---------- */
+  body.employee-workspace-site :where(.dispatch-shell, .report-shell, .my-payout-page, .it-wrap, .sbm),
+  body:has(.employee-app-topbar) :where(.dispatch-shell, .report-shell, .my-payout-page, .it-wrap, .sbm) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+
+  body.employee-workspace-site :where(.dispatch-board, .report-list, .summary-items, .it-grid, .sbm-grid),
+  body:has(.employee-app-topbar) :where(.dispatch-board, .report-list, .summary-items, .it-grid, .sbm-grid) {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  body.employee-workspace-site .dispatch-panel,
+  body:has(.employee-app-topbar) .dispatch-panel,
+  body.employee-workspace-site .report-card,
+  body:has(.employee-app-topbar) .report-card,
+  body.employee-workspace-site .it-card,
+  body:has(.employee-app-topbar) .it-card,
+  body.employee-workspace-site .sbm-panel,
+  body.employee-workspace-site .sbm-card,
+  body:has(.employee-app-topbar) .sbm-panel,
+  body:has(.employee-app-topbar) .sbm-card {
+    background: var(--m4-surface) !important;
+  }
+
+  body.employee-workspace-site .dispatch-empty,
+  body:has(.employee-app-topbar) .dispatch-empty,
+  body.employee-workspace-site .report-empty,
+  body:has(.employee-app-topbar) .report-empty,
+  body.employee-workspace-site .summary-empty,
+  body:has(.employee-app-topbar) .summary-empty,
+  body.employee-workspace-site .sbm-empty,
+  body:has(.employee-app-topbar) .sbm-empty {
+    min-height: 64px !important;
+    padding: 18px 13px !important;
+    border: 1px dashed var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    color: var(--m4-muted) !important;
+    text-align: center !important;
+  }
+
+  /* ---------- Customer site: one gutter/radius system across all pages ---------- */
+  body.customer-mobile-app-site .site-header,
+  body.customer-mobile-app-site .site-footer {
+    display: none !important;
+  }
+
+  body.customer-mobile-app-site .site-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-right: 0 !important;
+    margin-left: 0 !important;
+  }
+
+  body.customer-mobile-app-site :where(
+    .home-shell,
+    .home-page,
+    .order-page,
+    .order3-shell,
+    .member-page,
+    .member-center,
+    .member-orders,
+    .wallet-page,
+    .vip-page,
+    .staff-page,
+    .staff-list,
+    .service-rules-page,
+    .delta-page
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+
+  body.customer-mobile-app-site :where([class$="-grid"], [class$="-list"]) > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  body.customer-mobile-app-site :where(
+    .home-card,
+    .staff-card,
+    .member-card,
+    .member-order-card,
+    .wallet-card,
+    .vip-card,
+    .rule-card,
+    .service-card,
+    .delta-card
+  ) {
+    border-radius: var(--m4-radius-card) !important;
+  }
+
+  body.customer-mobile-app-site .mw-support-launcher {
+    right: max(14px, env(safe-area-inset-right)) !important;
+    bottom: calc(var(--m4-nav-h) + env(safe-area-inset-bottom) + 14px) !important;
+  }
+
+  body.employee-workspace-site .mw-support-launcher,
+  body:has(.employee-app-topbar) .mw-support-launcher {
+    right: max(14px, env(safe-area-inset-right)) !important;
+    bottom: calc(var(--m4-nav-h) + env(safe-area-inset-bottom) + 14px) !important;
+  }
+
+  /* ---------- Sheets ---------- */
+  .employee-app-more-panel,
+  .admin-app-more-panel {
+    right: max(10px, env(safe-area-inset-right)) !important;
+    bottom: calc(var(--m4-nav-h) + env(safe-area-inset-bottom) + 10px) !important;
+    left: max(10px, env(safe-area-inset-left)) !important;
+    max-width: none !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-xl) !important;
+    background: #18181c !important;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, .48) !important;
+  }
+
+  .mobile-app-sheet-close {
+    border-radius: 12px !important;
+  }
+
+  /* ---------- Interaction ---------- */
+  body.customer-mobile-app-site :where(a, button, input, select, textarea, summary):focus-visible,
+  body.employee-workspace-site :where(a, button, input, select, textarea, summary):focus-visible,
+  body:has(.employee-app-topbar) :where(a, button, input, select, textarea, summary):focus-visible,
+  body.mw-r5-admin :where(a, button, input, select, textarea, summary):focus-visible {
+    outline: 2px solid rgba(242, 207, 112, .82) !important;
+    outline-offset: 2px !important;
+  }
+
+  @media (hover: hover) {
+    .customer-app-nav-item:hover,
+    .employee-app-nav-item:hover,
+    .admin-app-nav-item:hover,
+    .mobile-app-context-switch a:hover {
+      color: var(--m4-text) !important;
+    }
+  }
+}
+
+@media (max-width: 390px) {
+  :root {
+    --m4-gutter: 11px;
+  }
+
+  .mobile-app-context-switch a {
+    gap: 6px !important;
+    padding-right: 7px !important;
+    padding-left: 7px !important;
+    font-size: 12px !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-action {
+    min-height: 74px !important;
+    padding: 10px !important;
+  }
+
+  body.mw-r5-admin .center-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 340px) {
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-grid,
+  body.mw-r5-admin .stats,
+  body.mw-r5-admin .admin-dashboard-stats,
+  body.mw-r5-admin .center-stats,
+  body.mw-r5-admin .history-ledger-stats {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.mw-r5-admin .stats .stat:last-child:nth-child(odd) {
+    grid-column: auto !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-app-topbar,
+  .employee-app-topbar,
+  .admin-app-topbar,
+  .mobile-app-context-switch,
+  .customer-app-bottom-nav,
+  .employee-app-bottom-nav,
+  .admin-app-bottom-nav {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
