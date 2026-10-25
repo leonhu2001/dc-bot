@@ -152,31 +152,31 @@
     }
 
     /* Refund table: 8 columns. */
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(1)::before{content:"建立時間"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(2)::before{content:"實退"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(3)::before{content:"本金扣除"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(4)::before{content:"已用贈額抵扣"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(5)::before{content:"撤銷未用贈額"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(6)::before{content:"狀態"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(7)::before{content:"VIP"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(8)::before{content:"備註 / 錯誤"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(1),
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(7),
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:first-of-type .wallet-table tbody td:nth-child(8){grid-column:1/-1}
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(1)::before{content:"建立時間"}
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(2)::before{content:"實退"}
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(3)::before{content:"本金扣除"}
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(4)::before{content:"已用贈額抵扣"}
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(5)::before{content:"撤銷未用贈額"}
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(6)::before{content:"狀態"}
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(7)::before{content:"VIP"}
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(8)::before{content:"備註 / 錯誤"}
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(1),
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(7),
+    body.mw-r5-admin .wallet-refund-panel .wallet-table tbody td:nth-child(8){grid-column:1/-1}
 
     /* Transaction table: 8 columns. */
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(1)::before{content:"時間"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(2)::before{content:"類型"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(3)::before{content:"異動"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(4)::before{content:"異動前"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(5)::before{content:"異動後"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(6)::before{content:"訂單"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(7)::before{content:"操作人"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(8)::before{content:"備註"}
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(1),
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(6),
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(7),
-    body.mw-r5-admin .wallet-detail-page .wallet-detail-panel:last-of-type .wallet-table tbody td:nth-child(8){grid-column:1/-1}
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(1)::before{content:"時間"}
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(2)::before{content:"類型"}
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(3)::before{content:"異動"}
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(4)::before{content:"異動前"}
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(5)::before{content:"異動後"}
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(6)::before{content:"訂單"}
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(7)::before{content:"操作人"}
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(8)::before{content:"備註"}
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(1),
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(6),
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(7),
+    body.mw-r5-admin .wallet-transactions-panel .wallet-table tbody td:nth-child(8){grid-column:1/-1}
 
     body.mw-r5-admin .wallet-empty{grid-column:1/-1!important;text-align:center!important}
 }
