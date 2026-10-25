@@ -75,7 +75,6 @@
 
   function restoreMobileSubmitLocks() {
     document.querySelectorAll('[data-mobile-submit-locked="1"]').forEach((control) => {
-      control.disabled = false;
       control.removeAttribute('aria-disabled');
       delete control.dataset.mobileSubmitLocked;
       if (control.dataset.mobileOriginalText !== undefined) {
@@ -107,7 +106,6 @@
         form.querySelectorAll('button[type="submit"],input[type="submit"]').forEach((control) => {
           if (control.disabled) return;
           control.dataset.mobileSubmitLocked = '1';
-          control.disabled = true;
           control.setAttribute('aria-disabled', 'true');
         });
         if (submitter && submitter.matches('button[type="submit"]')) {
