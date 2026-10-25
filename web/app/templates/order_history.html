@@ -357,6 +357,7 @@
                                                                   {% set manual_key = payout.kind ~ ":" ~ order.id ~ ":" ~ payout.person_id %}
                                                                   <div class="history-dossier-payout-row">
                                                                       <strong class="history-dossier-payout-type">{{ payout.label }}</strong>
+
                                                                       <div class="history-dossier-payout-person">
                                                                           <span>{{ payout.person_name or payout.person_id }}</span>
                                                                           <small>{{ payout.person_id }}</small>
