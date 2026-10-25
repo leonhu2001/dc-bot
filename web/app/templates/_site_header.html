@@ -1,10 +1,5 @@
 {% set current_path = request.url.path %}
 {% set _employee_workspace_header = employee_workspace_header if employee_workspace_header is defined else false %}
-{% if current_path.startswith('/employee') or current_path.startswith('/dispatch') %}
-<link rel="stylesheet" href="/static/css/pages/employee_workspace_viewport.css?v=20261020-1">
-{% else %}
-<link rel="stylesheet" href="/static/css/pages/mobile_app_polish.css?v=20261026-1">
-{% endif %}
 <header class="site-header mw-shared-site-header">
   <div class="site-nav-shell">
     <a class="site-brand" href="/" aria-label="魔丸娛樂首頁">
@@ -49,10 +44,10 @@
           <a href="/me">我的專區</a>
           {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
           <div class="account-divider"></div>
-          <a href="/employee" class="account-special">員工中心</a>
+          <a href="/employee" class="account-special">員工後台</a>
           {% endif %}
           {% if user.is_customer_service %}
-          <a href="/service" class="account-special">客服後台</a>
+          <a href="/admin" class="account-special">客服後台</a>
           {% endif %}
           <div class="account-divider"></div>
           <a href="/auth/logout" class="account-logout">登出</a>
@@ -82,8 +77,8 @@
     <a href="/#about">關於我們</a>
     {% if user %}
     <a href="/me">我的專區</a>
-    {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}<a href="/employee">員工中心</a>{% endif %}
-    {% if user.is_customer_service %}<a href="/service">客服後台</a>{% endif %}
+    {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}<a href="/employee">員工後台</a>{% endif %}
+    {% if user.is_customer_service %}<a href="/admin">客服後台</a>{% endif %}
     {% endif %}
   </nav>
 </header>
