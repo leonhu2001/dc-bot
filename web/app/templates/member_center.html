@@ -29,10 +29,7 @@
 
         <aside class="mc-status-card">
             <div class="mc-status-head">
-                <div>
-                    <small>MEMBERSHIP</small>
-                    <strong>{{ member.vip_name }}</strong>
-                </div>
+                <div><small>MEMBERSHIP</small><strong>{{ member.vip_name }}</strong></div>
                 <span>{{ member.total_spent_text }}</span>
             </div>
             <div class="mc-progress"><i data-csp-width-percent="{{ member.vip_progress.percent }}"></i></div>
@@ -70,8 +67,8 @@
     <div class="mc-staff-strip">
         <span>你同時擁有店內身分</span>
         <div>
-            <a href="/employee">員工中心 →</a>
-            {% if user.is_customer_service %}<a href="/service">客服後台 →</a>{% endif %}
+            <a href="/employee">員工後台 →</a>
+            {% if user.is_customer_service %}<a href="/admin">客服後台 →</a>{% endif %}
         </div>
     </div>
     {% endif %}
@@ -86,10 +83,7 @@
                 <div><small>ORDERS</small><h3>訂單狀態</h3></div>
                 <a href="/me/orders">查看全部 →</a>
             </div>
-            <div class="mc-order-count">
-                <strong>{{ portal.open_count }}</strong>
-                <span>目前進行中</span>
-            </div>
+            <div class="mc-order-count"><strong>{{ portal.open_count }}</strong><span>目前進行中</span></div>
             {% if member.recent_orders %}
                 <div class="mc-order-list">
                 {% for order in member.recent_orders[:3] %}
@@ -112,16 +106,10 @@
             {% if benefits.promotions or benefits.coupons %}
                 <div class="mc-coupon-stack">
                 {% for coupon in benefits.promotions[:4] %}
-                    <div class="mc-coupon">
-                        <div><small>ISSUED BENEFIT</small><b>{{ coupon.title }}</b></div>
-                        <span>{{ coupon.effect_text }} · 剩 {{ coupon.remaining_uses }} 次 · 有效至 {{ coupon.expires_at_text }}</span>
-                    </div>
+                    <div class="mc-coupon"><div><small>ISSUED BENEFIT</small><b>{{ coupon.title }}</b></div><span>{{ coupon.effect_text }} · 剩 {{ coupon.remaining_uses }} 次 · 有效至 {{ coupon.expires_at_text }}</span></div>
                 {% endfor %}
                 {% for coupon in benefits.coupons[:4] %}
-                    <div class="mc-coupon">
-                        <div><small>AVAILABLE</small><b>{{ coupon.title }}</b></div>
-                        <span>有效至 {{ coupon.expires_at_text or '—' }}</span>
-                    </div>
+                    <div class="mc-coupon"><div><small>AVAILABLE</small><b>{{ coupon.title }}</b></div><span>有效至 {{ coupon.expires_at_text or '—' }}</span></div>
                 {% endfor %}
                 </div>
             {% elif benefits.progress %}
@@ -133,11 +121,7 @@
             {% if benefits.progress %}
                 <div class="mc-progress-list">
                 {% for item in benefits.progress[:4] %}
-                    <div>
-                        <span>{{ item.title }}</span>
-                        <b>{{ item.progress_text }} {{ '局' if item.pricing_type == 'game' else '小時' }}</b>
-                        <small>達標送 {{ '+1 局' if item.pricing_type == 'game' else '+30 分鐘' }}</small>
-                    </div>
+                    <div><span>{{ item.title }}</span><b>{{ item.progress_text }} {{ '局' if item.pricing_type == 'game' else '小時' }}</b><small>達標送 {{ '+1 局' if item.pricing_type == 'game' else '+30 分鐘' }}</small></div>
                 {% endfor %}
                 </div>
             {% endif %}
@@ -153,11 +137,7 @@
             {% if member.favorite_profiles %}
                 <div class="mc-favorite-grid">
                 {% for staff in member.favorite_profiles[:6] %}
-                    <a href="/staff/{{ staff.staff_id }}">
-                        <img src="{{ staff.avatar_url }}" alt="">
-                        <div><b>{{ staff.display_name }}</b><span>{{ staff.role_title }}</span></div>
-                        <i>→</i>
-                    </a>
+                    <a href="/staff/{{ staff.staff_id }}"><img src="{{ staff.avatar_url }}" alt=""><div><b>{{ staff.display_name }}</b><span>{{ staff.role_title }}</span></div><i>→</i></a>
                 {% endfor %}
                 </div>
             {% else %}
