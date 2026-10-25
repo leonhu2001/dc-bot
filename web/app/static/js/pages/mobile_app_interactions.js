@@ -73,6 +73,51 @@
     });
   }
 
+  function restoreMobileSubmitLocks() {
+    document.querySelectorAll('[data-mobile-submit-locked="1"]').forEach((control) => {
+      control.disabled = false;
+      control.removeAttribute('aria-disabled');
+      delete control.dataset.mobileSubmitLocked;
+      if (control.dataset.mobileOriginalText !== undefined) {
+        control.textContent = control.dataset.mobileOriginalText;
+        delete control.dataset.mobileOriginalText;
+      }
+    });
+    document.querySelectorAll('form[data-mobile-submitting="1"]').forEach((form) => {
+      delete form.dataset.mobileSubmitting;
+      form.removeAttribute('aria-busy');
+    });
+  }
+
+  function bindMobileSubmitGuard() {
+    document.addEventListener('submit', (event) => {
+      if (!mobileMedia.matches) return;
+      const form = event.target instanceof HTMLFormElement ? event.target : null;
+      if (!form || form.dataset.mobileSubmitGuard === 'off') return;
+      if (form.dataset.mobileSubmitting === '1') {
+        event.preventDefault();
+        return;
+      }
+
+      const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+      queueMicrotask(() => {
+        if (event.defaultPrevented || !form.isConnected) return;
+        form.dataset.mobileSubmitting = '1';
+        form.setAttribute('aria-busy', 'true');
+        form.querySelectorAll('button[type="submit"],input[type="submit"]').forEach((control) => {
+          if (control.disabled) return;
+          control.dataset.mobileSubmitLocked = '1';
+          control.disabled = true;
+          control.setAttribute('aria-disabled', 'true');
+        });
+        if (submitter && submitter.matches('button[type="submit"]')) {
+          submitter.dataset.mobileOriginalText = submitter.textContent || '';
+          submitter.textContent = '處理中…';
+        }
+      });
+    }, true);
+  }
+
   function bindEscapeAndPageRestore() {
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;
@@ -81,7 +126,11 @@
       event.preventDefault(); closeSheet(openSheet);
       openSheet.querySelector(':scope > summary')?.focus({ preventScroll: true });
     });
-    window.addEventListener('pageshow', () => { closeAllSheets(); consumeExplicitNavTarget(); });
+    window.addEventListener('pageshow', () => {
+      closeAllSheets();
+      restoreMobileSubmitLocks();
+      consumeExplicitNavTarget();
+    });
   }
 
   function bindAdminOrderCards() {
@@ -141,7 +190,7 @@
   }
 
   function init() {
-    bindSheets(); bindExplicitMobileNavigation(); consumeExplicitNavTarget();
+    bindSheets(); bindExplicitMobileNavigation(); consumeExplicitNavTarget(); bindMobileSubmitGuard();
     bindEscapeAndPageRestore(); bindAdminOrderCards(); bindResponsiveEnhancements(); bindPressedStateCleanup();
   }
 
