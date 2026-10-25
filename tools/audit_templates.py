@@ -30,7 +30,7 @@ ALLOWED_LEGACY_PATCH_ASSETS: set[str] = set()
 # Legacy extracted-asset names are still present, so keep their current counts as
 # shrink-only ceilings. Lower these values whenever files are renamed; never raise
 # them to make CI green. Exact duplicate page assets have no legacy allowance.
-MAX_INLINE_NAMED_PAGE_ASSETS = 14
+MAX_INLINE_NAMED_PAGE_ASSETS = 13
 MAX_DATED_PAGE_ASSETS = 0
 
 STATIC_REF_RE = re.compile(
