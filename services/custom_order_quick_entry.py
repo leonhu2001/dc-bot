@@ -448,10 +448,9 @@ async def _create_custom_order_request_ticket(
         )
         return None
 
-    try:
-        await interaction.delete_original_response()
-    except (discord.NotFound, discord.HTTPException):
-        pass
+    await interaction.edit_original_response(
+        content=f"自訂單需求已送出：{ticket.mention}\n請到私人客服中心確認自助下單規格並等待客服報價。"
+    )
     return ticket
 
 
