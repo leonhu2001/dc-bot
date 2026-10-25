@@ -1,0 +1,181 @@
+/* Task-first mobile UX pass for employee and customer-service workspaces.
+   Desktop remains unchanged. This layer removes oversized dead space, promotes
+   the next useful action, and keeps secondary reference content subordinate. */
+@media (max-width:767px){
+  :root{
+    --mw-m2-gap:10px;
+    --mw-m2-radius:16px;
+    --mw-m2-line:rgba(255,255,255,.11);
+    --mw-m2-surface:rgba(22,22,26,.94);
+    --mw-m2-surface-2:rgba(255,255,255,.035);
+    --mw-m2-muted:rgba(236,235,244,.62);
+    --mw-m2-text:#f7f3e8;
+    --mw-m2-gold:#f2cf70;
+  }
+
+  /* Shared: dense, task-oriented rhythm. */
+  body:has(.employee-app-topbar) .panel,
+  body.mw-r5-admin .panel,
+  body.mw-r5-admin .compact-panel,
+  body:has(.employee-app-topbar) .ec-card,
+  body:has(.employee-app-topbar) .ec-salary,
+  body:has(.employee-app-topbar) .binding-card{
+    min-height:0!important;
+    margin-block:0!important;
+    border-radius:var(--mw-m2-radius)!important;
+  }
+
+  body:has(.employee-app-topbar) .empty-state,
+  body:has(.employee-app-topbar) .empty,
+  body.mw-r5-admin .empty-state,
+  body.mw-r5-admin .empty,
+  .report-empty{
+    min-height:0!important;
+    padding:18px 16px!important;
+    border-radius:15px!important;
+  }
+
+  .mobile-task-hub{
+    display:grid;
+    gap:10px;
+    margin:0 0 12px;
+    padding:14px;
+    border:1px solid rgba(242,207,112,.22);
+    border-radius:18px;
+    background:linear-gradient(145deg,rgba(242,207,112,.09),rgba(255,255,255,.025));
+  }
+  .mobile-task-hub-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+  .mobile-task-hub-copy{min-width:0}
+  .mobile-task-hub-kicker{display:block;margin:0 0 3px;color:var(--mw-m2-gold);font-size:10px;font-weight:900;letter-spacing:.15em}
+  .mobile-task-hub h2{margin:0;color:var(--mw-m2-text);font-size:20px;line-height:1.15}
+  .mobile-task-hub p{margin:5px 0 0;color:var(--mw-m2-muted);font-size:12px;line-height:1.45}
+  .mobile-task-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .mobile-task-action{
+    display:flex;min-width:0;min-height:58px;align-items:center;gap:10px;padding:11px 12px;
+    border:1px solid var(--mw-m2-line);border-radius:14px;background:var(--mw-m2-surface-2);
+    color:var(--mw-m2-text);text-decoration:none;-webkit-tap-highlight-color:transparent;
+  }
+  .mobile-task-action:active{transform:scale(.985);background:rgba(242,207,112,.09)}
+  .mobile-task-action.is-primary{border-color:rgba(242,207,112,.40);background:rgba(242,207,112,.12)}
+  .mobile-task-icon{display:grid;flex:0 0 30px;width:30px;height:30px;place-items:center;border-radius:10px;background:rgba(242,207,112,.10);color:var(--mw-m2-gold);font-size:17px}
+  .mobile-task-copy{display:flex;min-width:0;flex-direction:column;gap:2px}
+  .mobile-task-copy strong{overflow:hidden;font-size:13px;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}
+  .mobile-task-copy small{overflow:hidden;color:var(--mw-m2-muted);font-size:10px;line-height:1.25;text-overflow:ellipsis;white-space:nowrap}
+
+  /* Employee home: actions first, metrics second, reference content compact. */
+  body:has(.employee-app-topbar) .ec{display:flex;flex-direction:column;gap:12px}
+  body:has(.employee-app-topbar) .employee-mobile-task-hub{order:-30}
+  body:has(.employee-app-topbar) .ec-overview{order:-20;margin:0!important}
+  body:has(.employee-app-topbar) .binding-card{order:-10;padding:14px!important;display:grid!important;gap:10px!important}
+  body:has(.employee-app-topbar) .ec-salary{order:0;padding:14px!important}
+  body:has(.employee-app-topbar) .ec-grid{order:10;margin:0!important;gap:10px!important}
+  body:has(.employee-app-topbar) .ec-stat{min-height:84px!important;padding:12px 14px!important}
+  body:has(.employee-app-topbar) .ec-stat span{font-size:12px!important}
+  body:has(.employee-app-topbar) .ec-stat b{font-size:27px!important}
+  body:has(.employee-app-topbar) .binding-copy{min-width:0}
+  body:has(.employee-app-topbar) .binding-copy .ec-k{font-size:9px!important}
+  body:has(.employee-app-topbar) .binding-title-row{align-items:center!important;gap:8px!important}
+  body:has(.employee-app-topbar) .binding-title-row h2{font-size:20px!important}
+  body:has(.employee-app-topbar) #bindingDescription{margin:5px 0 0!important;font-size:12px!important;line-height:1.45!important}
+  body:has(.employee-app-topbar) .binding-breakdown{display:none!important}
+  body:has(.employee-app-topbar) .binding-side{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px!important}
+  body:has(.employee-app-topbar) .binding-meta{min-height:0!important;padding:10px 12px!important}
+  body:has(.employee-app-topbar) .binding-meta span,
+  body:has(.employee-app-topbar) .binding-meta small{font-size:10px!important}
+  body:has(.employee-app-topbar) .binding-meta b{font-size:14px!important}
+  body:has(.employee-app-topbar) .binding-action{width:auto!important;min-width:104px;min-height:44px!important;padding-inline:13px!important}
+  body:has(.employee-app-topbar) .ec-salary-head{align-items:center!important;gap:8px!important}
+  body:has(.employee-app-topbar) .ec-salary-title .ec-k{font-size:9px!important}
+  body:has(.employee-app-topbar) .ec-salary-title h2{font-size:20px!important}
+  body:has(.employee-app-topbar) .ec-salary-title p,
+  body:has(.employee-app-topbar) .ec-note,
+  body:has(.employee-app-topbar) .salary-tabs,
+  body:has(.employee-app-topbar) .salary-list{display:none!important}
+  body:has(.employee-app-topbar) .salary-summary{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important;margin-top:10px!important}
+  body:has(.employee-app-topbar) .salary-card{min-height:82px!important;padding:10px!important}
+  body:has(.employee-app-topbar) .salary-label{font-size:10px!important}
+  body:has(.employee-app-topbar) .salary-value{font-size:20px!important}
+  body:has(.employee-app-topbar) .salary-sub{display:none!important}
+  body:has(.employee-app-topbar) .employee-home-salary-link{display:flex!important;margin-top:10px}
+  body:has(.employee-app-topbar) .ec-grid{grid-template-columns:1fr!important}
+  body:has(.employee-app-topbar) .ec-grid aside{display:none!important}
+  body:has(.employee-app-topbar) .ec-card{padding:13px!important}
+  body:has(.employee-app-topbar) .ec-row{padding:10px 0!important;grid-template-columns:1fr auto!important;gap:3px 10px!important}
+  body:has(.employee-app-topbar) .ec-row > :nth-child(2),
+  body:has(.employee-app-topbar) .ec-row > :nth-child(4){grid-column:1/-1}
+
+  /* Admin bottom nav now maps to distinct jobs: workbench, customers, support, finance, more. */
+  .admin-app-bottom-nav{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+
+  /* Admin workbench: task queues before vanity stats; full order table is desktop/history only. */
+  body.mw-r5-admin .mw-r5-page-header{display:none!important}
+  body.mw-r5-admin .mw-r5-legacy-body .main{display:flex!important;flex-direction:column!important;gap:12px!important}
+  body.mw-r5-admin .admin-mobile-task-hub{order:-40}
+  body.mw-r5-admin .queues{order:-30;display:grid!important;grid-template-columns:1fr!important;gap:10px!important}
+  body.mw-r5-admin .stats{order:-20;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:7px!important}
+  body.mw-r5-admin .stats .stat{min-height:78px!important;padding:10px!important;border-radius:14px!important}
+  body.mw-r5-admin .stats .stat span{font-size:10px!important}
+  body.mw-r5-admin .stats .stat strong{font-size:24px!important}
+  body.mw-r5-admin .stats .stat:last-child{display:none!important}
+  body.mw-r5-admin .queues .panel{padding:0!important;overflow:hidden}
+  body.mw-r5-admin .panel-head{min-height:48px;padding:11px 13px!important}
+  body.mw-r5-admin .queue-row{min-height:58px;padding:10px 12px!important}
+  body.mw-r5-admin .queue-row .queue-no{font-size:10px!important}
+  body.mw-r5-admin .queue-main strong{font-size:13px!important}
+  body.mw-r5-admin .queue-main small{font-size:10px!important}
+  body.mw-r5-admin .orders-panel{display:none!important}
+
+  /* Customer/support/finance center: first screen = actions + useful summary, not oversized prose. */
+  body.mw-r5-admin .center-grid{display:grid!important;gap:10px!important}
+  body.mw-r5-admin .center-grid > .panel{padding:13px!important}
+  body.mw-r5-admin .section-title-row{display:grid!important;gap:10px!important}
+  body.mw-r5-admin .section-title-row h2{margin:0!important;font-size:20px!important}
+  body.mw-r5-admin .section-title-row .muted-text{margin:5px 0 0!important;font-size:12px!important;line-height:1.45!important}
+  body.mw-r5-admin .center-actions{display:grid!important;grid-template-columns:1fr 1fr;gap:7px!important;width:100%}
+  body.mw-r5-admin .center-actions .button,
+  body.mw-r5-admin .center-actions button{width:100%!important;min-height:46px!important;justify-content:center!important;padding:9px 10px!important;font-size:12px!important}
+  body.mw-r5-admin .center-stats{grid-template-columns:1fr 1fr!important;gap:7px!important;margin-top:10px!important}
+  body.mw-r5-admin .center-stat{min-height:82px!important;padding:11px 13px!important;border-radius:14px!important}
+  body.mw-r5-admin .center-stat span{font-size:11px!important}
+  body.mw-r5-admin .center-stat strong{font-size:27px!important}
+  body.mw-r5-admin .center-filter-form{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;padding:0!important;background:none!important}
+  body.mw-r5-admin .center-filter-form .input,
+  body.mw-r5-admin .center-filter-form .button{width:100%!important;min-height:46px!important}
+  body.mw-r5-admin .center-list{gap:8px!important}
+  body.mw-r5-admin .center-row,
+  body.mw-r5-admin .center-review{padding:12px!important;border-radius:14px!important}
+  body.mw-r5-admin .center-row .center-cell{padding:7px 0!important}
+  body.mw-r5-admin .center-row > .center-actions{grid-template-columns:1fr 1fr!important;margin-top:5px}
+  body.mw-r5-admin .center-review p{margin-bottom:0!important}
+
+  /* Order-report flow: compact top controls, no giant empty card. */
+  .report-shell{display:grid!important;gap:10px!important;padding:0!important}
+  .report-hero{display:grid!important;gap:10px!important;padding:13px!important;border-radius:16px!important}
+  .report-hero h2{margin:0!important;font-size:22px!important}
+  .report-hero p:not(.report-kicker){display:none!important}
+  .report-filter-bar{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;margin:0!important;padding:12px!important;border-radius:15px!important;background:var(--mw-m2-surface)!important}
+  .report-filter-bar input,.report-filter-bar select,.report-filter-bar button{width:100%!important;min-height:46px!important}
+  .report-list{gap:9px!important}
+  .report-card{padding:12px!important;border-radius:15px!important}
+  .report-card-title-row{gap:8px!important}
+  .report-card-title-row h3{font-size:16px!important}
+  .report-meta-grid{grid-template-columns:1fr 1fr!important;gap:6px!important}
+  .report-meta-grid > div{padding:8px!important;border-radius:12px!important}
+  .report-card-action .report-button{width:100%!important;min-height:46px!important}
+  .report-empty{display:grid!important;gap:5px!important;margin:0!important;text-align:left!important}
+  .report-empty strong{font-size:16px!important}
+  .report-empty p{margin:0!important;font-size:11px!important}
+
+  /* Bottom content should end close to the nav instead of looking like a dead viewport. */
+  body:has(.employee-app-topbar) .site-main,
+  body.mw-r5-admin .mw-r5-main-host{min-height:0!important}
+  body:has(.employee-app-topbar) main,
+  body.mw-r5-admin main{min-height:0!important}
+}
+
+@media (max-width:390px){
+  .mobile-task-grid{grid-template-columns:1fr}
+  body:has(.employee-app-topbar) .salary-summary{grid-template-columns:1fr 1fr!important}
+  body:has(.employee-app-topbar) .salary-card:last-child{grid-column:1/-1}
+  body.mw-r5-admin .stats{grid-template-columns:1fr 1fr!important}
+}
