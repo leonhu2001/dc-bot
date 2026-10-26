@@ -54,7 +54,8 @@ def test_only_entertainment_products_have_loyalty_progress():
         assert rule.loyalty_benefits_enabled is True
         policy = loyalty.loyalty_policy_for_rule(rule_key)
         assert policy is not None
-        assert policy["threshold_units"] == 10.0
+        expected_threshold = 15.0 if policy["pricing_type"] == "game" else 10.0
+        assert policy["threshold_units"] == expected_threshold
         assert policy["benefit_units"] == 1.0
 
     for rule_key in INELIGIBLE_RULES:
@@ -62,13 +63,14 @@ def test_only_entertainment_products_have_loyalty_progress():
         assert loyalty.loyalty_policy_for_rule(rule_key) is None
 
 
-def test_ranked_entertainment_keeps_ten_percent_reward_rate():
+def test_ranked_game_entertainment_uses_fifteen_game_reward_threshold():
     assert loyalty.loyalty_policy_for_rule("valorant_entertain_ranked") == {
         "pricing_type": "game",
-        "threshold_units": 10.0,
+        "threshold_units": 15.0,
         "benefit_kind": "extra_games",
         "benefit_units": 1.0,
         "unit_label": "局",
         "benefit_label": "+1 局",
     }
     assert loyalty.loyalty_policy_for_rule("apex_entertain_ranked")["pricing_type"] == "hourly"
+    assert loyalty.loyalty_policy_for_rule("apex_entertain_ranked")["threshold_units"] == 10.0
