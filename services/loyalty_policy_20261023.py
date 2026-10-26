@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 
 _MIGRATION_KEY = "20261026_game_threshold_15_v5"
+_FULL_RECONCILE_MIGRATION_KEY = "20261026_entertainment_loyalty_full_reconcile_v6"
 _GAME_THRESHOLD = 15.0
 _OPEN_LOYALTY_STATUSES = {"active", "paid", "stored"}
 
@@ -99,6 +100,91 @@ def _sync_existing_game_progress(loyalty, bind) -> None:
         })
 
 
+def _sync_all_entertainment_progress(loyalty, bind) -> None:
+    """One-time full rebuild for undercounted entertainment loyalty progress.
+
+    Earlier companion-unit repairs were themselves one-time migrations, so a server
+    that had already recorded those migration keys could keep stale single-person
+    units for historical double/triple/quad orders. This pass intentionally uses a
+    new migration key and rebuilds every currently eligible customer's closed-order
+    pools with the current per-companion calculation. Missing coupons are issued by
+    the normal reconciliation routine; redeemed/reserved rewards remain protected.
+    """
+    with bind.begin() as conn:
+        applied = conn.execute(text("""
+            SELECT migration_key
+            FROM loyalty_migrations
+            WHERE migration_key = :migration_key
+            LIMIT 1
+        """), {"migration_key": _FULL_RECONCILE_MIGRATION_KEY}).first()
+        if applied is not None:
+            return
+
+        affected_customers: set[str] = set()
+
+        has_orders = conn.execute(text("""
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'web_orders'
+            LIMIT 1
+        """)).first()
+        if has_orders is not None:
+            rows = conn.execute(text("""
+                SELECT DISTINCT customer_discord_id, order_rule_key
+                FROM web_orders
+                WHERE status = 'closed'
+                  AND customer_discord_id IS NOT NULL
+                ORDER BY customer_discord_id
+            """)).fetchall()
+            for row in rows:
+                customer_id = str(row[0] or "").strip()
+                rule_key = str(row[1] or "").strip()
+                if customer_id and loyalty.loyalty_policy_for_rule(rule_key) is not None:
+                    affected_customers.add(customer_id)
+
+        for row in conn.execute(text("""
+            SELECT customer_discord_id, rule_key
+            FROM customer_loyalty_progress
+        """)).fetchall():
+            customer_id = str(row[0] or "").strip()
+            rule_key = str(row[1] or "").strip()
+            if customer_id and loyalty.loyalty_policy_for_rule(rule_key) is not None:
+                affected_customers.add(customer_id)
+
+        for row in conn.execute(text("""
+            SELECT DISTINCT customer_discord_id, rule_key
+            FROM customer_benefit_coupons
+            WHERE source = 'loyalty'
+        """)).fetchall():
+            customer_id = str(row[0] or "").strip()
+            rule_key = str(row[1] or "").strip()
+            if customer_id and loyalty.loyalty_policy_for_rule(rule_key) is not None:
+                affected_customers.add(customer_id)
+
+        reconciled = 0
+        revoked = 0
+        issued = 0
+        scopes = 0
+        for customer_id in sorted(affected_customers):
+            summary = loyalty.reconcile_customer_loyalty_in_connection(conn, customer_id)
+            reconciled += 1
+            revoked += int(summary.get("revoked") or 0)
+            issued += int(summary.get("issued") or 0)
+            scopes += int(summary.get("scopes") or 0)
+
+        conn.execute(text("""
+            INSERT INTO loyalty_migrations (migration_key, applied_at, note)
+            VALUES (:migration_key, :applied_at, :note)
+        """), {
+            "migration_key": _FULL_RECONCILE_MIGRATION_KEY,
+            "applied_at": loyalty.get_taipei_now_iso(),
+            "note": (
+                f"reconciled_customers={reconciled};"
+                f"scopes={scopes};revoked={revoked};issued={issued}"
+            ),
+        })
+
+
 def _open_paid_units_for_scope(loyalty, conn, *, customer_id: str, scope_key: str) -> float:
     """Return service units from paid/active orders that are not closed yet.
 
@@ -175,6 +261,7 @@ def install_loyalty_policy_20261023() -> None:
     def ensure_loyalty_tables_with_owner_policy(bind=loyalty.engine) -> None:
         original_ensure(bind)
         _sync_existing_game_progress(loyalty, bind)
+        _sync_all_entertainment_progress(loyalty, bind)
 
     def preview_same_order_benefit_immediate_one_per_order(
         customer_id,
