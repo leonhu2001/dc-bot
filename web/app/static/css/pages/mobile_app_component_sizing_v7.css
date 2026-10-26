@@ -25,22 +25,14 @@
   }
 
   /* ===== Shared touch geometry ===== */
-  body.customer-mobile-app-site :where(
+  body.customer-mobile-app-site :is(
     button,
     .button,
     a.button,
     input[type="button"],
     input[type="submit"]
   ):not(.mobile-app-sheet-backdrop),
-  body.employee-workspace-site :where(
-    button,
-    .button,
-    a.button,
-    .ec-btn,
-    input[type="button"],
-    input[type="submit"]
-  ):not(.mobile-app-sheet-backdrop),
-  body:has(.employee-app-topbar) :where(
+  body.employee-workspace-site :is(
     button,
     .button,
     a.button,
@@ -48,7 +40,15 @@
     input[type="button"],
     input[type="submit"]
   ):not(.mobile-app-sheet-backdrop),
-  body.mw-r5-admin :where(
+  body:has(.employee-app-topbar) :is(
+    button,
+    .button,
+    a.button,
+    .ec-btn,
+    input[type="button"],
+    input[type="submit"]
+  ):not(.mobile-app-sheet-backdrop),
+  body.mw-r5-admin :is(
     button,
     .button,
     a.button,
@@ -63,10 +63,10 @@
     line-height: 1.15 !important;
   }
 
-  body.customer-mobile-app-site :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
-  body.employee-workspace-site :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
-  body:has(.employee-app-topbar) :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
-  body.mw-r5-admin :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  body.customer-mobile-app-site :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+  body.employee-workspace-site :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+  body:has(.employee-app-topbar) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+  body.mw-r5-admin :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
     min-height: var(--v7-control-h) !important;
     border-radius: var(--v7-radius-control) !important;
   }
@@ -81,16 +81,14 @@
   }
 
   /* Icon-only controls keep a compact visual box without becoming tiny taps. */
-  :where(
-    .customer-app-mark,
-    .customer-app-account,
-    .employee-app-mark,
-    .employee-app-profile,
-    .admin-app-home,
-    .admin-app-search,
-    .mobile-app-sheet-close,
-    .order3-dialog-close
-  ) {
+  .customer-app-mark,
+  .customer-app-account,
+  .employee-app-mark,
+  .employee-app-profile,
+  .admin-app-home,
+  .admin-app-search,
+  .mobile-app-sheet-close,
+  .order3-dialog-close {
     width: var(--v7-icon-control) !important;
     height: var(--v7-icon-control) !important;
     min-width: var(--v7-icon-control) !important;
@@ -311,7 +309,7 @@
   }
 
   /* Dialog actions/steppers were a common source of odd tiny controls. */
-  body.customer-mobile-app-site .order3-dialog :where(
+  body.customer-mobile-app-site .order3-dialog :is(
     button:not(.order3-dialog-close),
     select,
     input:not([type="checkbox"]):not([type="radio"])
@@ -320,7 +318,7 @@
     border-radius: var(--v7-radius-control) !important;
   }
 
-  body.customer-mobile-app-site :where(
+  body.customer-mobile-app-site :is(
     #mw-quantity-minus,
     #mw-quantity-plus,
     #mw-player-minus,
@@ -464,7 +462,7 @@
     border-radius: 14px !important;
   }
 
-  body.employee-workspace-site :where(
+  body.employee-workspace-site :is(
     .binding-card,
     .ec-card,
     .dispatch-panel,
@@ -476,7 +474,7 @@
     .sbm-panel,
     .sbm-card
   ),
-  body:has(.employee-app-topbar) :where(
+  body:has(.employee-app-topbar) :is(
     .binding-card,
     .ec-card,
     .dispatch-panel,
@@ -493,8 +491,8 @@
     border-radius: var(--v7-radius-card) !important;
   }
 
-  body.employee-workspace-site :where(.ec-card, .dispatch-order-card, .dispatch-my-card, .report-card, .my-payout-card, .it-card, .sbm-card),
-  body:has(.employee-app-topbar) :where(.ec-card, .dispatch-order-card, .dispatch-my-card, .report-card, .my-payout-card, .it-card, .sbm-card) {
+  body.employee-workspace-site :is(.ec-card, .dispatch-order-card, .dispatch-my-card, .report-card, .my-payout-card, .it-card, .sbm-card),
+  body:has(.employee-app-topbar) :is(.ec-card, .dispatch-order-card, .dispatch-my-card, .report-card, .my-payout-card, .it-card, .sbm-card) {
     padding: var(--v7-card-pad) !important;
   }
 
@@ -507,8 +505,8 @@
     padding: var(--v7-card-pad) !important;
   }
 
-  body.employee-workspace-site :where(.binding-action, .dispatch-footer .button, .dispatch-support-form button, .salary-tab, .dispatch-my-link, .dispatch-support-link),
-  body:has(.employee-app-topbar) :where(.binding-action, .dispatch-footer .button, .dispatch-support-form button, .salary-tab, .dispatch-my-link, .dispatch-support-link) {
+  body.employee-workspace-site :is(.binding-action, .dispatch-footer .button, .dispatch-support-form button, .salary-tab, .dispatch-my-link, .dispatch-support-link),
+  body:has(.employee-app-topbar) :is(.binding-action, .dispatch-footer .button, .dispatch-support-form button, .salary-tab, .dispatch-my-link, .dispatch-support-link) {
     min-height: var(--v7-control-h) !important;
     padding: 0 11px !important;
     border-radius: var(--v7-radius-control) !important;
@@ -609,7 +607,7 @@
     gap: 8px !important;
   }
 
-  body.mw-r5-admin :where(.stats .stat, .center-stat, .history-ledger-stat) {
+  body.mw-r5-admin :is(.stats .stat, .center-stat, .history-ledger-stat) {
     min-height: var(--v7-stat-h) !important;
     height: auto !important;
     padding: 10px !important;
@@ -620,7 +618,7 @@
     min-height: var(--v7-stat-h) !important;
   }
 
-  body.mw-r5-admin :where(
+  body.mw-r5-admin :is(
     .panel,
     .compact-panel,
     .orders-panel,
@@ -640,7 +638,7 @@
     border-radius: var(--v7-radius-card) !important;
   }
 
-  body.mw-r5-admin :where(.orders-panel, .center-row, .center-review, .admin-order-card, .topup-card, .wallet-card, .vip-timer-card) {
+  body.mw-r5-admin :is(.orders-panel, .center-row, .center-review, .admin-order-card, .topup-card, .wallet-card, .vip-timer-card) {
     padding: var(--v7-card-pad) !important;
   }
 
@@ -667,19 +665,19 @@
     border-radius: 11px !important;
   }
 
-  body.mw-r5-admin :where(.filters, .center-actions, .pagination) {
+  body.mw-r5-admin :is(.filters, .center-actions, .pagination) {
     gap: 8px !important;
   }
 
-  body.mw-r5-admin :where(.filters, .center-actions, .pagination) :where(button, .button, a.button, a:not(.workspace)) {
+  body.mw-r5-admin :is(.filters, .center-actions, .pagination) :is(button, .button, a.button, a:not(.workspace)) {
     min-height: var(--v7-control-h) !important;
     border-radius: var(--v7-radius-control) !important;
   }
 
   /* Prevent old page CSS from stretching action rows to arbitrary heights. */
-  body.mw-r5-admin :where(.section-title-row, .orders-top, .panel-head, .center-actions),
-  body.employee-workspace-site :where(.ec-card-head, .dispatch-column-head, .dispatch-subsection-head),
-  body:has(.employee-app-topbar) :where(.ec-card-head, .dispatch-column-head, .dispatch-subsection-head) {
+  body.mw-r5-admin :is(.section-title-row, .orders-top, .panel-head, .center-actions),
+  body.employee-workspace-site :is(.ec-card-head, .dispatch-column-head, .dispatch-subsection-head),
+  body:has(.employee-app-topbar) :is(.ec-card-head, .dispatch-column-head, .dispatch-subsection-head) {
     min-height: 0 !important;
     height: auto !important;
   }
