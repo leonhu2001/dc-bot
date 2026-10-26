@@ -99,7 +99,14 @@ def _sync_existing_game_progress(loyalty, bind) -> None:
 
 
 def install_loyalty_policy_20261023() -> None:
-    """Make 10H->1H and 15 games->1 game authoritative in every process."""
+    """Install the owner-approved entertainment loyalty policy.
+
+    - Hourly entertainment: 10H -> 1H.
+    - Game-based entertainment: 15 games -> 1 game.
+    - Current-order service units participate in eligibility immediately at checkout.
+    - A single order may consume at most one loyalty reward, even if it crosses
+      multiple thresholds. Any additional earned value remains for later handling.
+    """
     from services import loyalty_benefits as loyalty
 
     # Hourly policy is intentionally unchanged; multi-companion service units are
@@ -113,12 +120,37 @@ def install_loyalty_policy_20261023() -> None:
         return
 
     original_ensure = loyalty.ensure_loyalty_tables
+    original_preview_same_order_benefit = loyalty.preview_same_order_benefit
 
     def ensure_loyalty_tables_with_owner_policy(bind=loyalty.engine) -> None:
         original_ensure(bind)
         _sync_existing_game_progress(loyalty, bind)
 
+    def preview_same_order_benefit_one_per_order(*args, **kwargs):
+        """Keep same-order eligibility immediate, but consume only one reward."""
+        benefit = original_preview_same_order_benefit(*args, **kwargs)
+        if not benefit:
+            return benefit
+
+        result = dict(benefit)
+        try:
+            earned_count = max(0, int(result.get("earned_count") or 0))
+        except (TypeError, ValueError):
+            earned_count = 0
+        if earned_count <= 0:
+            return None
+
+        result["earned_count"] = 1
+        policy = loyalty.loyalty_policy_for_rule(
+            str(result.get("rule_key") or "").strip()
+        )
+        if policy is not None:
+            result["benefit_units"] = float(policy.get("benefit_units") or 0)
+        result["title"] = loyalty._coupon_title(result)
+        return result
+
     loyalty.ensure_loyalty_tables = ensure_loyalty_tables_with_owner_policy
+    loyalty.preview_same_order_benefit = preview_same_order_benefit_one_per_order
     loyalty._owner_20261023_policy_installed = True
 
 
