@@ -371,6 +371,13 @@ def install_vip_timer_policy_v5() -> None:
     global _INSTALLED
     if _INSTALLED:
         return
+
+    # The web process also closes/reconciles orders. Install the owner-approved
+    # entertainment loyalty policy here before loyalty exclusions are wrapped so
+    # both Bot and Web always use 10H / 15-game thresholds consistently.
+    from services.loyalty_policy_20261023 import install_loyalty_policy_20261023
+
+    install_loyalty_policy_20261023()
     _install_catalog_guard_policy()
     _install_selector_policy()
     _install_switch_catalog_policy()
