@@ -105,12 +105,12 @@ def test_load_customer_loyalty_formats_progress_coupon_counts_and_new_benefit_la
 
     snapshot = load_customer_loyalty(db, ["100"])["100"]
 
-    assert snapshot["progress"][0]["title"] == "特戰英豪｜娛樂陪｜積分"
-    assert snapshot["progress"][0]["progress_text"] == "14 / 20局"
-    assert snapshot["progress"][0]["benefit_text"] == "折抵 1 局額度"
-    assert snapshot["progress"][1]["title"] == "娛樂陪〈端遊〉"
-    assert snapshot["progress"][1]["progress_text"] == "6 / 10H"
-    assert snapshot["progress"][1]["benefit_text"] == "折抵 30 分鐘額度"
+    assert snapshot["progress"][0]["title"] == "娛樂陪〈端遊〉"
+    assert snapshot["progress"][0]["progress_text"] == "6 / 10H"
+    assert snapshot["progress"][0]["benefit_text"] == "折抵 30 分鐘額度"
+    assert snapshot["progress"][1]["title"] == "特戰英豪｜娛樂陪｜積分"
+    assert snapshot["progress"][1]["progress_text"] == "14 / 20局"
+    assert snapshot["progress"][1]["benefit_text"] == "折抵 1 局額度"
     assert snapshot["coupon_counts"] == {
         "active": 1,
         "reserved": 1,
@@ -160,8 +160,8 @@ def test_customer_center_snapshot_includes_loyalty_progress(tmp_path: Path, monk
     assert row["customer_discord_id"] == "100"
     assert row["completed_spend"] == 450
     assert [item["progress_text"] for item in row["loyalty_progress"]] == [
-        "14 / 20局",
         "6 / 10H",
+        "14 / 20局",
     ]
     assert row["loyalty_coupon_counts"]["active"] == 1
     assert row["loyalty_active_coupons"][0]["status_label"] == "可使用"
