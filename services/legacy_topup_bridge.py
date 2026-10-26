@@ -8,6 +8,7 @@ from services.member_portal_runtime_20261026 import install_member_portal_202610
 from services.loyalty_policy_20261023 import install_loyalty_policy_20261023
 from services.loyalty_reconcile_v7 import run_entertainment_loyalty_reconcile_v7
 from services.staff_topup import credit_staff_topup
+from services.wallet_spend_rewards import install_wallet_spend_rewards
 
 
 _BRIDGE_INSTALLED_GLOBAL = "_legacy_wallet_add_bridge_installed"
@@ -79,6 +80,11 @@ def install_legacy_wallet_add_bridge(bot: discord.Client) -> None:
     # Keep the customer portal persistent and synchronized without requiring a
     # one-off /setup command after deployment.
     install_member_portal_20261026(bot)
+
+    # Wallet top-ups continue to advance VIP progress without minting usable
+    # points. Actual wallet consumption now earns usable points in a separate
+    # cumulative bucket, and legacy wallet orders are backfilled idempotently.
+    install_wallet_spend_rewards()
 
     target_globals = _wallet_add_globals(bot)
     if target_globals is None or bool(target_globals.get(_BRIDGE_INSTALLED_GLOBAL)):
