@@ -4,6 +4,7 @@ from typing import Any, Callable
 
 import discord
 
+from services.member_portal_runtime_20261026 import install_member_portal_20261026
 from services.staff_topup import credit_staff_topup
 
 
@@ -54,6 +55,11 @@ def _wallet_add_globals(bot: discord.Client) -> dict[str, Any] | None:
 
 
 def install_legacy_wallet_add_bridge(bot: discord.Client) -> None:
+    # The top-up runtime is guaranteed to start on every production boot, so it
+    # is also the safest place to keep the customer member portal persistent and
+    # synchronized without requiring a one-off /setup command after deployment.
+    install_member_portal_20261026(bot)
+
     target_globals = _wallet_add_globals(bot)
     if target_globals is None or bool(target_globals.get(_BRIDGE_INSTALLED_GLOBAL)):
         return
