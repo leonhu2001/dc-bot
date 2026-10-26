@@ -18,11 +18,19 @@ body.mw-r5-admin .admin-dashboard-orders .order-row:focus-visible {
   background: rgba(214, 176, 90, .065);
 }
 
-/* Keep every order-status pill on the same typographic system. Colors still
-   communicate state; type size, weight, spacing and pill geometry do not. */
+/* Keep order state + report state on one visual system and one line. */
+body.mw-r5-admin .admin-dashboard-orders .order-status-col {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+}
+
 body.mw-r5-admin .admin-dashboard-orders .order-status-col .badge {
   display: inline-flex !important;
+  min-width: 58px !important;
   min-height: 24px !important;
+  box-sizing: border-box !important;
   align-items: center !important;
   justify-content: center !important;
   padding: 6px 10px !important;
@@ -33,6 +41,18 @@ body.mw-r5-admin .admin-dashboard-orders .order-status-col .badge {
   line-height: 1 !important;
   letter-spacing: .02em !important;
   white-space: nowrap !important;
+}
+
+body.mw-r5-admin .admin-dashboard-orders .admin-order-report-badge.reported {
+  border-color: rgba(60, 201, 151, .42) !important;
+  background: rgba(60, 201, 151, .10) !important;
+  color: #8ee9c2 !important;
+}
+
+body.mw-r5-admin .admin-dashboard-orders .admin-order-report-badge.unreported {
+  border-color: rgba(255, 104, 122, .40) !important;
+  background: rgba(255, 104, 122, .09) !important;
+  color: #ff9cab !important;
 }
 
 @media (min-width: 901px) {
@@ -67,7 +87,7 @@ body.mw-r5-admin .admin-dashboard-orders .order-status-col .badge {
       minmax(170px, 1.05fr)
       minmax(220px, 1.5fr)
       92px
-      105px
+      146px
       minmax(170px, 1.1fr) !important;
   }
 }
@@ -95,7 +115,7 @@ body.mw-r5-admin .admin-dashboard-orders .order-status-col .badge {
       minmax(125px, 1fr)
       minmax(150px, 1.28fr)
       76px
-      92px
+      136px
       minmax(132px, 1.02fr) !important;
   }
 
@@ -129,7 +149,7 @@ body.mw-r5-admin .admin-dashboard-orders .order-status-col .badge {
 
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head,
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row {
-    min-width: 786px !important;
+    min-width: 830px !important;
   }
 }
 
@@ -184,13 +204,13 @@ body.mw-r5-admin .admin-dashboard-orders .order-status-col .badge {
 
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head,
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row {
-    min-width: 726px !important;
+    min-width: 770px !important;
     grid-template-columns:
       118px
       128px
       minmax(155px, 1fr)
       76px
-      92px
+      136px
       132px !important;
   }
 }
