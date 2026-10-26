@@ -1,0 +1,96 @@
+/* Desktop-only geometry for the report task hub.
+   Phone task-hub geometry is owned by employee_mobile_routes.css. */
+
+@media (min-width: 768px) {
+  body.desktop-ui .report-mobile-task-hub {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 18px;
+    background: linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018)),rgba(8,11,19,.94);
+  }
+
+  body.desktop-ui .report-mobile-task-hub .mobile-task-hub-head,
+  body.desktop-ui .report-mobile-task-hub .mobile-task-hub-copy {
+    min-width: 0;
+  }
+
+  body.desktop-ui .report-mobile-task-hub .mobile-task-hub-kicker {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--mw-gold,#f5c66b);
+    font-size: 10px;
+    font-weight: 950;
+    letter-spacing: .16em;
+  }
+
+  body.desktop-ui .report-mobile-task-hub h2 {
+    margin: 0;
+    font-size: 20px;
+  }
+
+  body.desktop-ui .report-mobile-task-hub .mobile-task-grid {
+    display: grid;
+    grid-template-columns: repeat(5,minmax(0,1fr));
+    gap: 9px;
+  }
+
+  body.desktop-ui .report-mobile-task-hub .mobile-task-action {
+    display: grid;
+    grid-template-columns: 34px minmax(0,1fr);
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    min-height: 68px;
+    padding: 10px 11px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 13px;
+    background: rgba(255,255,255,.025);
+    color: var(--mw-text,#f4f0e8);
+    text-decoration: none;
+  }
+
+  body.desktop-ui .report-mobile-task-hub .mobile-task-action:hover,
+  body.desktop-ui .report-mobile-task-hub .mobile-task-action.is-primary {
+    border-color: rgba(245,198,107,.28);
+    background: rgba(245,198,107,.065);
+  }
+
+  body.desktop-ui .report-mobile-task-hub .mobile-task-icon {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border: 1px solid rgba(245,198,107,.22);
+    border-radius: 10px;
+    color: var(--mw-gold,#f5c66b);
+    font-size: 17px;
+    font-weight: 950;
+  }
+
+  body.desktop-ui .report-mobile-task-hub .mobile-task-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  body.desktop-ui .report-mobile-task-hub .mobile-task-copy strong,
+  body.desktop-ui .report-mobile-task-hub .mobile-task-copy small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.desktop-ui .report-mobile-task-hub .mobile-task-copy small {
+    color: var(--mw-muted,#a7a0b5);
+    font-size: 11px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1180px) {
+  body.desktop-ui .report-mobile-task-hub .mobile-task-grid {
+    grid-template-columns: repeat(3,minmax(0,1fr));
+  }
+}
