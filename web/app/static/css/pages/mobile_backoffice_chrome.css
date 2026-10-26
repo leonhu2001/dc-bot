@@ -1,0 +1,87 @@
+/* Shared phone-only chrome for employee/admin mobile render paths.
+   This file owns only cross-backoffice components; desktop never loads it. */
+
+:root {
+    --mobile-bo-bg:#09090b;
+    --mobile-bo-surface:#18181c;
+    --mobile-bo-line:rgba(255,255,255,.10);
+    --mobile-bo-text:#f5f3ed;
+    --mobile-bo-muted:rgba(245,243,237,.58);
+    --mobile-bo-gold:#f0cf72;
+    --mobile-bo-gold-soft:rgba(240,207,114,.12);
+    --mobile-bo-gold-line:rgba(240,207,114,.30);
+}
+
+.mobile-app-logo-image {
+    display:block;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
+
+.mobile-app-context-switch {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+    width:100%;
+    margin:0;
+    padding:6px max(12px,env(safe-area-inset-right)) 6px max(12px,env(safe-area-inset-left));
+    border-bottom:1px solid var(--mobile-bo-line);
+    background:#0d0d0f;
+}
+
+.mobile-app-context-switch a {
+    display:flex;
+    min-width:0;
+    min-height:42px;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    padding:0 10px;
+    border:1px solid var(--mobile-bo-line);
+    border-radius:12px;
+    background:transparent;
+    color:var(--mobile-bo-muted);
+    font-size:12px;
+    font-weight:850;
+    line-height:1;
+    text-decoration:none;
+}
+
+.mobile-app-context-switch a.is-active {
+    border-color:var(--mobile-bo-gold-line);
+    background:var(--mobile-bo-gold-soft);
+    color:var(--mobile-bo-gold);
+}
+
+.mobile-app-sheet-backdrop {
+    position:fixed;
+    inset:0;
+    z-index:1205;
+    width:100%;
+    height:100%;
+    min-height:0;
+    padding:0;
+    border:0;
+    border-radius:0;
+    background:rgba(0,0,0,.52);
+    appearance:none;
+}
+
+.admin-app-more .mobile-app-sheet-backdrop { z-index:1455; }
+
+.mobile-app-sheet-close {
+    display:grid;
+    width:40px;
+    height:40px;
+    min-width:40px;
+    min-height:40px;
+    place-items:center;
+    padding:0;
+    border:1px solid var(--mobile-bo-line);
+    border-radius:12px;
+    background:var(--mobile-bo-surface);
+    color:var(--mobile-bo-text);
+    font-size:20px;
+    line-height:1;
+}
