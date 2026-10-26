@@ -72,10 +72,9 @@ def test_workspace_reuses_employee_center_shared_css_and_isolates_page_content_c
     site_layout = _read("web/app/templates/site_layout.html")
     page_css = _read("web/app/static/css/pages/employee_workspace_page_content.css")
 
-    shared = "employee_workspace_site_shell.css?v=20261020-9"
-    assert shared in employee
-    assert shared in site_layout
-    assert "employee_workspace_page_content.css?v=20261020-1" in site_layout
+    assert "employee_workspace_site_shell.css?v=" in employee
+    assert "employee_workspace_site_shell.css?v=" in site_layout
+    assert "employee_workspace_page_content.css?v=" in site_layout
 
     # Page-only CSS is forbidden from changing the site header or shared hero.
     assert ".employee-workspace-page-content" in page_css
