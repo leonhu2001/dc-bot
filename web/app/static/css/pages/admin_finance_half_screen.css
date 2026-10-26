@@ -1,0 +1,123 @@
+/* Desktop admin finance pages at half-screen widths.
+   Desktop UA stays in desktop mode, so reflow here instead of using mobile styles. */
+
+body.mw-r5-admin.mw-desktop-ui .payout-summary-v2,
+body.mw-r5-admin.mw-desktop-ui .ops-report {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+body.mw-r5-admin.mw-desktop-ui .payout-summary-v2 > *,
+body.mw-r5-admin.mw-desktop-ui .ops-report > *,
+body.mw-r5-admin.mw-desktop-ui .staff-summary-ledger-panel,
+body.mw-r5-admin.mw-desktop-ui .ops-panel {
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+/* Keep wide payout data inside its own panel instead of widening/clipping the page. */
+body.mw-r5-admin.mw-desktop-ui .staff-summary-ledger-panel {
+    overflow: hidden !important;
+}
+
+body.mw-r5-admin.mw-desktop-ui .payout-ledger-scroll,
+body.mw-r5-admin.mw-desktop-ui .staff-summary-table-wrap,
+body.mw-r5-admin.mw-desktop-ui .ops-table-wrap {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-inline: contain;
+    scrollbar-gutter: stable;
+}
+
+@media (min-width: 901px) and (max-width: 1500px) {
+    /* Salary settlement: compress the nine-column ledger into the available
+       content width. The table still remains horizontally scrollable as a
+       fallback for unusually narrow desktop windows. */
+    body.mw-r5-admin.mw-desktop-ui .payout-ledger-grid {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    body.mw-r5-admin.mw-desktop-ui .payout-ledger-head,
+    body.mw-r5-admin.mw-desktop-ui .payout-ledger-row {
+        width: 100% !important;
+        min-width: 0 !important;
+        grid-template-columns:
+            minmax(160px, 1.7fr)
+            minmax(58px, .66fr)
+            minmax(72px, .82fr)
+            minmax(64px, .72fr)
+            minmax(64px, .72fr)
+            minmax(64px, .72fr)
+            minmax(78px, .88fr)
+            minmax(84px, .96fr)
+            minmax(160px, 1.55fr) !important;
+    }
+
+    body.mw-r5-admin.mw-desktop-ui .payout-ledger-head > div,
+    body.mw-r5-admin.mw-desktop-ui .payout-ledger-row > .payout-cell {
+        padding: 9px 7px !important;
+    }
+
+    body.mw-r5-admin.mw-desktop-ui .payout-ledger-row > .payout-cell:first-child,
+    body.mw-r5-admin.mw-desktop-ui .payout-ledger-head > div:first-child {
+        padding-left: 10px !important;
+    }
+
+    body.mw-r5-admin.mw-desktop-ui .payout-ledger-actions {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 4px !important;
+    }
+
+    body.mw-r5-admin.mw-desktop-ui .payout-ledger-actions .staff-summary-button {
+        min-height: 32px !important;
+        padding: 5px 4px !important;
+        font-size: 10px !important;
+        line-height: 1.15 !important;
+        white-space: normal !important;
+    }
+
+    body.mw-r5-admin.mw-desktop-ui .staff-summary-total-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    /* Operations finance report: half-screen desktop must no longer keep the
+       full-screen two/three-column panel geometry. */
+    body.mw-r5-admin.mw-desktop-ui .ops-grid,
+    body.mw-r5-admin.mw-desktop-ui .ops-grid-three {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    body.mw-r5-admin.mw-desktop-ui .ops-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    body.mw-r5-admin.mw-desktop-ui .ops-panel,
+    body.mw-r5-admin.mw-desktop-ui .ops-card {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    body.mw-r5-admin.mw-desktop-ui .ops-table {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+@media (min-width: 901px) and (max-width: 1120px) {
+    body.mw-r5-admin.mw-desktop-ui .payout-ledger-grid {
+        min-width: 880px !important;
+    }
+
+    body.mw-r5-admin.mw-desktop-ui .staff-summary-total-grid,
+    body.mw-r5-admin.mw-desktop-ui .ops-kpis {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+}
