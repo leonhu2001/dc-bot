@@ -2,25 +2,45 @@
    Mobile rendering owns its geometry in admin_mobile_app.css. */
 
 @media (min-width: 901px) {
-    body.mw-desktop-ui .admin-dashboard-shell {
-        display: block;
+    body.mw-r5-admin.mw-desktop-ui .mw-r5-content {
         width: 100%;
+        max-width: none;
         min-width: 0;
+    }
+
+    body.mw-desktop-ui .admin-dashboard-shell {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        justify-self: stretch !important;
+        align-self: stretch !important;
     }
 
     body.mw-desktop-ui .admin-dashboard-main {
         display: grid;
         gap: 16px;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body.mw-desktop-ui .admin-dashboard-main > * {
         width: 100%;
         min-width: 0;
         max-width: none;
-        margin: 0;
-        padding: 0;
     }
 
     body.mw-desktop-ui .admin-mobile-task-hub {
         display: grid;
         gap: 12px;
+        width: 100%;
+        max-width: none;
+        margin: 0 !important;
         padding: 16px;
         border: 1px solid var(--r5-line);
         border-radius: var(--r5-radius);
@@ -52,6 +72,8 @@
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 10px;
+        width: 100%;
+        min-width: 0;
     }
 
     body.mw-desktop-ui .mobile-task-action {
@@ -109,10 +131,16 @@
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 14px;
+        width: 100%;
+        min-width: 0;
+        margin: 0 !important;
     }
 
     body.mw-desktop-ui .admin-priority-panel {
         min-width: 0;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
         overflow: hidden;
     }
 
@@ -195,13 +223,18 @@
         display: grid;
         grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 10px;
+        width: 100%;
+        min-width: 0;
+        margin: 0 !important;
     }
 
     body.mw-desktop-ui .admin-dashboard-stats .stat {
         display: grid;
         gap: 5px;
         min-width: 0;
+        max-width: none !important;
         min-height: 88px;
+        margin: 0 !important;
         align-content: center;
         padding: 13px 14px;
     }
@@ -219,7 +252,10 @@
     }
 
     body.mw-desktop-ui .admin-dashboard-orders {
+        width: 100%;
         min-width: 0;
+        max-width: none;
+        margin: 0 !important;
         overflow: hidden;
         border: 1px solid var(--r5-line);
         border-radius: var(--r5-radius);
