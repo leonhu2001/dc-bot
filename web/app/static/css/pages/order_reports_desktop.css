@@ -1,96 +1,228 @@
-/* Desktop-only geometry for the report task hub.
-   Phone task-hub geometry is owned by employee_mobile_routes.css. */
+/* Desktop report queue workbar.
+   Mobile route geometry remains owned by employee_mobile_routes.css. */
 
 @media (min-width: 768px) {
-  body.desktop-ui .report-mobile-task-hub {
+  body.desktop-ui .report-workbar {
     display: grid;
-    gap: 12px;
-    padding: 16px;
-    border: 1px solid rgba(255,255,255,.09);
-    border-radius: 18px;
-    background: linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018)),rgba(8,11,19,.94);
-  }
-
-  body.desktop-ui .report-mobile-task-hub .mobile-task-hub-head,
-  body.desktop-ui .report-mobile-task-hub .mobile-task-hub-copy {
-    min-width: 0;
-  }
-
-  body.desktop-ui .report-mobile-task-hub .mobile-task-hub-kicker {
-    display: block;
-    margin-bottom: 4px;
-    color: var(--mw-gold,#f5c66b);
-    font-size: 10px;
-    font-weight: 950;
-    letter-spacing: .16em;
-  }
-
-  body.desktop-ui .report-mobile-task-hub h2 {
-    margin: 0;
-    font-size: 20px;
-  }
-
-  body.desktop-ui .report-mobile-task-hub .mobile-task-grid {
-    display: grid;
-    grid-template-columns: repeat(5,minmax(0,1fr));
-    gap: 9px;
-  }
-
-  body.desktop-ui .report-mobile-task-hub .mobile-task-action {
-    display: grid;
-    grid-template-columns: 34px minmax(0,1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 9px;
+    gap: 16px;
     min-width: 0;
-    min-height: 68px;
-    padding: 10px 11px;
+    padding: 11px 13px;
     border: 1px solid rgba(255,255,255,.09);
-    border-radius: 13px;
-    background: rgba(255,255,255,.025);
+    border-radius: 16px;
+    background: linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015)),rgba(8,11,19,.94);
+  }
+
+  body.desktop-ui .report-workbar-title {
+    display: grid;
+    gap: 1px;
+    min-width: 100px;
+  }
+
+  body.desktop-ui .report-workbar-kicker {
+    color: var(--mw-gold,#f5c66b);
+    font-size: 9px;
+    font-weight: 950;
+    letter-spacing: .15em;
+  }
+
+  body.desktop-ui .report-workbar-title strong {
+    font-size: 13px;
+    line-height: 1.25;
+  }
+
+  body.desktop-ui .report-worktabs {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  body.desktop-ui .report-worktab {
+    display: grid;
+    gap: 1px;
+    min-width: 108px;
+    padding: 8px 11px;
+    border: 1px solid transparent;
+    border-radius: 10px;
     color: var(--mw-text,#f4f0e8);
     text-decoration: none;
+    transition: border-color .16s ease, background .16s ease, transform .16s ease;
   }
 
-  body.desktop-ui .report-mobile-task-hub .mobile-task-action:hover,
-  body.desktop-ui .report-mobile-task-hub .mobile-task-action.is-primary {
-    border-color: rgba(245,198,107,.28);
-    background: rgba(245,198,107,.065);
+  body.desktop-ui .report-worktab span {
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1.3;
   }
 
-  body.desktop-ui .report-mobile-task-hub .mobile-task-icon {
-    display: grid;
-    width: 34px;
-    height: 34px;
-    place-items: center;
-    border: 1px solid rgba(245,198,107,.22);
-    border-radius: 10px;
-    color: var(--mw-gold,#f5c66b);
-    font-size: 17px;
-    font-weight: 950;
-  }
-
-  body.desktop-ui .report-mobile-task-hub .mobile-task-copy {
-    display: grid;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  body.desktop-ui .report-mobile-task-hub .mobile-task-copy strong,
-  body.desktop-ui .report-mobile-task-hub .mobile-task-copy small {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  body.desktop-ui .report-mobile-task-hub .mobile-task-copy small {
+  body.desktop-ui .report-worktab small {
     color: var(--mw-muted,#a7a0b5);
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  body.desktop-ui .report-worktab:hover {
+    border-color: rgba(245,198,107,.2);
+    background: rgba(245,198,107,.045);
+    transform: translateY(-1px);
+  }
+
+  body.desktop-ui .report-worktab.is-active {
+    border-color: rgba(245,198,107,.34);
+    background: rgba(245,198,107,.085);
+  }
+
+  body.desktop-ui .report-worktab.is-active span {
+    color: var(--mw-gold,#f5c66b);
+  }
+
+  body.desktop-ui :is(.report-worktab,.report-worktool):focus-visible {
+    outline: 2px solid rgba(245,198,107,.52);
+    outline-offset: 2px;
+  }
+
+  body.desktop-ui .report-worktools {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+  }
+
+  body.desktop-ui .report-worktool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 11px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 999px;
+    background: rgba(255,255,255,.025);
+    color: var(--mw-text,#f4f0e8);
     font-size: 11px;
+    font-weight: 850;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color .16s ease, background .16s ease;
+  }
+
+  body.desktop-ui .report-worktool:hover {
+    border-color: rgba(245,198,107,.25);
+    background: rgba(245,198,107,.055);
+  }
+
+  body.desktop-ui .report-worktool-review {
+    border-color: rgba(245,198,107,.22);
+    color: var(--mw-gold,#f5c66b);
+  }
+
+  body.desktop-ui .report-worktool span {
+    display: inline-grid;
+    min-width: 20px;
+    height: 20px;
+    place-items: center;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: rgba(245,198,107,.12);
+    font-size: 10px;
+  }
+
+  body.desktop-ui .report-filter-bar {
+    grid-template-columns: minmax(240px,1fr) 190px auto auto;
   }
 }
 
-@media (min-width: 768px) and (max-width: 1180px) {
-  body.desktop-ui .report-mobile-task-hub .mobile-task-grid {
+@media (min-width: 768px) and (max-width: 1080px) {
+  body.desktop-ui .report-workbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  body.desktop-ui .report-workbar-title {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  body.desktop-ui .report-worktabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  body.desktop-ui .report-worktabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  body.desktop-ui .report-filter-bar {
+    grid-template-columns: minmax(0,1fr) 170px auto auto;
+  }
+}
+
+@media (max-width: 767px) {
+  .report-workbar {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 15px;
+    background: rgba(8,11,19,.94);
+  }
+
+  .report-workbar-title {
+    display: none;
+  }
+
+  .report-worktabs {
+    display: grid;
     grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 6px;
+  }
+
+  .report-worktab {
+    display: grid;
+    gap: 2px;
+    padding: 9px 8px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 10px;
+    color: var(--mw-text,#f4f0e8);
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .report-worktab span {
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  .report-worktab small {
+    color: var(--mw-muted,#a7a0b5);
+    font-size: 9px;
+  }
+
+  .report-worktab.is-active {
+    border-color: rgba(245,198,107,.34);
+    background: rgba(245,198,107,.08);
+  }
+
+  .report-worktools {
+    display: flex;
+    gap: 7px;
+  }
+
+  .report-worktool {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 36px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 999px;
+    color: var(--mw-text,#f4f0e8);
+    font-size: 11px;
+    font-weight: 850;
+    text-decoration: none;
   }
 }
