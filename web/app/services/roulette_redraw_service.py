@@ -537,6 +537,8 @@ def list_admin_roulette_orders(
     output: list[dict[str, Any]] = []
     for row in rows:
         order = dict(row)
+        if not roulette_service._is_roulette_order(order):
+            continue
         state = get_redraw_state(int(order["id"]), db_file=db_file)
         final_draw = state["final_draw"]
         output.append(

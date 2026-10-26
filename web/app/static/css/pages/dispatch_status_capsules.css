@@ -1,150 +1,163 @@
-/* 2026-10-20: compact dispatch control surface.
-   Keep status controls clear without turning the whole header into neon pills. */
+/* Canonical dispatch hero/control surface.
+   The markup owns its geometry. No JS node re-parenting and no secondary CSS
+   layer is allowed to rearrange these controls. */
 
-/* Hero hierarchy */
 html body .dispatch-shell .dispatch-hero-main {
   position: relative;
+  display: block;
   overflow: hidden;
-  padding: 22px 24px !important;
-  border-radius: 20px !important;
+  padding: 22px 24px;
+  border-radius: 20px;
   background:
     radial-gradient(circle at 88% 0%, rgba(47, 202, 119, .075), transparent 34%),
     linear-gradient(145deg, rgba(255,255,255,.048), rgba(255,255,255,.018)),
-    rgba(10, 12, 15, .94) !important;
-  box-shadow: 0 14px 36px rgba(0,0,0,.22) !important;
+    rgba(10, 12, 15, .94);
+  box-shadow: 0 14px 36px rgba(0,0,0,.22);
 }
 
 html body .dispatch-shell .dispatch-hero-main > .dispatch-order-top {
-  align-items: center !important;
-  gap: 18px !important;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+html body .dispatch-shell .dispatch-hero-main > .dispatch-order-top > div:first-child {
+  min-width: 0;
 }
 
 html body .dispatch-shell .dispatch-hero-main .dispatch-eyebrow {
-  margin-bottom: 6px !important;
-  font-size: 10px !important;
-  letter-spacing: .17em !important;
+  margin-bottom: 6px;
+  font-size: 10px;
+  letter-spacing: .17em;
   opacity: .92;
 }
 
 html body .dispatch-shell .dispatch-hero-main .dispatch-title {
-  font-size: clamp(29px, 3vw, 38px) !important;
-  line-height: 1.05 !important;
-  letter-spacing: .035em !important;
+  margin: 0;
+  font-size: clamp(29px, 3vw, 38px);
+  line-height: 1.05;
+  letter-spacing: .035em;
 }
 
 html body .dispatch-shell .dispatch-hero-main .dispatch-tags {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  margin-top: 17px !important;
-  padding-top: 14px !important;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 17px;
+  padding-top: 14px;
   border-top: 1px solid rgba(255,255,255,.07);
 }
 
 html body .dispatch-shell .dispatch-hero-main .dispatch-tag {
+  display: inline-flex;
+  flex: 0 0 auto;
   min-height: 34px;
-  padding: 7px 10px !important;
-  border-radius: 10px !important;
-  border-color: rgba(255,255,255,.09) !important;
-  background: rgba(255,255,255,.035) !important;
-  color: rgba(244,240,232,.88) !important;
-  box-shadow: none !important;
-  font-size: 12px !important;
-  font-weight: 850 !important;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 10px;
+  background: rgba(255,255,255,.035);
+  color: rgba(244,240,232,.88);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 850;
 }
 
 html body .dispatch-shell .dispatch-hero-main .dispatch-tag[data-state="online"] {
-  border-color: rgba(91, 218, 145, .18) !important;
-  background: rgba(91, 218, 145, .055) !important;
-  color: #d9ffe8 !important;
+  border-color: rgba(91, 218, 145, .18);
+  background: rgba(91, 218, 145, .055);
+  color: #d9ffe8;
 }
 
 html body .dispatch-shell .dispatch-hero-main .dispatch-tag[data-state="reconnecting"] {
-  border-color: rgba(245, 198, 107, .2) !important;
-  background: rgba(245, 198, 107, .055) !important;
-  color: #ffe3a3 !important;
+  border-color: rgba(245, 198, 107, .2);
+  background: rgba(245, 198, 107, .055);
+  color: #ffe3a3;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-tag[data-state="offline"] {
-  border-color: rgba(255,107,138,.2) !important;
-  background: rgba(255,107,138,.055) !important;
-  color: #ffd5df !important;
+html body .dispatch-shell .dispatch-hero-main .dispatch-tag[data-state="offline"],
+html body .dispatch-shell .dispatch-hero-main .dispatch-tag[data-state="blocked"] {
+  border-color: rgba(255,107,138,.2);
+  background: rgba(255,107,138,.055);
+  color: #ffd5df;
 }
 
-/* Interactive status controls */
+/* Interactive controls keep their own state colors but never participate in
+   title geometry beyond their natural width. */
 html body .dispatch-shell button[data-dispatch-notification-toggle],
-html body .dispatch-alert-toggle {
-  min-height: 38px !important;
-  padding: 8px 13px !important;
-  border-radius: 11px !important;
-  background-image: none !important;
-  font: inherit !important;
-  font-size: 12px !important;
-  font-weight: 900 !important;
-  line-height: 1.2 !important;
-  letter-spacing: .01em !important;
-  text-decoration: none !important;
+html body .dispatch-shell .dispatch-alert-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 13px;
+  border-radius: 11px;
+  background-image: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: .01em;
+  text-decoration: none;
   white-space: nowrap;
-  cursor: pointer !important;
-  filter: none !important;
-  will-change: transform;
-  transition:
-    transform 90ms ease,
-    box-shadow 130ms ease,
-    border-color 130ms ease,
-    background-color 130ms ease,
-    filter 130ms ease !important;
+  cursor: pointer;
+  filter: none;
+  transition: transform 90ms ease, box-shadow 130ms ease, border-color 130ms ease, background-color 130ms ease, filter 130ms ease;
 }
 
-html body .dispatch-alert-toggle {
-  flex: 0 0 auto;
+html body .dispatch-shell .dispatch-tags button[data-dispatch-notification-toggle] {
+  margin-left: auto;
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="online"],
-html body .dispatch-alert-toggle[data-state="online"] {
-  border: 1px solid rgba(99,230,160,.76) !important;
-  background: #2fca77 !important;
-  color: #07150c !important;
-  box-shadow: 0 5px 14px rgba(47,202,119,.17) !important;
+html body .dispatch-shell .dispatch-alert-toggle[data-state="online"] {
+  border: 1px solid rgba(99,230,160,.76);
+  background: #2fca77;
+  color: #07150c;
+  box-shadow: 0 5px 14px rgba(47,202,119,.17);
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="pending"],
-html body .dispatch-alert-toggle[data-state="pending"] {
-  border: 1px solid rgba(248,205,93,.78) !important;
-  background: #e9b33e !important;
-  color: #211600 !important;
-  box-shadow: 0 5px 14px rgba(242,184,63,.15) !important;
+html body .dispatch-shell .dispatch-alert-toggle[data-state="pending"] {
+  border: 1px solid rgba(248,205,93,.78);
+  background: #e9b33e;
+  color: #211600;
+  box-shadow: 0 5px 14px rgba(242,184,63,.15);
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="blocked"],
-html body .dispatch-alert-toggle[data-state="blocked"] {
-  border: 1px solid rgba(255,139,146,.78) !important;
-  background: #d94e58 !important;
-  color: #fff !important;
-  box-shadow: 0 5px 14px rgba(230,83,93,.14) !important;
+html body .dispatch-shell .dispatch-alert-toggle[data-state="blocked"] {
+  border: 1px solid rgba(255,139,146,.78);
+  background: #d94e58;
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(230,83,93,.14);
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle]:hover,
-html body .dispatch-alert-toggle:hover {
+html body .dispatch-shell .dispatch-alert-toggle:hover {
   transform: translateY(-1px);
-  filter: brightness(1.06) !important;
+  filter: brightness(1.06);
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle]:active,
-html body .dispatch-alert-toggle:active {
+html body .dispatch-shell .dispatch-alert-toggle:active {
   transform: scale(.965);
-  filter: brightness(1.02) !important;
+  filter: brightness(1.02);
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle]:focus-visible,
-html body .dispatch-alert-toggle:focus-visible {
-  outline: 2px solid rgba(245,198,107,.9) !important;
-  outline-offset: 3px !important;
+html body .dispatch-shell .dispatch-alert-toggle:focus-visible {
+  outline: 2px solid rgba(245,198,107,.9);
+  outline-offset: 3px;
 }
 
-html body .dispatch-alert-toggle.dispatch-alert-tap,
+html body .dispatch-shell .dispatch-alert-toggle.dispatch-alert-tap,
 html body .dispatch-shell button[data-dispatch-notification-toggle]:active {
-  animation: dispatch-alert-tap 180ms ease-out !important;
+  animation: dispatch-alert-tap 180ms ease-out;
 }
 
 @keyframes dispatch-alert-tap {
@@ -153,145 +166,38 @@ html body .dispatch-shell button[data-dispatch-notification-toggle]:active {
   100% { transform: scale(1); }
 }
 
-/* Keep the three passive states together and the two actions together. */
-@media (min-width: 761px) {
-  html body .dispatch-shell .dispatch-hero-main {
-    display: grid !important;
-    grid-template-columns: max-content max-content max-content minmax(24px, 1fr) max-content max-content;
-    column-gap: 8px;
-    row-gap: 18px;
-    align-items: center;
-  }
-
-  html body .dispatch-shell .dispatch-hero-main > .dispatch-order-top,
-  html body .dispatch-shell .dispatch-hero-main > .dispatch-tags {
-    display: contents !important;
-  }
-
-  html body .dispatch-shell .dispatch-hero-main > .dispatch-order-top > div {
-    grid-column: 1 / 5;
-    grid-row: 1;
-    min-width: 0;
+@media (max-width: 860px) {
+  html body .dispatch-shell .dispatch-hero-main > .dispatch-order-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
   }
 
   html body .dispatch-shell .dispatch-alert-toggle {
-    grid-column: 6;
-    grid-row: 1;
-    justify-self: end;
-  }
-
-  html body .dispatch-shell button[data-dispatch-notification-toggle] {
-    grid-column: 5;
-    grid-row: 1;
-    justify-self: end;
-  }
-
-  html body .dispatch-shell .dispatch-tags > span:nth-of-type(1) {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  html body .dispatch-shell .dispatch-tags > span:nth-of-type(2) {
-    grid-column: 2;
-    grid-row: 2;
-  }
-
-  html body .dispatch-shell .dispatch-tags > span:nth-of-type(3) {
-    grid-column: 3;
-    grid-row: 2;
-  }
-
-  html body .dispatch-shell .dispatch-hero-main::before {
-    content: "";
-    grid-column: 1 / -1;
-    grid-row: 2;
-    align-self: start;
-    border-top: 1px solid rgba(255,255,255,.07);
-    transform: translateY(-9px);
-    pointer-events: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html body .dispatch-alert-toggle,
-  html body .dispatch-shell button[data-dispatch-notification-toggle] {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-
-@media (max-width: 760px) {
-  html body .dispatch-shell .dispatch-hero-main {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px 8px;
-    padding: 18px !important;
-  }
-
-  html body .dispatch-shell .dispatch-hero-main > .dispatch-order-top,
-  html body .dispatch-shell .dispatch-hero-main > .dispatch-tags {
-    display: contents !important;
-  }
-
-  html body .dispatch-shell .dispatch-hero-main > .dispatch-order-top > div {
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
-
-  html body .dispatch-shell .dispatch-hero-main .dispatch-title {
-    font-size: 28px !important;
-  }
-
-  html body .dispatch-shell .dispatch-alert-toggle {
-    grid-column: 1;
-    grid-row: 2;
-    width: 100%;
-    max-width: none;
-  }
-
-  html body .dispatch-shell button[data-dispatch-notification-toggle] {
-    grid-column: 2;
-    grid-row: 2;
     width: 100%;
   }
 
-  html body .dispatch-shell .dispatch-tags > span:nth-of-type(1) {
-    grid-column: 1;
-    grid-row: 3;
-  }
-
-  html body .dispatch-shell .dispatch-tags > span:nth-of-type(2) {
-    grid-column: 2;
-    grid-row: 3;
-  }
-
-  html body .dispatch-shell .dispatch-tags > span:nth-of-type(3) {
-    grid-column: 1 / -1;
-    grid-row: 4;
-    justify-self: start;
-  }
-
-  html body .dispatch-shell .dispatch-hero-main::before {
-    content: "";
-    grid-column: 1 / -1;
-    grid-row: 3;
-    align-self: start;
-    border-top: 1px solid rgba(255,255,255,.07);
-    transform: translateY(-5px);
-    pointer-events: none;
-  }
-
-  html body .dispatch-alert-toggle,
-  html body .dispatch-shell button[data-dispatch-notification-toggle] {
-    white-space: normal;
-    text-align: center;
-    justify-content: center;
+  html body .dispatch-shell .dispatch-tags button[data-dispatch-notification-toggle] {
+    width: 100%;
+    margin-left: 0;
   }
 }
 
 @media (max-width: 520px) {
+  html body .dispatch-shell .dispatch-hero-main {
+    padding: 18px;
+  }
+
   html body .dispatch-shell .dispatch-hero-main .dispatch-tags > span {
     width: 100%;
     justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body .dispatch-shell .dispatch-alert-toggle,
+  html body .dispatch-shell button[data-dispatch-notification-toggle] {
+    transition: none;
+    animation: none;
   }
 }

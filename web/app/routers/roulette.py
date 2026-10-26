@@ -11,12 +11,11 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from web.app.services import roulette_redraw_service as roulette_redraw_service
-from web.app.services import roulette_service as roulette_service
 from web.app.services.roulette_redraw_service import (
     ensure_redraw_tables,
     get_redraw_state,
     grant_redraw,
+    list_admin_roulette_orders,
     prepare_redraw_if_credited,
 )
 from web.app.services.roulette_service import (
@@ -34,64 +33,6 @@ TEMPLATES = Jinja2Templates(
     directory=str(Path(__file__).resolve().parents[1] / "templates")
 )
 _ROULETTE_READY_TASK: asyncio.Task | None = None
-
-
-def _strict_roulette_identity(order: dict[str, Any]) -> bool:
-    """Roulette identity is canonical rule metadata, never a display-name guess."""
-    rule_key = str(order.get("order_rule_key") or "").strip()
-    return rule_key in roulette_service.ROULETTE_RULE_KEYS
-
-
-# Keep all existing roulette services, redraw validation and member routes aligned
-# on the same canonical identity rule. Older code used the item label as a fallback,
-# which could make an unrelated fun order look like a roulette order.
-roulette_service._is_roulette_order = _strict_roulette_identity
-
-
-def _list_admin_roulette_orders_strict(*, limit: int = 100) -> list[dict[str, Any]]:
-    ensure_redraw_tables()
-    safe_limit = max(1, min(int(limit or 100), 250))
-    keys = tuple(sorted(roulette_service.ROULETTE_RULE_KEYS))
-    placeholders = ",".join("?" for _ in keys)
-
-    with roulette_redraw_service._connect() as conn:
-        rows = conn.execute(
-            f"""
-            SELECT *
-            FROM web_orders
-            WHERE order_rule_key IN ({placeholders})
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (*keys, safe_limit),
-        ).fetchall()
-
-    output: list[dict[str, Any]] = []
-    for raw in rows:
-        order = dict(raw)
-        state = get_redraw_state(int(order["id"]))
-        output.append(
-            {
-                "id": int(order["id"]),
-                "order_no": str(order.get("bot_order_no") or f"WEB-{order['id']}"),
-                "customer_name": str(
-                    order.get("customer_display_name")
-                    or order.get("customer_username")
-                    or order.get("customer_discord_id")
-                    or "未紀錄"
-                ),
-                "customer_discord_id": str(order.get("customer_discord_id") or ""),
-                "status": str(order.get("status") or "").strip().lower(),
-                "ticket_channel_id": str(order.get("ticket_channel_id") or ""),
-                "final_draw": state["final_draw"],
-                "remaining": state["remaining"],
-                "total_granted": state["total_granted"],
-                "attempt_count": state["attempt_count"],
-                "history": state["history"],
-                "grants": state["grants"],
-            }
-        )
-    return output
 
 
 # 只初始化輪盤資料表與舊誤建商品清理；正式商品設定仍完全由後台管理。
@@ -287,7 +228,7 @@ async def admin_fun_orders(
     if not user:
         return RedirectResponse(url="/service", status_code=303)
 
-    orders = await run_in_threadpool(_list_admin_roulette_orders_strict)
+    orders = await run_in_threadpool(list_admin_roulette_orders)
     return TEMPLATES.TemplateResponse(
         request=request,
         name="admin_fun_orders.html",

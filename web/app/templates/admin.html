@@ -14,6 +14,7 @@
         <div class="notice error">{{ error }}</div>
     {% endif %}
 
+    {% if mobile_ui %}
     <section class="mobile-task-hub admin-mobile-task-hub" aria-label="客服快捷操作">
         <div class="mobile-task-hub-head">
             <div class="mobile-task-hub-copy">
@@ -41,6 +42,7 @@
             </a>
         </div>
     </section>
+    {% endif %}
 
     <section class="queues admin-priority-queues" aria-label="客服優先待辦">
         <div class="panel admin-priority-panel admin-priority-p0">
