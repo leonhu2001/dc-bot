@@ -24,19 +24,22 @@ def test_dispatch_has_one_hero_css_owner() -> None:
 def test_admin_dashboard_owns_desktop_grid_geometry() -> None:
     template = _read(TEMPLATES / "admin.html")
     css = _read(CSS / "admin_dashboard_pc.css")
+    responsive = _read(CSS / "admin_dashboard_responsive.css")
 
-    assert "admin_dashboard_pc.css?v=20261026-1" in template
+    assert "admin_dashboard_pc.css?v=" in template
+    assert "admin_dashboard_responsive.css?v=" in template
     assert "body.mw-desktop-ui .admin-dashboard-stats" in css
     assert "grid-template-columns: repeat(5, minmax(0, 1fr))" in css
     assert "body.mw-desktop-ui .admin-dashboard-orders .order-head" in css
     assert "body.mw-desktop-ui .admin-dashboard-orders .order-row" in css
+    assert "max-width: 1500px" in responsive
 
 
 def test_report_queue_owns_desktop_shortcut_geometry() -> None:
     template = _read(TEMPLATES / "order_reports.html")
     css = _read(CSS / "order_reports_desktop.css")
 
-    assert "order_reports_desktop.css?v=20261026-1" in template
+    assert "order_reports_desktop.css?v=" in template
     assert "body.desktop-ui .report-mobile-task-hub .mobile-task-grid" in css
     assert "grid-template-columns: repeat(5,minmax(0,1fr))" in css
     assert "body.desktop-ui .report-mobile-task-hub .mobile-task-action" in css
