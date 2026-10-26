@@ -138,6 +138,7 @@ async def _wallet_aware_add_customer_reward_from_order(
     return (
         f"會員紀錄已更新：完成訂單 +1；錢包實際消費 {amount:,}T，"
         f"本次增加 {earned:,} 點，目前可用 {rewards.get_current_reward_points(data):,} 點。"
+        "VIP 儲值本金已先累積，因此未再次增加累積消費。"
         f"（錢包消費累積尾數 {remainder}T）"
     )
 
