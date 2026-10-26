@@ -4,6 +4,8 @@ from pathlib import Path
 CUSTOMER_SHELL = Path("web/app/templates/_customer_mobile_app_shell.html")
 EMPLOYEE_SHELL = Path("web/app/templates/_employee_mobile_app_shell.html")
 ADMIN_SIDEBAR = Path("web/app/templates/_admin_sidebar.html")
+SITE_LAYOUT = Path("web/app/templates/site_layout.html")
+ADMIN_LAYOUT = Path("web/app/templates/admin_layout.html")
 CSS = Path("web/app/static/css/pages/mobile_app_rebuild_v6.css")
 
 
@@ -11,11 +13,14 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_v6_is_loaded_from_all_mobile_shell_surfaces() -> None:
-    marker = "/static/css/pages/mobile_app_rebuild_v6.css?v=20261026-1"
-    assert marker in _read(CUSTOMER_SHELL)
-    assert marker in _read(EMPLOYEE_SHELL)
-    assert marker in _read(ADMIN_SIDEBAR)
+def test_v6_is_owned_by_render_layouts_not_body_partials() -> None:
+    marker = "/static/css/pages/mobile_app_rebuild_v6.css?v=20261026-2"
+    assert marker in _read(SITE_LAYOUT)
+    assert marker in _read(ADMIN_LAYOUT)
+
+    assert "mobile_app_rebuild_v6.css" not in _read(CUSTOMER_SHELL)
+    assert "mobile_app_rebuild_v6.css" not in _read(EMPLOYEE_SHELL)
+    assert "mobile_app_rebuild_v6.css" not in _read(ADMIN_SIDEBAR)
 
 
 def test_customer_home_and_order_have_dedicated_mobile_dom() -> None:
