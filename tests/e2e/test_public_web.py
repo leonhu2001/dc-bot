@@ -38,6 +38,18 @@ def open_first_order_dialog(page: Page):
     return dialog
 
 
+def _visible_heights(page: Page, selector: str) -> list[float]:
+    return page.locator(selector).evaluate_all(
+        """els => els
+            .filter(el => {
+                const s = getComputedStyle(el);
+                const r = el.getBoundingClientRect();
+                return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0;
+            })
+            .map(el => el.getBoundingClientRect().height)"""
+    )
+
+
 def test_home_and_order_catalog_render(page: Page) -> None:
     home = page.goto(f"{BASE_URL}/", wait_until="domcontentloaded")
     assert home is not None and home.ok
@@ -199,6 +211,74 @@ def test_mobile_order_skips_billboard_and_puts_products_near_top(page: Page) -> 
     box = cards.first.bounding_box()
     assert box is not None
     assert box["y"] < 460
+
+
+def test_mobile_home_component_sizes_are_consistent(page: Page) -> None:
+    page.set_viewport_size({"width": 390, "height": 844})
+    response = page.goto(f"{BASE_URL}/", wait_until="domcontentloaded")
+    assert response is not None and response.ok
+
+    action_heights = _visible_heights(page, ".mobile-v6-actions a")
+    assert len(action_heights) == 2
+    assert all(43 <= height <= 45 for height in action_heights)
+    assert max(action_heights) - min(action_heights) <= 1
+
+    quick_heights = _visible_heights(page, ".mobile-v6-quick-grid a")
+    assert len(quick_heights) == 4
+    assert all(69 <= height <= 71 for height in quick_heights)
+    assert max(quick_heights) - min(quick_heights) <= 1
+
+    icon_box = page.locator(".customer-app-mark").bounding_box()
+    assert icon_box is not None
+    assert 39 <= icon_box["width"] <= 41
+    assert 39 <= icon_box["height"] <= 41
+
+
+def test_mobile_order_component_sizes_are_consistent(page: Page) -> None:
+    page.set_viewport_size({"width": 390, "height": 844})
+    open_order_catalog(page)
+
+    category_heights = _visible_heights(page, ".mobile-v6-category-strip a")
+    assert category_heights
+    assert all(41 <= height <= 43 for height in category_heights)
+    assert max(category_heights) - min(category_heights) <= 1
+
+    open_heights = _visible_heights(page, ".order3-open")
+    if not open_heights:
+        pytest.skip("No public order groups are available in this fixture")
+    assert all(43 <= height <= 45 for height in open_heights[:4])
+
+    media_box = page.locator(".order3-media").first.bounding_box()
+    assert media_box is not None
+    assert 87 <= media_box["width"] <= 89
+    assert 99 <= media_box["height"] <= 101
+
+
+def test_mobile_staff_and_vip_cards_do_not_inherit_oversized_min_heights(page: Page) -> None:
+    page.set_viewport_size({"width": 390, "height": 844})
+
+    staff = page.goto(f"{BASE_URL}/staff", wait_until="domcontentloaded")
+    assert staff is not None and staff.ok
+    filter_heights = _visible_heights(page, ".crew-filters a")
+    assert filter_heights
+    assert all(41 <= height <= 43 for height in filter_heights)
+
+    crew_cards = page.locator(".public-crew-card")
+    if crew_cards.count():
+        min_height = crew_cards.first.evaluate("el => getComputedStyle(el).minHeight")
+        assert min_height in {"0px", "auto"}
+        more = crew_cards.first.locator(".public-crew-more")
+        if more.count() and more.is_visible():
+            box = more.bounding_box()
+            assert box is not None
+            assert 43 <= box["height"] <= 45
+
+    vip = page.goto(f"{BASE_URL}/vip", wait_until="domcontentloaded")
+    assert vip is not None and vip.ok
+    levels = page.locator(".vip-level-card")
+    assert levels.count() >= 1
+    min_height = levels.first.evaluate("el => getComputedStyle(el).minHeight")
+    assert min_height in {"0px", "auto"}
 
 
 def test_health_endpoint_stays_public(page: Page) -> None:
