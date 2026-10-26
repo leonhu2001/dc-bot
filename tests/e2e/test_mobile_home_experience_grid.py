@@ -8,7 +8,7 @@ from playwright.sync_api import Page, expect
 BASE_URL = os.environ.get("E2E_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 
-def test_mobile_home_experience_cards_stay_in_two_equal_columns(page: Page) -> None:
+def test_mobile_home_experience_cards_are_readable_without_horizontal_overflow(page: Page) -> None:
     # The server chooses a UI surface from device hints, not viewport width alone.
     # This keeps a narrow desktop window on the desktop pathway.
     page.context.set_extra_http_headers({"Sec-CH-UA-Mobile": "?1"})
@@ -30,6 +30,7 @@ def test_mobile_home_experience_cards_stay_in_two_equal_columns(page: Page) -> N
             const cards = [...el.querySelectorAll('.experience-card')];
             return {
                 autoFlow: style.gridAutoFlow,
+                columns: style.gridTemplateColumns,
                 clientWidth: el.clientWidth,
                 scrollWidth: el.scrollWidth,
                 cardWidths: cards.map(card => card.getBoundingClientRect().width),
@@ -41,7 +42,8 @@ def test_mobile_home_experience_cards_stay_in_two_equal_columns(page: Page) -> N
     assert geometry["autoFlow"] == "row"
     assert geometry["scrollWidth"] <= geometry["clientWidth"] + 2
     assert max(geometry["cardWidths"]) - min(geometry["cardWidths"]) <= 2
-    assert min(geometry["cardWidths"]) >= 150
+    # Compact phones use one readable full-width card per row instead of cramped columns.
+    assert min(geometry["cardWidths"]) >= 280
 
     heading = page.locator(".experience-section .section-heading")
     expect(heading).to_be_visible()
