@@ -4,10 +4,17 @@ from typing import Any, Callable, Awaitable
 
 import discord
 
+from services.support_calls import (
+    cancel_support_call,
+    create_or_get_active_support_call,
+    set_support_call_notification,
+)
 from views.support import ComplaintModal, FeedbackModal
+from views.support_calls import SupportCallActionView, build_support_call_embed
 
 # Dependencies configured by bot.py after IDs and helper functions are available.
 EXAM_CATEGORY_ID: int | None = None
+CUSTOMER_CATEGORY_ID: int | None = None
 CUSTOMER_ROLE_ID: int | None = None
 EXAMINER_ROLE_ID: int | None = None
 MANAGER_ROLE_ID: int | None = None
@@ -16,14 +23,16 @@ RECRUIT_APPLICANT_ROLE_ID: int | None = None
 safe_channel_name: Callable[[str, discord.Member], str] | None = None
 create_private_channel: Callable[..., Awaitable[Any]] | None = None
 recruit_control_view_factory: Callable[[], discord.ui.View] | None = None
+format_customer_notes_for_ticket: Callable[[int], str] | None = None
+order_control_view_factory: Callable[[], discord.ui.View] | None = None
 
 
 def build_main_panel_embed() -> discord.Embed:
     return discord.Embed(
-        title="魔丸娛樂｜客服中心",
+        title="魔丸娛樂｜聯絡客服",
         description=(
             "歡迎來到魔丸娛樂，請選擇下方需要的服務。\n"
-            "入職、客訴與顧客意見皆可由此進入。\n"
+            "需要真人客服時可按 **🔔 呼叫客服**，系統會建立 / 開啟你的私人客服票口並通知客服。\n"
             "客服服務時間：**AM 10:00－隔日 AM 2:00**"
         ),
         color=discord.Color.purple(),
@@ -44,11 +53,14 @@ def configure_panel_views(
 ) -> None:
     """Configure the customer-service panel.
 
-    Old ordering-related keyword arguments are intentionally ignored so the main
-    bot wiring remains backward compatible while the removed legacy order entry
-    is no longer kept alive inside this view module.
+    Ordering-related dependencies are still captured for the member portal and
+    black-diamond redemption flow, while the public service lobby itself keeps
+    only customer-service actions.
     """
     globals()["EXAM_CATEGORY_ID"] = exam_category_id
+    globals()["CUSTOMER_CATEGORY_ID"] = int(
+        _legacy_order_kwargs.get("customer_category_id") or 0
+    ) or None
     globals()["CUSTOMER_ROLE_ID"] = customer_role_id
     globals()["EXAMINER_ROLE_ID"] = examiner_role_id
     globals()["MANAGER_ROLE_ID"] = manager_role_id
@@ -56,12 +68,174 @@ def configure_panel_views(
     globals()["safe_channel_name"] = safe_channel_name
     globals()["create_private_channel"] = create_private_channel
     globals()["recruit_control_view_factory"] = recruit_control_view_factory
+    globals()["format_customer_notes_for_ticket"] = _legacy_order_kwargs.get(
+        "format_customer_notes_for_ticket"
+    )
+    globals()["order_control_view_factory"] = _legacy_order_kwargs.get(
+        "order_control_view_factory"
+    )
 
 
 def _require_configured(name: str, value):
     if value is None:
         raise RuntimeError(f"views.panels 尚未設定 {name}")
     return value
+
+
+def _support_channel_for_member(
+    category: discord.CategoryChannel,
+    member_id: int,
+) -> discord.TextChannel | None:
+    marker = f"support_customer_id={int(member_id)}"
+    for channel in category.text_channels:
+        if marker in str(channel.topic or ""):
+            return channel
+    return None
+
+
+async def _open_or_ring_support(interaction: discord.Interaction) -> None:
+    guild = interaction.guild
+    member = interaction.user
+    if guild is None or not isinstance(member, discord.Member):
+        await interaction.response.send_message(
+            "客服鈴只能在伺服器內使用。",
+            ephemeral=True,
+        )
+        return
+
+    category_id = _require_configured("CUSTOMER_CATEGORY_ID", CUSTOMER_CATEGORY_ID)
+    support_role_id = _require_configured("CUSTOMER_ROLE_ID", CUSTOMER_ROLE_ID)
+    name_builder = _require_configured("safe_channel_name", safe_channel_name)
+
+    category = guild.get_channel(int(category_id))
+    support_role = guild.get_role(int(support_role_id))
+    if not isinstance(category, discord.CategoryChannel) or support_role is None:
+        await interaction.response.send_message(
+            "客服票口尚未完成設定，請直接標記客服協助。",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    channel = _support_channel_for_member(category, member.id)
+    created_channel = False
+    if channel is None:
+        bot_member = guild.me
+        if bot_member is None:
+            await interaction.followup.send("目前無法建立客服票口，請稍後再試。", ephemeral=True)
+            return
+
+        overwrites: dict[discord.abc.Snowflake, discord.PermissionOverwrite] = {
+            guild.default_role: discord.PermissionOverwrite(
+                view_channel=False,
+                send_messages=False,
+                read_message_history=False,
+            ),
+            member: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                attach_files=True,
+            ),
+            support_role: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                attach_files=True,
+            ),
+            bot_member: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                attach_files=True,
+                manage_channels=True,
+                manage_messages=True,
+            ),
+        }
+        manager_role = guild.get_role(int(MANAGER_ROLE_ID or 0))
+        if manager_role is not None and manager_role.id != support_role.id:
+            overwrites[manager_role] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                attach_files=True,
+            )
+
+        try:
+            channel = await guild.create_text_channel(
+                name=name_builder("客服", member),
+                category=category,
+                overwrites=overwrites,
+                topic=f"support_customer_id={member.id};support_source=main_panel",
+                reason=f"{member} opened a customer-service ticket",
+            )
+            created_channel = True
+            await channel.send(
+                f"👋 {member.mention}，這裡是你的私人客服票口。\n"
+                "請直接描述需要協助的事情；按下客服鈴後會通知目前可處理的客服。",
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False,
+                ),
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.followup.send(
+                "建立客服票口失敗，請直接標記客服協助。",
+                ephemeral=True,
+            )
+            return
+
+    call, created_call = create_or_get_active_support_call(
+        ticket_channel_id=channel.id,
+        customer_discord_id=member.id,
+        customer_display_name=str(member.display_name or member.name),
+    )
+
+    if created_call:
+        try:
+            notification = await channel.send(
+                content=(
+                    f"{support_role.mention}\n"
+                    f"🔔 {member.mention} 呼叫客服，請可處理的人員按 **接手處理**。"
+                ),
+                embed=build_support_call_embed(call),
+                view=SupportCallActionView(),
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=True,
+                    everyone=False,
+                ),
+            )
+            set_support_call_notification(int(call["id"]), notification.id)
+        except Exception:
+            cancel_support_call(int(call["id"]), "notification_send_failed")
+            await interaction.followup.send(
+                f"客服票口已建立：{channel.mention}\n但客服鈴通知失敗，請在票口直接標記客服。",
+                ephemeral=True,
+            )
+            return
+
+        message = (
+            f"🔔 已呼叫客服，請到 {channel.mention} 描述需要協助的事情。"
+            if not created_channel
+            else f"🔔 已建立客服票口並呼叫客服：{channel.mention}"
+        )
+    else:
+        status = str(call.get("status") or "")
+        if status == "claimed":
+            staff_id = str(call.get("claimed_by_discord_id") or "").strip()
+            state = f"已由 <@{staff_id}> 接手" if staff_id else "已由客服接手"
+        else:
+            state = "已送出，正在等待客服接手"
+        message = f"你的客服鈴{state}。請到 {channel.mention} 繼續說明問題。"
+
+    await interaction.followup.send(
+        message,
+        ephemeral=True,
+        allowed_mentions=discord.AllowedMentions.none(),
+    )
 
 
 class RecruitModal(discord.ui.Modal, title="我要入職"):
@@ -156,6 +330,16 @@ class RecruitModal(discord.ui.Modal, title="我要入職"):
 class MainPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="呼叫客服",
+        emoji="🔔",
+        style=discord.ButtonStyle.primary,
+        custom_id="mawan_main_panel_support_call_v1",
+        row=0,
+    )
+    async def support_call_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await _open_or_ring_support(interaction)
 
     @discord.ui.button(
         label="我要入職",
