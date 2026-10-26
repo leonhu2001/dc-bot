@@ -77,7 +77,7 @@ async def _vip_with_cumulative_spend(interaction: discord.Interaction) -> None:
 def _build_member_portal_embed_v2() -> discord.Embed:
     embed = member_portal.build_member_portal_embed()
     embed.description = (
-        "查詢訂單、錢包、點數 / VIP、會員福利與儲值中心。\n"
+        "查詢訂單、錢包、累積消費、點數 / VIP、會員福利與儲值中心。\n"
         "查詢結果僅自己可見。"
     )
     return embed
@@ -202,13 +202,20 @@ async def _remove_legacy_topup_panel(bot: discord.Client, bot_user_id: int) -> N
 def install_member_portal_20261026(bot: discord.Client) -> None:
     _patch_member_portal_view()
 
-    if not getattr(bot, "_member_portal_view_registered", False):
-        bot.add_view(member_portal.MemberPortalView())
+    add_view = getattr(bot, "add_view", None)
+    if callable(add_view) and not getattr(bot, "_member_portal_view_registered", False):
+        add_view(member_portal.MemberPortalView())
         bot._member_portal_view_registered = True
 
-    if not getattr(bot, "_member_portal_20261026_sync_started", False):
+    # setup_commands and this compatibility runtime share the same flag so only
+    # one startup sync task is ever scheduled. Lightweight test doubles may not
+    # expose a Discord loop at all; in that case portal sync is simply skipped.
+    loop = getattr(bot, "loop", None)
+    create_task = getattr(loop, "create_task", None)
+    if callable(create_task) and not getattr(bot, "_member_portal_sync_task_started", False):
+        bot._member_portal_sync_task_started = True
         bot._member_portal_20261026_sync_started = True
-        bot.loop.create_task(_sync_member_portal_panel(bot))
+        create_task(_sync_member_portal_panel(bot))
 
 
 __all__ = ["install_member_portal_20261026"]
