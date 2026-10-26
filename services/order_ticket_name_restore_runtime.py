@@ -299,12 +299,19 @@ def _install_quick_create_ticket_patch() -> bool:
 def _install_store_renamer_patch() -> bool:
     """Keep game + service/detail in every quick-order rename and stored order."""
     try:
-        from services import order_runtime
+        from services import order_payment_runtime, order_runtime
 
         state = getattr(order_runtime, "_RUNTIME_STATE", None)
         if state is None:
             return False
+
+        existing_wrapper = getattr(order_runtime, "_rich_store_ticket_renamer", None)
         if getattr(order_runtime, "_rich_store_ticket_renamer_installed", False):
+            if callable(existing_wrapper):
+                # Payment finalization owns a separate runtime callback. Keep it
+                # on the same context-aware renamer so a raw item such as 單陪
+                # cannot overwrite the rich quick-ticket name after payment.
+                order_payment_runtime.rename_ticket_channel = existing_wrapper
             return True
 
         original = state.ticket_channel_renamer
@@ -342,7 +349,12 @@ def _install_store_renamer_patch() -> bool:
             state,
             ticket_channel_renamer=rich_ticket_channel_renamer,
         )
+        order_runtime._rich_store_ticket_renamer = rich_ticket_channel_renamer
         order_runtime._rich_store_ticket_renamer_installed = True
+        # order_payment_runtime is configured independently from order_runtime.
+        # Without this assignment, payment completion renames the ticket again
+        # from its raw item label and can erase the game/service prefix.
+        order_payment_runtime.rename_ticket_channel = rich_ticket_channel_renamer
         return True
     except Exception as exc:
         print(
