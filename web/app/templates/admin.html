@@ -1,8 +1,8 @@
 {% extends "admin_layout.html" %}
 
 {% block head %}
-<link rel="stylesheet" href="/static/css/pages/admin_dashboard_pc.css?v=20261026-3">
-<link rel="stylesheet" href="/static/css/pages/admin_dashboard_responsive.css?v=20261026-1">
+<link rel="stylesheet" href="/static/css/pages/admin_dashboard_pc.css?v=20261027-1">
+<link rel="stylesheet" href="/static/css/pages/admin_dashboard_responsive.css?v=20261027-1">
 {% endblock %}
 
 {% block page_title %}客服工作台{% endblock %}
@@ -132,12 +132,11 @@
             <div>金額</div>
             <div>狀態</div>
             <div>客服 / 時間</div>
-            <div></div>
         </div>
 
         {% if orders %}
             {% for order in orders %}
-                <div class="order-row">
+                <a class="order-row" href="/admin/order-workspace/{{ order.id }}" title="開啟訂單工作區">
                     <div>
                         <div class="order-no">{{ order.order_no }}</div>
                         {% if order.needs_attention %}<div class="secondary">⚠ 需注意</div>{% endif %}
@@ -165,11 +164,7 @@
                         <div class="primary">{{ order.customer_service or "尚未指派" }}</div>
                         <div class="secondary">{{ order.created_display }}</div>
                     </div>
-
-                    <div>
-                        <a class="workspace" href="/admin/order-workspace/{{ order.id }}" title="開啟訂單工作區">→</a>
-                    </div>
-                </div>
+                </a>
             {% endfor %}
         {% else %}
             <div class="empty">沒有符合條件的訂單</div>
