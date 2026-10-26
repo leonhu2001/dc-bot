@@ -14,8 +14,8 @@ from services.dispatch_presence import (
 
 # 舊 formatter 保留給相容測試 / 其他呼叫點；Discord 實際顯示已改為男女陪分流。
 DEFAULT_IDLE_CHANNEL_NAME = "⚫┃暫無陪玩"
-DEFAULT_SUPPORT_IDLE_CHANNEL_NAME = "🛎️┃客服中心"
-SUPPORT_ONLINE_CHANNEL_NAME = "🟢┃客服中心"
+DEFAULT_SUPPORT_IDLE_CHANNEL_NAME = "🛎️┃聯絡客服"
+SUPPORT_ONLINE_CHANNEL_NAME = "🟢┃聯絡客服"
 
 FEMALE_COMPANION_ROLE_ID = "1482080315798192210"
 MALE_COMPANION_ROLE_ID = "1500751059239440575"
