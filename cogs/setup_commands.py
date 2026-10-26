@@ -15,6 +15,12 @@ from services.quick_order_v2_select_display import install_quick_order_v2_select
 from services.custom_order_quick_entry import install_custom_order_quick_entry
 from services.discord_vip_channel_access import install_discord_vip_channel_access
 from services.order_ticket_name_restore_runtime import install_order_ticket_name_restore
+from views.member_portal import (
+    MEMBER_PORTAL_CHANNEL_ID,
+    MEMBER_PORTAL_MARKER,
+    MemberPortalView,
+    build_member_portal_embed,
+)
 from views.panels import MainPanelView, build_main_panel_embed
 from views.topups import TopupPanelView
 from views.staff_management import (
@@ -57,6 +63,75 @@ class SetupCommands(commands.Cog):
         if not getattr(bot, "_topup_panel_view_registered", False):
             bot.add_view(TopupPanelView())
             bot._topup_panel_view_registered = True
+
+        if not getattr(bot, "_member_portal_view_registered", False):
+            bot.add_view(MemberPortalView())
+            bot._member_portal_view_registered = True
+
+        if not getattr(bot, "_member_portal_sync_task_started", False):
+            bot._member_portal_sync_task_started = True
+            bot.loop.create_task(self._sync_member_portal_panel())
+
+    async def _sync_member_portal_panel(self) -> None:
+        """Refresh the existing member portal in place after every bot restart."""
+        await self.bot.wait_until_ready()
+
+        channel = self.bot.get_channel(MEMBER_PORTAL_CHANNEL_ID)
+        if not isinstance(channel, discord.TextChannel):
+            try:
+                fetched = await self.bot.fetch_channel(MEMBER_PORTAL_CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as exc:
+                print(
+                    f"[member-portal] channel lookup failed: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+                return
+            channel = fetched if isinstance(fetched, discord.TextChannel) else None
+
+        if channel is None or self.bot.user is None:
+            return
+
+        target_message: discord.Message | None = None
+        try:
+            async for message in channel.history(limit=100, oldest_first=False):
+                if message.author.id != self.bot.user.id or not message.embeds:
+                    continue
+                embed = message.embeds[0]
+                footer_text = str(getattr(embed.footer, "text", "") or "")
+                if embed.title == "👤 我的專區" or footer_text == MEMBER_PORTAL_MARKER:
+                    target_message = message
+                    break
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            print(
+                f"[member-portal] history scan failed: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return
+
+        try:
+            if target_message is None:
+                target_message = await channel.send(
+                    embed=build_member_portal_embed(),
+                    view=MemberPortalView(),
+                )
+                action = "created"
+            else:
+                await target_message.edit(
+                    embed=build_member_portal_embed(),
+                    view=MemberPortalView(),
+                )
+                action = "refreshed"
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            print(
+                f"[member-portal] panel sync failed: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return
+
+        print(
+            f"[member-portal] panel {action}: channel={channel.id} message={target_message.id}",
+            flush=True,
+        )
 
     @setup.command(
         name="panel",
