@@ -1,0 +1,739 @@
+/* Mobile component sizing v7
+   Final phone-only density layer. This file deliberately owns component size,
+   padding and touch geometry across customer, employee and admin surfaces.
+   Layout composition remains in v6; this file removes inconsistent one-off
+   34/36/38/40/42/48px controls and oversized fixed card heights. */
+
+@media (max-width: 767px) {
+  :root {
+    --v7-control-h: 44px;
+    --v7-control-sm: 40px;
+    --v7-icon-control: 40px;
+    --v7-shortcut-h: 70px;
+    --v7-stat-h: 72px;
+    --v7-card-pad: 12px;
+    --v7-card-gap: 9px;
+    --v7-radius-control: 12px;
+    --v7-radius-card: 16px;
+  }
+
+  body.customer-mobile-app-site *,
+  body.employee-workspace-site *,
+  body:has(.employee-app-topbar) *,
+  body.mw-r5-admin * {
+    box-sizing: border-box;
+  }
+
+  /* ===== Shared touch geometry ===== */
+  body.customer-mobile-app-site :where(
+    button,
+    .button,
+    a.button,
+    input[type="button"],
+    input[type="submit"]
+  ):not(.mobile-app-sheet-backdrop),
+  body.employee-workspace-site :where(
+    button,
+    .button,
+    a.button,
+    .ec-btn,
+    input[type="button"],
+    input[type="submit"]
+  ):not(.mobile-app-sheet-backdrop),
+  body:has(.employee-app-topbar) :where(
+    button,
+    .button,
+    a.button,
+    .ec-btn,
+    input[type="button"],
+    input[type="submit"]
+  ):not(.mobile-app-sheet-backdrop),
+  body.mw-r5-admin :where(
+    button,
+    .button,
+    a.button,
+    input[type="button"],
+    input[type="submit"]
+  ):not(.mobile-app-sheet-backdrop) {
+    min-height: var(--v7-control-h) !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-radius: var(--v7-radius-control) !important;
+    font-size: 13px !important;
+    line-height: 1.15 !important;
+  }
+
+  body.customer-mobile-app-site :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+  body.employee-workspace-site :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+  body:has(.employee-app-topbar) :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+  body.mw-r5-admin :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    min-height: var(--v7-control-h) !important;
+    border-radius: var(--v7-radius-control) !important;
+  }
+
+  body.customer-mobile-app-site textarea,
+  body.employee-workspace-site textarea,
+  body:has(.employee-app-topbar) textarea,
+  body.mw-r5-admin textarea {
+    min-height: 96px !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  /* Icon-only controls keep a compact visual box without becoming tiny taps. */
+  :where(
+    .customer-app-mark,
+    .customer-app-account,
+    .employee-app-mark,
+    .employee-app-profile,
+    .admin-app-home,
+    .admin-app-search,
+    .mobile-app-sheet-close,
+    .order3-dialog-close
+  ) {
+    width: var(--v7-icon-control) !important;
+    height: var(--v7-icon-control) !important;
+    min-width: var(--v7-icon-control) !important;
+    min-height: var(--v7-icon-control) !important;
+    flex: 0 0 var(--v7-icon-control) !important;
+    padding: 0 !important;
+  }
+
+  .customer-app-login {
+    min-height: var(--v7-icon-control) !important;
+    padding: 0 13px !important;
+    font-size: 12px !important;
+  }
+
+  .mobile-app-context-switch a {
+    min-height: var(--v7-control-sm) !important;
+    padding: 0 10px !important;
+    border-radius: 11px !important;
+    font-size: 12px !important;
+  }
+
+  /* Bottom dock items should feel equal on all three apps. */
+  .customer-app-nav-item,
+  .employee-app-nav-item,
+  .admin-app-nav-item,
+  .employee-app-more > summary,
+  .admin-app-more > summary {
+    min-height: 50px !important;
+    max-height: 50px !important;
+    gap: 2px !important;
+    padding: 3px 2px !important;
+    border-radius: 11px !important;
+    font-size: 10px !important;
+  }
+
+  .customer-app-nav-icon,
+  .employee-app-nav-icon,
+  .admin-app-nav-icon {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 18px !important;
+  }
+
+  /* More sheets: every row has the same tap height. */
+  .employee-app-sheet-links > a,
+  .admin-app-sheet-links > a {
+    min-height: 56px !important;
+    padding: 9px 10px !important;
+    border-radius: 13px !important;
+  }
+
+  /* ===== Customer / public ===== */
+  .mobile-v6-home-card {
+    min-height: 0 !important;
+    padding: 14px !important;
+    gap: 10px !important;
+  }
+
+  .mobile-v6-home-art {
+    min-height: 134px !important;
+    border-radius: 14px !important;
+  }
+
+  .mobile-v6-actions {
+    gap: 8px !important;
+    margin-top: 11px !important;
+  }
+
+  .mobile-v6-actions a {
+    min-height: var(--v7-control-h) !important;
+    height: var(--v7-control-h) !important;
+    padding: 0 10px !important;
+    border-radius: var(--v7-radius-control) !important;
+    font-size: 12px !important;
+  }
+
+  .mobile-v6-quick-grid {
+    gap: 8px !important;
+  }
+
+  .mobile-v6-quick-grid a {
+    min-height: var(--v7-shortcut-h) !important;
+    height: var(--v7-shortcut-h) !important;
+    padding: 7px 4px !important;
+    border-radius: 14px !important;
+    font-size: 10px !important;
+  }
+
+  .mobile-v6-quick-grid a > span:first-child {
+    font-size: 18px !important;
+  }
+
+  .mobile-v6-category-strip a,
+  body.customer-mobile-app-site .crew-filters a {
+    min-height: 42px !important;
+    height: 42px !important;
+    padding: 0 13px !important;
+    border-radius: 12px !important;
+    font-size: 11px !important;
+  }
+
+  body.customer-mobile-app-site .experience-grid {
+    gap: var(--v7-card-gap) !important;
+  }
+
+  body.customer-mobile-app-site .experience-card {
+    min-height: 124px !important;
+    padding: var(--v7-card-pad) !important;
+    gap: 6px !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  body.customer-mobile-app-site .experience-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 10px !important;
+  }
+
+  body.customer-mobile-app-site .service-grid {
+    gap: var(--v7-card-gap) !important;
+  }
+
+  body.customer-mobile-app-site .service-card {
+    grid-template-columns: 104px minmax(0, 1fr) !important;
+    min-height: 104px !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  body.customer-mobile-app-site .service-art {
+    width: 104px !important;
+    min-height: 104px !important;
+  }
+
+  body.customer-mobile-app-site .service-content {
+    padding: var(--v7-card-pad) !important;
+  }
+
+  body.customer-mobile-app-site .service-content h3 {
+    margin: 3px 0 6px !important;
+    font-size: 16px !important;
+  }
+
+  body.customer-mobile-app-site .crew-type-card,
+  body.customer-mobile-app-site .mw-social-card,
+  body.customer-mobile-app-site .special-banner,
+  body.customer-mobile-app-site .public-crew-card,
+  body.customer-mobile-app-site .vip-level-card,
+  body.customer-mobile-app-site .vip-general-card,
+  body.customer-mobile-app-site .vip-rule-card,
+  body.customer-mobile-app-site .mc-card,
+  body.customer-mobile-app-site .customer-order-card,
+  body.customer-mobile-app-site .wallet-card,
+  body.customer-mobile-app-site .service-rules-card,
+  body.customer-mobile-app-site .delta-card {
+    min-height: 0 !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  body.customer-mobile-app-site .mw-social-card {
+    min-height: 78px !important;
+    padding: var(--v7-card-pad) !important;
+  }
+
+  body.customer-mobile-app-site .special-banner {
+    grid-template-columns: 78px minmax(0, 1fr) !important;
+    gap: 11px !important;
+    padding: var(--v7-card-pad) !important;
+  }
+
+  body.customer-mobile-app-site .special-banner-art {
+    width: 78px !important;
+    min-height: 88px !important;
+    border-radius: 14px !important;
+  }
+
+  body.customer-mobile-app-site .special-banner-copy .button {
+    min-height: var(--v7-control-h) !important;
+    height: var(--v7-control-h) !important;
+  }
+
+  /* Order list: square-ish media + one canonical action height. */
+  body:has(.mobile-v6-order) .order3-grid {
+    gap: var(--v7-card-gap) !important;
+  }
+
+  body:has(.mobile-v6-order) .order3-card {
+    grid-template-columns: 96px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto 1fr !important;
+    min-height: 0 !important;
+    padding: 10px !important;
+    gap: 4px 10px !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  body:has(.mobile-v6-order) .order3-media {
+    width: 96px !important;
+    height: 104px !important;
+    border-radius: 12px !important;
+  }
+
+  body:has(.mobile-v6-order) .order3-card h2 {
+    font-size: 15px !important;
+    line-height: 1.2 !important;
+  }
+
+  body:has(.mobile-v6-order) .order3-card-meta {
+    margin-top: 0 !important;
+  }
+
+  body:has(.mobile-v6-order) .order3-open {
+    min-height: var(--v7-control-h) !important;
+    height: var(--v7-control-h) !important;
+    align-self: end !important;
+    margin-top: 2px !important;
+    padding: 0 10px !important;
+    border-radius: var(--v7-radius-control) !important;
+    font-size: 11px !important;
+  }
+
+  /* Dialog actions/steppers were a common source of odd tiny controls. */
+  body.customer-mobile-app-site .order3-dialog :where(
+    button:not(.order3-dialog-close),
+    select,
+    input:not([type="checkbox"]):not([type="radio"])
+  ) {
+    min-height: var(--v7-control-h) !important;
+    border-radius: var(--v7-radius-control) !important;
+  }
+
+  body.customer-mobile-app-site :where(
+    #mw-quantity-minus,
+    #mw-quantity-plus,
+    #mw-player-minus,
+    #mw-player-plus
+  ) {
+    width: var(--v7-control-h) !important;
+    min-width: var(--v7-control-h) !important;
+    height: var(--v7-control-h) !important;
+    min-height: var(--v7-control-h) !important;
+    padding: 0 !important;
+  }
+
+  /* Staff cards */
+  body.customer-mobile-app-site .public-crew-grid {
+    gap: var(--v7-card-gap) !important;
+  }
+
+  body.customer-mobile-app-site .public-crew-card {
+    overflow: hidden !important;
+  }
+
+  body.customer-mobile-app-site .public-crew-content {
+    padding: var(--v7-card-pad) !important;
+  }
+
+  body.customer-mobile-app-site .public-crew-stats {
+    gap: 6px !important;
+  }
+
+  body.customer-mobile-app-site .public-crew-stats > div {
+    min-height: 48px !important;
+    padding: 7px 5px !important;
+  }
+
+  body.customer-mobile-app-site .public-crew-more {
+    display: flex !important;
+    width: 100% !important;
+    min-height: var(--v7-control-h) !important;
+    height: var(--v7-control-h) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-top: 9px !important;
+    padding: 0 11px !important;
+    border-radius: var(--v7-radius-control) !important;
+  }
+
+  /* VIP long-form cards should size from content, never a decorative min-height. */
+  body.customer-mobile-app-site .vip-level-grid,
+  body.customer-mobile-app-site .vip-rule-grid {
+    gap: var(--v7-card-gap) !important;
+  }
+
+  body.customer-mobile-app-site .vip-level-card,
+  body.customer-mobile-app-site .vip-general-card,
+  body.customer-mobile-app-site .vip-rule-card {
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 14px !important;
+  }
+
+  /* Member / orders / wallet */
+  body.customer-mobile-app-site .mc-shortcuts {
+    gap: 8px !important;
+  }
+
+  body.customer-mobile-app-site .mc-shortcuts > a {
+    min-height: var(--v7-shortcut-h) !important;
+    padding: 9px !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  body.customer-mobile-app-site .mc-card {
+    padding: var(--v7-card-pad) !important;
+  }
+
+  body.customer-mobile-app-site .mc-mini-stats > div,
+  body.customer-mobile-app-site .customer-order-stat {
+    min-height: var(--v7-stat-h) !important;
+    padding: 10px !important;
+    border-radius: 14px !important;
+  }
+
+  body.customer-mobile-app-site .customer-order-card {
+    padding: var(--v7-card-pad) !important;
+    gap: 8px !important;
+  }
+
+  body.customer-mobile-app-site .customer-orders-actions {
+    gap: 8px !important;
+  }
+
+  body.customer-mobile-app-site .customer-orders-actions .button {
+    min-height: var(--v7-control-h) !important;
+    height: var(--v7-control-h) !important;
+  }
+
+  body.customer-mobile-app-site .service-rules-card {
+    padding: 14px !important;
+  }
+
+  /* ===== Employee ===== */
+  body.employee-workspace-site .employee-mobile-task-hub .mobile-task-grid,
+  body:has(.employee-app-topbar) .employee-mobile-task-hub .mobile-task-grid {
+    gap: 8px !important;
+  }
+
+  body.employee-workspace-site .employee-mobile-task-hub .mobile-task-action,
+  body:has(.employee-app-topbar) .employee-mobile-task-hub .mobile-task-action,
+  body.employee-workspace-site .employee-home-salary-link,
+  body:has(.employee-app-topbar) .employee-home-salary-link {
+    min-height: var(--v7-shortcut-h) !important;
+    height: auto !important;
+    padding: 10px !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  body.employee-workspace-site .mobile-task-icon,
+  body:has(.employee-app-topbar) .mobile-task-icon {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    border-radius: 10px !important;
+  }
+
+  body.employee-workspace-site .ec-overview,
+  body:has(.employee-app-topbar) .ec-overview,
+  body.employee-workspace-site .salary-summary,
+  body:has(.employee-app-topbar) .salary-summary {
+    gap: 8px !important;
+  }
+
+  body.employee-workspace-site .ec-stat,
+  body:has(.employee-app-topbar) .ec-stat,
+  body.employee-workspace-site .salary-card,
+  body:has(.employee-app-topbar) .salary-card,
+  body.employee-workspace-site .dispatch-stat,
+  body:has(.employee-app-topbar) .dispatch-stat {
+    min-height: var(--v7-stat-h) !important;
+    padding: 10px !important;
+    border-radius: 14px !important;
+  }
+
+  body.employee-workspace-site :where(
+    .binding-card,
+    .ec-card,
+    .dispatch-panel,
+    .dispatch-order-card,
+    .dispatch-my-card,
+    .report-card,
+    .my-payout-card,
+    .it-card,
+    .sbm-panel,
+    .sbm-card
+  ),
+  body:has(.employee-app-topbar) :where(
+    .binding-card,
+    .ec-card,
+    .dispatch-panel,
+    .dispatch-order-card,
+    .dispatch-my-card,
+    .report-card,
+    .my-payout-card,
+    .it-card,
+    .sbm-panel,
+    .sbm-card
+  ) {
+    min-height: 0 !important;
+    height: auto !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  body.employee-workspace-site :where(.ec-card, .dispatch-order-card, .dispatch-my-card, .report-card, .my-payout-card, .it-card, .sbm-card),
+  body:has(.employee-app-topbar) :where(.ec-card, .dispatch-order-card, .dispatch-my-card, .report-card, .my-payout-card, .it-card, .sbm-card) {
+    padding: var(--v7-card-pad) !important;
+  }
+
+  body.employee-workspace-site .binding-card,
+  body:has(.employee-app-topbar) .binding-card,
+  body.employee-workspace-site .dispatch-panel,
+  body:has(.employee-app-topbar) .dispatch-panel,
+  body.employee-workspace-site .sbm-panel,
+  body:has(.employee-app-topbar) .sbm-panel {
+    padding: var(--v7-card-pad) !important;
+  }
+
+  body.employee-workspace-site :where(.binding-action, .dispatch-footer .button, .dispatch-support-form button, .salary-tab, .dispatch-my-link, .dispatch-support-link),
+  body:has(.employee-app-topbar) :where(.binding-action, .dispatch-footer .button, .dispatch-support-form button, .salary-tab, .dispatch-my-link, .dispatch-support-link) {
+    min-height: var(--v7-control-h) !important;
+    padding: 0 11px !important;
+    border-radius: var(--v7-radius-control) !important;
+  }
+
+  body.employee-workspace-site .salary-tabs,
+  body:has(.employee-app-topbar) .salary-tabs {
+    gap: 6px !important;
+  }
+
+  body.employee-workspace-site .salary-tab,
+  body:has(.employee-app-topbar) .salary-tab {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    font-size: 11px !important;
+  }
+
+  body.employee-workspace-site .dispatch-tags,
+  body:has(.employee-app-topbar) .dispatch-tags {
+    gap: 6px !important;
+  }
+
+  /* Status pills remain pills; interactive pill buttons get a 40px target. */
+  body.employee-workspace-site button.dispatch-tag,
+  body:has(.employee-app-topbar) button.dispatch-tag,
+  body.employee-workspace-site .dispatch-alert-toggle,
+  body:has(.employee-app-topbar) .dispatch-alert-toggle {
+    min-height: var(--v7-control-sm) !important;
+    padding: 0 10px !important;
+    border-radius: 999px !important;
+    font-size: 11px !important;
+  }
+
+  .mobile-v6-report-review {
+    min-height: var(--v7-control-sm) !important;
+    height: var(--v7-control-sm) !important;
+    padding: 0 11px !important;
+    border-radius: 11px !important;
+    font-size: 10px !important;
+  }
+
+  .mobile-v6-report-actions {
+    gap: 7px !important;
+  }
+
+  .mobile-v6-report-actions a {
+    min-height: 66px !important;
+    height: 66px !important;
+    padding: 6px 3px !important;
+    border-radius: 13px !important;
+    font-size: 10px !important;
+  }
+
+  body:has(.mobile-v6-report) .report-filter-bar {
+    gap: 8px !important;
+    padding: 10px !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  body:has(.mobile-v6-report) .report-filter-bar :is(input, select, button, a) {
+    min-height: var(--v7-control-h) !important;
+    height: var(--v7-control-h) !important;
+    border-radius: var(--v7-radius-control) !important;
+    font-size: 12px !important;
+  }
+
+  body:has(.mobile-v6-report) .report-card,
+  body:has(.mobile-v6-report) .report-empty {
+    min-height: 0 !important;
+    padding: var(--v7-card-pad) !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  /* ===== Admin ===== */
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-grid {
+    gap: 8px !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-action {
+    min-height: var(--v7-shortcut-h) !important;
+    height: auto !important;
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    gap: 9px !important;
+    padding: 10px !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 10px !important;
+  }
+
+  body.mw-r5-admin .stats,
+  body.mw-r5-admin .admin-dashboard-stats,
+  body.mw-r5-admin .center-stats,
+  body.mw-r5-admin .history-ledger-stats {
+    gap: 8px !important;
+  }
+
+  body.mw-r5-admin :where(.stats .stat, .center-stat, .history-ledger-stat) {
+    min-height: var(--v7-stat-h) !important;
+    height: auto !important;
+    padding: 10px !important;
+    border-radius: 14px !important;
+  }
+
+  body.mw-r5-admin .stats .stat:last-child:nth-child(odd) {
+    min-height: var(--v7-stat-h) !important;
+  }
+
+  body.mw-r5-admin :where(
+    .panel,
+    .compact-panel,
+    .orders-panel,
+    .queue-row,
+    .center-row,
+    .center-review,
+    .admin-order-card,
+    .history-ledger-panel,
+    .pay-review-panel,
+    .topup-card,
+    .topup-panel,
+    .wallet-card,
+    .vip-timer-card
+  ) {
+    min-height: 0 !important;
+    height: auto !important;
+    border-radius: var(--v7-radius-card) !important;
+  }
+
+  body.mw-r5-admin :where(.orders-panel, .center-row, .center-review, .admin-order-card, .topup-card, .wallet-card, .vip-timer-card) {
+    padding: var(--v7-card-pad) !important;
+  }
+
+  body.mw-r5-admin .queues .panel-head {
+    min-height: var(--v7-control-h) !important;
+    padding: 9px 11px !important;
+  }
+
+  body.mw-r5-admin .queues .count {
+    min-width: 28px !important;
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  body.mw-r5-admin .queue-row {
+    padding: 10px 11px !important;
+  }
+
+  body.mw-r5-admin .workspace {
+    width: var(--v7-icon-control) !important;
+    height: var(--v7-icon-control) !important;
+    min-width: var(--v7-icon-control) !important;
+    min-height: var(--v7-icon-control) !important;
+    border-radius: 11px !important;
+  }
+
+  body.mw-r5-admin :where(.filters, .center-actions, .pagination) {
+    gap: 8px !important;
+  }
+
+  body.mw-r5-admin :where(.filters, .center-actions, .pagination) :where(button, .button, a.button, a:not(.workspace)) {
+    min-height: var(--v7-control-h) !important;
+    border-radius: var(--v7-radius-control) !important;
+  }
+
+  /* Prevent old page CSS from stretching action rows to arbitrary heights. */
+  body.mw-r5-admin :where(.section-title-row, .orders-top, .panel-head, .center-actions),
+  body.employee-workspace-site :where(.ec-card-head, .dispatch-column-head, .dispatch-subsection-head),
+  body:has(.employee-app-topbar) :where(.ec-card-head, .dispatch-column-head, .dispatch-subsection-head) {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  /* Floating support button keeps its own intentional 48px target. */
+  body.customer-mobile-app-site .mw-support-launcher,
+  body.employee-workspace-site .mw-support-launcher,
+  body:has(.employee-app-topbar) .mw-support-launcher,
+  body.mw-r5-admin .mw-support-launcher {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    padding: 0 !important;
+    border-radius: 15px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  :root {
+    --v7-card-pad: 11px;
+    --v7-card-gap: 8px;
+  }
+
+  .mobile-v6-home-card {
+    grid-template-columns: minmax(0, 1fr) 96px !important;
+  }
+
+  body:has(.mobile-v6-order) .order3-card {
+    grid-template-columns: 88px minmax(0, 1fr) !important;
+  }
+
+  body:has(.mobile-v6-order) .order3-media {
+    width: 88px !important;
+    height: 100px !important;
+  }
+
+  body.customer-mobile-app-site .mobile-v6-quick-grid a,
+  .mobile-v6-report-actions a {
+    font-size: 9px !important;
+  }
+}
+
+@media (max-width: 340px) {
+  .mobile-v6-quick-grid,
+  .mobile-v6-report-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body.customer-mobile-app-site .experience-grid,
+  body.mw-r5-admin .stats,
+  body.mw-r5-admin .admin-dashboard-stats,
+  body.mw-r5-admin .center-stats,
+  body.mw-r5-admin .history-ledger-stats {
+    grid-template-columns: 1fr !important;
+  }
+}
