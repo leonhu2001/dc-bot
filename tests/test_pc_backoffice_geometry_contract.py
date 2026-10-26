@@ -35,11 +35,13 @@ def test_admin_dashboard_owns_desktop_grid_geometry() -> None:
     assert "max-width: 1500px" in responsive
 
 
-def test_report_queue_owns_desktop_shortcut_geometry() -> None:
+def test_report_queue_owns_desktop_workbar_geometry() -> None:
     template = _read(TEMPLATES / "order_reports.html")
     css = _read(CSS / "order_reports_desktop.css")
 
     assert "order_reports_desktop.css?v=" in template
-    assert "body.desktop-ui .report-mobile-task-hub .mobile-task-grid" in css
-    assert "grid-template-columns: repeat(5,minmax(0,1fr))" in css
-    assert "body.desktop-ui .report-mobile-task-hub .mobile-task-action" in css
+    assert "body.desktop-ui .report-workbar" in css
+    assert "grid-template-columns: auto minmax(0, 1fr) auto" in css
+    assert "body.desktop-ui .report-worktabs" in css
+    assert "body.desktop-ui .report-worktool" in css
+    assert "@media (min-width: 768px) and (max-width: 1080px)" in css
