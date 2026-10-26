@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-GEOMETRY_CSS = Path("web/app/static/css/pages/mobile_app_geometry_v5.css")
+V6_CSS = Path("web/app/static/css/pages/mobile_app_rebuild_v6.css")
 SITE_LAYOUT = Path("web/app/templates/site_layout.html")
 ADMIN_LAYOUT = Path("web/app/templates/admin_layout.html")
 REPORT_TEMPLATE = Path("web/app/templates/order_reports.html")
@@ -12,35 +12,34 @@ def _read(path: Path) -> str:
 
 
 def test_public_phone_heroes_cannot_inherit_desktop_billboard_heights() -> None:
-    source = _read(GEOMETRY_CSS)
+    source = _read(V6_CSS)
 
     assert 'body.customer-mobile-app-site .site-main [class*="-hero"]' in source
     assert "min-height: 0 !important" in source
-    assert "body.customer-mobile-app-site .order3-hero" in source
-    assert "body.customer-mobile-app-site .crew-page-hero" in source
-    assert "body.customer-mobile-app-site .vip-page-hero" in source
-    assert "body.customer-mobile-app-site .hero-grid" in source
+    assert "body:has(.mobile-v6-order) .order3-hero" in source
+    assert "body:has(.mobile-v6-staff) .crew-page-hero" in source
+    assert "body:has(.mobile-v6-vip) .vip-page-hero" in source
 
 
-def test_mobile_dock_has_single_safe_area_geometry_owner() -> None:
-    source = _read(GEOMETRY_CSS)
+def test_mobile_dock_has_one_active_geometry_owner() -> None:
+    source = _read(V6_CSS)
 
-    assert "--m5-dock-base: 66px" in source
+    assert "--v6-dock: 62px" in source
     assert "bottom: 0 !important" in source
-    assert "height: calc(var(--m5-dock-base) + env(safe-area-inset-bottom)) !important" in source
-    assert "padding: 6px max(6px, env(safe-area-inset-right)) env(safe-area-inset-bottom)" in source
-    assert "padding-bottom: calc(var(--m5-dock-base) + env(safe-area-inset-bottom) + 10px) !important" in source
+    assert "height: calc(var(--v6-dock) + env(safe-area-inset-bottom)) !important" in source
+    assert "padding-bottom: calc(var(--v6-dock) + env(safe-area-inset-bottom) + 10px) !important" in source
 
 
-def test_final_geometry_layer_is_loaded_after_v4_on_phone_shells() -> None:
+def test_legacy_geometry_and_visual_layers_are_retired_from_active_surfaces() -> None:
     site = _read(SITE_LAYOUT)
     admin = _read(ADMIN_LAYOUT)
 
-    marker = "/static/css/pages/mobile_app_geometry_v5.css?v=20261026-1"
-    assert marker in site
-    assert marker in admin
-    assert site.index("mobile_app_public_pages_v4.css") < site.index(marker)
-    assert admin.index("mobile_app_visual_system_v4.css") < admin.index(marker)
+    for layout in (site, admin):
+        assert "mobile_app_geometry_v5.css" not in layout
+        assert "mobile_app_visual_system_v4.css" not in layout
+        assert "mobile_app_component_sizing_v7.css" not in layout
+        assert "mobile_app_rebuild_v6.css?v=20261026-2" in layout
+        assert "mobile_surface_sizing.css?v=20261026-1" in layout
 
 
 def test_report_phone_copy_is_compact_and_task_focused() -> None:

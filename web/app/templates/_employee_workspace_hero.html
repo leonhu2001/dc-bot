@@ -4,8 +4,9 @@
 {% set _employee_name = _employee_store_name or (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工' %}
 {% set _employee_id = _employee_member.get('discord_id') or (user.id if user else '') %}
 
+{% if mobile_surface|default(false) %}
 {% include "_employee_mobile_app_shell.html" %}
-
+{% else %}
 <div class="ec-hero employee-workspace-hero" data-employee-store-name="{{ _employee_store_name }}" data-employee-user-id="{{ _employee_id }}">
     <div>
         <div class="ec-k">EMPLOYEE BACKOFFICE</div>
@@ -25,3 +26,4 @@
         <a class="ec-btn{% if _employee_path == '/me' %} active{% endif %}" href="/me">個人中心</a>
     </div>
 </div>
+{% endif %}
