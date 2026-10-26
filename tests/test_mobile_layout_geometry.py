@@ -44,7 +44,8 @@ def test_employee_and_admin_geometry_have_separate_owners() -> None:
 def test_report_phone_copy_is_compact_and_task_focused() -> None:
     source = _read(REPORT_TEMPLATE)
     assert "已結單待補" in source
-    assert "被退回待補" in source
-    assert "查看歷史" in source
+    assert "退回待補" in source
+    assert "全部紀錄" in source
+    assert "完整歷史" in source
     assert "目前沒有報單" in source
     assert "未報單與被退回的訂單優先，完成後再看歷史。" not in source
