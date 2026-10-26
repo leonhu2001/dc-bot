@@ -5,6 +5,7 @@ from typing import Any, Callable
 import discord
 
 from services.member_portal_runtime_20261026 import install_member_portal_20261026
+from services.loyalty_policy_20261023 import install_loyalty_policy_20261023
 from services.staff_topup import credit_staff_topup
 
 
@@ -55,9 +56,17 @@ def _wallet_add_globals(bot: discord.Client) -> dict[str, Any] | None:
 
 
 def install_legacy_wallet_add_bridge(bot: discord.Client) -> None:
-    # The top-up runtime is guaranteed to start on every production boot, so it
-    # is also the safest place to keep the customer member portal persistent and
-    # synchronized without requiring a one-off /setup command after deployment.
+    # This runtime is guaranteed to start on every production bot boot. Install
+    # the current loyalty policy here as an idempotent safety net, then force its
+    # table/migration pass so historical under-counted entertainment orders are
+    # repaired immediately after deployment.
+    install_loyalty_policy_20261023()
+    from services import loyalty_benefits
+
+    loyalty_benefits.ensure_loyalty_tables()
+
+    # Keep the customer portal persistent and synchronized without requiring a
+    # one-off /setup command after deployment.
     install_member_portal_20261026(bot)
 
     target_globals = _wallet_add_globals(bot)
