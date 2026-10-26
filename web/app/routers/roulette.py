@@ -37,14 +37,21 @@ _ROULETTE_READY_TASK: asyncio.Task | None = None
 
 
 def _strict_roulette_identity(order: dict[str, Any]) -> bool:
-    """Roulette identity is canonical rule metadata, never a display-name guess."""
+    """A roulette order must match both rule metadata and its creation snapshot.
+
+    Manager-created rule keys can be renamed or repurposed later.  The copied
+    order item is creation-time data, so requiring both prevents a historical
+    order from becoming roulette retroactively when a rule key is reused.
+    """
     rule_key = str(order.get("order_rule_key") or "").strip()
-    return rule_key in roulette_service.ROULETTE_RULE_KEYS
+    item_snapshot = str(order.get("item") or "").strip()
+    return (
+        rule_key in roulette_service.ROULETTE_RULE_KEYS
+        and roulette_service.ROULETTE_ITEM_LABEL in item_snapshot
+    )
 
 
-# Keep all existing roulette services, redraw validation and member routes aligned
-# on the same canonical identity rule. Older code used the item label as a fallback,
-# which could make an unrelated fun order look like a roulette order.
+# Roulette services and routes share one strict identity rule for this process.
 roulette_service._is_roulette_order = _strict_roulette_identity
 
 
@@ -60,10 +67,15 @@ def _list_admin_roulette_orders_strict(*, limit: int = 100) -> list[dict[str, An
             SELECT *
             FROM web_orders
             WHERE order_rule_key IN ({placeholders})
+              AND item LIKE ?
             ORDER BY id DESC
             LIMIT ?
             """,
-            (*keys, safe_limit),
+            (
+                *keys,
+                f"%{roulette_service.ROULETTE_ITEM_LABEL}%",
+                safe_limit,
+            ),
         ).fetchall()
 
     output: list[dict[str, Any]] = []
