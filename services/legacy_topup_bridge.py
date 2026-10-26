@@ -6,6 +6,7 @@ import discord
 
 from services.member_portal_runtime_20261026 import install_member_portal_20261026
 from services.loyalty_policy_20261023 import install_loyalty_policy_20261023
+from services.loyalty_reconcile_v7 import run_entertainment_loyalty_reconcile_v7
 from services.staff_topup import credit_staff_topup
 
 
@@ -64,6 +65,16 @@ def install_legacy_wallet_add_bridge(bot: discord.Client) -> None:
     from services import loyalty_benefits
 
     loyalty_benefits.ensure_loyalty_tables()
+    reconcile_summary = run_entertainment_loyalty_reconcile_v7()
+    if any(int(value or 0) for value in reconcile_summary.values()):
+        print(
+            "[loyalty-v7] confirmed backfill "
+            f"customers={reconcile_summary['customers']} "
+            f"scopes={reconcile_summary['scopes']} "
+            f"issued={reconcile_summary['issued']} "
+            f"revoked={reconcile_summary['revoked']}",
+            flush=True,
+        )
 
     # Keep the customer portal persistent and synchronized without requiring a
     # one-off /setup command after deployment.
