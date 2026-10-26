@@ -26,6 +26,7 @@ def test_mobile_dock_has_single_safe_area_geometry_owner() -> None:
     source = _read(GEOMETRY_CSS)
 
     assert "--m5-dock-base: 66px" in source
+    assert "bottom: 0 !important" in source
     assert "height: calc(var(--m5-dock-base) + env(safe-area-inset-bottom)) !important" in source
     assert "padding: 6px max(6px, env(safe-area-inset-right)) env(safe-area-inset-bottom)" in source
     assert "padding-bottom: calc(var(--m5-dock-base) + env(safe-area-inset-bottom) + 10px) !important" in source
