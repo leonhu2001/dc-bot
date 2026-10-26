@@ -1,5 +1,8 @@
 <!doctype html>
 <html lang="zh-Hant">
+{% set _ui_ua = (request.headers.get('user-agent') or '')|lower %}
+{% set _ui_ch_mobile = (request.headers.get('sec-ch-ua-mobile') or '')|lower %}
+{% set mobile_surface = _ui_ch_mobile == '?1' or 'iphone' in _ui_ua or 'ipad' in _ui_ua or 'ipod' in _ui_ua or 'android' in _ui_ua or 'mobile' in _ui_ua %}
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -39,7 +42,8 @@
 
     {% if _head_path.startswith('/admin') %}
     <link rel="stylesheet" href="/static/css/pages/admin_shell_layout.css?v=2">
-    <link rel="stylesheet" href="/static/css/pages/admin_mobile_app.css?v=20261026-1">
+    {% if mobile_surface %}
+    <link rel="stylesheet" href="/static/css/pages/admin_mobile_app.css?v=20261026-2">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_polish.css?v=20261026-1">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_repair.css?v=20261026-1">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_page_audit.css?v=20261026-1">
@@ -51,7 +55,10 @@
     {% endif %}
     <link rel="stylesheet" href="/static/css/pages/mobile_app_visual_system_v4.css?v=20261026-1">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_geometry_v5.css?v=20261026-1">
-    <script src="/static/js/pages/mobile_app_interactions.js?v=20261026-1" defer></script>
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_rebuild_v6.css?v=20261026-2">
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_component_sizing_v7.css?v=20261026-2">
+    <script src="/static/js/pages/mobile_app_interactions.js?v=20261026-2" defer></script>
+    {% endif %}
     {% endif %}
 
     <link rel="icon" type="image/png" href="/static/img/favicon.png?v=20260904-2">
@@ -60,11 +67,15 @@
 
 {% set current_path = request.url.path %}
 {% set mw_admin_area = current_path.startswith('/admin') %}
-<body class="mw-r5-layout {% if mw_admin_area %}mw-r5-admin{% else %}mw-r5-employee{% endif %}">
+<body class="mw-r5-layout {% if mw_admin_area %}mw-r5-admin{% else %}mw-r5-employee{% endif %}" data-ui-surface="{{ 'mobile' if mobile_surface else 'desktop' }}">
 
 <div class="mw-r5-shell">
     {% if mw_admin_area %}
-        {% include "_admin_sidebar.html" %}
+        {% if mobile_surface %}
+            {% include "_admin_mobile_app_shell.html" %}
+        {% else %}
+            {% include "_admin_sidebar.html" %}
+        {% endif %}
     {% else %}
         {% include "_employee_sidebar.html" %}
     {% endif %}
@@ -72,6 +83,7 @@
     <main class="mw-r5-main-host">
         {% set _p = request.url.path %}
 
+        {% if not mobile_surface %}
         <header class="mw-r5-page-header">
             {% if _p.startswith('/admin/orders/history') %}
                 <div class="mw-r5-kicker">ORDER MANAGEMENT</div>
@@ -205,6 +217,7 @@
                 <button class="button" type="submit">搜尋</button>
             </form>
         </div>
+        {% endif %}
         {% endif %}
 
         <section class="mw-r5-content">
