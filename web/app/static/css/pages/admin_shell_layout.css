@@ -318,11 +318,6 @@ body.mw-r5-admin.mw-desktop-ui .ops-canvas {
         overflow-wrap: anywhere;
     }
 
-    body.mw-r5-admin.mw-desktop-ui .mw-r5-nav-section {
-        margin-inline: 9px !important;
-        letter-spacing: .08em !important;
-    }
-
     body.mw-r5-admin.mw-desktop-ui .mw-r5-main-host {
         width: 100% !important;
         min-width: 0 !important;
