@@ -33,4 +33,4 @@ def test_order_panel_deploy_uploads_and_verifies_only_changed_assets() -> None:
     assert "$ChangedPanelAssetPaths = @($ChangedPanelAssets | ForEach-Object { $_.Path })" in source
     assert '& scp @SshTransportArgs @ChangedPanelAssetPaths' in source
     assert 'foreach ($PanelAsset in $ChangedPanelAssets)' in source
-    assert 'changed public panel image URLs are reachable' in source
+    assert '$VerifyAssetCommand =' in source
