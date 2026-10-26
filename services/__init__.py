@@ -51,6 +51,15 @@ from .retired_black_diamond_benefit import (
 
 _install_retired_black_diamond_benefit_policy()
 
+# Owner-approved entertainment loyalty policy: hourly remains 10H -> 1H, while
+# game-based entertainment is 15 games -> 1 game. The installer also reconciles
+# existing stored game progress once after the new policy reaches production.
+from .loyalty_policy_20261023 import (
+    install_loyalty_policy_20261023 as _install_loyalty_policy_20261023,
+)
+
+_install_loyalty_policy_20261023()
+
 # Keep coupon reservation / release / redemption and the VIP monthly entitlement
 # policy centralized for both Discord and Web entry points.
 from .benefit_runtime_integration import install_root_benefit_integrations as _install_benefits
