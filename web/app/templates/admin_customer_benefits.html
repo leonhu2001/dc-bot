@@ -41,7 +41,11 @@
                 <small>達標後：{{ progress.benefit_text }}</small>
             </div>
             <div class="benefit-bar"><i data-csp-width-percent="{{ progress.percent }}"></i></div>
+            {% if progress.open_paid_units %}
+            <small>🟡 {{ progress.open_progress_text }}；結單後轉為正式進度，取消則自動移除。</small>
+            {% else %}
             <small>最近更新：{{ progress.updated_at_text }}</small>
+            {% endif %}
         </div>
         {% endfor %}
 
