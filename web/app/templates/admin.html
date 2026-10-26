@@ -2,7 +2,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/admin_dashboard_pc.css?v=20261027-1">
-<link rel="stylesheet" href="/static/css/pages/admin_dashboard_responsive.css?v=20261027-2">
+<link rel="stylesheet" href="/static/css/pages/admin_dashboard_responsive.css?v=20261027-3">
 {% endblock %}
 
 {% block page_title %}客服工作台{% endblock %}
@@ -157,6 +157,9 @@
                     <div class="order-status-col">
                         <span class="badge admin-order-status-badge {% if order.status == "stored" %}stored{% else %}{{ order.status_class }}{% endif %}">
                             {% if order.status == "stored" %}已暫存{% else %}{{ order.status_label }}{% endif %}
+                        </span>
+                        <span class="badge admin-order-report-badge {% if order.dispatch_message_id %}reported{% else %}unreported{% endif %}">
+                            {% if order.dispatch_message_id %}已報單{% else %}未報單{% endif %}
                         </span>
                     </div>
 
