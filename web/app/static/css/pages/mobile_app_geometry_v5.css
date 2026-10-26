@@ -31,10 +31,17 @@
   .customer-app-bottom-nav,
   .employee-app-bottom-nav,
   .admin-app-bottom-nav {
+    position: fixed !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
     height: calc(var(--m5-dock-base) + env(safe-area-inset-bottom)) !important;
+    margin: 0 !important;
     padding: 6px max(6px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(6px, env(safe-area-inset-left)) !important;
     align-items: start !important;
     background: #101013 !important;
+    box-sizing: border-box !important;
   }
 
   .customer-app-nav-item,
@@ -192,6 +199,10 @@
     color: var(--m4-text) !important;
     text-decoration: none !important;
     box-shadow: none !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-action:last-child:nth-child(odd) {
+    grid-column: 1 / -1 !important;
   }
 
   body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-action.is-primary {
