@@ -1,150 +1,125 @@
-import json
+from __future__ import annotations
+
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-from services.dispatch_presence import (
-    count_online_dispatch_companions_for_role,
-    count_online_dispatch_workers,
-    get_dispatch_companion_ids_for_role,
+from views.dispatch_presence import (
+    DISPATCH_PRESENCE_TTL_SECONDS,
+    ensure_dispatch_presence_tables,
+    format_dispatch_support_channel_name,
+    get_online_dispatch_presence_ids,
     get_online_dispatch_support_ids,
-    get_online_dispatch_worker_ids,
     has_online_dispatch_support,
     touch_dispatch_presence,
-    touch_dispatch_support_presence,
-)
-from views.dispatch_presence import (
-    format_companion_presence_channel_name,
-    format_dispatch_presence_channel_name,
-    format_dispatch_support_channel_name,
 )
 
 
-def test_dispatch_presence_expires_after_timeout(tmp_path):
-    db_path = tmp_path / "web_dashboard.db"
-    now = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc)
+UTC = timezone.utc
 
+
+def _db(path: Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def test_dispatch_presence_tracks_users_and_expires(tmp_path):
+    db_path = tmp_path / "presence.db"
+    now = datetime(2026, 10, 17, 0, 0, tzinfo=UTC)
+
+    ensure_dispatch_presence_tables(db_path)
     touch_dispatch_presence(
-        "100",
-        display_name="Worker A",
+        discord_id="100",
+        is_companion=True,
+        is_support=False,
+        display_name="陪玩A",
+        db_file=db_path,
+        now=now,
+    )
+    touch_dispatch_presence(
+        discord_id="200",
+        is_companion=False,
+        is_support=True,
+        display_name="客服B",
         db_file=db_path,
         now=now,
     )
 
-    assert get_online_dispatch_worker_ids(
+    assert get_online_dispatch_presence_ids(
+        role="companion",
         db_file=db_path,
-        now=now + timedelta(seconds=89),
+        now=now + timedelta(seconds=DISPATCH_PRESENCE_TTL_SECONDS - 1),
     ) == ["100"]
-
-    assert get_online_dispatch_worker_ids(
+    assert get_online_dispatch_presence_ids(
+        role="support",
         db_file=db_path,
-        now=now + timedelta(seconds=91),
+        now=now + timedelta(seconds=DISPATCH_PRESENCE_TTL_SECONDS - 1),
+    ) == ["200"]
+
+    assert get_online_dispatch_presence_ids(
+        role="companion",
+        db_file=db_path,
+        now=now + timedelta(seconds=DISPATCH_PRESENCE_TTL_SECONDS + 1),
     ) == []
 
 
-def test_dispatch_presence_can_filter_candidates(tmp_path):
-    db_path = tmp_path / "web_dashboard.db"
-    now = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc)
+def test_dispatch_presence_touch_is_upsert(tmp_path):
+    db_path = tmp_path / "presence.db"
+    first = datetime(2026, 10, 17, 0, 0, tzinfo=UTC)
+    second = first + timedelta(seconds=30)
 
-    touch_dispatch_presence("100", db_file=db_path, now=now)
-    touch_dispatch_presence("200", db_file=db_path, now=now)
-
-    assert get_online_dispatch_worker_ids(
-        candidate_ids=["200", "300"],
+    touch_dispatch_presence(
+        discord_id="100",
+        is_companion=True,
+        is_support=False,
+        display_name="陪玩A",
         db_file=db_path,
-        now=now,
-    ) == ["200"]
-
-    assert count_online_dispatch_workers(
-        candidate_ids=["100", "200", "300"],
-        db_file=db_path,
-        now=now,
-    ) == 2
-
-
-def test_dispatch_presence_can_count_companions_by_role(tmp_path):
-    db_path = tmp_path / "web_dashboard.db"
-    now = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc)
-    female_role_id = "1482080315798192210"
-    male_role_id = "1500751059239440575"
-
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            """
-            CREATE TABLE web_staff_members (
-                discord_id TEXT PRIMARY KEY,
-                roles_json TEXT,
-                is_active INTEGER,
-                is_companion INTEGER
-            )
-            """
-        )
-        conn.executemany(
-            """
-            INSERT INTO web_staff_members (
-                discord_id,
-                roles_json,
-                is_active,
-                is_companion
-            ) VALUES (?, ?, 1, 1)
-            """,
-            [
-                ("100", json.dumps([female_role_id])),
-                ("200", json.dumps([male_role_id])),
-                ("300", json.dumps([female_role_id, male_role_id])),
-            ],
-        )
-        conn.commit()
-
-    touch_dispatch_presence("100", db_file=db_path, now=now)
-    touch_dispatch_presence("200", db_file=db_path, now=now)
-    touch_dispatch_presence("300", db_file=db_path, now=now)
-
-    assert get_dispatch_companion_ids_for_role(
-        female_role_id,
-        db_file=db_path,
-    ) == ["100", "300"]
-    assert count_online_dispatch_companions_for_role(
-        female_role_id,
-        db_file=db_path,
-        now=now,
-    ) == 2
-    assert count_online_dispatch_companions_for_role(
-        male_role_id,
-        db_file=db_path,
-        now=now,
-    ) == 2
-
-
-def test_dispatch_presence_channel_name_reflects_count():
-    assert format_dispatch_presence_channel_name(0) == "⚫┃暫無陪玩"
-    assert format_dispatch_presence_channel_name(1) == "🟢┃在線陪玩：1"
-    assert format_dispatch_presence_channel_name(2) == "🟢┃在線陪玩：2"
-    assert format_dispatch_presence_channel_name(5) == "🟢┃在線陪玩：5"
-
-    assert (
-        format_companion_presence_channel_name("女陪", "👩", 0)
-        == "👩┃女陪・⚫0人在線"
+        now=first,
     )
-    assert (
-        format_companion_presence_channel_name("女陪", "👩", 3)
-        == "👩┃女陪・🟢3人在線"
-    )
-    assert (
-        format_companion_presence_channel_name("男陪", "🧑", 1)
-        == "🧑┃男陪・🟢1人在線"
+    touch_dispatch_presence(
+        discord_id="100",
+        is_companion=True,
+        is_support=True,
+        display_name="陪玩A2",
+        db_file=db_path,
+        now=second,
     )
 
+    with _db(db_path) as conn:
+        rows = conn.execute("SELECT * FROM dispatch_presence").fetchall()
 
-def test_dispatch_support_presence_expires_after_timeout(tmp_path):
-    db_path = tmp_path / "web_dashboard.db"
-    now = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc)
+    assert len(rows) == 1
+    assert rows[0]["discord_id"] == "100"
+    assert rows[0]["display_name"] == "陪玩A2"
+    assert rows[0]["is_companion"] == 1
+    assert rows[0]["is_support"] == 1
 
-    touch_dispatch_support_presence(
-        "900",
-        display_name="Support A",
+
+def test_dispatch_support_online_only_counts_support(tmp_path):
+    db_path = tmp_path / "presence.db"
+    now = datetime(2026, 10, 17, 0, 0, tzinfo=UTC)
+
+    touch_dispatch_presence(
+        discord_id="100",
+        is_companion=True,
+        is_support=False,
+        display_name="陪玩A",
         db_file=db_path,
         now=now,
     )
+    assert not has_online_dispatch_support(db_file=db_path, now=now)
+
+    touch_dispatch_presence(
+        discord_id="900",
+        is_companion=False,
+        is_support=True,
+        display_name="客服A",
+        db_file=db_path,
+        now=now,
+    )
+    assert get_online_dispatch_support_ids(db_file=db_path, now=now) == ["900"]
+    assert has_online_dispatch_support(db_file=db_path, now=now)
 
     assert get_online_dispatch_support_ids(
         db_file=db_path,
@@ -166,5 +141,5 @@ def test_dispatch_support_presence_expires_after_timeout(tmp_path):
 
 
 def test_dispatch_support_channel_name_reflects_any_online_staff():
-    assert format_dispatch_support_channel_name(False) == "🛎️┃客服中心"
-    assert format_dispatch_support_channel_name(True) == "🟢┃客服中心"
+    assert format_dispatch_support_channel_name(False) == "🛎️┃聯絡客服"
+    assert format_dispatch_support_channel_name(True) == "🟢┃聯絡客服"
