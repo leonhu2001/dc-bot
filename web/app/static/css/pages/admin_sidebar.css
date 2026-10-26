@@ -19,3 +19,12 @@ body.mw-r5-admin .mw-r5-nav-section:first-child {
 body.mw-r5-admin .mw-r5-nav-section-muted {
     color: rgba(235, 232, 222, .34);
 }
+
+/* Desktop browser narrowed to a split-screen window still keeps the desktop
+   shell; compact the sidebar labels here so component ownership stays local. */
+@media (max-width: 900px) {
+    body.mw-r5-admin.mw-desktop-ui .mw-r5-nav-section {
+        margin-inline: 9px !important;
+        letter-spacing: .08em !important;
+    }
+}
