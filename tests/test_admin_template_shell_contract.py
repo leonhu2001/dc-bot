@@ -38,8 +38,6 @@ def _direct_standalone_admin_templates() -> set[str]:
             continue
         match = _EXTENDS_RE.search(source)
         if match and match.group(1).startswith("admin_"):
-            # Derived admin pages inherit their parent shell; do not count them
-            # as a second standalone owner.
             continue
         if '{% extends "admin_layout.html" %}' not in source and '{% extends "layout.html" %}' not in source:
             offenders.add(path.name)
@@ -58,6 +56,14 @@ def test_no_unreviewed_template_directly_owns_admin_sidebar() -> None:
             owners.add(path.name)
 
     assert owners == LEGACY_STANDALONE_ADMIN_TEMPLATES | {"admin_layout.html"}
+
+
+def test_all_reviewed_legacy_shells_share_admin_sidebar_scope() -> None:
+    for name in sorted(LEGACY_STANDALONE_ADMIN_TEMPLATES):
+        source = (TEMPLATES / name).read_text(encoding="utf-8")
+        assert '{% include "_admin_sidebar.html" %}' in source, name
+        assert "mw-r5-admin" in source, name
+        assert "mw_portal_r5.css" in source, name
 
 
 def test_admin_sidebar_visual_rules_have_one_component_owner() -> None:
