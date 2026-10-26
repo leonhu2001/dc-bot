@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="/static/css/pages/mobile_app_rebuild_v6.css?v=20261026-1">
 {% set _app_path = request.url.path %}
 {% set _app_user_name = (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工' %}
 {% set _can_switch_admin = user and (user.is_admin or user.is_customer_service or user.is_manager) %}
@@ -43,6 +44,28 @@
     <a class="is-active" href="/employee"><span aria-hidden="true">⚡</span>員工後台</a>
     <a href="/admin"><span aria-hidden="true">◈</span>客服後台</a>
 </nav>
+{% endif %}
+
+{% if _app_path.startswith('/dispatch/reports') and not _app_path.startswith('/dispatch/reports/review') %}
+<section class="mobile-v6-employee-route mobile-v6-report" aria-label="報單快捷操作">
+    <div class="mobile-v6-report-head">
+        <div class="mobile-v6-report-top">
+            <div>
+                <strong>待辦報單</strong>
+                <span>先補未報與被退回的訂單</span>
+            </div>
+            {% if support_can_manage is defined and support_can_manage %}
+            <a class="mobile-v6-report-review" href="/dispatch/reports/review">客服審核{% if pending_report_review_count is defined and pending_report_review_count %} · {{ pending_report_review_count }}{% endif %}</a>
+            {% endif %}
+        </div>
+        <nav class="mobile-v6-report-actions" aria-label="報單狀態快捷篩選">
+            <a class="{% if status_filter is defined and status_filter == 'missing' %}is-active{% endif %}" href="/dispatch/reports?status=missing"><span>!</span><span>未報單</span></a>
+            <a class="{% if status_filter is defined and status_filter == 'changes_requested' %}is-active{% endif %}" href="/dispatch/reports?status=changes_requested"><span>↺</span><span>需修改</span></a>
+            <a class="{% if status_filter is defined and not status_filter %}is-active{% endif %}" href="/dispatch/reports"><span>≡</span><span>全部紀錄</span></a>
+            <a href="/dispatch"><span>⚡</span><span>接單大廳</span></a>
+        </nav>
+    </div>
+</section>
 {% endif %}
 
 <nav class="employee-app-bottom-nav" aria-label="員工 App 主要導覽">
