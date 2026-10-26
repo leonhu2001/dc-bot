@@ -234,20 +234,36 @@ def _merge_open_paid_progress(
             data["progress"].append(existing)
 
         confirmed = float(existing.get("progress_units") or 0)
-        displayed = confirmed + open_units
-        earned_preview = int(displayed // threshold) if threshold > 0 else 0
+        projected = confirmed + open_units
+        earned_preview = int(projected // threshold) if threshold > 0 else 0
+        projected_remainder = (
+            max(0.0, projected - earned_preview * threshold)
+            if threshold > 0
+            else projected
+        )
         existing["confirmed_progress_units"] = confirmed
         existing["open_paid_units"] = open_units
-        existing["display_progress_units"] = displayed
+        existing["display_progress_units"] = projected
+        # The headline is confirmed progress only. Showing provisional units in
+        # the numerator made a 6H confirmed + 6H active order look like a missed
+        # 12/10H reward even though the active order had not closed yet.
         existing["progress_text"] = (
-            f"{_format_units(displayed)} / {_format_units(threshold)}{unit_label}"
+            f"{_format_units(confirmed)} / {_format_units(threshold)}{unit_label}"
         )
-        existing["open_progress_text"] = (
-            f"含進行中暫計 {_format_units(open_units)}{unit_label}"
-        )
+        if earned_preview > 0:
+            existing["open_progress_text"] = (
+                f"進行中暫計 +{_format_units(open_units)}{unit_label}｜"
+                f"正常結單後預計發 {earned_preview} 張，"
+                f"剩 {_format_units(projected_remainder)} / {_format_units(threshold)}{unit_label}"
+            )
+        else:
+            existing["open_progress_text"] = (
+                f"進行中暫計 +{_format_units(open_units)}{unit_label}｜"
+                f"正常結單後預計 {_format_units(projected)} / {_format_units(threshold)}{unit_label}"
+            )
         existing["earned_preview_count"] = earned_preview
         existing["percent"] = (
-            max(0, min(100, int(round(displayed / threshold * 100))))
+            max(0, min(100, int(round(confirmed / threshold * 100))))
             if threshold > 0
             else 0
         )
