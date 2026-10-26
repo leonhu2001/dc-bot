@@ -25,12 +25,11 @@ def test_admin_layout_server_splits_mobile_and_desktop_shells():
     assert '{% include "_admin_sidebar.html" %}' in layout
     assert "mw-mobile-ui" in layout
     assert "mw-desktop-ui" in layout
-    # Mobile assets belong to the mobile branch and desktop shell stylesheet to desktop.
-    mobile_branch = layout.index("{% if mobile_ui %}")
-    mobile_css = layout.index("admin_mobile_app.css")
-    desktop_css = layout.index("admin_shell_layout.css")
-    assert mobile_css > mobile_branch
-    assert desktop_css > mobile_css
+    assert "mobile_backoffice_chrome.css" in layout
+    assert "admin_mobile_app.css" in layout
+    assert "admin_shell_layout.css" in layout
+    assert "mobile_app_rebuild_v6.css" not in layout
+    assert "mobile_app_component_sizing_v7.css" not in layout
 
 
 def test_public_layout_server_splits_mobile_and_desktop_dom():
@@ -40,10 +39,11 @@ def test_public_layout_server_splits_mobile_and_desktop_dom():
     assert '{% include "_employee_mobile_app_shell.html" %}' in layout
     assert '{% include "_site_header.html" %}' in layout
     assert "customer_mobile_app.css?v=20261026-3" in layout
-    # Customer mobile no longer loads the generic v6/v7 cascade.
-    customer_pos = layout.index("customer_mobile_app.css?v=20261026-3")
-    employee_v6_pos = layout.index("mobile_app_rebuild_v6.css?v=20261026-2")
-    assert employee_v6_pos < customer_pos
+    assert "employee_mobile_app.css?v=20261026-3" in layout
+    assert "employee_mobile_routes.css?v=20261026-1" in layout
+    assert "mobile_backoffice_chrome.css?v=20261026-1" in layout
+    assert "mobile_app_rebuild_v6.css" not in layout
+    assert "mobile_app_component_sizing_v7.css" not in layout
 
 
 def test_employee_desktop_hero_does_not_render_mobile_shell():
@@ -53,7 +53,7 @@ def test_employee_desktop_hero_does_not_render_mobile_shell():
 
 def test_customer_mobile_grid_has_single_owner_and_no_legacy_carousel_columns():
     css = read(CSS / "customer_mobile_app.css")
-    compact = css.replace(" ", "").replace("\n", "")
+    compact = "".join(css.split())
     assert "grid-auto-flow:column" not in compact
     assert "grid-auto-columns:min(82vw,330px)" not in compact
     assert "grid-template-columns:repeat(2,minmax(0,1fr))" in compact
@@ -65,3 +65,27 @@ def test_desktop_admin_grid_keeps_sidebar_first():
     compact = "".join(portal.split())
     assert ".mw-r5-shell{" in compact
     assert "grid-template-columns:var(--r5-side)minmax(0,1fr)!important" in compact
+
+
+def test_generic_mobile_overlay_layers_are_retired_from_active_templates():
+    active = "\n".join(read(path) for path in (
+        TEMPLATES / "site_layout.html",
+        TEMPLATES / "admin_layout.html",
+        TEMPLATES / "_customer_mobile_app_shell.html",
+        TEMPLATES / "_employee_mobile_app_shell.html",
+        TEMPLATES / "_admin_mobile_app_shell.html",
+    ))
+    for retired in (
+        "mobile_app_polish.css",
+        "mobile_app_repair.css",
+        "mobile_app_page_audit.css",
+        "mobile_app_redesign_v3.css",
+        "mobile_app_redesign_v3_pages.css",
+        "mobile_app_ux_v2.css",
+        "mobile_app_visual_system_v4.css",
+        "mobile_app_public_pages_v4.css",
+        "mobile_app_geometry_v5.css",
+        "mobile_app_rebuild_v6.css",
+        "mobile_app_component_sizing_v7.css",
+    ):
+        assert retired not in active
