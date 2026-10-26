@@ -53,3 +53,8 @@ def test_router_does_not_import_legacy_ready_notifier() -> None:
     assert "roulette_identity_service" in source
     service_import_block = source.split("from web.app.services.roulette_service import (", 1)[1].split(")", 1)[0]
     assert "notify_ready_roulette_orders" not in service_import_block
+
+
+def test_roulette_fix_is_policy_based_not_order_number_exception() -> None:
+    source = ROUTER.read_text(encoding="utf-8") + IDENTITY.read_text(encoding="utf-8")
+    assert "MO20261007001" not in source
