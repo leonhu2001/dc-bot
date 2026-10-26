@@ -167,6 +167,40 @@ def test_order_dialog_has_no_mobile_horizontal_overflow(page: Page) -> None:
     assert widths["shell"] <= widths["inner"] + 2
 
 
+def test_mobile_home_renders_v6_structure_and_hides_desktop_hero(page: Page) -> None:
+    page.set_viewport_size({"width": 390, "height": 844})
+    response = page.goto(f"{BASE_URL}/", wait_until="domcontentloaded")
+    assert response is not None and response.ok
+
+    expect(page.locator(".mobile-v6-home")).to_be_visible()
+    expect(page.locator(".mobile-v6-home-card")).to_be_visible()
+    expect(page.locator(".hero")).not_to_be_visible()
+    expect(page.locator(".trust-strip")).not_to_be_visible()
+
+    dock = page.locator(".customer-app-bottom-nav")
+    expect(dock).to_be_visible()
+    box = dock.bounding_box()
+    assert box is not None
+    assert abs((box["y"] + box["height"]) - 844) <= 2
+
+
+def test_mobile_order_skips_billboard_and_puts_products_near_top(page: Page) -> None:
+    page.set_viewport_size({"width": 390, "height": 844})
+    open_order_catalog(page)
+
+    expect(page.locator(".mobile-v6-order")).to_be_visible()
+    expect(page.locator(".mobile-v6-category-strip")).to_be_visible()
+    expect(page.locator(".order3-hero")).not_to_be_visible()
+    expect(page.locator(".order3-filter")).not_to_be_visible()
+
+    cards = page.locator(".order3-card")
+    if cards.count() == 0:
+        pytest.skip("No public order groups are available in this fixture")
+    box = cards.first.bounding_box()
+    assert box is not None
+    assert box["y"] < 460
+
+
 def test_health_endpoint_stays_public(page: Page) -> None:
     response = page.goto(f"{BASE_URL}/health", wait_until="domcontentloaded")
     assert response is not None and response.ok
