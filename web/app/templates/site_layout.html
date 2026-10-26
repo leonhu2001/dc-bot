@@ -2,6 +2,9 @@
 <html lang="zh-Hant">
 {% set employee_app_shell = employee_workspace_shell|default(false) or page_name|default('') == 'employee' %}
 {% set customer_app_shell = not employee_app_shell %}
+{% set _ua = request.headers.get('user-agent', '')|lower %}
+{% set _ch_mobile = request.headers.get('sec-ch-ua-mobile', '') %}
+{% set mobile_ui = (_ch_mobile == '?1') or ('iphone' in _ua) or ('ipod' in _ua) or ('ipad' in _ua) or ('android' in _ua) or ('mobile' in _ua) %}
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -30,40 +33,32 @@
     <link rel="stylesheet" href="/static/css/csp_style_attrs.css?v=20261013">
     <script src="/static/js/csp_dynamic_styles.js?v=20261013" defer></script>
 
-    {% if employee_app_shell %}
-    <link rel="stylesheet" href="/static/css/pages/employee_mobile_pwa.css?v=20261024-2">
-    {% endif %}
-
     {% if employee_workspace_shell|default(false) %}
     <link rel="stylesheet" href="/static/css/pages/employee_center.css?v=20261020-2">
     <link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-9">
     <link rel="stylesheet" href="/static/css/pages/employee_workspace_page_content.css?v=20261020-1">
     <link rel="stylesheet" href="/static/css/pages/employee_select_picker.css?v=20261020-1">
     <link rel="stylesheet" href="/static/css/pages/employee_workspace_viewport.css?v=20261020-1">
-    {% if request.url.path == '/dispatch' %}
-    <link rel="stylesheet" href="/static/css/pages/dispatch_hero_controls.css?v=20261020-2">
-    {% endif %}
-    {% if request.url.path.startswith('/employee/store-bindings') %}
-    <link rel="stylesheet" href="/static/css/pages/store_bindings_select.css?v=20261021-1">
-    {% endif %}
+    {% if request.url.path == '/dispatch' %}<link rel="stylesheet" href="/static/css/pages/dispatch_hero_controls.css?v=20261020-2">{% endif %}
+    {% if request.url.path.startswith('/employee/store-bindings') %}<link rel="stylesheet" href="/static/css/pages/store_bindings_select.css?v=20261021-1">{% endif %}
     {% endif %}
 
     {% block head %}{% endblock %}
 
     <link rel="stylesheet" href="/static/css/mw_public_r5.css?v=scroll_perf_20260917_1">
-    <link rel="stylesheet" href="/static/css/pages/customer_mobile_app.css?v=20261026-1">
-    <link rel="stylesheet" href="/static/css/pages/employee_mobile_app.css?v=20261026-1">
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_polish.css?v=20261026-1">
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_repair.css?v=20261026-1">
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_page_audit.css?v=20261026-1">
-    <link rel="stylesheet" href="/static/css/pages/employee_mobile_loading.css?v=20261026-1">
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_redesign_v3.css?v=20261026-3">
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_redesign_v3_pages.css?v=20261026-1">
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_ux_v2.css?v=20261026-4">
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_visual_system_v4.css?v=20261026-1">
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_public_pages_v4.css?v=20261026-1">
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_geometry_v5.css?v=20261026-1">
-    <script src="/static/js/pages/mobile_app_interactions.js?v=20261026-1" defer></script>
+
+    {% if mobile_ui %}
+        {% if employee_app_shell %}
+        <link rel="stylesheet" href="/static/css/pages/employee_mobile_pwa.css?v=20261024-2">
+        <link rel="stylesheet" href="/static/css/pages/employee_mobile_app.css?v=20261026-2">
+        <link rel="stylesheet" href="/static/css/pages/employee_mobile_loading.css?v=20261026-2">
+        {% else %}
+        <link rel="stylesheet" href="/static/css/pages/customer_mobile_app.css?v=20261026-2">
+        {% endif %}
+        <link rel="stylesheet" href="/static/css/pages/mobile_app_rebuild_v6.css?v=20261026-2">
+        <link rel="stylesheet" href="/static/css/pages/mobile_app_component_sizing_v7.css?v=20261026-2">
+        <script src="/static/js/pages/mobile_app_interactions.js?v=20261026-2" defer></script>
+    {% endif %}
 
     <link rel="icon" href="/static/img/favicon.ico?v=20261025-5" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png?v=20261025-5">
@@ -79,28 +74,25 @@
     <meta property="og:description" content="{{ seo_data.get('description') or '今晚，想怎麼玩？找到今天最適合陪你玩的那個人。' }}">
     <meta property="og:url" content="{{ seo_data.get('canonical') or 'https://mowanentertainment.com/' }}">
     <meta property="og:image" content="{{ seo_data.get('image') or 'https://mowanentertainment.com/static/img/og-share.jpg?v=20260904-2' }}">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
+    <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{ seo_data.get('title') or title or '魔丸娛樂｜MOWAN Entertainment' }}">
     <meta name="twitter:description" content="{{ seo_data.get('description') or '今晚，想怎麼玩？' }}">
     <meta name="twitter:image" content="{{ seo_data.get('image') or 'https://mowanentertainment.com/static/img/og-share.jpg?v=20260904-2' }}">
-
-    {% for schema in seo_data.get("schemas", []) %}
-        <script nonce="{{ request.state.csp_nonce }}" type="application/ld+json">{{ schema|tojson }}</script>
-    {% endfor %}
+    {% for schema in seo_data.get("schemas", []) %}<script nonce="{{ request.state.csp_nonce }}" type="application/ld+json">{{ schema|tojson }}</script>{% endfor %}
 </head>
 
-<body class="site-body mw-public-r5{% if employee_app_shell %} employee-workspace-site{% elif customer_app_shell %} customer-mobile-app-site{% endif %}" data-page="{{ page_name or '' }}">
-    {% include "_site_header.html" %}
-    {% if customer_app_shell %}
-    {% include "_customer_mobile_app_shell.html" %}
+<body class="site-body mw-public-r5 {% if mobile_ui %}{% if employee_app_shell %}employee-workspace-site{% else %}customer-mobile-app-site{% endif %} mobile-ui{% else %}desktop-ui{% endif %}" data-page="{{ page_name or '' }}">
+    {% if mobile_ui %}
+        {% if employee_app_shell %}{% include "_employee_mobile_app_shell.html" %}{% else %}{% include "_customer_mobile_app_shell.html" %}{% endif %}
+    {% else %}
+        {% include "_site_header.html" %}
     {% endif %}
 
     <main class="site-main">
         {% if employee_workspace_shell|default(false) %}
         <section class="ec employee-workspace-frame">
-            {% include "_employee_workspace_hero.html" %}
+            {% if not mobile_ui %}{% include "_employee_workspace_hero.html" %}{% endif %}
             <div class="employee-workspace-page-content">
         {% endif %}
 
@@ -112,54 +104,26 @@
         {% endif %}
     </main>
 
+    {% if not mobile_ui %}
     <footer class="site-footer">
         <div class="footer-grid">
-            <div class="footer-brand">
-                <a class="site-brand" href="/">
-                    <span class="site-brand-logo"><img src="/static/img/server_logo.gif" alt="魔丸娛樂"></span>
-                    <span class="site-brand-copy"><strong>魔丸娛樂</strong><small>MOWAN ENTERTAINMENT</small></span>
-                </a>
-                <p>陪你玩，也陪你把今晚玩得有意思。</p>
-            </div>
-            <div>
-                <strong class="footer-title">服務</strong>
-                <a href="/order">立即下單</a>
-                <a href="/games/delta-force">三角洲服務</a>
-                <a href="/staff">陪玩陣容</a>
-                <a href="/vip">VIP</a>
-            </div>
-            <div>
-                <strong class="footer-title">會員</strong>
-                {% if user %}<a href="/me">我的專區</a>{% else %}<a href="/auth/discord/login">Discord 登入</a>{% endif %}
-                {% if user and (user.is_employee or user.is_worker or user.is_companion or user.is_customer_service) %}<a href="/employee">員工後台</a>{% endif %}
-            </div>
-            <div>
-                <strong class="footer-title">魔丸</strong>
-                <a href="/#about">關於我們</a>
-                <a class="mw-footer-link" href="/#social">社群網址</a>
-                <span><a class="mw-footer-link" href="/service-rules">下單須知</a></span>
-            </div>
+            <div class="footer-brand"><a class="site-brand" href="/"><span class="site-brand-logo"><img src="/static/img/server_logo.gif" alt="魔丸娛樂"></span><span class="site-brand-copy"><strong>魔丸娛樂</strong><small>MOWAN ENTERTAINMENT</small></span></a><p>陪你玩，也陪你把今晚玩得有意思。</p></div>
+            <div><strong class="footer-title">服務</strong><a href="/order">立即下單</a><a href="/games/delta-force">三角洲服務</a><a href="/staff">陪玩陣容</a><a href="/vip">VIP</a></div>
+            <div><strong class="footer-title">會員</strong>{% if user %}<a href="/me">我的專區</a>{% else %}<a href="/auth/discord/login">Discord 登入</a>{% endif %}{% if user and (user.is_employee or user.is_worker or user.is_companion or user.is_customer_service) %}<a href="/employee">員工後台</a>{% endif %}</div>
+            <div><strong class="footer-title">魔丸</strong><a href="/#about">關於我們</a><a class="mw-footer-link" href="/#social">社群網址</a><span><a class="mw-footer-link" href="/service-rules">下單須知</a></span></div>
         </div>
-        <div class="footer-bottom">
-            <span>© 魔丸娛樂 MOWAN ENTERTAINMENT</span>
-            <span>Discord OAuth 安全登入</span>
-        </div>
+        <div class="footer-bottom"><span>© 魔丸娛樂 MOWAN ENTERTAINMENT</span><span>Discord OAuth 安全登入</span></div>
         <div class="mw-social-links"></div>
     </footer>
+    {% endif %}
 
     <button class="mw-support-launcher" type="button" aria-label="開啟客服" aria-expanded="false" data-mw-support-launcher>💬</button>
     <section class="mw-support-panel" aria-label="魔丸網站客服" data-mw-support-panel>
-        <header class="mw-support-head">
-            <div class="mw-support-head-copy"><strong>魔丸客服</strong><span>AI 先協助，需要時轉真人</span></div>
-            <button class="mw-support-close" type="button" aria-label="關閉客服" data-mw-support-close>×</button>
-        </header>
+        <header class="mw-support-head"><div class="mw-support-head-copy"><strong>魔丸客服</strong><span>AI 先協助，需要時轉真人</span></div><button class="mw-support-close" type="button" aria-label="關閉客服" data-mw-support-close>×</button></header>
         <div class="mw-support-status" data-mw-support-status>客服連線中</div>
         <div class="mw-support-messages" aria-live="polite" data-mw-support-messages></div>
         <div class="mw-support-actions"><button class="mw-support-human" type="button" data-mw-support-human>轉接真人客服</button></div>
-        <form class="mw-support-form" data-mw-support-form>
-            <textarea class="mw-support-input" rows="1" maxlength="2000" placeholder="輸入你的問題…" aria-label="客服訊息" data-mw-support-input></textarea>
-            <button class="mw-support-send" type="submit" aria-label="送出" data-mw-support-send>➤</button>
-        </form>
+        <form class="mw-support-form" data-mw-support-form><textarea class="mw-support-input" rows="1" maxlength="2000" placeholder="輸入你的問題…" aria-label="客服訊息" data-mw-support-input></textarea><button class="mw-support-send" type="submit" aria-label="送出" data-mw-support-send>➤</button></form>
     </section>
 
     <script src="/static/js/mw_site.js?v=3-order-rule-intro" defer></script>
@@ -173,15 +137,7 @@
     <script src="/static/js/payout_status_i18n.js?v=1"></script>
     <script src="/static/js/month_select.js?v=1"></script>
     <script src="/static/js/pages/employee_select_picker.js?v=20261020-1" defer></script>
-    {% if request.url.path == '/dispatch' %}
-    <script src="/static/js/dispatch_navigation.js?v=20261013-1" defer></script>
-    <script src="/static/js/dispatch_alerts.js?v=59"></script>
-    <script src="/static/js/pages/dispatch_hero_controls.js?v=20261020-3" defer></script>
+    {% if request.url.path == '/dispatch' %}<script src="/static/js/dispatch_navigation.js?v=20261013-1" defer></script><script src="/static/js/dispatch_alerts.js?v=59"></script><script src="/static/js/pages/dispatch_hero_controls.js?v=20261020-3" defer></script>{% endif %}
     {% endif %}
-    {% if request.url.path.startswith('/employee/store-bindings') %}
-    <script src="/static/js/pages/store_binding_time.js?v=20261020-2" defer></script>
-    {% endif %}
-    {% endif %}
-    {% block scripts %}{% endblock %}
 </body>
 </html>
