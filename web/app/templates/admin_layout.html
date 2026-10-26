@@ -48,7 +48,7 @@
         <script src="/static/js/pages/mobile_app_interactions.js?v=20261026-2" defer></script>
     {% else %}
         {% if mw_admin_area %}
-            <link rel="stylesheet" href="/static/css/pages/admin_shell_layout.css?v=3">
+            <link rel="stylesheet" href="/static/css/pages/admin_shell_layout.css?v=4">
         {% else %}
             <link rel="stylesheet" href="/static/css/mw_site.css?v=16">
             <link rel="stylesheet" href="/static/css/pages/employee_center.css?v=20261020-2">
@@ -57,6 +57,7 @@
         {% endif %}
     {% endif %}
 
+    {% block admin_head %}{% endblock %}
     <link rel="icon" type="image/png" href="/static/img/favicon.png?v=20260904-2">
     <link rel="apple-touch-icon" href="/static/img/favicon.png?v=20260904-2">
 </head>
@@ -112,7 +113,7 @@
             {% endif %}
 {% endif %}
 
-        <section class="mw-r5-content{% if mobile_ui %} mw-mobile-content{% endif %}">{% block content %}{% endblock %}</section>
+        <section class="mw-r5-content{% if mw_admin_area and not mobile_ui %} mw-r5-legacy-body{% endif %}{% if mobile_ui %} mw-mobile-content{% endif %}">{% block content %}{% endblock %}</section>
     </main>
 {% if not mobile_ui %}</div>{% endif %}
 
@@ -120,6 +121,11 @@
 <script src="/static/js/payout_status_i18n.js?v=1"></script>
 <script src="/static/js/month_select.js?v=1"></script>
 <script src="/static/js/site_pwa.js?v=20261024-1" defer></script>
+{% if mw_admin_area %}
+<script src="/static/js/pages/admin_order_copy_unification.js?v=20261020_1" defer></script>
+{% if current_path.startswith('/admin/order-workspace/') %}<script src="/static/js/pages/admin_order_workspace_copy_cleanup.js?v=20261020-1" defer></script>{% endif %}
+{% endif %}
 {% if current_path == "/dispatch" %}<script src="/static/js/dispatch_alerts.js?v=58"></script>{% endif %}
+{% block admin_scripts %}{% endblock %}
 </body>
 </html>
