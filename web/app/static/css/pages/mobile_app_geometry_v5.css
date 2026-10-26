@@ -1,0 +1,285 @@
+/* Mobile geometry v5
+   Owns viewport geometry only: page start/end reserves, hero height resets,
+   dock safe-area math, clipping guards, and compact task hubs.
+   Loaded after v4 so legacy desktop min-heights cannot leak into phone layouts. */
+
+@media (max-width: 767px) {
+  :root {
+    --m5-gutter: 14px;
+    --m5-top-gap: 10px;
+    --m5-dock-base: 66px;
+    --m5-card-radius: 18px;
+  }
+
+  /* One safe-area owner per edge. */
+  body.customer-mobile-app-site .site-main {
+    padding-top: calc(var(--m4-topbar-h) + env(safe-area-inset-top) + var(--m5-top-gap)) !important;
+    padding-bottom: calc(var(--m5-dock-base) + env(safe-area-inset-bottom) + 10px) !important;
+  }
+
+  body.employee-workspace-site .site-main,
+  body:has(.employee-app-topbar) .site-main {
+    padding-top: calc(var(--m4-topbar-h) + env(safe-area-inset-top) + var(--m4-switch-h) + var(--m5-top-gap)) !important;
+    padding-bottom: calc(var(--m5-dock-base) + env(safe-area-inset-bottom) + 10px) !important;
+  }
+
+  body.mw-r5-admin .mw-r5-main-host {
+    padding-top: calc(var(--m4-topbar-h) + env(safe-area-inset-top) + var(--m4-switch-h) + var(--m5-top-gap)) !important;
+    padding-bottom: calc(var(--m5-dock-base) + env(safe-area-inset-bottom) + 10px) !important;
+  }
+
+  .customer-app-bottom-nav,
+  .employee-app-bottom-nav,
+  .admin-app-bottom-nav {
+    height: calc(var(--m5-dock-base) + env(safe-area-inset-bottom)) !important;
+    padding: 6px max(6px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(6px, env(safe-area-inset-left)) !important;
+    align-items: start !important;
+    background: #101013 !important;
+  }
+
+  .customer-app-nav-item,
+  .employee-app-nav-item,
+  .admin-app-nav-item,
+  .employee-app-more > summary,
+  .admin-app-more > summary {
+    min-height: 52px !important;
+    max-height: 52px !important;
+    padding: 3px 2px !important;
+    border-radius: 14px !important;
+  }
+
+  body.customer-mobile-app-site .mw-support-launcher,
+  body.employee-workspace-site .mw-support-launcher,
+  body:has(.employee-app-topbar) .mw-support-launcher,
+  body.mw-r5-admin .mw-support-launcher {
+    bottom: calc(var(--m5-dock-base) + env(safe-area-inset-bottom) + 10px) !important;
+  }
+
+  /* Desktop billboard dimensions must never survive into phone pages. */
+  body.customer-mobile-app-site .hero,
+  body.customer-mobile-app-site .site-main [class*="-hero"] {
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  body.customer-mobile-app-site .hero {
+    display: block !important;
+    align-items: stretch !important;
+    padding: 0 0 16px !important;
+    border-bottom: 0 !important;
+    overflow: visible !important;
+  }
+
+  body.customer-mobile-app-site .hero-grid {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  body.customer-mobile-app-site .hero-copy {
+    padding: 8px 2px 0 !important;
+  }
+
+  body.customer-mobile-app-site .hero-art-frame {
+    height: clamp(168px, 48vw, 220px) !important;
+    min-height: 0 !important;
+  }
+
+  /* Route title already lives in the app bar: remove duplicate mobile billboards. */
+  body.customer-mobile-app-site .order3-hero,
+  body.customer-mobile-app-site .crew-page-hero {
+    display: none !important;
+  }
+
+  body.customer-mobile-app-site .vip-page-hero,
+  body.customer-mobile-app-site .mc-hero {
+    display: block !important;
+    min-height: 0 !important;
+    padding: 6px 0 10px !important;
+    text-align: left !important;
+    place-items: initial !important;
+  }
+
+  body.customer-mobile-app-site .order3-store,
+  body.customer-mobile-app-site .crew-directory,
+  body.customer-mobile-app-site .vip-level-section,
+  body.customer-mobile-app-site .mc-main,
+  body.customer-mobile-app-site .customer-orders-shell {
+    min-height: 0 !important;
+    margin-top: 0 !important;
+    padding-top: 4px !important;
+  }
+
+  /* A phone page may be short; do not force one viewport of decorative emptiness. */
+  body.customer-mobile-app-site .site-main,
+  body.employee-workspace-site .site-main,
+  body:has(.employee-app-topbar) .site-main,
+  body.mw-r5-admin .mw-r5-main-host,
+  body.mw-r5-admin .mw-r5-content,
+  body.employee-workspace-site .employee-workspace-page-content,
+  body:has(.employee-app-topbar) .employee-workspace-page-content {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  /* Prevent desktop widths / square wrappers from clipping phone cards. */
+  body.customer-mobile-app-site .site-main > *,
+  body.customer-mobile-app-site .site-section,
+  body.customer-mobile-app-site :where(.hero-grid, .trust-strip, .experience-grid, .service-grid, .order3-store, .order3-grid, .crew-directory, .public-crew-grid, .vip-level-section, .vip-level-grid, .mc-shell, .mc-main, .customer-orders-shell),
+  body.employee-workspace-site .employee-workspace-page-content > *,
+  body:has(.employee-app-topbar) .employee-workspace-page-content > *,
+  body.mw-r5-admin .mw-r5-content > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  body.customer-mobile-app-site :where(.experience-card, .service-card, .order3-card, .public-crew-card, .vip-level-card, .vip-rule-card, .vip-general-card, .mc-card, .customer-order-card),
+  body.employee-workspace-site :where(.report-card, .report-empty, .report-filter-bar, .mobile-task-hub),
+  body:has(.employee-app-topbar) :where(.report-card, .report-empty, .report-filter-bar, .mobile-task-hub),
+  body.mw-r5-admin :where(.panel, .center-row, .center-stat, .history-ledger-panel) {
+    border-radius: var(--m5-card-radius) !important;
+  }
+
+  /* Report page: task-first, compact, no desktop hero duplication. */
+  body:has(.employee-app-topbar) .report-shell {
+    display: grid !important;
+    gap: 10px !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body:has(.employee-app-topbar) .report-hero {
+    display: none !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub {
+    display: block !important;
+    margin: 0 !important;
+    padding: 12px !important;
+    border: 1px solid rgba(242, 207, 112, .28) !important;
+    border-radius: var(--m5-card-radius) !important;
+    background: rgba(242, 207, 112, .055) !important;
+    box-shadow: none !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-hub-head {
+    display: none !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-action {
+    display: grid !important;
+    grid-template-columns: 30px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    min-height: 70px !important;
+    padding: 10px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: 14px !important;
+    background: var(--m4-surface) !important;
+    color: var(--m4-text) !important;
+    text-decoration: none !important;
+    box-shadow: none !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-action.is-primary {
+    border-color: var(--m4-gold-line) !important;
+    background: var(--m4-gold-soft) !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-icon {
+    display: grid !important;
+    width: 30px !important;
+    height: 30px !important;
+    place-items: center !important;
+    border-radius: 10px !important;
+    background: rgba(242, 207, 112, .10) !important;
+    color: var(--m4-gold) !important;
+    font-size: 17px !important;
+    text-decoration: none !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-copy {
+    display: block !important;
+    min-width: 0 !important;
+    text-decoration: none !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-copy strong,
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-copy small {
+    display: block !important;
+    overflow: hidden !important;
+    text-decoration: none !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-copy strong {
+    font-size: 14px !important;
+    line-height: 1.25 !important;
+  }
+
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-copy small {
+    margin-top: 4px !important;
+    color: var(--m4-muted) !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+  }
+
+  body:has(.employee-app-topbar) .report-filter-bar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(118px, .7fr) !important;
+    gap: 8px !important;
+    margin: 0 !important;
+    padding: 10px !important;
+  }
+
+  body:has(.employee-app-topbar) .report-filter-bar input[type="search"] {
+    grid-column: 1 / -1 !important;
+  }
+
+  body:has(.employee-app-topbar) .report-filter-bar :where(input, select, button, a) {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px !important;
+  }
+
+  body:has(.employee-app-topbar) .report-empty {
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 20px 14px !important;
+    text-align: center !important;
+  }
+
+  body:has(.employee-app-topbar) .report-empty p {
+    margin: 6px 0 0 !important;
+    color: var(--m4-muted) !important;
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+  }
+
+  /* Short phone pages should end just above the dock, without synthetic black space. */
+  body.customer-mobile-app-site .site-footer,
+  body.employee-workspace-site .site-footer,
+  body:has(.employee-app-topbar) .site-footer {
+    display: none !important;
+  }
+}
+
+@media (max-width: 360px) {
+  body:has(.employee-app-topbar) .report-mobile-task-hub .mobile-task-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
