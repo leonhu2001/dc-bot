@@ -1,0 +1,287 @@
+/* Mobile surface sizing.
+   Canonical touch geometry only. This file must never own layout composition:
+   no grid-template, grid-auto-flow, flex-direction, position or page spacing.
+   Page/layout ownership stays in each surface base stylesheet. */
+
+@media (max-width: 767px) {
+  :root {
+    --mobile-control-h: 44px;
+    --mobile-control-sm: 40px;
+    --mobile-icon-control: 40px;
+    --mobile-shortcut-h: 68px;
+    --mobile-stat-h: 72px;
+    --mobile-card-pad: 12px;
+    --mobile-radius-control: 12px;
+    --mobile-radius-card: 16px;
+  }
+
+  body.customer-mobile-app-site *,
+  body.employee-workspace-site *,
+  body.mw-r5-admin * {
+    box-sizing: border-box;
+  }
+
+  body.customer-mobile-app-site :is(button,.button,a.button,input[type="button"],input[type="submit"]):not(.mobile-app-sheet-backdrop),
+  body.employee-workspace-site :is(button,.button,a.button,.ec-btn,input[type="button"],input[type="submit"]):not(.mobile-app-sheet-backdrop),
+  body.mw-r5-admin :is(button,.button,a.button,input[type="button"],input[type="submit"]):not(.mobile-app-sheet-backdrop) {
+    min-height: var(--mobile-control-h);
+    border-radius: var(--mobile-radius-control);
+  }
+
+  body.customer-mobile-app-site :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea),
+  body.employee-workspace-site :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea),
+  body.mw-r5-admin :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea) {
+    min-height: var(--mobile-control-h);
+    border-radius: var(--mobile-radius-control);
+  }
+
+  body.customer-mobile-app-site textarea,
+  body.employee-workspace-site textarea,
+  body.mw-r5-admin textarea {
+    min-height: 96px;
+  }
+
+  :is(.customer-app-mark,.customer-app-account,.employee-app-mark,.employee-app-profile,.admin-app-home,.admin-app-search,.mobile-app-sheet-close,.order3-dialog-close) {
+    width: var(--mobile-icon-control);
+    height: var(--mobile-icon-control);
+    min-width: var(--mobile-icon-control);
+    min-height: var(--mobile-icon-control);
+    padding: 0;
+  }
+
+  :is(.customer-app-nav-item,.employee-app-nav-item,.admin-app-nav-item,.employee-app-more>summary,.admin-app-more>summary) {
+    min-height: 50px;
+    max-height: 50px;
+    border-radius: 11px;
+  }
+
+  :is(.customer-app-nav-icon,.employee-app-nav-icon,.admin-app-nav-icon) {
+    width: 24px;
+    height: 24px;
+    font-size: 18px;
+  }
+
+  :is(.employee-app-sheet-links>a,.admin-app-sheet-links>a) {
+    min-height: 56px;
+    padding: 9px 10px;
+    border-radius: 13px;
+  }
+
+  .mobile-v6-home-card {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .mobile-v6-home-art {
+    min-height: 134px;
+    border-radius: 14px;
+  }
+
+  .mobile-v6-actions a {
+    min-height: var(--mobile-control-h);
+    height: var(--mobile-control-h);
+    border-radius: var(--mobile-radius-control);
+  }
+
+  .mobile-v6-quick-grid a {
+    min-height: var(--mobile-shortcut-h);
+    height: var(--mobile-shortcut-h);
+    border-radius: 14px;
+  }
+
+  :is(.mobile-v6-category-strip a,.crew-filters a) {
+    min-height: 42px;
+    height: 42px;
+    border-radius: 12px;
+  }
+
+  body.customer-mobile-app-site .experience-card {
+    min-height: 124px;
+    padding: var(--mobile-card-pad);
+    border-radius: var(--mobile-radius-card);
+  }
+
+  body.customer-mobile-app-site .experience-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  body.customer-mobile-app-site :is(.service-card,.crew-type-card,.public-crew-card,.vip-level-card,.vip-general-card,.vip-rule-card,.mc-card,.customer-order-card,.wallet-card,.service-rules-card,.delta-card,.special-banner,.mw-social-card) {
+    border-radius: var(--mobile-radius-card);
+  }
+
+  body.customer-mobile-app-site .service-card {
+    min-height: 104px;
+  }
+
+  body.customer-mobile-app-site .service-art {
+    width: 104px;
+    min-height: 104px;
+  }
+
+  body.customer-mobile-app-site :is(.service-content,.public-crew-content,.mc-card,.customer-order-card) {
+    padding: var(--mobile-card-pad);
+  }
+
+  body.customer-mobile-app-site .mw-social-card {
+    min-height: 78px;
+    padding: var(--mobile-card-pad);
+  }
+
+  body.customer-mobile-app-site .special-banner-art {
+    width: 78px;
+    min-height: 88px;
+    border-radius: 14px;
+  }
+
+  body.customer-mobile-app-site .order3-card {
+    min-height: 0;
+    padding: 10px;
+    border-radius: var(--mobile-radius-card);
+  }
+
+  body.customer-mobile-app-site .order3-media {
+    width: 96px;
+    height: 104px;
+    border-radius: 12px;
+  }
+
+  body.customer-mobile-app-site .order3-open {
+    min-height: var(--mobile-control-h);
+    height: var(--mobile-control-h);
+    border-radius: var(--mobile-radius-control);
+  }
+
+  body.customer-mobile-app-site :is(#mw-quantity-minus,#mw-quantity-plus,#mw-player-minus,#mw-player-plus) {
+    width: var(--mobile-control-h);
+    min-width: var(--mobile-control-h);
+    height: var(--mobile-control-h);
+    min-height: var(--mobile-control-h);
+    padding: 0;
+  }
+
+  body.customer-mobile-app-site .public-crew-stats>div {
+    min-height: 48px;
+    padding: 7px 5px;
+  }
+
+  body.customer-mobile-app-site .public-crew-more {
+    min-height: var(--mobile-control-h);
+    height: var(--mobile-control-h);
+    border-radius: var(--mobile-radius-control);
+  }
+
+  body.customer-mobile-app-site :is(.vip-level-card,.vip-general-card,.vip-rule-card) {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  body.customer-mobile-app-site .mc-shortcuts>a {
+    min-height: var(--mobile-shortcut-h);
+    padding: 9px;
+    border-radius: var(--mobile-radius-card);
+  }
+
+  body.customer-mobile-app-site :is(.mc-mini-stats>div,.customer-order-stat) {
+    min-height: var(--mobile-stat-h);
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  body.employee-workspace-site :is(.employee-mobile-task-hub .mobile-task-action,.employee-home-salary-link) {
+    min-height: var(--mobile-shortcut-h);
+    padding: 10px;
+    border-radius: var(--mobile-radius-card);
+  }
+
+  body.employee-workspace-site .mobile-task-icon {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 10px;
+  }
+
+  body.employee-workspace-site :is(.ec-stat,.salary-card,.dispatch-stat) {
+    min-height: var(--mobile-stat-h);
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  body.employee-workspace-site :is(.binding-card,.ec-card,.dispatch-panel,.dispatch-order-card,.dispatch-my-card,.report-card,.my-payout-card,.it-card,.sbm-panel,.sbm-card) {
+    min-height: 0;
+    border-radius: var(--mobile-radius-card);
+  }
+
+  body.employee-workspace-site :is(.ec-card,.dispatch-order-card,.dispatch-my-card,.report-card,.my-payout-card,.it-card,.sbm-card,.binding-card,.dispatch-panel,.sbm-panel) {
+    padding: var(--mobile-card-pad);
+  }
+
+  body.employee-workspace-site :is(.binding-action,.dispatch-footer .button,.dispatch-support-form button,.salary-tab,.dispatch-my-link,.dispatch-support-link) {
+    min-height: var(--mobile-control-h);
+    border-radius: var(--mobile-radius-control);
+  }
+
+  .mobile-v6-report-review {
+    min-height: var(--mobile-control-sm);
+    height: var(--mobile-control-sm);
+    border-radius: 11px;
+  }
+
+  .mobile-v6-report-actions a {
+    min-height: 66px;
+    height: 66px;
+    border-radius: 13px;
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-action {
+    min-height: var(--mobile-shortcut-h);
+    padding: 10px;
+    border-radius: var(--mobile-radius-card);
+  }
+
+  body.mw-r5-admin .admin-mobile-task-hub .mobile-task-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  body.mw-r5-admin :is(.stats .stat,.center-stat,.history-ledger-stat) {
+    min-height: var(--mobile-stat-h);
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  body.mw-r5-admin :is(.panel,.compact-panel,.orders-panel,.queue-row,.center-row,.center-review,.admin-order-card,.history-ledger-panel,.pay-review-panel,.topup-card,.topup-panel,.wallet-card,.vip-timer-card) {
+    min-height: 0;
+    border-radius: var(--mobile-radius-card);
+  }
+
+  body.mw-r5-admin :is(.orders-panel,.center-row,.center-review,.admin-order-card,.topup-card,.wallet-card,.vip-timer-card) {
+    padding: var(--mobile-card-pad);
+  }
+
+  body.mw-r5-admin .workspace {
+    width: var(--mobile-icon-control);
+    height: var(--mobile-icon-control);
+    min-width: var(--mobile-icon-control);
+    min-height: var(--mobile-icon-control);
+    border-radius: 11px;
+  }
+
+  :is(body.customer-mobile-app-site,body.employee-workspace-site,body.mw-r5-admin) .mw-support-launcher {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    padding: 0;
+    border-radius: 15px;
+  }
+}
+
+@media (max-width: 390px) {
+  :root {
+    --mobile-card-pad: 11px;
+  }
+}
