@@ -1,0 +1,6 @@
+/* Admin dashboard: keep mobile quick actions off desktop. */
+@media (min-width: 901px) {
+    body.mw-desktop-ui .admin-mobile-task-hub {
+        display: none !important;
+    }
+}
