@@ -12,14 +12,14 @@ def _eligible_game_rule(loyalty, rule_key: object) -> bool:
     return bool(policy and str(policy.get("pricing_type") or "") == "game")
 
 
-def _sync_existing_game_progress(loyalty) -> None:
+def _sync_existing_game_progress(loyalty, bind) -> None:
     """Rebuild stored game-based loyalty state against the owner-approved 15-game rule.
 
     Active/expired rewards that were over-issued by the old 10-game threshold may be
     revoked by the existing reconciliation routine. Reserved/redeemed rewards are
     preserved and converted to loyalty debt, matching normal admin reconciliation.
     """
-    with loyalty.engine.begin() as conn:
+    with bind.begin() as conn:
         applied = conn.execute(text("""
             SELECT migration_key
             FROM loyalty_migrations
@@ -116,7 +116,7 @@ def install_loyalty_policy_20261023() -> None:
 
     def ensure_loyalty_tables_with_owner_policy(bind=loyalty.engine) -> None:
         original_ensure(bind)
-        _sync_existing_game_progress(loyalty)
+        _sync_existing_game_progress(loyalty, bind)
 
     loyalty.ensure_loyalty_tables = ensure_loyalty_tables_with_owner_policy
     loyalty._owner_20261023_policy_installed = True
