@@ -9,9 +9,13 @@ BASE_URL = os.environ.get("E2E_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 
 def test_mobile_home_experience_cards_stay_in_two_equal_columns(page: Page) -> None:
+    page.set_extra_http_headers({"Sec-CH-UA-Mobile": "?1"})
     page.set_viewport_size({"width": 390, "height": 844})
     response = page.goto(f"{BASE_URL}/", wait_until="domcontentloaded")
     assert response is not None and response.ok
+
+    expect(page.locator(".customer-app-topbar")).to_be_visible()
+    expect(page.locator(".site-header")).to_have_count(0)
 
     grid = page.locator(".experience-grid")
     expect(grid).to_be_visible()
