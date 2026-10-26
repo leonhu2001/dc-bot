@@ -217,7 +217,7 @@
     body.customer-mobile-app-site .section-heading h2{font-size:28px!important;line-height:1.08!important}
     body.customer-mobile-app-site .section-more{font-size:12px!important;white-space:nowrap}
 
-    /* Experience cards are a bounded two-column grid. */
+    /* Experience cards are a bounded grid. Compact phones switch to one readable column. */
     body.customer-mobile-app-site .experience-grid{
         display:grid!important;
         grid-template-columns:repeat(2,minmax(0,1fr))!important;
@@ -289,7 +289,7 @@
     body.customer-mobile-app-site .order3-filter::-webkit-scrollbar{display:none}
     body.customer-mobile-app-site .order3-filter a{flex:0 0 auto;min-height:38px;display:inline-flex;align-items:center;padding:0 13px!important;border-radius:999px!important;white-space:nowrap}
     body.customer-mobile-app-site .order3-grid{grid-template-columns:1fr!important;gap:12px!important}
-    body.customer-mobile-app-site .order3-card{padding:12px!important;border-radius:20px!important}
+    body.customer-mobile-app-site .order3-card{padding:12px!important;border-radius:20px!important;scroll-margin-top:calc(76px + env(safe-area-inset-top))}
     body.customer-mobile-app-site .order3-media{min-height:150px!important;max-height:190px!important;border-radius:16px!important;overflow:hidden}
     body.customer-mobile-app-site .order3-card h2{font-size:23px!important}
     body.customer-mobile-app-site .order3-card-meta{grid-template-columns:1fr 1fr!important;gap:8px!important}
@@ -413,6 +413,10 @@
     body.customer-mobile-app-site .vip-level-card ul{padding-left:20px!important}
     body.customer-mobile-app-site .vip-general-card{grid-template-columns:1fr!important;gap:12px!important;padding:15px!important;border-radius:18px!important}
     body.customer-mobile-app-site .vip-general-card ol{padding-left:20px!important}
+}
+
+@media (max-width:420px){
+    body.customer-mobile-app-site .experience-grid{grid-template-columns:1fr!important}
 }
 
 @media (max-width:390px){
