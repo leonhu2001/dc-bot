@@ -118,13 +118,18 @@ $RequiredPanelAssetNames = @(
     "valorant_panel.png",
     "delta_fun_panel.png"
 )
-$PanelAssetPaths = @()
+$PanelAssets = @()
 foreach ($PanelAssetName in $RequiredPanelAssetNames) {
     $PanelAssetPath = Join-Path $PanelAssetDir $PanelAssetName
     if (-not (Test-Path -LiteralPath $PanelAssetPath -PathType Leaf)) {
         throw "Missing order panel image: $PanelAssetPath"
     }
-    $PanelAssetPaths += $PanelAssetPath
+
+    $PanelAssets += [PSCustomObject]@{
+        Name = $PanelAssetName
+        Path = $PanelAssetPath
+        Hash = (Get-FileHash -LiteralPath $PanelAssetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
 }
 
 # Price lists are text embeds now. Remove the obsolete local image folder so it
@@ -135,30 +140,66 @@ if (Test-Path -LiteralPath $ObsoletePriceListAssetDir) {
     Write-Host "PASS: removed obsolete local price-list image directory" -ForegroundColor Green
 }
 
-# Upload root artwork before the safe deployment. These files are already part of
-# the established runtime-artwork flow and are needed when public panels refresh
-# during bot startup.
+# Compare both VPS copies against the local SHA256 before uploading. A file is
+# synchronized when either the runtime source or the public static copy is missing
+# or differs. This keeps normal code/CSS deploys from retransferring ~18 MB of
+# unchanged panel artwork.
 Write-Host "=== SYNC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
+$ChangedPanelAssets = @()
+foreach ($PanelAsset in $PanelAssets) {
+    $RemoteRuntimePath = "/opt/dc-bot/assets/order_panels/$($PanelAsset.Name)"
+    $RemotePublicPath = "/opt/dc-bot/web/app/static/order_panels/$($PanelAsset.Name)"
+    $RemoteHashCommand = "for p in '$RemoteRuntimePath' '$RemotePublicPath'; do if [ -f `"`$p`" ]; then sha256sum `"`$p`" | cut -d ' ' -f1; else echo MISSING; fi; done"
+
+    $RemoteHashOutput = @(& ssh @SshTransportArgs $Vps $RemoteHashCommand)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to compare order panel image hash on VPS: $($PanelAsset.Name)"
+    }
+
+    $RemoteHashes = @(
+        $RemoteHashOutput |
+            ForEach-Object { $_.ToString().Trim().ToLowerInvariant() } |
+            Where-Object { $_ }
+    )
+
+    if (
+        $RemoteHashes.Count -eq 2 -and
+        $RemoteHashes[0] -eq $PanelAsset.Hash -and
+        $RemoteHashes[1] -eq $PanelAsset.Hash
+    ) {
+        Write-Host "SKIP: $($PanelAsset.Name) unchanged" -ForegroundColor DarkGray
+        continue
+    }
+
+    $ChangedPanelAssets += $PanelAsset
+    Write-Host "CHANGE: $($PanelAsset.Name) will be synchronized" -ForegroundColor Cyan
+}
+
 $RemotePanelStage = "/tmp/dc-bot-order-panels"
-Write-Host "Preparing remote panel staging directory..." -ForegroundColor DarkGray
-& ssh @SshTransportArgs $Vps "rm -rf '$RemotePanelStage' && mkdir -p '$RemotePanelStage'"
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to prepare remote order-panel staging directory."
-}
+if ($ChangedPanelAssets.Count -eq 0) {
+    Write-Host "SKIP: order panel images unchanged" -ForegroundColor Green
+} else {
+    Write-Host "Preparing remote panel staging directory..." -ForegroundColor DarkGray
+    & ssh @SshTransportArgs $Vps "rm -rf '$RemotePanelStage' && mkdir -p '$RemotePanelStage'"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to prepare remote order-panel staging directory."
+    }
 
-Write-Host "Uploading 5 public panel images..." -ForegroundColor DarkGray
-& scp @SshTransportArgs @PanelAssetPaths "${Vps}:${RemotePanelStage}/"
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to upload order panel images to VPS staging."
-}
+    $ChangedPanelAssetPaths = @($ChangedPanelAssets | ForEach-Object { $_.Path })
+    Write-Host "Uploading $($ChangedPanelAssets.Count) changed public panel image(s)..." -ForegroundColor DarkGray
+    & scp @SshTransportArgs @ChangedPanelAssetPaths "${Vps}:${RemotePanelStage}/"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to upload changed order panel images to VPS staging."
+    }
 
-Write-Host "Installing public panel images..." -ForegroundColor DarkGray
-$InstallPanelCommand = "mkdir -p /opt/dc-bot/web/app/static/order_panels /opt/dc-bot/assets/order_panels && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/web/app/static/order_panels/ && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/assets/order_panels/ && rm -rf /opt/dc-bot/web/app/static/order_panels/pricelists /opt/dc-bot/assets/order_panels/pricelists '$RemotePanelStage'"
-& ssh @SshTransportArgs $Vps $InstallPanelCommand
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to install order panel images on VPS."
+    Write-Host "Installing changed public panel images..." -ForegroundColor DarkGray
+    $InstallPanelCommand = "mkdir -p /opt/dc-bot/web/app/static/order_panels /opt/dc-bot/assets/order_panels && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/web/app/static/order_panels/ && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/assets/order_panels/ && rm -rf /opt/dc-bot/web/app/static/order_panels/pricelists /opt/dc-bot/assets/order_panels/pricelists '$RemotePanelStage'"
+    & ssh @SshTransportArgs $Vps $InstallPanelCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install changed order panel images on VPS."
+    }
+    Write-Host "PASS: $($ChangedPanelAssets.Count) changed order panel image(s) synchronized before service restart" -ForegroundColor Green
 }
-Write-Host "PASS: order panel images synchronized before service restart" -ForegroundColor Green
 Write-Host ""
 
 # Run the existing safe deployment. deploy_main.sh owns the single bot/web restart.
@@ -171,23 +212,26 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "=== VERIFY PUBLIC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
 
-# Verify the same GET request shape that Discord uses instead of HEAD. Cloudflare
-# returns CRLF-delimited response headers; parsing them after storing the raw block
-# in a shell variable can make carriage returns overwrite console output and cause
-# false negatives. Ask curl for the effective content type directly, and normalize
-# CRLF only for the header-specific CORP check.
-foreach ($AssetRelativePath in $RequiredPanelAssetNames) {
-    $PublicAssetUrl = "https://mowanentertainment.com/static/order_panels/${AssetRelativePath}?deploy=$Target"
-    $VerifyAssetCommand = "curl --fail --silent --show-error --max-time 10 -o /dev/null -w '%{content_type}\n' '$PublicAssetUrl' | grep -Eqi '^image/png([;[:space:]]|$)' || { echo '--- response headers for $AssetRelativePath ---'; curl --silent --show-error --max-time 10 -o /dev/null -D - '$PublicAssetUrl' | tr -d '\r'; echo 'Invalid image content-type for $AssetRelativePath'; exit 1; }; curl --fail --silent --show-error --max-time 10 -o /dev/null -D - '$PublicAssetUrl' | tr -d '\r' | grep -Eqi '^cross-origin-resource-policy:[[:space:]]*cross-origin([[:space:]]|$)' || { echo '--- response headers for $AssetRelativePath ---'; curl --silent --show-error --max-time 10 -o /dev/null -D - '$PublicAssetUrl' | tr -d '\r'; echo 'Missing cross-origin image policy for $AssetRelativePath'; exit 1; }"
+# Only public assets changed during this deployment need a network verification.
+# Use one GET per changed image and inspect the captured response headers for both
+# image content type and the Discord-required cross-origin resource policy.
+if ($ChangedPanelAssets.Count -eq 0) {
+    Write-Host "SKIP: no changed public panel images to verify" -ForegroundColor Green
+} else {
+    foreach ($PanelAsset in $ChangedPanelAssets) {
+        $AssetRelativePath = $PanelAsset.Name
+        $PublicAssetUrl = "https://mowanentertainment.com/static/order_panels/${AssetRelativePath}?deploy=$Target"
+        $VerifyAssetCommand = "headers=`$(mktemp); trap 'rm -f `"`$headers`"' EXIT; curl --fail --silent --show-error --max-time 20 -o /dev/null -D `"`$headers`" '$PublicAssetUrl' && tr -d '\r' < `"`$headers`" | grep -Eqi '^content-type:[[:space:]]*image/png([;[:space:]]|$)' && tr -d '\r' < `"`$headers`" | grep -Eqi '^cross-origin-resource-policy:[[:space:]]*cross-origin([[:space:]]|$)'"
 
-    & ssh @SshTransportArgs $Vps $VerifyAssetCommand
-    if ($LASTEXITCODE -ne 0) {
-        throw "Public order panel image verification failed: $AssetRelativePath"
+        & ssh @SshTransportArgs $Vps $VerifyAssetCommand
+        if ($LASTEXITCODE -ne 0) {
+            throw "Public order panel image verification failed: $AssetRelativePath"
+        }
+
+        Write-Host "PASS: $AssetRelativePath" -ForegroundColor Green
     }
-
-    Write-Host "PASS: $AssetRelativePath" -ForegroundColor Green
+    Write-Host "PASS: changed public order panel image URLs are reachable" -ForegroundColor Green
 }
-Write-Host "PASS: public order panel image URLs are reachable" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "DEPLOY COMPLETED" -ForegroundColor Green
