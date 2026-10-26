@@ -1,4 +1,5 @@
 {% set _p = request.url.path %}
+<link rel="stylesheet" href="/static/css/pages/admin_sidebar.css?v=20261026-1">
 
 <aside class="mw-r5-sidebar">
     <div class="mw-r5-brand">
@@ -36,8 +37,3 @@
         <a href="/">返回官網</a>
     </nav>
 </aside>
-
-<script src="/static/js/pages/admin_order_copy_unification.js?v=20261020_1" defer></script>
-{% if _p.startswith('/admin/order-workspace/') %}
-<script src="/static/js/pages/admin_order_workspace_copy_cleanup.js?v=20261020-1" defer></script>
-{% endif %}
