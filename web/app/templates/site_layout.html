@@ -35,8 +35,8 @@
 
     {% if employee_workspace_shell|default(false) %}
     <link rel="stylesheet" href="/static/css/pages/employee_center.css?v=20261020-2">
-    <link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-9">
-    <link rel="stylesheet" href="/static/css/pages/employee_workspace_page_content.css?v=20261020-1">
+    <link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261026-1">
+    <link rel="stylesheet" href="/static/css/pages/employee_workspace_page_content.css?v=20261026-2">
     <link rel="stylesheet" href="/static/css/pages/employee_select_picker.css?v=20261020-1">
     <link rel="stylesheet" href="/static/css/pages/employee_workspace_viewport.css?v=20261020-1">
     {% if request.url.path.startswith('/employee/store-bindings') %}<link rel="stylesheet" href="/static/css/pages/store_bindings_select.css?v=20261021-1">{% endif %}
@@ -80,7 +80,7 @@
     {% for schema in seo_data.get("schemas", []) %}<script nonce="{{ request.state.csp_nonce }}" type="application/ld+json">{{ schema|tojson }}</script>{% endfor %}
 </head>
 
-<body class="site-body mw-public-r5 {% if mobile_ui %}{% if employee_app_shell %}employee-workspace-site{% else %}customer-mobile-app-site{% endif %} mobile-ui{% else %}desktop-ui{% endif %}" data-page="{{ page_name or '' }}">
+<body class="site-body mw-public-r5{% if employee_app_shell %} employee-workspace-site{% elif mobile_ui %} customer-mobile-app-site{% endif %} {% if mobile_ui %}mobile-ui{% else %}desktop-ui{% endif %}" data-page="{{ page_name or '' }}">
     {% if mobile_ui %}
         {% if employee_app_shell %}{% include "_employee_mobile_app_shell.html" %}{% else %}{% include "_customer_mobile_app_shell.html" %}{% endif %}
     {% else %}
