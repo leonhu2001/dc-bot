@@ -161,6 +161,22 @@ body.mw-r5-employee :is(.dispatch-shell,.report-shell,.it-wrap,.sbm) {
   margin-right: 0 !important;
 }
 
+/* site_layout uses employee-workspace-site on desktop. Keep the page-specific
+   surface on the same vertical rhythm as dispatch/reports and do not let the
+   legacy .sbm top margin stack on top of the shared 18px page-content gap. */
+.employee-workspace-site .employee-workspace-page-content > .sbm {
+  margin-top: 0 !important;
+}
+
+/* These two components are intentionally mobile shortcuts. Without a desktop
+   default they render as a raw line of text/links under the hero. */
+@media (min-width: 721px) {
+  .employee-workspace-site .employee-mobile-task-hub,
+  .employee-workspace-site .employee-home-salary-link {
+    display: none !important;
+  }
+}
+
 /* The bar above is the only large hero. Page-specific headings below it stay compact. */
 body.mw-r5-employee .mw-r5-page-header {
   display: block !important;
