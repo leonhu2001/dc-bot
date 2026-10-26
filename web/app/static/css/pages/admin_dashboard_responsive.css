@@ -1,32 +1,21 @@
 /* Canonical responsive rules for the desktop admin operations workspace.
    Breakpoints account for the fixed admin sidebar and page padding. */
 
-/* Keep the order-workspace action easy to hit at every desktop window width. */
-body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .workspace {
-  display: grid !important;
-  width: 44px !important;
-  height: 44px !important;
-  min-width: 44px !important;
-  place-items: center !important;
-  border: 1px solid rgba(214, 176, 90, .34) !important;
-  border-radius: 11px !important;
-  color: var(--r5-gold-soft) !important;
-  font-size: 25px !important;
-  font-weight: 900 !important;
-  line-height: 1 !important;
+/* The whole order row is the action on desktop and mobile. */
+body.mw-r5-admin .admin-dashboard-orders .order-row {
+  color: inherit !important;
   text-decoration: none !important;
+  cursor: pointer;
 }
 
-body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .workspace:hover {
-  border-color: rgba(214, 176, 90, .62) !important;
-  background: rgba(214, 176, 90, .09) !important;
+body.mw-r5-admin .admin-dashboard-orders .order-row:hover {
+  background: rgba(214, 176, 90, .045);
 }
 
-body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head > div:last-child,
-body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row > div:last-child {
-  display: grid !important;
-  place-items: center !important;
-  padding-inline: 2px !important;
+body.mw-r5-admin .admin-dashboard-orders .order-row:focus-visible {
+  outline: 2px solid rgba(214, 176, 90, .62);
+  outline-offset: -2px;
+  background: rgba(214, 176, 90, .065);
 }
 
 @media (min-width: 901px) {
@@ -52,6 +41,17 @@ body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row > div:last-chi
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
+  }
+
+  body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head,
+  body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row {
+    grid-template-columns:
+      minmax(150px, .95fr)
+      minmax(170px, 1.05fr)
+      minmax(220px, 1.5fr)
+      92px
+      105px
+      minmax(170px, 1.1fr) !important;
   }
 }
 
@@ -79,18 +79,12 @@ body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row > div:last-chi
       minmax(150px, 1.28fr)
       76px
       92px
-      minmax(132px, 1.02fr)
-      54px !important;
+      minmax(132px, 1.02fr) !important;
   }
 
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head > div,
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row > div {
     padding-inline: 9px !important;
-  }
-
-  body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head > div:last-child,
-  body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row > div:last-child {
-    padding-inline: 5px !important;
   }
 }
 
@@ -118,7 +112,7 @@ body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row > div:last-chi
 
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head,
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row {
-    min-width: 840px !important;
+    min-width: 786px !important;
   }
 }
 
@@ -173,15 +167,14 @@ body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row > div:last-chi
 
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head,
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row {
-    min-width: 780px !important;
+    min-width: 726px !important;
     grid-template-columns:
       118px
       128px
       minmax(155px, 1fr)
       76px
       92px
-      132px
-      54px !important;
+      132px !important;
   }
 }
 
