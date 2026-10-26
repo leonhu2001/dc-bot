@@ -1,5 +1,3 @@
-<link rel="stylesheet" href="/static/css/pages/mobile_app_rebuild_v6.css?v=20261026-1">
-<link rel="stylesheet" href="/static/css/pages/mobile_app_component_sizing_v7.css?v=20261026-1">
 {% set _app_path = request.url.path %}
 {% set _app_user_name = (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工' %}
 {% set _can_switch_admin = user and (user.is_admin or user.is_customer_service or user.is_manager) %}
