@@ -22,6 +22,13 @@ body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .workspace:hover {
   background: rgba(214, 176, 90, .09) !important;
 }
 
+body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head > div:last-child,
+body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row > div:last-child {
+  display: grid !important;
+  place-items: center !important;
+  padding-inline: 2px !important;
+}
+
 @media (min-width: 901px) {
   body.mw-r5-admin.mw-desktop-ui .mw-r5-main-host,
   body.mw-r5-admin.mw-desktop-ui .mw-r5-content,
@@ -79,6 +86,11 @@ body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .workspace:hover {
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head > div,
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row > div {
     padding-inline: 9px !important;
+  }
+
+  body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-head > div:last-child,
+  body.mw-r5-admin.mw-desktop-ui .admin-dashboard-orders .order-row > div:last-child {
+    padding-inline: 5px !important;
   }
 }
 
