@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 {% block head %}
-<link rel="stylesheet" href="/static/css/pages/order_reports_desktop.css?v=20261026-1">
+<link rel="stylesheet" href="/static/css/pages/order_reports_desktop.css?v=20261026-2">
 {% endblock %}
 {% block page_title %}報單系統{% endblock %}
 {% block content %}
@@ -20,38 +20,40 @@
   {% if message %}<div class="report-alert report-alert-success">{{ message }}</div>{% endif %}
   {% if error %}<div class="report-alert report-alert-danger">{{ error }}</div>{% endif %}
 
-  <section class="mobile-task-hub report-mobile-task-hub" aria-label="報單快捷操作">
-    <div class="mobile-task-hub-head">
-      <div class="mobile-task-hub-copy">
-        <span class="mobile-task-hub-kicker">REPORT QUEUE</span>
-        <h2>需要你處理的</h2>
-      </div>
+  <nav class="report-workbar" aria-label="報單工作列">
+    <div class="report-workbar-title">
+      <span class="report-workbar-kicker">REPORT QUEUE</span>
+      <strong>報單佇列</strong>
     </div>
-    <div class="mobile-task-grid">
-      <a class="mobile-task-action is-primary" href="/dispatch/reports?status=missing">
-        <span class="mobile-task-icon" aria-hidden="true">!</span>
-        <span class="mobile-task-copy"><strong>未報單</strong><small>已結單待補</small></span>
+
+    <div class="report-worktabs" role="list" aria-label="報單狀態篩選">
+      <a class="report-worktab{% if status_filter == 'missing' %} is-active{% endif %}"
+         href="/dispatch/reports?status=missing"
+         {% if status_filter == 'missing' %}aria-current="page"{% endif %}>
+        <span>未報單</span><small>已結單待補</small>
       </a>
-      <a class="mobile-task-action" href="/dispatch/reports?status=changes_requested">
-        <span class="mobile-task-icon" aria-hidden="true">↺</span>
-        <span class="mobile-task-copy"><strong>需修改</strong><small>被退回待補</small></span>
+      <a class="report-worktab{% if status_filter == 'changes_requested' %} is-active{% endif %}"
+         href="/dispatch/reports?status=changes_requested"
+         {% if status_filter == 'changes_requested' %}aria-current="page"{% endif %}>
+        <span>需修改</span><small>退回待補</small>
       </a>
-      <a class="mobile-task-action" href="/dispatch/reports">
-        <span class="mobile-task-icon" aria-hidden="true">≡</span>
-        <span class="mobile-task-copy"><strong>全部紀錄</strong><small>查看歷史</small></span>
+      <a class="report-worktab{% if not status_filter %} is-active{% endif %}"
+         href="/dispatch/reports"
+         {% if not status_filter %}aria-current="page"{% endif %}>
+        <span>全部紀錄</span><small>完整歷史</small>
       </a>
-      <a class="mobile-task-action" href="/dispatch">
-        <span class="mobile-task-icon" aria-hidden="true">⚡</span>
-        <span class="mobile-task-copy"><strong>接單大廳</strong><small>返回接單</small></span>
-      </a>
+    </div>
+
+    <div class="report-worktools">
+      <a class="report-worktool" href="/dispatch">← 接單大廳</a>
       {% if support_can_manage %}
-      <a class="mobile-task-action" href="/dispatch/reports/review">
-        <span class="mobile-task-icon" aria-hidden="true">◇</span>
-        <span class="mobile-task-copy"><strong>客服審核</strong><small>待審 {{ pending_report_review_count or 0 }}</small></span>
+      <a class="report-worktool report-worktool-review" href="/dispatch/reports/review">
+        客服審核
+        {% if pending_report_review_count %}<span>{{ pending_report_review_count }}</span>{% endif %}
       </a>
       {% endif %}
     </div>
-  </section>
+  </nav>
 
   <form method="get" class="report-filter-bar">
     <input type="search" name="q" value="{{ q }}" placeholder="搜尋訂單、老闆、單別">
