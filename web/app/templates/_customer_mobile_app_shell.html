@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="/static/css/pages/mobile_app_rebuild_v6.css?v=20261026-1">
 {% set _customer_path = request.url.path %}
 {% set _customer_name = (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '訪客' %}
 {% if _customer_path == '/' %}
@@ -43,6 +44,67 @@
     <a class="customer-app-login" href="/auth/discord/login">登入</a>
     {% endif %}
 </header>
+
+{% if _customer_path == '/' %}
+<section class="mobile-v6-route mobile-v6-home" aria-label="魔丸娛樂手機首頁">
+    <div class="mobile-v6-home-card">
+        <div class="mobile-v6-home-copy">
+            <span class="mobile-v6-kicker">MOWAN PLAY</span>
+            <h1>今晚想玩什麼？</h1>
+            <p>找陪玩、開黑或遊戲服務，直接從這裡開始。</p>
+            <div class="mobile-v6-actions">
+                <a href="/order">立即下單</a>
+                <a href="/staff">挑選陪玩</a>
+            </div>
+        </div>
+        <a class="mobile-v6-home-art" href="/order" aria-label="前往立即下單">
+            <img src="/static/img/home_hero_mascot_final.webp?v=1" alt="魔丸娛樂吉祥物" decoding="async">
+        </a>
+    </div>
+    <nav class="mobile-v6-quick-grid" aria-label="首頁快捷功能">
+        <a href="/order"><span>＋</span><span>快速下單</span></a>
+        <a href="{% if user %}/me/orders{% else %}/auth/discord/login{% endif %}"><span>▣</span><span>訂單紀錄</span></a>
+        <a href="/vip"><span>◆</span><span>VIP 權益</span></a>
+        <a href="{% if user %}/me{% else %}/auth/discord/login{% endif %}"><span>◎</span><span>個人中心</span></a>
+    </nav>
+</section>
+{% elif _customer_path.startswith('/order') %}
+<section class="mobile-v6-route mobile-v6-order" aria-label="手機下單分類">
+    <div class="mobile-v6-order-head">
+        <div class="mobile-v6-route-title">
+            <strong>選擇服務</strong>
+            <span>選好商品後再設定人數、數量與需求</span>
+        </div>
+        {% if categories is defined and categories %}
+        <nav class="mobile-v6-category-strip" aria-label="服務分類">
+            {% for item in categories %}
+            <a href="/order?category={{ item.key }}{% if selected_staff is defined and selected_staff %}&staff={{ selected_staff.staff_id }}{% endif %}" class="{% if category_filter is defined and category_filter == item.key %}is-active{% endif %}">{{ item.label }}</a>
+            {% endfor %}
+        </nav>
+        {% endif %}
+        {% if selected_staff is defined and selected_staff %}
+        <div class="mobile-v6-specified">
+            <img src="{{ selected_staff.avatar_url }}" alt="" onerror="this.onerror=null;this.src='/static/img/server_logo.gif';">
+            <strong>已指定 {{ selected_staff.display_name }} · {{ selected_staff.role_title }}</strong>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% elif _customer_path.startswith('/staff') and _customer_path == '/staff' %}
+<section class="mobile-v6-route mobile-v6-staff" aria-label="陪玩陣容手機版">
+    <div class="mobile-v6-page-head">
+        <strong>挑選陪玩</strong>
+        <span>依遊戲、身份與評價快速找到適合的人</span>
+    </div>
+</section>
+{% elif _customer_path.startswith('/vip') %}
+<section class="mobile-v6-route mobile-v6-vip" aria-label="VIP 手機版">
+    <div class="mobile-v6-page-head">
+        <strong>VIP 會員</strong>
+        <span>查看目前權益、升級門檻與每月福利</span>
+    </div>
+</section>
+{% endif %}
 
 <nav class="customer-app-bottom-nav" aria-label="魔丸 App 主要導覽">
     <a class="customer-app-nav-item{% if _customer_path == '/' %} is-active{% endif %}" href="/">
