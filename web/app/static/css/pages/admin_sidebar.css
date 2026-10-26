@@ -1,0 +1,21 @@
+/* Canonical admin sidebar component.
+   Loaded by the sidebar partial so legacy and canonical desktop admin pages
+   render the same navigation hierarchy while page/layout CSS stays separate. */
+
+body.mw-r5-admin .mw-r5-nav-section {
+    margin: 17px 12px 6px;
+    color: rgba(223, 183, 92, .58);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .15em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+body.mw-r5-admin .mw-r5-nav-section:first-child {
+    margin-top: 5px;
+}
+
+body.mw-r5-admin .mw-r5-nav-section-muted {
+    color: rgba(235, 232, 222, .34);
+}
