@@ -190,15 +190,40 @@
     font-size: 11px !important;
   }
 
+  /* Legacy customer CSS mixed a horizontal auto-flow grid with the newer two-column
+     layout. Reset every implicit-grid property here so the five cards cannot create
+     an 82vw third column or horizontal overflow. */
+  body.customer-mobile-app-site .experience-section .section-heading {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+  }
+
   body.customer-mobile-app-site .experience-grid {
+    display: grid !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-flow: row !important;
+    grid-auto-columns: auto !important;
     gap: var(--v7-card-gap) !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    scroll-snap-type: none !important;
+    overscroll-behavior-x: auto !important;
   }
 
   body.customer-mobile-app-site .experience-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     min-height: 124px !important;
     padding: var(--v7-card-pad) !important;
     gap: 6px !important;
     border-radius: var(--v7-radius-card) !important;
+    scroll-snap-align: none !important;
   }
 
   body.customer-mobile-app-site .experience-icon {
