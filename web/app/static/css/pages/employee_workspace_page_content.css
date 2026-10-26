@@ -8,7 +8,7 @@
   --ews-text: #ebe8de;
   --ews-muted: rgba(235,232,222,.52);
 }
-.employee-workspace-site .employee-workspace-page-content{width:100%;min-width:0;margin-top:16px}
+.employee-workspace-site .employee-workspace-page-content{width:100%;min-width:0;margin-top:18px}
 .employee-workspace-site :is(.dispatch-shell,.report-shell,.it-wrap,.sbm){width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important}
 .employee-workspace-site .dispatch-hero-main{min-height:0!important;padding:20px!important;border-radius:18px!important}
 .employee-workspace-site .dispatch-hero-main .dispatch-title{margin:2px 0 0!important;font-size:24px!important;letter-spacing:normal!important}
@@ -28,5 +28,6 @@
 .employee-workspace-site :is(.report-button-primary,.it-btn:not(.danger):not(.secondary),.sbm-btn.primary){border-color:rgba(242,214,141,.32)!important;background:rgba(242,214,141,.11)!important;color:var(--ews-gold)!important}
 .employee-workspace-site :is(input,select,textarea){border-color:rgba(255,255,255,.10)!important;background-color:rgba(255,255,255,.025)!important;color:var(--ews-text)!important}
 .employee-workspace-site :is(input,textarea)::placeholder{color:rgba(235,232,222,.32)!important}
+.employee-workspace-site :is(a,button,input,select,textarea):focus-visible{outline:2px solid rgba(242,214,141,.48);outline-offset:2px}
 @media(max-width:980px){.employee-workspace-site .dispatch-board{grid-template-columns:1fr!important}.employee-workspace-site .dispatch-column:nth-child(2){position:static!important}}
-@media(max-width:720px){.employee-workspace-site :is(.report-hero,.sbm-hero,.dispatch-hero-main){padding:16px!important}}
+@media(max-width:720px){.employee-workspace-site .employee-workspace-page-content{margin-top:0}.employee-workspace-site :is(.report-hero,.sbm-hero,.dispatch-hero-main){padding:16px!important}}
