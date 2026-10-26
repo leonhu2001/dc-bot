@@ -1,0 +1,78 @@
+/* Canonical responsive rules for the desktop dispatch workspace. */
+
+@media (min-width: 901px) {
+  body.mw-r5-employee.mw-desktop-ui .dispatch-shell,
+  body.mw-r5-employee.mw-desktop-ui .dispatch-hero,
+  body.mw-r5-employee.mw-desktop-ui .dispatch-board,
+  body.mw-r5-employee.mw-desktop-ui .dispatch-panel,
+  body.mw-r5-employee.mw-desktop-ui .dispatch-column {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  body.mw-r5-employee.mw-desktop-ui .dispatch-hero-main > .dispatch-order-top {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: start !important;
+    gap: 14px 20px !important;
+    min-width: 0 !important;
+  }
+
+  body.mw-r5-employee.mw-desktop-ui .dispatch-hero-main > .dispatch-order-top > div:first-child {
+    min-width: 0 !important;
+  }
+
+  body.mw-r5-employee.mw-desktop-ui .dispatch-hero-main .dispatch-alert-toggle {
+    position: static !important;
+    inset: auto !important;
+    justify-self: end !important;
+    align-self: start !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    flex: 0 0 auto !important;
+  }
+
+  body.mw-r5-employee.mw-desktop-ui .dispatch-tags {
+    min-width: 0 !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1500px) {
+  body.mw-r5-employee.mw-desktop-ui .dispatch-hero,
+  body.mw-r5-employee.mw-desktop-ui .dispatch-board {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  body.mw-r5-employee.mw-desktop-ui .dispatch-column:nth-child(2) {
+    position: static !important;
+    top: auto !important;
+  }
+
+  body.mw-r5-employee.mw-desktop-ui .dispatch-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1150px) {
+  body.mw-r5-employee.mw-desktop-ui .dispatch-hero-main > .dispatch-order-top {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  body.mw-r5-employee.mw-desktop-ui .dispatch-hero-main .dispatch-alert-toggle {
+    justify-self: start !important;
+  }
+
+  body.mw-r5-employee.mw-desktop-ui .dispatch-meta,
+  body.mw-r5-employee.mw-desktop-ui .dispatch-payout,
+  body.mw-r5-employee.mw-desktop-ui .dispatch-my-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body.mw-r5-employee.mw-desktop-ui .dispatch-column-head,
+  body.mw-r5-employee.mw-desktop-ui .dispatch-subsection-head {
+    flex-wrap: wrap !important;
+  }
+}
