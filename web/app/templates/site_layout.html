@@ -1,7 +1,10 @@
 <!doctype html>
 <html lang="zh-Hant">
-{% set employee_app_shell = employee_workspace_shell|default(false) or page_name|default('') == 'employee' %}
-{% set customer_app_shell = not employee_app_shell %}
+{% set _ui_ua = (request.headers.get('user-agent') or '')|lower %}
+{% set _ui_ch_mobile = (request.headers.get('sec-ch-ua-mobile') or '')|lower %}
+{% set mobile_surface = _ui_ch_mobile == '?1' or 'iphone' in _ui_ua or 'ipad' in _ui_ua or 'ipod' in _ui_ua or 'android' in _ui_ua or 'mobile' in _ui_ua %}
+{% set employee_app_shell = mobile_surface and (employee_workspace_shell|default(false) or page_name|default('') == 'employee') %}
+{% set customer_app_shell = mobile_surface and not employee_app_shell %}
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -30,7 +33,7 @@
     <link rel="stylesheet" href="/static/css/csp_style_attrs.css?v=20261013">
     <script src="/static/js/csp_dynamic_styles.js?v=20261013" defer></script>
 
-    {% if employee_app_shell %}
+    {% if mobile_surface and employee_app_shell %}
     <link rel="stylesheet" href="/static/css/pages/employee_mobile_pwa.css?v=20261024-2">
     {% endif %}
 
@@ -51,8 +54,9 @@
     {% block head %}{% endblock %}
 
     <link rel="stylesheet" href="/static/css/mw_public_r5.css?v=scroll_perf_20260917_1">
-    <link rel="stylesheet" href="/static/css/pages/customer_mobile_app.css?v=20261026-1">
-    <link rel="stylesheet" href="/static/css/pages/employee_mobile_app.css?v=20261026-1">
+    {% if mobile_surface %}
+    <link rel="stylesheet" href="/static/css/pages/customer_mobile_app.css?v=20261026-2">
+    <link rel="stylesheet" href="/static/css/pages/employee_mobile_app.css?v=20261026-2">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_polish.css?v=20261026-1">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_repair.css?v=20261026-1">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_page_audit.css?v=20261026-1">
@@ -63,7 +67,10 @@
     <link rel="stylesheet" href="/static/css/pages/mobile_app_visual_system_v4.css?v=20261026-1">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_public_pages_v4.css?v=20261026-1">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_geometry_v5.css?v=20261026-1">
-    <script src="/static/js/pages/mobile_app_interactions.js?v=20261026-1" defer></script>
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_rebuild_v6.css?v=20261026-2">
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_component_sizing_v7.css?v=20261026-2">
+    <script src="/static/js/pages/mobile_app_interactions.js?v=20261026-2" defer></script>
+    {% endif %}
 
     <link rel="icon" href="/static/img/favicon.ico?v=20261025-5" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png?v=20261025-5">
@@ -91,8 +98,10 @@
     {% endfor %}
 </head>
 
-<body class="site-body mw-public-r5{% if employee_app_shell %} employee-workspace-site{% elif customer_app_shell %} customer-mobile-app-site{% endif %}" data-page="{{ page_name or '' }}">
+<body class="site-body mw-public-r5{% if employee_app_shell %} employee-workspace-site{% elif customer_app_shell %} customer-mobile-app-site{% endif %}" data-page="{{ page_name or '' }}" data-ui-surface="{{ 'mobile' if mobile_surface else 'desktop' }}">
+    {% if not mobile_surface %}
     {% include "_site_header.html" %}
+    {% endif %}
     {% if customer_app_shell %}
     {% include "_customer_mobile_app_shell.html" %}
     {% endif %}
@@ -112,6 +121,7 @@
         {% endif %}
     </main>
 
+    {% if not mobile_surface %}
     <footer class="site-footer">
         <div class="footer-grid">
             <div class="footer-brand">
@@ -146,6 +156,7 @@
         </div>
         <div class="mw-social-links"></div>
     </footer>
+    {% endif %}
 
     <button class="mw-support-launcher" type="button" aria-label="開啟客服" aria-expanded="false" data-mw-support-launcher>💬</button>
     <section class="mw-support-panel" aria-label="魔丸網站客服" data-mw-support-panel>
