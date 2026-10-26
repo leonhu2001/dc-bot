@@ -13,6 +13,7 @@ STATUS_LABELS = {
     "expired": "已過期",
     "revoked": "已收回",
 }
+_OPEN_LOYALTY_STATUSES = {"active", "paid", "stored"}
 
 
 def _connect(path: Path) -> sqlite3.Connection:
@@ -114,6 +115,144 @@ def _build_groups(data: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+def _merge_open_paid_progress(
+    conn: sqlite3.Connection,
+    *,
+    placeholders: str,
+    ids: list[str],
+    result: dict[str, dict[str, Any]],
+) -> None:
+    """Add paid/open service units to display progress without persisting them.
+
+    Closed orders remain the durable loyalty source of truth. Paid active/stored
+    orders are shown as provisional progress so staff and customers can see the
+    same units that the checkout eligibility logic already uses immediately.
+    """
+    if not _table_exists(conn, "web_orders"):
+        return
+
+    try:
+        from services.loyalty_policy_20261023 import install_loyalty_policy_20261023
+        from services import loyalty_benefits as loyalty
+
+        install_loyalty_policy_20261023()
+    except Exception:
+        return
+
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT *
+            FROM web_orders
+            WHERE customer_discord_id IN ({placeholders})
+              AND LOWER(COALESCE(status, '')) IN ('active', 'paid', 'stored')
+            ORDER BY id ASC
+            """,
+            ids,
+        ).fetchall()
+    except sqlite3.Error:
+        return
+
+    open_scopes: dict[tuple[str, str], dict[str, Any]] = {}
+    for raw in rows:
+        row = dict(raw)
+        customer_id = str(row.get("customer_discord_id") or "").strip()
+        rule_key = str(row.get("order_rule_key") or "").strip()
+        if not customer_id or customer_id not in result or not rule_key:
+            continue
+
+        try:
+            policy = loyalty.loyalty_policy_for_rule(rule_key)
+            if policy is None:
+                continue
+            if not loyalty._event_time_is_in_scope(row):
+                continue
+            if loyalty._qualifying_paid_amount(row) <= 0:
+                continue
+
+            player_count = loyalty._extract_player_count(row)
+            rule = loyalty._rule_for_key(rule_key)
+            companion_count = loyalty._service_companion_count(rule, player_count)
+            quantity = max(0, int(row.get("quantity") or 0))
+            paid_units = float(quantity * companion_count)
+            if paid_units <= 0:
+                continue
+            scope_key = loyalty.loyalty_scope_key(rule_key, player_count)
+        except Exception:
+            continue
+
+        key = (customer_id, scope_key)
+        entry = open_scopes.setdefault(
+            key,
+            {
+                "customer_id": customer_id,
+                "scope_key": scope_key,
+                "rule_key": rule_key,
+                "title": loyalty._loyalty_display_label(
+                    rule_key,
+                    getattr(rule, "label", rule_key),
+                ),
+                "pricing_type": str(policy.get("pricing_type") or ""),
+                "threshold_units": float(policy.get("threshold_units") or 0),
+                "benefit_kind": str(policy.get("benefit_kind") or ""),
+                "benefit_units": float(policy.get("benefit_units") or 0),
+                "open_paid_units": 0.0,
+            },
+        )
+        entry["open_paid_units"] = float(entry["open_paid_units"]) + paid_units
+
+    for (customer_id, scope_key), live in open_scopes.items():
+        data = result[customer_id]
+        existing = next(
+            (
+                item
+                for item in data.get("progress") or []
+                if str(item.get("scope_key") or "") == scope_key
+            ),
+            None,
+        )
+        pricing_type = str(live.get("pricing_type") or "")
+        unit_label = "H" if pricing_type == "hourly" else "局" if pricing_type == "game" else ""
+        threshold = float(live.get("threshold_units") or 0)
+        open_units = float(live.get("open_paid_units") or 0)
+
+        if existing is None:
+            existing = {
+                "scope_key": scope_key,
+                "rule_key": str(live.get("rule_key") or ""),
+                "title": str(live.get("title") or "福利"),
+                "pricing_type": pricing_type,
+                "progress_units": 0.0,
+                "threshold_units": threshold,
+                "benefit_text": _benefit_text(
+                    live.get("benefit_kind"),
+                    live.get("benefit_units"),
+                ),
+                "updated_at": "",
+                "updated_at_text": "—",
+            }
+            data["progress"].append(existing)
+
+        confirmed = float(existing.get("progress_units") or 0)
+        displayed = confirmed + open_units
+        earned_preview = int(displayed // threshold) if threshold > 0 else 0
+        existing["confirmed_progress_units"] = confirmed
+        existing["open_paid_units"] = open_units
+        existing["display_progress_units"] = displayed
+        existing["progress_text"] = (
+            f"{_format_units(displayed)} / {_format_units(threshold)}{unit_label}"
+        )
+        existing["open_progress_text"] = (
+            f"含進行中暫計 {_format_units(open_units)}{unit_label}"
+        )
+        existing["earned_preview_count"] = earned_preview
+        existing["percent"] = (
+            max(0, min(100, int(round(displayed / threshold * 100))))
+            if threshold > 0
+            else 0
+        )
+
+
 def load_customer_loyalty(
     db_path: Path,
     customer_ids: Iterable[str],
@@ -169,14 +308,25 @@ def load_customer_loyalty(
                         "title": _display_label(raw["rule_key"], raw["rule_label"]),
                         "pricing_type": pricing_type,
                         "progress_units": current,
+                        "confirmed_progress_units": current,
+                        "open_paid_units": 0.0,
+                        "display_progress_units": current,
                         "threshold_units": threshold,
                         "progress_text": f"{_format_units(current)} / {_format_units(threshold)}{unit_label}",
+                        "open_progress_text": "",
                         "benefit_text": _benefit_text(raw["benefit_kind"], raw["benefit_units"]),
                         "percent": percent,
                         "updated_at": str(raw["updated_at"] or ""),
                         "updated_at_text": _time_text(raw["updated_at"]),
                     }
                 )
+
+        _merge_open_paid_progress(
+            conn,
+            placeholders=placeholders,
+            ids=ids,
+            result=result,
+        )
 
         if _table_exists(conn, "customer_benefit_coupons"):
             coupon_rows = conn.execute(
@@ -252,6 +402,12 @@ def load_customer_loyalty(
                     result[customer_id]["active_coupons"].append(coupon)
 
     for data in result.values():
+        data["progress"].sort(
+            key=lambda item: (
+                str(item.get("title") or ""),
+                str(item.get("scope_key") or ""),
+            )
+        )
         data["groups"] = _build_groups(data)
 
     return result
