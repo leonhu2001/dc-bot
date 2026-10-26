@@ -21,6 +21,7 @@ from services.wallet_service import get_wallet_balance_breakdown
 from web.app.config import config
 from web.app.services.customer_portal import build_customer_portal_snapshot
 from web.app.services.site_data import get_member_summary
+from views.topups import TopupAmountModal
 
 
 MEMBER_PORTAL_CHANNEL_ID = 1558395213406412801
@@ -34,7 +35,7 @@ def build_member_portal_embed() -> discord.Embed:
     embed = discord.Embed(
         title="👤 我的專區",
         description=(
-            "查詢訂單、錢包、點數 / VIP 與會員福利。\n"
+            "查詢訂單、錢包、累積消費、點數 / VIP 與會員福利。\n"
             "查詢結果僅自己可見。"
         ),
         color=discord.Color.purple(),
@@ -538,6 +539,11 @@ class MemberPortalView(discord.ui.View):
             inline=True,
         )
         embed.add_field(
+            name="累積消費",
+            value=f"**{int(member.get('total_spent') or 0):,}T**",
+            inline=True,
+        )
+        embed.add_field(
             name="升級進度",
             value=progress_text,
             inline=False,
@@ -650,5 +656,64 @@ class MemberPortalView(discord.ui.View):
         await interaction.response.send_message(
             embed=embed,
             view=MemberBenefitsView(monthly),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(
+        label="儲值中心",
+        emoji="💳",
+        style=discord.ButtonStyle.primary,
+        custom_id="mawan_member_portal_topup_v1",
+        row=1,
+    )
+    async def topup(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(TopupAmountModal())
+
+    @discord.ui.button(
+        label="累積消費",
+        emoji="📈",
+        style=discord.ButtonStyle.secondary,
+        custom_id="mawan_member_portal_spending_v1",
+        row=1,
+    )
+    async def spending(self, interaction: discord.Interaction, button: discord.ui.Button):
+        member = get_member_summary(_member_id(interaction))
+        vip_progress = member.get("vip_progress") or {}
+        next_name = str(vip_progress.get("next_name") or "").strip()
+        total_spent = int(member.get("total_spent") or 0)
+        if next_name:
+            next_text = (
+                f"距離 **{next_name}** 還差 "
+                f"**{int(vip_progress.get('remaining') or 0):,}T**"
+            )
+        else:
+            next_text = "目前已達最高 VIP 等級。"
+
+        embed = discord.Embed(
+            title="📈 我的累積消費",
+            description=(
+                f"目前累積有效消費：\n**{total_spent:,}T**\n\n"
+                "此金額用於 VIP 等級與升級進度計算。"
+            ),
+            color=discord.Color.gold(),
+        )
+        embed.add_field(
+            name="目前等級",
+            value=f"**{member.get('vip_name') or '普通魔丸'}**",
+            inline=True,
+        )
+        embed.add_field(
+            name="可用點數",
+            value=f"**{int(member.get('points') or 0):,} 點**",
+            inline=True,
+        )
+        embed.add_field(
+            name="下一階段",
+            value=next_text,
+            inline=False,
+        )
+        await interaction.response.send_message(
+            embed=embed,
+            view=_link_view("前往會員專區", MEMBER_PORTAL_URL),
             ephemeral=True,
         )
