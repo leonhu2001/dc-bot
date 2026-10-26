@@ -15,6 +15,7 @@ from web.app.config import config
 ROULETTE_RULE_KEY = "admin_delta_desktop_fun_20261007053129_91eb"
 LEGACY_ROULETTE_RULE_KEY = "fun_russian_roulette"
 ROULETTE_RULE_KEYS = {ROULETTE_RULE_KEY, LEGACY_ROULETTE_RULE_KEY}
+ROULETTE_HISTORICAL_RULE_KEYS = {LEGACY_ROULETTE_RULE_KEY}
 ROULETTE_RULES_VERSION = "roulette-v2-2026-10-12"
 ROULETTE_ITEM_LABEL = "俄羅斯輪盤"
 DRAW_ALLOWED_STATUSES = {"active", "stored"}
@@ -328,11 +329,39 @@ def _load_order(
     return dict(row) if row is not None else None
 
 
+def _snapshot_rule_label(order: dict[str, Any]) -> str:
+    raw = order.get("rule_snapshot_json")
+    if not raw:
+        return ""
+    try:
+        snapshot = raw if isinstance(raw, dict) else json.loads(str(raw))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return ""
+    if not isinstance(snapshot, dict):
+        return ""
+    for key in ("label", "name", "item"):
+        value = str(snapshot.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
 def _is_roulette_order(order: dict[str, Any]) -> bool:
-    rule_key = str(order.get("order_rule_key") or "").strip()
-    if rule_key in ROULETTE_RULE_KEYS:
+    """Classify an existing order from identity persisted at order creation.
+
+    The current roulette product reused an older 2026-10-07 rule key. A rule
+    key therefore describes the current template, not the historical identity
+    of every order that ever referenced it. Historical orders must be decided
+    from their persisted item/rule snapshot. The old dedicated roulette key is
+    still safe because it was never shared by another product.
+    """
+    item = str(order.get("item") or "").strip()
+    if item == ROULETTE_ITEM_LABEL:
         return True
-    return ROULETTE_ITEM_LABEL in str(order.get("item") or "")
+    if _snapshot_rule_label(order) == ROULETTE_ITEM_LABEL:
+        return True
+    rule_key = str(order.get("order_rule_key") or "").strip()
+    return rule_key in ROULETTE_HISTORICAL_RULE_KEYS
 
 
 def _public_order(order: dict[str, Any]) -> dict[str, Any]:
@@ -614,8 +643,9 @@ def notify_ready_roulette_orders(
 ) -> int:
     """Send one ticket prompt once a roulette order becomes paid/active.
 
-    This is intentionally driven from canonical Web order status, so wallet,
-    bank transfer, and payment-review approvals all follow the same behavior.
+    Candidate rows are intentionally broad enough to preserve compatibility,
+    but every candidate is re-checked by persisted order identity before any
+    notification is written or sent.
     """
     ensure_roulette_feature(db_file)
     safe_limit = max(1, min(int(limit or 20), 100))
@@ -630,7 +660,8 @@ def notify_ready_roulette_orders(
                 ticket_channel_id,
                 item,
                 status,
-                order_rule_key
+                order_rule_key,
+                rule_snapshot_json
             FROM web_orders
             WHERE status IN ('active', 'stored')
               AND ticket_channel_id IS NOT NULL
@@ -654,6 +685,8 @@ def notify_ready_roulette_orders(
 
     for raw_row in rows:
         order = dict(raw_row)
+        if not _is_roulette_order(order):
+            continue
         order_id = int(order.get("id") or 0)
         if order_id <= 0:
             continue
