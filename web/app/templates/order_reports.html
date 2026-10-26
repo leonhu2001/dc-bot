@@ -21,27 +21,32 @@
     <div class="mobile-task-hub-head">
       <div class="mobile-task-hub-copy">
         <span class="mobile-task-hub-kicker">REPORT QUEUE</span>
-        <h2>先看需要你處理的</h2>
-        <p>未報單與被退回的訂單優先，完成後再看歷史。</p>
+        <h2>需要你處理的</h2>
       </div>
     </div>
     <div class="mobile-task-grid">
       <a class="mobile-task-action is-primary" href="/dispatch/reports?status=missing">
         <span class="mobile-task-icon" aria-hidden="true">!</span>
-        <span class="mobile-task-copy"><strong>未報單</strong><small>需要補填的已結單訂單</small></span>
+        <span class="mobile-task-copy"><strong>未報單</strong><small>已結單待補</small></span>
       </a>
       <a class="mobile-task-action" href="/dispatch/reports?status=changes_requested">
         <span class="mobile-task-icon" aria-hidden="true">↺</span>
-        <span class="mobile-task-copy"><strong>需修改</strong><small>客服退回待補正</small></span>
+        <span class="mobile-task-copy"><strong>需修改</strong><small>被退回待補</small></span>
       </a>
       <a class="mobile-task-action" href="/dispatch/reports">
         <span class="mobile-task-icon" aria-hidden="true">≡</span>
-        <span class="mobile-task-copy"><strong>全部紀錄</strong><small>含待審核與已完成</small></span>
+        <span class="mobile-task-copy"><strong>全部紀錄</strong><small>查看歷史</small></span>
       </a>
       <a class="mobile-task-action" href="/dispatch">
         <span class="mobile-task-icon" aria-hidden="true">⚡</span>
-        <span class="mobile-task-copy"><strong>回接單大廳</strong><small>查看目前可接任務</small></span>
+        <span class="mobile-task-copy"><strong>接單大廳</strong><small>返回接單</small></span>
       </a>
+      {% if support_can_manage %}
+      <a class="mobile-task-action" href="/dispatch/reports/review">
+        <span class="mobile-task-icon" aria-hidden="true">◇</span>
+        <span class="mobile-task-copy"><strong>客服審核</strong><small>待審 {{ pending_report_review_count or 0 }}</small></span>
+      </a>
+      {% endif %}
     </div>
   </section>
 
@@ -54,8 +59,8 @@
       <option value="changes_requested" {% if status_filter == 'changes_requested' %}selected{% endif %}>需修改</option>
       <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>已報單</option>
     </select>
-    <button class="report-button report-button-secondary" type="submit">套用篩選</button>
-    {% if q or status_filter %}<a class="report-button report-button-secondary" href="/dispatch/reports">清除篩選</a>{% endif %}
+    <button class="report-button report-button-secondary" type="submit">篩選</button>
+    {% if q or status_filter %}<a class="report-button report-button-secondary" href="/dispatch/reports">清除</a>{% endif %}
   </form>
 
   {% if reports %}
@@ -91,8 +96,8 @@
     </div>
   {% else %}
     <div class="report-empty">
-      <strong>目前沒有需要顯示的報單</strong>
-      <p>{% if q or status_filter %}目前篩選條件沒有結果，可清除篩選再看全部紀錄。{% else %}只有你實際參與過的已結單訂單會出現在這裡。{% endif %}</p>
+      <strong>目前沒有報單</strong>
+      <p>{% if q or status_filter %}這個篩選沒有結果。{% else %}需要處理的訂單會出現在這裡。{% endif %}</p>
       {% if q or status_filter %}<a class="report-button report-button-secondary" href="/dispatch/reports">清除篩選</a>{% endif %}
     </div>
   {% endif %}
