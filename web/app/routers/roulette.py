@@ -11,8 +11,11 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from web.app.services import roulette_redraw_service as roulette_redraw_service
-from web.app.services import roulette_service as roulette_service
+from web.app.services.roulette_identity_service import (
+    install_identity_policy,
+    list_admin_roulette_orders,
+    notify_ready_roulette_orders,
+)
 from web.app.services.roulette_redraw_service import (
     ensure_redraw_tables,
     get_redraw_state,
@@ -25,7 +28,6 @@ from web.app.services.roulette_service import (
     ensure_roulette_feature,
     get_roulette_context,
     normalize_bet,
-    notify_ready_roulette_orders,
 )
 
 
@@ -35,76 +37,9 @@ TEMPLATES = Jinja2Templates(
 )
 _ROULETTE_READY_TASK: asyncio.Task | None = None
 
-
-def _strict_roulette_identity(order: dict[str, Any]) -> bool:
-    """A roulette order must match both rule metadata and its creation snapshot.
-
-    Manager-created rule keys can be renamed or repurposed later.  The copied
-    order item is creation-time data, so requiring both prevents a historical
-    order from becoming roulette retroactively when a rule key is reused.
-    """
-    rule_key = str(order.get("order_rule_key") or "").strip()
-    item_snapshot = str(order.get("item") or "").strip()
-    return (
-        rule_key in roulette_service.ROULETTE_RULE_KEYS
-        and roulette_service.ROULETTE_ITEM_LABEL in item_snapshot
-    )
-
-
-# Roulette services and routes share one strict identity rule for this process.
-roulette_service._is_roulette_order = _strict_roulette_identity
-
-
-def _list_admin_roulette_orders_strict(*, limit: int = 100) -> list[dict[str, Any]]:
-    ensure_redraw_tables()
-    safe_limit = max(1, min(int(limit or 100), 250))
-    keys = tuple(sorted(roulette_service.ROULETTE_RULE_KEYS))
-    placeholders = ",".join("?" for _ in keys)
-
-    with roulette_redraw_service._connect() as conn:
-        rows = conn.execute(
-            f"""
-            SELECT *
-            FROM web_orders
-            WHERE order_rule_key IN ({placeholders})
-              AND item LIKE ?
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (
-                *keys,
-                f"%{roulette_service.ROULETTE_ITEM_LABEL}%",
-                safe_limit,
-            ),
-        ).fetchall()
-
-    output: list[dict[str, Any]] = []
-    for raw in rows:
-        order = dict(raw)
-        state = get_redraw_state(int(order["id"]))
-        output.append(
-            {
-                "id": int(order["id"]),
-                "order_no": str(order.get("bot_order_no") or f"WEB-{order['id']}"),
-                "customer_name": str(
-                    order.get("customer_display_name")
-                    or order.get("customer_username")
-                    or order.get("customer_discord_id")
-                    or "未紀錄"
-                ),
-                "customer_discord_id": str(order.get("customer_discord_id") or ""),
-                "status": str(order.get("status") or "").strip().lower(),
-                "ticket_channel_id": str(order.get("ticket_channel_id") or ""),
-                "final_draw": state["final_draw"],
-                "remaining": state["remaining"],
-                "total_granted": state["total_granted"],
-                "attempt_count": state["attempt_count"],
-                "history": state["history"],
-                "grants": state["grants"],
-            }
-        )
-    return output
-
+# Draw/context checks inside roulette_service resolve this function dynamically.
+# Install one immutable identity policy before any route or worker can use them.
+install_identity_policy()
 
 # 只初始化輪盤資料表與舊誤建商品清理；正式商品設定仍完全由後台管理。
 ensure_roulette_feature()
@@ -206,8 +141,6 @@ async def member_roulette(request: Request, order_id: int):
         (context.get("order") or {}).get("status") or ""
     ).strip().lower()
 
-    # 輪盤頁不是公開遊戲頁。只有這張輪盤趣味單本人，且訂單仍在
-    # 進行中 / 存單中時才能進入；結案後由 Discord 與客服後台保留紀錄。
     if order_status not in DRAW_ALLOWED_STATUSES:
         raise HTTPException(
             status_code=404,
@@ -216,7 +149,6 @@ async def member_roulette(request: Request, order_id: int):
 
     remaining = int(redraw_state.get("remaining") or 0)
     if remaining > 0 and context.get("draw") is not None:
-        # 補發後保留舊結果於後台歷史，但前台回到可下注狀態。
         context["previous_draw"] = context["draw"]
         context["draw"] = None
         context["can_draw"] = True
@@ -246,7 +178,6 @@ async def member_roulette_draw(
         raise HTTPException(status_code=401, detail="請先登入。")
 
     try:
-        # 先完整驗證下注內容，再動補抽額度。避免異常 payload 消耗掉補發次數。
         normalize_bet(payload.mode, payload.selection)
         context = await run_in_threadpool(
             get_roulette_context,
@@ -299,7 +230,7 @@ async def admin_fun_orders(
     if not user:
         return RedirectResponse(url="/service", status_code=303)
 
-    orders = await run_in_threadpool(_list_admin_roulette_orders_strict)
+    orders = await run_in_threadpool(list_admin_roulette_orders)
     return TEMPLATES.TemplateResponse(
         request=request,
         name="admin_fun_orders.html",
