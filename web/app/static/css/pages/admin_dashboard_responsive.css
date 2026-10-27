@@ -56,6 +56,12 @@ body.mw-r5-admin .admin-dashboard-orders .admin-order-report-badge.unreported {
 }
 
 @media (min-width: 901px) {
+  /* This file loads after admin_dashboard_pc.css, so this rule cannot be
+     overwritten by the desktop layout that styles the mobile quick-action hub. */
+  body.mw-r5-admin.mw-desktop-ui .admin-mobile-task-hub {
+    display: none !important;
+  }
+
   body.mw-r5-admin.mw-desktop-ui .mw-r5-main-host,
   body.mw-r5-admin.mw-desktop-ui .mw-r5-content,
   body.mw-r5-admin.mw-desktop-ui .admin-dashboard-shell,
