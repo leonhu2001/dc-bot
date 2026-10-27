@@ -2,40 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from services.order_rule_manager_policy import get_manager_point_benefit_setting
 from services.point_benefit_catalog import is_service_bonus_allowed_for_rule
 
 
-def _manager_point_benefit_setting(rule_key: str) -> bool | None:
-    """Return the manager-published point-benefit flag when one exists.
-
-    Code-level category restrictions are only legacy defaults. Once a manager
-    publishes a product rule (or creates a product in the manager console), that
-    persisted setting must win for both Web and Discord.
-    """
-
-    key = str(rule_key or "").strip()
-    if not key:
-        return None
-
-    try:
-        from services.order_rule_store import (
-            get_active_override,
-            get_custom_rule_definition,
-        )
-
-        active = get_active_override(key)
-        active_payload = (active or {}).get("payload") or {}
-        if isinstance(active_payload, dict) and "point_benefits_allowed" in active_payload:
-            return bool(active_payload.get("point_benefits_allowed"))
-
-        custom = get_custom_rule_definition(key)
-        custom_payload = (custom or {}).get("payload") or {}
-        if isinstance(custom_payload, dict) and "point_benefits_allowed" in custom_payload:
-            return bool(custom_payload.get("point_benefits_allowed"))
-    except Exception:
-        return None
-
-    return None
+_POINT_DISABLED_TEXT = "此商品目前不開放點數福利；會員福利券仍可使用。"
 
 
 def check_order_point_benefit_allowed(
@@ -43,7 +14,7 @@ def check_order_point_benefit_allowed(
     benefit: dict[str, Any] | None,
     data: dict | None = None,
 ) -> tuple[bool, str]:
-    """Pure eligibility policy for applying a point benefit to one order draft."""
+    """Return whether one point benefit can be applied to the effective rule."""
 
     data = data or {}
     spec = dict(benefit or {})
@@ -54,31 +25,23 @@ def check_order_point_benefit_allowed(
     rule_key = str(getattr(rule, "key", "") or "")
     rule_label = str(getattr(rule, "label", "") or "")
 
-    # The combined Discord picker contains two independent benefit families:
-    # point redemptions and member coupons. self_service_ui_runtime probes with
-    # this legacy, non-selectable key before opening that picker. Never let a
-    # point-only restriction hide owner-issued/member coupons.
+    # Legacy non-selectable probe used only to open the combined point/member
+    # picker. Actual point choices are checked individually below.
     if str(spec.get("key") or "") == "discount_20":
         return True, ""
 
-    manager_setting = _manager_point_benefit_setting(rule_key)
-    if manager_setting is not None:
-        if not manager_setting:
-            return False, "此商品目前不開放點數福利；會員福利券仍可使用。"
-        # Manager-published product rules are authoritative. Do not apply the
-        # historical category/name deny-list after an explicit manager choice.
-    else:
+    manager_setting = get_manager_point_benefit_setting(rule_key)
+    if manager_setting is False:
+        return False, _POINT_DISABLED_TEXT
+    if manager_setting is None:
         if not getattr(rule, "point_benefits_allowed", False):
-            return False, "此商品目前不開放點數福利；會員福利券仍可使用。"
-
-        # Legacy defaults for products that have never been published through
-        # 商品與規則. They preserve old behavior without overriding a manager.
+            return False, _POINT_DISABLED_TEXT
         if category == "steam":
-            return False, "此商品目前不開放點數福利；會員福利券仍可使用。"
+            return False, _POINT_DISABLED_TEXT
         if category in {"fun", "delta_desktop_fun", "title"}:
-            return False, "此商品目前不開放點數福利；會員福利券仍可使用。"
+            return False, _POINT_DISABLED_TEXT
         if rule_key.startswith("basic_trial_") or rule_label.startswith("體驗單"):
-            return False, "此商品目前不開放點數福利；會員福利券仍可使用。"
+            return False, _POINT_DISABLED_TEXT
 
     kind = str(spec.get("kind") or "")
     pricing_type = str(getattr(rule, "pricing_type", "") or "")
