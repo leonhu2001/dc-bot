@@ -160,12 +160,7 @@
                         <span class="badge admin-order-status-badge {% if order.status == "stored" %}stored{% else %}{{ order.status_class }}{% endif %}">
                             {% if order.status == "stored" %}已暫存{% else %}{{ order.status_label }}{% endif %}
                         </span>
-                        {% set report_submitted = order.dispatch_message_id %}
-                        {% set report_pending = report_submitted and order.status == "pending_cs_dispatch" %}
-                        {% set report_approved = report_submitted and order.status in ["pending_dispatch", "active", "pending_settlement", "completed"] %}
-                        <span class="badge admin-order-report-badge {% if report_pending %}pending{% elif report_approved %}reported{% elif report_submitted %}pending{% else %}unreported{% endif %}">
-                            {% if report_pending %}待審核{% elif report_approved %}已報單{% elif report_submitted %}已送出{% else %}未報單{% endif %}
-                        </span>
+                        <span class="badge admin-order-report-badge unreported" data-admin-order-report-status data-order-id="{{ order.id }}">未報單</span>
                     </div>
 
                     <div class="order-cs-col order-time-col">
@@ -188,5 +183,5 @@
 </main>
 </div>
 
-<script src="/static/js/pages/admin_dashboard.js?v=20261013"></script>
+<script src="/static/js/pages/admin_dashboard.js?v=20261027-1"></script>
 {% endblock %}
