@@ -31,7 +31,6 @@ def configure_support_call_views(
     send_order_log_callback: Callable[..., Awaitable[object]] | None = None,
 ) -> None:
     global CUSTOMER_SERVICE_ROLE_ID, MANAGER_ROLE_ID, _send_order_log_callback
-
     CUSTOMER_SERVICE_ROLE_ID = int(customer_service_role_id)
     MANAGER_ROLE_ID = int(manager_role_id)
     _send_order_log_callback = send_order_log_callback
@@ -61,19 +60,31 @@ def _ticket_customer_id(channel: discord.TextChannel) -> int | None:
     return None
 
 
+def _is_main_panel_private_support_channel(channel: object) -> bool:
+    if not isinstance(channel, discord.TextChannel):
+        return False
+    markers = {
+        key.strip(): value.strip()
+        for part in str(channel.topic or "").split(";")
+        if "=" in part
+        for key, value in [part.split("=", 1)]
+    }
+    return (
+        markers.get("support_source") == "main_panel"
+        and bool(markers.get("support_customer_id"))
+    )
+
+
 def _timestamp(value: str | None) -> int | None:
     text = str(value or "").strip()
     if not text:
         return None
-
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
-
     try:
         parsed = datetime.fromisoformat(text)
     except ValueError:
         return None
-
     return int(parsed.timestamp())
 
 
@@ -109,20 +120,12 @@ def build_support_call_embed(call: dict) -> discord.Embed:
         title = "🔔 客服鈴・處理中"
         color = discord.Color.green()
         staff_id = str(call.get("claimed_by_discord_id") or "").strip()
-        status_text = (
-            f"已由 <@{staff_id}> 接手"
-            if staff_id
-            else "已由客服接手"
-        )
+        status_text = f"已由 <@{staff_id}> 接手" if staff_id else "已由客服接手"
     elif status == "resolved":
         title = "✅ 客服鈴・已完成"
         color = discord.Color.blue()
         staff_id = str(call.get("resolved_by_discord_id") or "").strip()
-        status_text = (
-            f"已由 <@{staff_id}> 完成處理"
-            if staff_id
-            else "已完成處理"
-        )
+        status_text = f"已由 <@{staff_id}> 完成處理" if staff_id else "已完成處理"
     else:
         title = "客服鈴"
         color = discord.Color.light_grey()
@@ -130,44 +133,30 @@ def build_support_call_embed(call: dict) -> discord.Embed:
 
     embed = discord.Embed(
         title=title,
-        description=(
-            f"顧客：{customer_text}\n"
-            f"狀態：{status_text}"
-        ),
+        description=f"顧客：{customer_text}\n狀態：{status_text}",
         color=color,
     )
-
     embed.add_field(
         name="呼叫時間",
         value=(f"<t:{called_ts}:F>\n<t:{called_ts}:R>" if called_ts else "-"),
         inline=True,
     )
-
-    response = _response_seconds(call)
     embed.add_field(
         name="接手耗時",
-        value=_duration_text(response),
+        value=_duration_text(_response_seconds(call)),
         inline=True,
     )
-
     embed.set_footer(text=f"客服鈴 #{int(call.get('id') or 0)}")
     return embed
 
 
 def _support_role_mentions(guild: discord.Guild, *, escalated: bool = False) -> str:
     role_ids = [CUSTOMER_SERVICE_ROLE_ID]
-
     if escalated:
-        role_ids.extend(
-            [
-                MANAGER_ROLE_ID,
-                GENERAL_MANAGER_ROLE_ID,
-            ]
-        )
+        role_ids.extend([MANAGER_ROLE_ID, GENERAL_MANAGER_ROLE_ID])
 
     mentions: list[str] = []
     seen: set[int] = set()
-
     for role_id in role_ids:
         role_id = int(role_id or 0)
         if not role_id or role_id in seen:
@@ -176,7 +165,6 @@ def _support_role_mentions(guild: discord.Guild, *, escalated: bool = False) -> 
         role = guild.get_role(role_id)
         if role is not None:
             mentions.append(role.mention)
-
     return " ".join(mentions)
 
 
@@ -191,14 +179,8 @@ class SupportCallButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if (
-            interaction.guild is None
-            or not isinstance(interaction.channel, discord.TextChannel)
-        ):
-            await interaction.response.send_message(
-                "客服鈴只能在下單票口內使用。",
-                ephemeral=True,
-            )
+        if interaction.guild is None or not isinstance(interaction.channel, discord.TextChannel):
+            await interaction.response.send_message("客服鈴只能在下單票口內使用。", ephemeral=True)
             return
 
         customer_id = _ticket_customer_id(interaction.channel)
@@ -221,7 +203,6 @@ class SupportCallButton(discord.ui.Button):
             customer_discord_id=customer_id,
             customer_display_name=_display_name(interaction.user),
         )
-
         if not created:
             status = str(call.get("status") or "")
             if status == "claimed":
@@ -233,7 +214,6 @@ class SupportCallButton(discord.ui.Button):
                 )
             else:
                 message = "客服鈴已經送出，目前正在等待客服接手，不會重複通知。"
-
             await interaction.response.send_message(
                 message,
                 ephemeral=True,
@@ -242,7 +222,6 @@ class SupportCallButton(discord.ui.Button):
             return
 
         role_mentions = _support_role_mentions(interaction.guild)
-
         try:
             notification = await interaction.channel.send(
                 content=(
@@ -251,21 +230,11 @@ class SupportCallButton(discord.ui.Button):
                 ).strip(),
                 embed=build_support_call_embed(call),
                 view=SupportCallActionView(),
-                allowed_mentions=discord.AllowedMentions(
-                    users=True,
-                    roles=True,
-                    everyone=False,
-                ),
+                allowed_mentions=discord.AllowedMentions(users=True, roles=True, everyone=False),
             )
-            set_support_call_notification(
-                int(call["id"]),
-                notification.id,
-            )
+            set_support_call_notification(int(call["id"]), notification.id)
         except Exception:
-            cancel_support_call(
-                int(call["id"]),
-                "notification_send_failed",
-            )
+            cancel_support_call(int(call["id"]), "notification_send_failed")
             await interaction.response.send_message(
                 "客服鈴送出失敗，請直接標記客服協助。",
                 ephemeral=True,
@@ -302,24 +271,13 @@ class SupportCallActionView(discord.ui.View):
         button: discord.ui.Button,
     ):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message(
-                "無法確認你的身分組。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
-
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message(
-                "只有客服或總管可以接手客服鈴。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("只有客服或總管可以接手客服鈴。", ephemeral=True)
             return
-
         if interaction.message is None:
-            await interaction.response.send_message(
-                "找不到客服鈴訊息。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("找不到客服鈴訊息。", ephemeral=True)
             return
 
         call = get_support_call_by_notification(interaction.message.id)
@@ -335,21 +293,15 @@ class SupportCallActionView(discord.ui.View):
             staff_discord_id=interaction.user.id,
             staff_display_name=_display_name(interaction.user),
         )
-
         if not changed:
             status = str(latest.get("status") or "")
             if status == "claimed":
                 staff_id = str(latest.get("claimed_by_discord_id") or "").strip()
-                message = (
-                    f"這筆已由 <@{staff_id}> 接手。"
-                    if staff_id
-                    else "這筆已由其他客服接手。"
-                )
+                message = f"這筆已由 <@{staff_id}> 接手。" if staff_id else "這筆已由其他客服接手。"
             elif status == "resolved":
                 message = "這筆客服鈴已完成處理。"
             else:
                 message = f"這筆目前狀態為 {status or '未知'}。"
-
             await interaction.response.send_message(
                 message,
                 ephemeral=True,
@@ -361,11 +313,7 @@ class SupportCallActionView(discord.ui.View):
             content=f"✅ {interaction.user.mention} 已接手這筆客服需求。",
             embed=build_support_call_embed(latest),
             view=self,
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False,
-            ),
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
 
     @discord.ui.button(
@@ -381,24 +329,13 @@ class SupportCallActionView(discord.ui.View):
         button: discord.ui.Button,
     ):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message(
-                "無法確認你的身分組。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
-
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message(
-                "只有客服或總管可以完成客服鈴。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("只有客服或總管可以完成客服鈴。", ephemeral=True)
             return
-
         if interaction.message is None:
-            await interaction.response.send_message(
-                "找不到客服鈴訊息。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("找不到客服鈴訊息。", ephemeral=True)
             return
 
         call = get_support_call_by_notification(interaction.message.id)
@@ -409,8 +346,7 @@ class SupportCallActionView(discord.ui.View):
             )
             return
 
-        status = str(call.get("status") or "")
-        if status == "open":
+        if str(call.get("status") or "") == "open":
             await interaction.response.send_message(
                 "請先按「接手處理」，再完成這筆客服需求。",
                 ephemeral=True,
@@ -422,7 +358,6 @@ class SupportCallActionView(discord.ui.View):
             staff_discord_id=interaction.user.id,
             staff_display_name=_display_name(interaction.user),
         )
-
         if not changed:
             await interaction.response.send_message(
                 "這筆客服鈴已經不是處理中狀態。",
@@ -430,23 +365,34 @@ class SupportCallActionView(discord.ui.View):
             )
             return
 
+        channel = interaction.channel
         await interaction.response.edit_message(
             content=f"☑️ {interaction.user.mention} 已完成這筆客服需求。",
             embed=build_support_call_embed(latest),
             view=self._disabled_copy(),
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False,
-            ),
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
 
+        # Only tickets created from the public 「聯絡客服」 panel are disposable.
+        # Order tickets also use SupportCallActionView and must never be deleted.
+        if _is_main_panel_private_support_channel(channel):
+            try:
+                await channel.delete(
+                    reason=(
+                        f"Main-panel customer-service ticket resolved: "
+                        f"support_call_id={int(call['id'])}, staff_id={interaction.user.id}"
+                    )
+                )
+            except (discord.Forbidden, discord.HTTPException) as exc:
+                print(
+                    f"[support-call] resolved private support channel delete failed "
+                    f"channel_id={getattr(channel, 'id', 0)} call_id={call['id']}: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
 
 
-def _message_has_component(
-    message: discord.Message,
-    custom_id: str,
-) -> bool:
+def _message_has_component(message: discord.Message, custom_id: str) -> bool:
     for row in getattr(message, "components", []) or []:
         for child in getattr(row, "children", []) or []:
             if str(getattr(child, "custom_id", "") or "") == str(custom_id):
@@ -454,18 +400,13 @@ def _message_has_component(
     return False
 
 
-def _message_has_link(
-    message: discord.Message,
-    url: str,
-) -> bool:
+def _message_has_link(message: discord.Message, url: str) -> bool:
     expected = str(url or "").rstrip("/")
-
     for row in getattr(message, "components", []) or []:
         for child in getattr(row, "children", []) or []:
             child_url = str(getattr(child, "url", "") or "").rstrip("/")
             if child_url == expected:
                 return True
-
     return False
 
 
@@ -480,47 +421,29 @@ async def refresh_existing_order_ticket_support_buttons(
         return 0
 
     refreshed = 0
-
-    channels = sorted(
-        category.text_channels,
-        key=lambda item: int(item.id),
-        reverse=True,
-    )[:120]
-
+    channels = sorted(category.text_channels, key=lambda item: int(item.id), reverse=True)[:120]
     for channel in channels:
         topic = str(channel.topic or "")
         if "order_customer_id=" not in topic:
             continue
-
-        lowered_name = str(channel.name or "").lower()
-        if lowered_name.startswith(("已結單", "已取消")):
+        if str(channel.name or "").lower().startswith(("已結單", "已取消")):
             continue
-
         try:
             async for message in channel.history(limit=60):
                 if not _message_has_component(message, "order_control_select"):
                     continue
-
-                has_support_call = _message_has_component(
-                    message,
-                    "order_support_call",
-                )
+                has_support_call = _message_has_component(message, "order_support_call")
                 has_customer_orders = _message_has_link(
                     message,
                     "https://mowanentertainment.com/me/orders",
                 )
-
                 if has_support_call and has_customer_orders:
                     break
-
-                await message.edit(
-                    view=order_control_view_factory(),
-                )
+                await message.edit(view=order_control_view_factory())
                 refreshed += 1
                 break
         except (discord.Forbidden, discord.HTTPException):
             continue
-
     return refreshed
 
 
@@ -530,7 +453,6 @@ async def support_call_sla_loop(bot: discord.Client) -> None:
     while not bot.is_closed():
         try:
             now_ts = int(datetime.now().timestamp())
-
             for call in list_active_support_calls(limit=300):
                 if str(call.get("status") or "") != "open":
                     continue
@@ -541,19 +463,15 @@ async def support_call_sla_loop(bot: discord.Client) -> None:
 
                 age_seconds = max(0, now_ts - called_ts)
                 current_stage = int(call.get("reminder_stage") or 0)
-
                 target_stage = 0
                 escalated = False
-
                 if age_seconds >= 15 * 60 and current_stage < 2:
                     target_stage = 2
                     escalated = True
                 elif age_seconds >= 5 * 60 and current_stage < 1:
                     target_stage = 1
-
                 if not target_stage:
                     continue
-
                 if not mark_support_call_reminder(int(call["id"]), target_stage):
                     continue
 
@@ -564,37 +482,24 @@ async def support_call_sla_loop(bot: discord.Client) -> None:
                 channel_id = int(str(call.get("ticket_channel_id") or "0"))
                 channel = bot.get_channel(channel_id)
                 if not isinstance(channel, discord.TextChannel):
-                    cancel_support_call(
-                        int(call["id"]),
-                        "ticket_channel_missing",
-                    )
+                    cancel_support_call(int(call["id"]), "ticket_channel_missing")
                     continue
 
-                mentions = _support_role_mentions(
-                    channel.guild,
-                    escalated=escalated,
-                )
-
+                mentions = _support_role_mentions(channel.guild, escalated=escalated)
                 if escalated:
                     message = (
                         f"{mentions}\n"
-                        f"🚨 客服鈴 #{int(call['id'])} 已等待超過 **15 分鐘**仍未接手，"
-                        "請優先處理。"
+                        f"🚨 客服鈴 #{int(call['id'])} 已等待超過 **15 分鐘**仍未接手，請優先處理。"
                     ).strip()
                 else:
                     message = (
                         f"{mentions}\n"
-                        f"🔔 客服鈴 #{int(call['id'])} 已等待超過 **5 分鐘**，"
-                        "目前仍未有人接手。"
+                        f"🔔 客服鈴 #{int(call['id'])} 已等待超過 **5 分鐘**，目前仍未有人接手。"
                     ).strip()
 
                 await channel.send(
                     message,
-                    allowed_mentions=discord.AllowedMentions(
-                        users=False,
-                        roles=True,
-                        everyone=False,
-                    ),
+                    allowed_mentions=discord.AllowedMentions(users=False, roles=True, everyone=False),
                 )
 
                 if escalated and _send_order_log_callback is not None:
@@ -612,11 +517,9 @@ async def support_call_sla_loop(bot: discord.Client) -> None:
                         )
                     except Exception as exc:
                         print(
-                            f"[support-call] escalation log failed "
-                            f"call_id={call['id']}: {exc}",
+                            f"[support-call] escalation log failed call_id={call['id']}: {exc}",
                             flush=True,
                         )
-
         except Exception as exc:
             print(
                 f"[support-call] SLA loop error: {type(exc).__name__}: {exc}",
