@@ -16,18 +16,34 @@ def check_order_point_benefit_allowed(
     spec = dict(benefit or {})
     if not spec:
         return False, "這個點數福利不支援新下單流程。"
-    if not getattr(rule, "point_benefits_allowed", False):
-        return False, "此分類不可使用點數福利。"
 
     category = str(getattr(rule, "category", "") or "").lower()
     rule_key = str(getattr(rule, "key", "") or "")
     rule_label = str(getattr(rule, "label", "") or "")
+    is_trial_order = rule_key.startswith("basic_trial_") or rule_label.startswith("體驗單")
+
+    # self_service_ui_runtime uses the legacy, non-selectable discount_20 item as
+    # a lightweight probe before opening the combined point/member-benefit picker.
+    # Trial orders intentionally reject normal point redemptions, but they still
+    # need to enter that picker so owner-issued member coupons (for example a
+    # free-order coupon) can be selected. Only bypass the probe here; the actual
+    # selectable point items are checked below and remain blocked for trial orders.
+    is_member_benefit_picker_probe = (
+        is_trial_order
+        and str(spec.get("key") or "") == "discount_20"
+    )
+    if is_member_benefit_picker_probe:
+        return True, ""
+
+    if not getattr(rule, "point_benefits_allowed", False):
+        return False, "此分類不可使用點數福利。"
+
     if category == "steam":
         return False, "Steam遊戲目前不可使用點數福利。"
     if category in {"fun", "delta_desktop_fun", "title"}:
         return False, "趣味單 / 高難度稱號不可使用點數福利。"
-    if rule_key.startswith("basic_trial_") or rule_label.startswith("體驗單"):
-        return False, "體驗單不可使用點數福利。"
+    if is_trial_order:
+        return False, "體驗單不可使用一般點數福利；會員福利券仍可使用。"
 
     kind = str(spec.get("kind") or "")
     pricing_type = str(getattr(rule, "pricing_type", "") or "")
