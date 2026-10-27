@@ -176,3 +176,11 @@ from .benefit_checkout_integration import (
 )
 
 _install_checkout_benefits()
+
+# Point-benefit eligibility is shared with Discord. This removes the historical
+# second Web-only deny-list so manager-published 商品與規則 settings are authoritative.
+from .point_benefit_policy_bridge import (
+    install_shared_point_benefit_policy as _install_shared_point_benefit_policy,
+)
+
+_install_shared_point_benefit_policy()
