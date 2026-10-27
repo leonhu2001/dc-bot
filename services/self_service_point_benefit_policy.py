@@ -5,6 +5,39 @@ from typing import Any
 from services.point_benefit_catalog import is_service_bonus_allowed_for_rule
 
 
+def _manager_point_benefit_setting(rule_key: str) -> bool | None:
+    """Return the manager-published point-benefit flag when one exists.
+
+    Code-level category restrictions are only legacy defaults. Once a manager
+    publishes a product rule (or creates a product in the manager console), that
+    persisted setting must win for both Web and Discord.
+    """
+
+    key = str(rule_key or "").strip()
+    if not key:
+        return None
+
+    try:
+        from services.order_rule_store import (
+            get_active_override,
+            get_custom_rule_definition,
+        )
+
+        active = get_active_override(key)
+        active_payload = (active or {}).get("payload") or {}
+        if isinstance(active_payload, dict) and "point_benefits_allowed" in active_payload:
+            return bool(active_payload.get("point_benefits_allowed"))
+
+        custom = get_custom_rule_definition(key)
+        custom_payload = (custom or {}).get("payload") or {}
+        if isinstance(custom_payload, dict) and "point_benefits_allowed" in custom_payload:
+            return bool(custom_payload.get("point_benefits_allowed"))
+    except Exception:
+        return None
+
+    return None
+
+
 def check_order_point_benefit_allowed(
     rule,
     benefit: dict[str, Any] | None,
@@ -20,30 +53,32 @@ def check_order_point_benefit_allowed(
     category = str(getattr(rule, "category", "") or "").lower()
     rule_key = str(getattr(rule, "key", "") or "")
     rule_label = str(getattr(rule, "label", "") or "")
-    is_trial_order = rule_key.startswith("basic_trial_") or rule_label.startswith("體驗單")
 
-    # self_service_ui_runtime uses the legacy, non-selectable discount_20 item as
-    # a lightweight probe before opening the combined point/member-benefit picker.
-    # Trial orders intentionally reject normal point redemptions, but they still
-    # need to enter that picker so owner-issued member coupons (for example a
-    # free-order coupon) can be selected. Only bypass the probe here; the actual
-    # selectable point items are checked below and remain blocked for trial orders.
-    is_member_benefit_picker_probe = (
-        is_trial_order
-        and str(spec.get("key") or "") == "discount_20"
-    )
-    if is_member_benefit_picker_probe:
+    # The combined Discord picker contains two independent benefit families:
+    # point redemptions and member coupons. self_service_ui_runtime probes with
+    # this legacy, non-selectable key before opening that picker. Never let a
+    # point-only restriction hide owner-issued/member coupons.
+    if str(spec.get("key") or "") == "discount_20":
         return True, ""
 
-    if not getattr(rule, "point_benefits_allowed", False):
-        return False, "此分類不可使用點數福利。"
+    manager_setting = _manager_point_benefit_setting(rule_key)
+    if manager_setting is not None:
+        if not manager_setting:
+            return False, "此商品目前不開放點數福利；會員福利券仍可使用。"
+        # Manager-published product rules are authoritative. Do not apply the
+        # historical category/name deny-list after an explicit manager choice.
+    else:
+        if not getattr(rule, "point_benefits_allowed", False):
+            return False, "此商品目前不開放點數福利；會員福利券仍可使用。"
 
-    if category == "steam":
-        return False, "Steam遊戲目前不可使用點數福利。"
-    if category in {"fun", "delta_desktop_fun", "title"}:
-        return False, "趣味單 / 高難度稱號不可使用點數福利。"
-    if is_trial_order:
-        return False, "體驗單不可使用一般點數福利；會員福利券仍可使用。"
+        # Legacy defaults for products that have never been published through
+        # 商品與規則. They preserve old behavior without overriding a manager.
+        if category == "steam":
+            return False, "此商品目前不開放點數福利；會員福利券仍可使用。"
+        if category in {"fun", "delta_desktop_fun", "title"}:
+            return False, "此商品目前不開放點數福利；會員福利券仍可使用。"
+        if rule_key.startswith("basic_trial_") or rule_label.startswith("體驗單"):
+            return False, "此商品目前不開放點數福利；會員福利券仍可使用。"
 
     kind = str(spec.get("kind") or "")
     pricing_type = str(getattr(rule, "pricing_type", "") or "")
