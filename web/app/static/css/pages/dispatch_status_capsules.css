@@ -86,7 +86,7 @@ html body .dispatch-alert-toggle {
   transition: transform 90ms ease, box-shadow 130ms ease, border-color 130ms ease, background-color 130ms ease, filter 130ms ease !important;
 }
 
-html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="online"],
+html body .dispatch-shell .dispatch-hero-main button.dispatch-tag[data-dispatch-notification-toggle][data-state="online"],
 html body .dispatch-alert-toggle[data-state="online"] {
   border: 1px solid rgba(99,230,160,.76) !important;
   background: #2fca77 !important;
@@ -94,7 +94,7 @@ html body .dispatch-alert-toggle[data-state="online"] {
   box-shadow: 0 5px 14px rgba(47,202,119,.17) !important;
 }
 
-html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="pending"],
+html body .dispatch-shell .dispatch-hero-main button.dispatch-tag[data-dispatch-notification-toggle][data-state="pending"],
 html body .dispatch-alert-toggle[data-state="pending"] {
   border: 1px solid rgba(248,205,93,.78) !important;
   background: #e9b33e !important;
@@ -102,7 +102,7 @@ html body .dispatch-alert-toggle[data-state="pending"] {
   box-shadow: 0 5px 14px rgba(242,184,63,.15) !important;
 }
 
-html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="blocked"],
+html body .dispatch-shell .dispatch-hero-main button.dispatch-tag[data-dispatch-notification-toggle][data-state="blocked"],
 html body .dispatch-alert-toggle[data-state="blocked"] {
   border: 1px solid rgba(255,139,146,.78) !important;
   background: #d94e58 !important;
