@@ -178,3 +178,11 @@ html body .dispatch-alert-toggle:focus-visible {
     animation: none !important;
   }
 }
+
+/* Desktop notification is a primary enabled control, not a passive status tag. */
+html body.mw-r5-employee .dispatch-shell .dispatch-hero-main .dispatch-tags > button.dispatch-tag.dispatch-tag-button[data-dispatch-notification-toggle][data-state="online"] {
+  border: 1px solid rgba(99,230,160,.76) !important;
+  background: #2fca77 !important;
+  color: #07150c !important;
+  box-shadow: 0 5px 14px rgba(47,202,119,.17) !important;
+}
