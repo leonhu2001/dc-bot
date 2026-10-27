@@ -8,12 +8,6 @@
     const STYLE_HREF = "/static/css/pages/admin_ops_experience.css?v=20261020_1";
     const SCROLL_PREFIX = "mw-admin-scroll:";
     const SCROLL_MAX_AGE = 30 * 60 * 1000;
-    const REPORT_STATUS_UI = {
-        missing: { label: "未報單", className: "unreported" },
-        pending: { label: "待審核", className: "pending" },
-        approved: { label: "已報單", className: "reported" },
-        changes_requested: { label: "已退回", className: "pending" }
-    };
 
     function ensureStyles() {
         if (document.querySelector('link[href^="/static/css/pages/admin_ops_experience.css"]')) {
@@ -276,81 +270,9 @@
         });
     }
 
-    function getOrderIdFromDashboardRow(row) {
-        if (!row) {
-            return "";
-        }
-
-        const href = row.getAttribute("href") || "";
-        const match = href.match(/^\/admin\/order-workspace\/(\d+)/);
-        return match ? match[1] : "";
-    }
-
-    function applyReportStatusBadge(badge, status) {
-        const normalized = Object.prototype.hasOwnProperty.call(REPORT_STATUS_UI, status)
-            ? status
-            : "missing";
-        const ui = REPORT_STATUS_UI[normalized];
-
-        badge.dataset.reportStatus = normalized;
-        badge.classList.remove("unreported", "pending", "reported", "rejected");
-        badge.classList.add(ui.className);
-        badge.textContent = ui.label;
-    }
-
-    async function syncOrderReportStatuses() {
-        const rows = Array.from(document.querySelectorAll(".admin-dashboard-orders .order-row"));
-        const targets = rows
-            .map(function (row) {
-                return {
-                    id: getOrderIdFromDashboardRow(row),
-                    badge: row.querySelector(".admin-order-report-badge")
-                };
-            })
-            .filter(function (target) {
-                return /^\d+$/.test(target.id) && Boolean(target.badge);
-            });
-
-        if (!targets.length) {
-            return;
-        }
-
-        const ids = Array.from(new Set(targets.map(function (target) {
-            return target.id;
-        })));
-
-        try {
-            const response = await fetch(
-                "/dispatch/reports/statuses.json?order_ids=" + encodeURIComponent(ids.join(",")),
-                {
-                    credentials: "same-origin",
-                    headers: { "Accept": "application/json" },
-                    cache: "no-store"
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error("report status request failed: " + response.status);
-            }
-
-            const payload = await response.json();
-            const statuses = payload && payload.statuses ? payload.statuses : {};
-
-            targets.forEach(function (target) {
-                applyReportStatusBadge(
-                    target.badge,
-                    String(statuses[target.id] || "missing")
-                );
-            });
-        } catch (error) {
-            console.warn("[admin-dashboard] report status sync failed", error);
-        }
-    }
-
     ensureStyles();
     enhanceWorkspaceLinks();
     enhanceWorkCenter();
-    syncOrderReportStatuses();
     restoreListPosition();
 
     document.addEventListener(
