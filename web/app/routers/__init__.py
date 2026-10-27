@@ -112,4 +112,14 @@ from web.app.routers.admin_reviews import router as _admin_reviews_router
 
 _site.router.include_router(_admin_reviews_router)
 
+# Benefits must be issuable to every real member in the Discord guild, including
+# people who have never placed an order. Keep the existing order-derived picker
+# only as a temporary fallback if Discord's member endpoint is unavailable.
+from web.app.routers import admin_benefits as _admin_benefits
+from web.app.services.benefit_member_source import (
+    install_benefit_member_source as _install_benefit_member_source,
+)
+
+_install_benefit_member_source(_admin_benefits)
+
 __all__ = []
