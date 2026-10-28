@@ -8,7 +8,15 @@ from services.multi_seat_order_policy_20261028 import (
     PLAYER_COUNT_PRICE_TABLES,
     get_rule_player_count_bounds,
 )
-from services.sweet_companion_policy_20261028 import SWEET_COMPANION_ROLE_ID
+from services.order_rule_store import (
+    get_active_override,
+    publish_rule_override,
+    rollback_rule_override,
+)
+from services.sweet_companion_policy_20261028 import (
+    SWEET_COMPANION_ROLE_ID,
+    SWEET_COMPANION_ROLE_KEY,
+)
 
 
 def _details(category: str, group: str) -> list[dict]:
@@ -35,11 +43,10 @@ def test_delta_technical_shared_catalog_is_count_neutral_and_keeps_stable_values
         "basic_mobile_tech_secret_single",
         "basic_mobile_tech_topsecret_single",
     ]
-
     assert all("player_count" not in item for item in desktop + mobile)
 
 
-def test_existing_quick_ticket_value_resolves_to_new_canonical_rule() -> None:
+def test_existing_quick_ticket_value_resolves_and_unlocks_companion_count() -> None:
     detail = orders.get_order_item_detail_for_selection(
         "delta_desktop_basic",
         "技術陪",
@@ -54,23 +61,16 @@ def test_existing_quick_ticket_value_resolves_to_new_canonical_rule() -> None:
     assert rule.required_staff_count == "player_count"
     assert rule.player_count_enabled is True
     assert rule.catalog_group_label == ""
-    assert "單陪" not in rule.label
-    assert "雙陪" not in rule.label
 
 
-def test_delta_technical_rules_are_directly_migrated_not_read_time_wrapped() -> None:
-    expected_labels = {
-        "basic_tech_secret_single": "技術陪〈端遊〉｜機密",
-        "basic_tech_topsecret_single": "技術陪〈端遊〉｜絕密",
-        "basic_mobile_tech_secret_single": "技術陪〈手遊〉｜機密",
-        "basic_mobile_tech_topsecret_single": "技術陪〈手遊〉｜絕密",
-    }
-
-    for key, label in expected_labels.items():
-        effective = order_rules.ORDER_RULES[key]
+def test_delta_technical_rules_are_direct_base_rules_not_read_time_wrappers() -> None:
+    for key in (
+        "basic_tech_secret_single",
+        "basic_tech_topsecret_single",
+        "basic_mobile_tech_secret_single",
+        "basic_mobile_tech_topsecret_single",
+    ):
         base = order_rules.get_base_rule(key)
-        assert effective.label == label
-        assert base.label == label
         assert base.required_staff_count == "player_count"
         assert base.player_count_enabled is True
         assert base.min_player_count == 1
@@ -89,7 +89,7 @@ def test_delta_technical_rules_are_directly_migrated_not_read_time_wrapped() -> 
         False,
     )
 
-    # Historical fixed-double definitions remain available only for old orders.
+    # Old fixed-double rules stay available only for historical snapshots/orders.
     assert order_rules.ORDER_RULES["basic_tech_secret_double"].required_staff_count == 2
     assert order_rules.ORDER_RULES["basic_mobile_tech_secret_double"].required_staff_count == 2
 
@@ -112,19 +112,69 @@ def test_delta_technical_two_companion_prices_are_preserved() -> None:
         assert result.required_staff_count == 2
 
 
-def test_delta_entertainment_rules_use_type_plus_independent_count() -> None:
-    for key, expected_label in (
-        ("basic_entertain_single", "娛樂陪〈端遊〉｜不限"),
-        ("basic_entertain_female_single", "娛樂陪〈端遊〉｜女陪"),
-        ("basic_entertain_male_single", "娛樂陪〈端遊〉｜男陪"),
-        ("basic_mobile_entertain_single", "娛樂陪〈手遊〉｜不限"),
-        ("basic_mobile_entertain_female_single", "娛樂陪〈手遊〉｜女陪"),
-        ("basic_mobile_entertain_male_single", "娛樂陪〈手遊〉｜男陪"),
+def test_delta_entertainment_uses_type_plus_independent_count_without_web_rename() -> None:
+    for key in (
+        "basic_entertain_single",
+        "basic_entertain_female_single",
+        "basic_entertain_male_single",
+        "basic_mobile_entertain_single",
+        "basic_mobile_entertain_female_single",
+        "basic_mobile_entertain_male_single",
     ):
         rule = order_rules.ORDER_RULES[key]
-        assert rule.label == expected_label
         assert get_rule_player_count_bounds(rule) == (1, 2, 1, True)
         assert PLAYER_COUNT_PRICE_TABLES[key] == {1: 320, 2: 600}
+        assert rule.catalog_group_label == ""
+
+
+def test_stale_admin_override_is_canonicalized_when_written(tmp_path) -> None:
+    db_file = tmp_path / "rules.db"
+    stale = order_rules.rule_to_override_payload(
+        order_rules.get_base_rule("basic_tech_secret_single")
+    )
+    stale.update({
+        "label": "機密｜單陪",
+        "catalog_group_label": "技術陪",
+        "required_staff_count": 1,
+        "player_count_enabled": False,
+        "min_player_count": 1,
+        "max_player_count": 1,
+        "max_specified_count": 1,
+        "price_multiply_player_count": False,
+    })
+
+    saved = publish_rule_override(
+        rule_key="basic_tech_secret_single",
+        payload=stale,
+        actor_discord_id="test",
+        actor_display_name="test",
+        db_file=db_file,
+    )
+    payload = saved["payload"]
+    assert payload["required_staff_count"] == "player_count"
+    assert payload["player_count_enabled"] is True
+    assert payload["max_player_count"] == 2
+    assert payload["max_specified_count"] == 2
+    assert payload["catalog_group_label"] == ""
+    assert payload["required_game_roles"] == ["delta_desktop"]
+
+    # Even rolling back a deliberately old structural version cannot resurrect the
+    # fixed-single rule because rollback goes through the same write boundary.
+    rolled = rollback_rule_override(
+        rule_key="basic_tech_secret_single",
+        target_version=1,
+        actor_discord_id="test",
+        actor_display_name="test",
+        expected_active_version=1,
+        db_file=db_file,
+    )
+    assert rolled["payload"]["required_staff_count"] == "player_count"
+    assert rolled["payload"]["max_player_count"] == 2
+    assert rolled["payload"]["catalog_group_label"] == ""
+
+    active = get_active_override("basic_tech_secret_single", db_file)
+    assert active is not None
+    assert active["payload"]["required_staff_count"] == "player_count"
 
 
 def test_sweet_shared_catalog_uses_gender_type_plus_independent_count() -> None:
@@ -157,17 +207,40 @@ def test_sweet_shared_catalog_uses_gender_type_plus_independent_count() -> None:
             assert base.required_staff_count == "player_count"
             assert PLAYER_COUNT_PRICE_TABLES[item["rule_key"]] == {1: 520, 2: 1314}
 
-        # Old fixed-seat keys are still lookup-compatible for saved orders/snapshots.
         assert order_rules.ORDER_RULES[f"{prefix}_sweet_female_single"].required_staff_count == 1
         assert order_rules.ORDER_RULES[f"{prefix}_sweet_female_double"].required_staff_count == 2
         assert order_rules.ORDER_RULES[f"{prefix}_sweet_male_double"].required_staff_count == 2
+
+
+def test_sweet_override_always_keeps_game_identity_and_sweet_role(tmp_path) -> None:
+    key = "valorant_sweet_female"
+    stale = order_rules.rule_to_override_payload(order_rules.get_base_rule(key))
+    stale.update({
+        "catalog_group_label": "甜蜜單",
+        "required_staff_count": 1,
+        "player_count_enabled": False,
+        "max_player_count": 1,
+        "required_game_roles": ["valorant_game"],
+    })
+    saved = publish_rule_override(
+        rule_key=key,
+        payload=stale,
+        actor_discord_id="test",
+        actor_display_name="test",
+        db_file=tmp_path / "sweet.db",
+    )
+    assert saved["payload"]["required_staff_count"] == "player_count"
+    assert saved["payload"]["max_player_count"] == 2
+    assert saved["payload"]["required_game_roles"] == [
+        "valorant_game",
+        SWEET_COMPANION_ROLE_KEY,
+    ]
 
 
 def test_sweet_price_uses_selected_companion_count() -> None:
     rule = order_rules.ORDER_RULES["valorant_sweet_female"]
     one = order_rules.calculate_price(rule, quantity=2, player_count=1)
     two = order_rules.calculate_price(rule, quantity=2, player_count=2)
-
     assert one.base_amount == 1040
     assert one.required_staff_count == 1
     assert two.base_amount == 2628
@@ -178,27 +251,19 @@ def test_sweet_role_is_additional_and_gate() -> None:
     rule = order_rules.ORDER_RULES["valorant_sweet_female"]
     allowed = order_rules.get_allowed_role_ids(rule)
     required = order_rules.get_required_game_role_ids(rule)
-
     female_role_id = order_rules.ROLE_IDS["female_companion"]
     game_ids = [role_id for role_id in required if role_id != SWEET_COMPANION_ROLE_ID]
 
     assert SWEET_COMPANION_ROLE_ID in required
     assert game_ids
-
     assert order_rules.role_ids_match_requirements(
-        [female_role_id, *game_ids],
-        allowed,
-        required,
+        [female_role_id, *game_ids], allowed, required
     ) is False
     assert order_rules.role_ids_match_requirements(
-        [female_role_id, SWEET_COMPANION_ROLE_ID],
-        allowed,
-        required,
+        [female_role_id, SWEET_COMPANION_ROLE_ID], allowed, required
     ) is False
     assert order_rules.role_ids_match_requirements(
-        [female_role_id, SWEET_COMPANION_ROLE_ID, game_ids[0]],
-        allowed,
-        required,
+        [female_role_id, SWEET_COMPANION_ROLE_ID, game_ids[0]], allowed, required
     ) is True
 
 
@@ -223,7 +288,6 @@ def test_smart_dispatch_only_reminds_fully_qualified_sweet_workers() -> None:
         member(2, [female_role_id, SWEET_COMPANION_ROLE_ID]),
         member(3, [female_role_id, game_id, SWEET_COMPANION_ROLE_ID]),
     ])
-
     assert smart_dispatch.get_eligible_dispatch_candidate_ids(
         guild,
         allowed_role_ids=allowed,
@@ -234,7 +298,6 @@ def test_smart_dispatch_only_reminds_fully_qualified_sweet_workers() -> None:
 def test_legacy_sweet_rules_do_not_gain_new_requirement() -> None:
     legacy_general = order_rules.ORDER_RULES["basic_sweet_female_single"]
     old_game_rule = order_rules.ORDER_RULES["valorant_sweet_female_single"]
-
     assert order_rules.get_required_game_role_keys(legacy_general) == ()
     assert order_rules.get_required_game_role_keys(old_game_rule) == ("valorant_game",)
     assert SWEET_COMPANION_ROLE_ID not in order_rules.get_required_game_role_ids(old_game_rule)
