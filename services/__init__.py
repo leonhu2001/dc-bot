@@ -52,6 +52,26 @@ from .multi_seat_effective_rule_runtime import (
 
 _install_multi_seat_effective_rule_runtime()
 
+# Finish the independent companion-count migration for Delta technical and sweet
+# orders. Historical single/double keys stay resolvable, but new self-service specs
+# no longer duplicate headcount that already has its own selector.
+from .companion_count_catalog_cleanup_20261028 import (
+    install_companion_count_catalog_cleanup_20261028 as _install_companion_count_catalog_cleanup_20261028,
+)
+
+_install_companion_count_catalog_cleanup_20261028()
+_order_rules.validate_rules()
+
+# Sweet orders require the normal service/game qualification AND the dedicated
+# 甜蜜陪 role. The same matcher feeds smart-dispatch reminders, specified-staff
+# validation and final acceptance claims.
+from .sweet_companion_policy_20261028 import (
+    install_sweet_companion_policy_20261028 as _install_sweet_companion_policy_20261028,
+)
+
+_install_sweet_companion_policy_20261028()
+_order_rules.validate_rules()
+
 # Changing customer-facing companion choices must not delete historical selector
 # values saved by already-created tickets/orders.
 from .entertainment_companion_compat_20261028 import (
@@ -136,6 +156,15 @@ from .order_ticket_ui_policy import (
 )
 
 _install_order_ticket_ui_policy()
+
+# Quick-order entry must explicitly confirm the customer read the order notice before
+# the ticket is created. This policy intentionally does not change the ticket's
+# original locked-service self-service layout.
+from .quick_order_ticket_policy_20261028 import (
+    install_quick_order_ticket_policy_20261028 as _install_quick_order_ticket_policy_20261028,
+)
+
+_install_quick_order_ticket_policy_20261028()
 
 # Install the Discord shared player-count control after core benefit policies are
 # ready. Importing this patches the UI class before bot.py imports self_service_runtime.
