@@ -560,7 +560,14 @@ def _install_service_point_policy_runtime() -> None:
         if not allowed:
             return allowed, reason
         spec = dict(benefit or {})
-        if str(spec.get("kind") or "") == "service_bonus" and not is_service_point_benefit_enabled(rule):
+        # The new seat-aware service catalog is paused for LoL/VALORANT/APEX.
+        # Historical service vouchers intentionally have no seat_count metadata and
+        # remain resolvable for old orders / already-selected legacy benefits.
+        if (
+            str(spec.get("kind") or "") == "service_bonus"
+            and int(spec.get("seat_count") or 0) > 0
+            and not is_service_point_benefit_enabled(rule)
+        ):
             return False, "這個商品目前暫停使用點數加時／加局券。"
         return True, ""
 
