@@ -228,10 +228,11 @@ def _install_change_category_option(item_select, enhanced_view: "EnhancedSelfSer
 class EnhancedSelfServiceOrderView(base_ui.SelfServiceOrderView):
     """Legacy-compatible panel with one shared player-count control.
 
-    Discord legacy views have only five action rows. Once a category is selected we
-    collapse the category selector into the embed and expose a return option in the
-    item selector. That frees one row for the requested five action buttons and one
-    final submit row without migrating the message to Components V2.
+    Discord legacy views have only five action rows. Before a category is selected,
+    the quantity selector is omitted because it cannot be used yet; that keeps the
+    requested five-button action row plus a dedicated submit row visible at all
+    times. Once a category is selected, category moves into the embed and the item
+    selector exposes a back option, keeping the same five-row layout.
     """
 
     def __init__(self, customer_id: int, channel_id: int, selected_category: str | None = None):
@@ -360,15 +361,22 @@ class EnhancedSelfServiceOrderView(base_ui.SelfServiceOrderView):
                 submit.callback = submit_callback
                 self.add_item(submit)
         else:
-            # Before a category is selected the four selectors consume rows 0-3.
-            # Keep the requested five controls visible on row 4; submit appears on
-            # its own final row immediately after the category has been selected.
+            # Quantity has no meaning before a concrete spec exists. Hide it so the
+            # two requested bottom rows are present from the first screen onward.
+            if quantity_select is not None:
+                self.remove_item(quantity_select)
+
             for item in (count_button, specified, point, staff_price, discount):
                 if item is None:
                     continue
-                item.row = 4
+                item.row = 3
                 item.disabled = True
                 self.add_item(item)
+
+            if submit is not None:
+                submit.row = 4
+                submit.disabled = True
+                self.add_item(submit)
 
 
 def install_self_service_companion_count_runtime():
