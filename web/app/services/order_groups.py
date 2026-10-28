@@ -57,7 +57,7 @@ GROUP_SPECS = [
         "description": "選擇本次四幻神賭單的目標。",
         "variants": [
             ("basic_exbar_gamble_zongheng", "縱橫"),
-            ("basic_exbar_gamble_leiguan", "淚冠"),
+            ("basic_exbar_gamble_leiguan", "萬金淚冠"),
             ("basic_exbar_gamble_tianyuan", "天圓地方"),
             ("basic_exbar_gamble_rangefinder", "測距儀"),
         ],
@@ -152,9 +152,9 @@ GROUP_SPECS = [
         "label": "賭約單",
         "selector_label": "賭約金額",
         "variants": [
-            ("basic_bet_1000", "1000T"),
-            ("basic_bet_1500", "1500T"),
-            ("basic_bet_2500", "2500T"),
+            ("basic_bet_1000", "800w"),
+            ("basic_bet_1500", "1000w"),
+            ("basic_bet_2500", "1200w"),
         ],
     },
 
@@ -164,8 +164,8 @@ GROUP_SPECS = [
         "label": "體驗單",
         "selector_label": "方案",
         "variants": [
-            ("basic_trial_500", "500T"),
-            ("basic_trial_1000", "1000T"),
+            ("basic_trial_500", "777w"),
+            ("basic_trial_1000", "1688w"),
         ],
     },
 
@@ -261,11 +261,11 @@ GROUP_SPECS = [
         ],
     },
 
-    {"key":"valorant_entertain","category":"valorant","label":"特戰英豪｜娛樂陪","selector_label":"模式","description":"娛樂陪福利：NG 累積 10 個服務小時回饋 1 小時、積分累積 10 個服務局回饋 1 局，達標當單可直接折抵；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_entertain_ng","NG"),("valorant_entertain_ranked","積分")]},
+    {"key":"valorant_entertain","category":"valorant","label":"特戰英豪｜娛樂陪","selector_label":"模式","description":"娛樂陪福利：NG 累積 10 個服務小時回饋 1 小時、積分累積 15 個服務局回饋 1 局，達標當單可直接折抵；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_entertain_ng","NG"),("valorant_entertain_ranked","積分")]},
     {"key":"valorant_ascendant","category":"valorant","label":"特戰英豪｜超凡陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_ascendant_ng","NG"),("valorant_ascendant_ranked","積分")]},
     {"key":"valorant_immortal","category":"valorant","label":"特戰英豪｜神話陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_immortal_ng","NG"),("valorant_immortal_ranked","積分")]},
     {"key":"valorant_radiant","category":"valorant","label":"特戰英豪｜輻能陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_radiant_ng","NG"),("valorant_radiant_ranked","積分")]},
-    {"key":"lol_entertain","category":"lol","label":"英雄聯盟｜娛樂陪","selector_label":"模式","description":"娛樂陪福利：ARAM / NG 累積 10 個服務小時回饋 1 小時、積分累積 10 個服務局回饋 1 局，達標當單可直接折抵；指定每位 +100T，ARAM / NG 2 小時、積分 2 局以上免指定費。","variants":[("lol_entertain_aram","ARAM"),("lol_entertain_ng","NG"),("lol_entertain_ranked","積分")]},
+    {"key":"lol_entertain","category":"lol","label":"英雄聯盟｜娛樂陪","selector_label":"模式","description":"娛樂陪福利：ARAM / NG 累積 10 個服務小時回饋 1 小時、積分累積 15 個服務局回饋 1 局，達標當單可直接折抵；指定每位 +100T，ARAM / NG 2 小時、積分 2 局以上免指定費。","variants":[("lol_entertain_aram","ARAM"),("lol_entertain_ng","NG"),("lol_entertain_ranked","積分")]},
     {"key":"lol_master","category":"lol","label":"英雄聯盟｜大師陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_master_ng","NG"),("lol_master_ranked","積分")]},
     {"key":"lol_grandmaster","category":"lol","label":"英雄聯盟｜宗師陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_grandmaster_ng","NG"),("lol_grandmaster_ranked","積分")]},
     {"key":"lol_elite","category":"lol","label":"英雄聯盟｜菁英陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_elite_ng","NG"),("lol_elite_ranked","積分")]},
@@ -297,7 +297,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜大師陪",
         "selector_label": "模式",
-        "description": "NG 500T/人/H、積分 550T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": "NG 480T/人/H、積分 530T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_master_ng", "NG"),
             ("apex_master_ranked", "積分"),
@@ -308,7 +308,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜頂獵陪",
         "selector_label": "模式",
-        "description": "NG 600T/人/H、積分 650T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": "NG 580T/人/H、積分 630T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_predator_ng", "NG"),
             ("apex_predator_ranked", "積分"),

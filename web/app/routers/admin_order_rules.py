@@ -80,6 +80,35 @@ PRICING_TYPES = {"fixed", "hourly", "game", "unit", "manual"}
 # 舊分類只保留給歷史訂單與舊快照回查，不應再從後台修改。
 ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}
 
+# 只供歷史訂單 / 舊快照回查，不是現在可販售商品。
+ADMIN_HISTORICAL_ONLY_RULE_KEYS = {
+    "basic_tech_secret_double",
+    "basic_tech_topsecret_double",
+    "basic_mobile_tech_secret_double",
+    "basic_mobile_tech_topsecret_double",
+    "basic_entertain_double",
+    "basic_entertain_female_double",
+    "basic_entertain_male_double",
+    "basic_mobile_entertain_double",
+    "basic_mobile_entertain_female_double",
+    "basic_mobile_entertain_male_double",
+    "farm_season_3x3_skin",
+    "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_loss",
+    "farm_season_3x3_dc_skin_loss",
+    "valorant_entertain",
+    "valorant_tech",
+    "valorant_top_tech",
+}
+for _legacy_prefix in ("delta_desktop", "delta_mobile", "steam", "valorant", "lol", "apex"):
+    ADMIN_HISTORICAL_ONLY_RULE_KEYS.update({
+        f"{_legacy_prefix}_sweet_female_single",
+        f"{_legacy_prefix}_sweet_male_single",
+        f"{_legacy_prefix}_sweet_female_double",
+        f"{_legacy_prefix}_sweet_male_double",
+        f"{_legacy_prefix}_sweet_double_any",
+    })
+
 ADMIN_PRODUCT_CATEGORIES = tuple(
     (key, label)
     for key, label in CATEGORY_LABELS.items()
@@ -232,10 +261,12 @@ GAME_IDENTITY_GROUPS = (
 
 
 def _is_admin_editable_rule(rule_key: str) -> bool:
-    rule = ORDER_RULES.get(str(rule_key))
+    key = str(rule_key)
+    rule = ORDER_RULES.get(key)
     return bool(
         rule is not None
         and str(rule.category) not in ADMIN_HIDDEN_RULE_CATEGORIES
+        and key not in ADMIN_HISTORICAL_ONLY_RULE_KEYS
     )
 
 
@@ -523,7 +554,7 @@ async def _render(
         (
             _rule_row(str(key))
             for key, rule in ORDER_RULES.items()
-            if str(rule.category) not in ADMIN_HIDDEN_RULE_CATEGORIES
+            if _is_admin_editable_rule(str(key))
         ),
         key=lambda row: (
             str(row["category_label"]),
