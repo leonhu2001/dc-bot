@@ -51,8 +51,6 @@ def check_order_point_benefit_allowed(
             return False, "服務加贈只適用計時或計局方案。"
         if not is_service_bonus_allowed_for_rule(rule, spec, player_count=data.get("player_count")):
             return False, "這張服務加贈券不適用目前選擇的陪玩人數／類型。"
-        if category in {"lol", "valorant", "apex"} and int(spec.get("seat_count") or 0) > 0:
-            return False, "這個商品目前暫停使用點數加時／加局券。"
 
     if kind == "free_specify_fee":
         if not getattr(rule, "allow_specify", False):
