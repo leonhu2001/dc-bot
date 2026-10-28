@@ -613,30 +613,54 @@ def _add_sweet_rule(
     category: str = "general",
     required_game_roles: tuple[str, ...] = (),
 ) -> None:
-    # 新甜蜜單只選性別／不限，人數由獨立欄位選 1～2；舊 fixed-double
-    # key 仍保留給歷史資料，但不再是新下單規格。
-    selectable_count = key.endswith(("female_single", "male_single", "double_any"))
-    effective_required_games = tuple(required_game_roles)
-    if category != "general" and SWEET_COMPANION_ROLE_KEY not in effective_required_games:
-        effective_required_games = (*effective_required_games, SWEET_COMPANION_ROLE_KEY)
+    # 舊甜蜜單 key 保持固定單／雙陪語意，只供歷史訂單與舊快照回查。
     _add(OrderRule(
         category,
         key,
         label,
         "hourly",
-        520 if selectable_count else price,
+        price,
         "H",
         allowed_roles=allowed_roles,
         allowed_game_roles=(),
-        required_game_roles=effective_required_games,
-        required_staff_count="player_count" if selectable_count else required_staff_count,
-        player_count_enabled=selectable_count,
-        min_player_count=1,
-        max_player_count=2 if selectable_count else None,
-        price_multiply_player_count=False,
-        player_count_prices={1: 520, 2: 1314} if selectable_count else {},
+        required_game_roles=required_game_roles,
+        required_staff_count=required_staff_count,
         allow_specify=True,
-        max_specified_count=2 if selectable_count else required_staff_count,
+        max_specified_count=required_staff_count,
+        specify_fee_default=100,
+        specify_fee_by_role={role: 100 for role in allowed_roles},
+        specify_free_min_units=2,
+        specify_free_basis="quantity",
+    ))
+
+
+def _add_selectable_sweet_rule(
+    key: str,
+    label: str,
+    *,
+    allowed_roles: tuple[RoleKey, ...],
+    category: str,
+    required_game_roles: tuple[str, ...],
+) -> None:
+    # 新甜蜜單只選性別／不限；陪玩人數由獨立欄位選 1～2。
+    _add(OrderRule(
+        category,
+        key,
+        label,
+        "hourly",
+        520,
+        "H",
+        allowed_roles=allowed_roles,
+        allowed_game_roles=(),
+        required_game_roles=(*required_game_roles, SWEET_COMPANION_ROLE_KEY),
+        required_staff_count="player_count",
+        player_count_enabled=True,
+        min_player_count=1,
+        max_player_count=2,
+        price_multiply_player_count=False,
+        player_count_prices={1: 520, 2: 1314},
+        allow_specify=True,
+        max_specified_count=2,
         specify_fee_default=100,
         specify_fee_by_role={role: 100 for role in allowed_roles},
         specify_free_min_units=2,
@@ -734,6 +758,31 @@ for _prefix, _category, _game_label, _required_game_roles in _GAME_SHARED_SERVIC
         category=_category,
         price=1314,
         required_staff_count=2,
+        allowed_roles=COMPANION_ROLES,
+        required_game_roles=_required_game_roles,
+    )
+
+
+# 新下單使用不含人數語意的 canonical sweet keys；舊 fixed-seat keys 留給歷史資料。
+for _prefix, _category, _game_label, _required_game_roles in _GAME_SHARED_SERVICE_SPECS:
+    _add_selectable_sweet_rule(
+        f"{_prefix}_sweet_female",
+        f"{_game_label}｜甜蜜單｜女陪",
+        category=_category,
+        allowed_roles=("female_companion",),
+        required_game_roles=_required_game_roles,
+    )
+    _add_selectable_sweet_rule(
+        f"{_prefix}_sweet_male",
+        f"{_game_label}｜甜蜜單｜男陪",
+        category=_category,
+        allowed_roles=("male_companion",),
+        required_game_roles=_required_game_roles,
+    )
+    _add_selectable_sweet_rule(
+        f"{_prefix}_sweet_any",
+        f"{_game_label}｜甜蜜單｜不限",
+        category=_category,
         allowed_roles=COMPANION_ROLES,
         required_game_roles=_required_game_roles,
     )

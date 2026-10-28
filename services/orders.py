@@ -106,9 +106,11 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "甜蜜單",
             "details": [
-                {"label": "女陪", "value": "female_single", "rule_key": "basic_sweet_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "男陪", "value": "male_single", "rule_key": "basic_sweet_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "不限", "value": "double_any", "rule_key": "basic_sweet_double_any", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "女單陪", "value": "female_single", "rule_key": "basic_sweet_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "男單陪", "value": "male_single", "rule_key": "basic_sweet_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "女雙陪", "value": "female_double", "rule_key": "basic_sweet_female_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "男雙陪", "value": "male_double", "rule_key": "basic_sweet_male_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "雙陪(不限)", "value": "double_any", "rule_key": "basic_sweet_double_any", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             ],
         },
         {
@@ -275,9 +277,9 @@ def _sweet_catalog_group(prefix: str) -> dict:
     return {
         "label": "甜蜜單",
         "details": [
-            {"label": "女陪", "value": "female_single", "rule_key": f"{prefix}_sweet_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-            {"label": "男陪", "value": "male_single", "rule_key": f"{prefix}_sweet_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-            {"label": "不限", "value": "double_any", "rule_key": f"{prefix}_sweet_double_any", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "女陪", "value": "female", "rule_key": f"{prefix}_sweet_female", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "男陪", "value": "male", "rule_key": f"{prefix}_sweet_male", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "不限", "value": "any", "rule_key": f"{prefix}_sweet_any", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ],
     }
 
@@ -383,7 +385,7 @@ CANONICAL_DETAIL_LABEL_RULE_KEYS = {
     *[f"valorant_{tier}_{mode}" for tier in ("entertain", "ascendant", "immortal", "radiant") for mode in ("ng", "ranked")],
     *[f"lol_{tier}_{mode}" for tier in ("entertain", "master", "grandmaster", "elite") for mode in ("aram", "ng", "ranked")],
     *[f"apex_{tier}_{mode}" for tier in ("entertain", "diamond", "master", "predator") for mode in ("ng", "ranked")],
-    *[f"{prefix}_sweet_{suffix}" for prefix in ("delta_desktop", "delta_mobile", "steam", "valorant", "lol", "apex") for suffix in ("female_single", "male_single", "double_any")],
+    *[f"{prefix}_sweet_{suffix}" for prefix in ("delta_desktop", "delta_mobile", "steam", "valorant", "lol", "apex") for suffix in ("female", "male", "any")],
 }
 
 DYNAMIC_ADMIN_GROUP_LABEL = "後台新增商品"
