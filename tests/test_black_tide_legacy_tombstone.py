@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import services  # noqa: F401 - installs production policies
-from services import order_rule_store, order_rules, orders
+from services import (
+    black_tide_legacy_tombstone,
+    order_rule_store,
+    order_rules,
+    orders,
+)
 from web.app.services import order_groups as web_order_groups
 
 
@@ -19,6 +24,16 @@ def _stale_custom_definition(rule_key: str, label: str, group_label: str) -> dic
         "created_by_discord_id": "legacy",
         "created_by_display_name": "legacy migration",
         "created_at": "2026-10-28T00:00:00+00:00",
+    }
+
+
+def _store_payload(label: str, group_label: str) -> dict:
+    return {
+        "label": label,
+        "pricing_type": "hourly",
+        "price": 320,
+        "unit_label": "H",
+        "catalog_group_label": group_label,
     }
 
 
@@ -99,3 +114,56 @@ def test_retired_black_tide_database_rows_never_reenter_live_catalog(monkeypatch
         ]
     finally:
         order_rules.ORDER_RULES.invalidate()
+
+
+def test_stale_black_tide_manager_rows_are_persistently_deactivated(tmp_path) -> None:
+    db_file = tmp_path / "manager-rules.db"
+    order_rule_store.ensure_order_rule_store(db_file)
+
+    rows = {
+        "basic_black_tide_tech_4": _store_payload(
+            "黑潮爆破｜技術四陪",
+            "舊歷史分組",
+        ),
+        "admin_delta_desktop_basic_bt_group": _store_payload(
+            "娛樂雙/三/四陪",
+            "黑潮爆破",
+        ),
+        "admin_delta_desktop_basic_bt_override": _store_payload(
+            "技術單陪",
+            "舊測試分組",
+        ),
+        "admin_delta_desktop_basic_keep": _store_payload(
+            "其他正常商品",
+            "其他正常分組",
+        ),
+    }
+
+    for key, payload in rows.items():
+        order_rule_store.create_custom_order_rule(
+            rule_key=key,
+            category="delta_desktop_basic",
+            payload=payload,
+            actor_discord_id="test",
+            actor_display_name="test",
+            db_file=db_file,
+        )
+
+    order_rule_store.publish_rule_override(
+        rule_key="admin_delta_desktop_basic_bt_override",
+        payload={"catalog_group_label": "黑潮爆破"},
+        actor_discord_id="test",
+        actor_display_name="test",
+        db_file=db_file,
+    )
+
+    retired = black_tide_legacy_tombstone.retire_stale_black_tide_custom_rows(db_file)
+    assert retired == 3
+
+    active = order_rule_store.load_custom_rule_definitions(db_file)
+    assert set(active) == {"admin_delta_desktop_basic_keep"}
+
+    # The cleanup is idempotent and does not touch normal manager products.
+    assert black_tide_legacy_tombstone.retire_stale_black_tide_custom_rows(db_file) == 0
+    active_again = order_rule_store.load_custom_rule_definitions(db_file)
+    assert set(active_again) == {"admin_delta_desktop_basic_keep"}
