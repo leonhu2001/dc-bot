@@ -246,20 +246,26 @@ def _replace_or_append_group(groups: list[dict[str, Any]], label: str, details: 
 
 
 def _collapse_group_by_rule(groups: list[dict[str, Any]], *, mode_labels: dict[str, str]) -> None:
+    """Collapse only actual gameplay rows; leave sweet/teaching/other groups intact."""
     for group in groups:
+        source = list(group.get("details", []))
+        if not source:
+            continue
+        modes = [str(item.get("value") or "").split("_", 1)[0] for item in source]
+        if not all(mode in mode_labels for mode in modes):
+            continue
+
         seen: set[str] = set()
         collapsed: list[dict[str, Any]] = []
-        for detail in list(group.get("details", [])):
+        for detail, mode in zip(source, modes):
             rule_key = str(detail.get("rule_key") or "")
             if not rule_key or rule_key in seen:
                 continue
             seen.add(rule_key)
-            value = str(detail.get("value") or "")
-            mode = value.split("_", 1)[0]
             item = dict(detail)
             item.pop("player_count", None)
             item["value"] = mode
-            item["label"] = mode_labels.get(mode, str(detail.get("label") or mode))
+            item["label"] = mode_labels[mode]
             collapsed.append(item)
         group["details"] = collapsed
 
@@ -385,22 +391,11 @@ def _patch_self_service_catalog() -> None:
 
     _collapse_group_by_rule(
         orders.SELF_SERVICE_ORDER_CATALOG.get("apex", []),
-        mode_labels={"ng": "NG", "ranked": "RK"},
+        mode_labels={"ng": "NG", "ranked": "積分"},
     )
 
-    custom_groups = orders.SELF_SERVICE_ORDER_CATALOG.get("custom", [])
-    _replace_or_append_group(
-        custom_groups,
-        "自訂",
-        [{
-            "label": "自訂",
-            "value": "custom",
-            "rule_key": "custom_custom_order",
-            "quantity_unit": "小時",
-            "min_quantity": 1,
-            "max_quantity": 24,
-        }],
-    )
+    # Custom quick-order has its own existing 1-4 headcount selector that resolves
+    # historical player_count detail metadata. Leave that catalog untouched.
 
 
 def _refresh_order_derived_maps() -> None:
