@@ -68,6 +68,25 @@ def clear_product_dependent_selection_state(data: dict[str, Any]) -> None:
     data.pop("payment_method", None)
 
 
+def _reset_player_count_for_selected_rule(data: dict[str, Any]) -> None:
+    rule_key = str(data.get("order_rule_key") or "").strip()
+    if not rule_key:
+        data.pop("player_count", None)
+        return
+    try:
+        from services.order_rules import ORDER_RULES
+        from services.multi_seat_order_policy_20261028 import get_rule_player_count_bounds
+
+        rule = ORDER_RULES.get(rule_key)
+        if rule is None:
+            data.pop("player_count", None)
+            return
+        _minimum, _maximum, default, _selectable = get_rule_player_count_bounds(rule)
+        data["player_count"] = int(default)
+    except Exception:
+        data.pop("player_count", None)
+
+
 def apply_self_service_category_selection(data: dict[str, Any], category: str) -> None:
     data["category"] = category
     for key in (
@@ -90,10 +109,12 @@ def apply_self_service_detail_selection(data: dict[str, Any], detail: dict[str, 
     data["item"] = str(detail.get("item") or detail.get("label") or "")
     data["order_rule_key"] = str(detail.get("rule_key") or "")
 
+    # Legacy detail rows may still carry player_count. New storefront rows do not;
+    # the shared count control is the only customer-facing source of truth.
     if detail.get("player_count") is not None:
         data["player_count"] = int(detail["player_count"])
     else:
-        data.pop("player_count", None)
+        _reset_player_count_for_selected_rule(data)
 
     data["quantity"] = int(detail.get("min_quantity") or 1)
     data.pop("specified_staff_ids", None)
