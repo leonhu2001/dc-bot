@@ -29,6 +29,14 @@ from .entertainment_companion_policy_20261028 import (
 )
 
 _install_entertainment_companion_policy_20261028()
+
+# Expand storefront seat selection and service rewards to 1-4 companions while
+# preserving the existing rule engine, legacy voucher lookup, and manager switches.
+from .multi_seat_order_policy_20261028 import (
+    install_multi_seat_order_policy_20261028 as _install_multi_seat_order_policy_20261028,
+)
+
+_install_multi_seat_order_policy_20261028()
 _order_rules.validate_rules()
 
 # Changing the customer-facing names to 單陪（不限）/雙陪（不限） must not change
@@ -86,9 +94,8 @@ from .benefit_runtime_integration import install_root_benefit_integrations as _i
 
 _install_benefits()
 
-# Double-companion point rewards extend both companions and therefore must fund
-# both seats. Install after benefit runtime setup and before financial-copy wrappers
-# capture the calculation function used by Web and Discord.
+# Multi-companion point rewards extend every selected companion and therefore must
+# fund every seat. The shared financial wrapper is seat-count generic (1-4).
 _install_point_service_financial_runtime_20261028()
 
 # User-facing checkout copy must describe the same funding policy as the actual
