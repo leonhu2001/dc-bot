@@ -4,27 +4,24 @@ from types import SimpleNamespace
 
 import services  # noqa: F401 - installs the production policies under test
 from services import order_rules
-from services import orders
 from services.multi_seat_order_policy_20261028 import PLAYER_COUNT_PRICE_TABLES
 from services.sweet_companion_policy_20261028 import SWEET_COMPANION_ROLE_ID
 
 
-def _group(category: str, label: str) -> dict:
-    return next(
-        group
-        for group in orders.SELF_SERVICE_ORDER_CATALOG[category]
-        if str(group.get("label") or "") == label
-    )
+def _discord_details(category: str, group: str) -> list[dict]:
+    from services import order_runtime
+
+    return order_runtime.get_order_item_details_for_group(category, group)
 
 
-def test_delta_technical_specs_use_independent_companion_count() -> None:
-    desktop = _group("delta_desktop_basic", "技術陪")
-    mobile = _group("delta_mobile_basic", "技術陪")
+def test_delta_technical_discord_specs_use_independent_companion_count() -> None:
+    desktop = _discord_details("delta_desktop_basic", "技術陪")
+    mobile = _discord_details("delta_mobile_basic", "技術陪")
 
-    assert [item["label"] for item in desktop["details"]] == ["機密", "絕密"]
-    assert [item["label"] for item in mobile["details"]] == ["機密", "絕密"]
-    assert all("player_count" not in item for item in desktop["details"])
-    assert all("player_count" not in item for item in mobile["details"])
+    assert [item["label"] for item in desktop] == ["機密", "絕密"]
+    assert [item["label"] for item in mobile] == ["機密", "絕密"]
+    assert all("player_count" not in item for item in desktop)
+    assert all("player_count" not in item for item in mobile)
 
     for key in (
         "basic_tech_secret_single",
@@ -38,7 +35,7 @@ def test_delta_technical_specs_use_independent_companion_count() -> None:
         assert rule.min_player_count == 1
         assert rule.max_player_count == 2
 
-    # Historical fixed-double keys still exist for snapshots / saved orders.
+    # Historical fixed-double keys remain available for old tickets/orders.
     assert "basic_tech_secret_double" in order_rules.ORDER_RULES
     assert "basic_mobile_tech_secret_double" in order_rules.ORDER_RULES
 
@@ -61,7 +58,7 @@ def test_delta_technical_two_companion_prices_are_preserved() -> None:
         assert result.required_staff_count == 2
 
 
-def test_sweet_specs_use_gender_type_plus_independent_count() -> None:
+def test_sweet_discord_specs_use_gender_type_plus_independent_count() -> None:
     prefixes = {
         "delta_desktop_basic": "delta_desktop",
         "delta_mobile_basic": "delta_mobile",
@@ -72,29 +69,30 @@ def test_sweet_specs_use_gender_type_plus_independent_count() -> None:
     }
 
     for category, prefix in prefixes.items():
-        group = _group(category, "甜蜜單")
-        assert [item["label"] for item in group["details"]] == ["女陪", "男陪", "不限"]
-        assert all("player_count" not in item for item in group["details"])
-        assert [item["rule_key"] for item in group["details"]] == [
-            f"{prefix}_sweet_female_single",
-            f"{prefix}_sweet_male_single",
-            f"{prefix}_sweet_double_any",
+        details = _discord_details(category, "甜蜜單")
+        assert [item["label"] for item in details] == ["女陪", "男陪", "不限"]
+        assert [item["rule_key"] for item in details] == [
+            f"{prefix}_sweet_female",
+            f"{prefix}_sweet_male",
+            f"{prefix}_sweet_any",
         ]
 
-        for item in group["details"]:
+        for item in details:
             rule = order_rules.ORDER_RULES[item["rule_key"]]
             assert rule.required_staff_count == "player_count"
             assert rule.player_count_enabled is True
+            assert rule.min_player_count == 1
             assert rule.max_player_count == 2
             assert PLAYER_COUNT_PRICE_TABLES[item["rule_key"]] == {1: 520, 2: 1314}
 
-        # Old fixed-double rules are lookup-only compatibility, not public choices.
-        assert f"{prefix}_sweet_female_double" in order_rules.ORDER_RULES
-        assert f"{prefix}_sweet_male_double" in order_rules.ORDER_RULES
+        # Existing fixed-seat keys remain untouched for old Web/ticket selections.
+        assert order_rules.ORDER_RULES[f"{prefix}_sweet_female_single"].required_staff_count == 1
+        assert order_rules.ORDER_RULES[f"{prefix}_sweet_female_double"].required_staff_count == 2
+        assert order_rules.ORDER_RULES[f"{prefix}_sweet_male_double"].required_staff_count == 2
 
 
 def test_sweet_price_uses_selected_companion_count() -> None:
-    rule = order_rules.ORDER_RULES["valorant_sweet_female_single"]
+    rule = order_rules.ORDER_RULES["valorant_sweet_female"]
     one = order_rules.calculate_price(rule, quantity=2, player_count=1)
     two = order_rules.calculate_price(rule, quantity=2, player_count=2)
 
@@ -105,7 +103,7 @@ def test_sweet_price_uses_selected_companion_count() -> None:
 
 
 def test_sweet_role_is_additional_and_gate() -> None:
-    rule = order_rules.ORDER_RULES["valorant_sweet_female_single"]
+    rule = order_rules.ORDER_RULES["valorant_sweet_female"]
     allowed = order_rules.get_allowed_role_ids(rule)
     required = order_rules.get_required_game_role_ids(rule)
 
@@ -132,10 +130,10 @@ def test_sweet_role_is_additional_and_gate() -> None:
     ) is True
 
 
-def test_smart_dispatch_only_reminds_fully_qualified_sweet_workers(monkeypatch) -> None:
+def test_smart_dispatch_only_reminds_fully_qualified_sweet_workers() -> None:
     from views import smart_dispatch
 
-    rule = order_rules.ORDER_RULES["valorant_sweet_female_single"]
+    rule = order_rules.ORDER_RULES["valorant_sweet_female"]
     allowed = order_rules.get_allowed_role_ids(rule)
     required = order_rules.get_required_game_role_ids(rule)
     female_role_id = order_rules.ROLE_IDS["female_companion"]
@@ -159,6 +157,15 @@ def test_smart_dispatch_only_reminds_fully_qualified_sweet_workers(monkeypatch) 
         allowed_role_ids=allowed,
         required_game_role_ids=required,
     ) == ["3"]
+
+
+def test_legacy_sweet_rules_do_not_gain_new_runtime_requirement() -> None:
+    legacy_general = order_rules.ORDER_RULES["basic_sweet_female_single"]
+    old_game_rule = order_rules.ORDER_RULES["valorant_sweet_female_single"]
+
+    assert order_rules.get_required_game_role_keys(legacy_general) == ()
+    assert order_rules.get_required_game_role_keys(old_game_rule) == ("valorant_game",)
+    assert SWEET_COMPANION_ROLE_ID not in order_rules.get_required_game_role_ids(old_game_rule)
 
 
 def test_quick_order_notice_installed_without_replacing_locked_ticket_patch() -> None:
