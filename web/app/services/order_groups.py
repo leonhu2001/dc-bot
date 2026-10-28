@@ -9,6 +9,7 @@ from services.order_rule_store import (
 from services.order_rules import (
     CATEGORY_LABELS,
     ORDER_RULES,
+    SOURCE_AUTHORITY_RULE_KEYS,
     get_allowed_role_labels,
 )
 
@@ -75,13 +76,11 @@ GROUP_SPECS = [
         "key": "tech_play",
         "category": "delta_desktop_basic",
         "label": "技術陪",
-        "selector_label": "難度 / 陪玩人數",
-        "description": "三角洲端遊技術陪，依難度與陪玩人數選擇方案。",
+        "selector_label": "難度",
+        "description": "三角洲端遊技術陪；難度與陪玩人數分開選擇。",
         "variants": [
-            ("basic_tech_secret_single", "機密｜單陪"),
-            ("basic_tech_secret_double", "機密｜雙陪"),
-            ("basic_tech_topsecret_single", "絕密｜單陪"),
-            ("basic_tech_topsecret_double", "絕密｜雙陪"),
+            ("basic_tech_secret_single", "機密"),
+            ("basic_tech_topsecret_single", "絕密"),
         ],
     },
 
@@ -89,13 +88,11 @@ GROUP_SPECS = [
         "key": "tech_play_mobile",
         "category": "delta_mobile_basic",
         "label": "技術陪",
-        "selector_label": "難度 / 陪玩人數",
-        "description": "三角洲手遊技術陪，機密 380T/H、絕密 420T/H。",
+        "selector_label": "難度",
+        "description": "三角洲手遊技術陪；難度與陪玩人數分開選擇。",
         "variants": [
-            ("basic_mobile_tech_secret_single", "機密｜單陪"),
-            ("basic_mobile_tech_secret_double", "機密｜雙陪"),
-            ("basic_mobile_tech_topsecret_single", "絕密｜單陪"),
-            ("basic_mobile_tech_topsecret_double", "絕密｜雙陪"),
+            ("basic_mobile_tech_secret_single", "機密"),
+            ("basic_mobile_tech_topsecret_single", "絕密"),
         ],
     },
 
@@ -103,11 +100,12 @@ GROUP_SPECS = [
         "key": "entertain",
         "category": "delta_desktop_basic",
         "label": "娛樂陪",
-        "selector_label": "陪玩人數",
-        "description": "娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
+        "selector_label": "陪玩類型",
+        "description": "娛樂陪類型與陪玩人數分開選擇；福利累積 10 個服務小時回饋 1 小時。",
         "variants": [
-            ("basic_entertain_single", "單陪"),
-            ("basic_entertain_double", "雙陪"),
+            ("basic_entertain_single", "不限"),
+            ("basic_entertain_female_single", "女陪"),
+            ("basic_entertain_male_single", "男陪"),
         ],
     },
 
@@ -115,11 +113,12 @@ GROUP_SPECS = [
         "key": "entertain_mobile",
         "category": "delta_mobile_basic",
         "label": "娛樂陪",
-        "selector_label": "陪玩人數",
-        "description": "價格與端遊相同；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
+        "selector_label": "陪玩類型",
+        "description": "娛樂陪類型與陪玩人數分開選擇；價格與端遊相同。",
         "variants": [
-            ("basic_mobile_entertain_single", "單陪"),
-            ("basic_mobile_entertain_double", "雙陪"),
+            ("basic_mobile_entertain_single", "不限"),
+            ("basic_mobile_entertain_female_single", "女陪"),
+            ("basic_mobile_entertain_male_single", "男陪"),
         ],
     },
 
@@ -322,14 +321,12 @@ for _prefix, _category, _game_label in _GAME_SHARED_GROUPS:
         "key": f"{_prefix}_sweet",
         "category": _category,
         "label": "甜蜜單",
-        "selector_label": "陪玩性別／人數",
-        "description": f"{_game_label}限定甜蜜單。",
+        "selector_label": "陪玩類型",
+        "description": f"{_game_label}限定甜蜜單；陪玩類型與人數分開選擇。",
         "variants": [
-            (f"{_prefix}_sweet_female_single", "女單陪"),
-            (f"{_prefix}_sweet_male_single", "男單陪"),
-            (f"{_prefix}_sweet_female_double", "女雙陪"),
-            (f"{_prefix}_sweet_male_double", "男雙陪"),
-            (f"{_prefix}_sweet_double_any", "雙陪(不限)"),
+            (f"{_prefix}_sweet_female", "女陪"),
+            (f"{_prefix}_sweet_male", "男陪"),
+            (f"{_prefix}_sweet_any", "不限"),
         ],
     })
 
@@ -719,9 +716,13 @@ def _current_group_specs() -> list[dict]:
         for rule_key, public_label in source_spec.get("variants", []):
             rule = ORDER_RULES.get(str(rule_key))
             manager_group_label = (
-                str(getattr(rule, "catalog_group_label", "") or "").strip()
-                if rule is not None
-                else ""
+                ""
+                if str(rule_key) in SOURCE_AUTHORITY_RULE_KEYS
+                else (
+                    str(getattr(rule, "catalog_group_label", "") or "").strip()
+                    if rule is not None
+                    else ""
+                )
             )
 
             if not manager_group_label:

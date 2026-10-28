@@ -6,8 +6,6 @@ root services package and install the centralized promotion-benefit adapter.
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 import services.order_rules as _order_rules_module
 
 from . import order_groups as _order_groups
@@ -18,87 +16,6 @@ from .order_catalog_read_cache import (
 from .public_staff_refresh import (
     install_nonblocking_public_staff_refresh as _install_public_staff_refresh,
 )
-
-
-def _catalog_group_for_admin(category: str, label: str) -> str:
-    """Return the real second-column label without repeating the top-level game."""
-    value = str(label or "").strip()
-    prefixes = {
-        "valorant": "特戰英豪｜",
-        "lol": "英雄聯盟｜",
-        "apex": "APEX｜",
-    }
-    prefix = prefixes.get(str(category or ""), "")
-    if prefix and value.startswith(prefix):
-        value = value[len(prefix):].strip()
-    return value
-
-
-def _install_builtin_catalog_columns() -> None:
-    """Backfill code-defined rules with explicit second/third catalog columns.
-
-    GROUP_SPECS is already the authoritative Web catalog definition: ``label`` is
-    the second-level group and every variant tuple contains the third-level
-    product label. Older code rules predate ``catalog_group_label`` and therefore
-    stored both pieces inside ``OrderRule.label``. Normalize the immutable code
-    defaults here so admin editing, previews and all Web consumers see the same
-    two columns without guessing from legacy separators.
-    """
-    base_rules = getattr(_order_rules_module, "_BASE_ORDER_RULES", {})
-    effective_rules = _order_rules_module.ORDER_RULES
-    mapped_keys: set[str] = set()
-
-    for spec in _order_groups.GROUP_SPECS:
-        category = str(spec.get("category") or "").strip()
-        group_label = _catalog_group_for_admin(category, spec.get("label") or "")
-        if not group_label:
-            continue
-
-        for variant in spec.get("variants") or []:
-            if not isinstance(variant, (list, tuple)) or len(variant) < 2:
-                continue
-            rule_key = str(variant[0] or "").strip()
-            product_label = str(variant[1] or "").strip()
-            if not rule_key or not product_label:
-                continue
-
-            base_rule = base_rules.get(rule_key)
-            if base_rule is None:
-                continue
-
-            normalized = replace(
-                base_rule,
-                catalog_group_label=group_label,
-                label=product_label,
-            )
-            base_rules[rule_key] = normalized
-            if isinstance(effective_rules, dict) and dict.__contains__(effective_rules, rule_key):
-                dict.__setitem__(effective_rules, rule_key, normalized)
-            mapped_keys.add(rule_key)
-
-    # Compatibility fallback for any built-in rule that has not yet been added
-    # to GROUP_SPECS. This only handles the old unambiguous "第二欄｜第三欄"
-    # storage shape and never swaps the two sides.
-    for rule_key, base_rule in list(base_rules.items()):
-        if rule_key in mapped_keys or str(base_rule.catalog_group_label or "").strip():
-            continue
-        legacy_label = str(base_rule.label or "").strip()
-        if "｜" not in legacy_label:
-            continue
-        group_label, product_label = legacy_label.split("｜", 1)
-        group_label = group_label.strip()
-        product_label = product_label.strip()
-        if not group_label or not product_label:
-            continue
-
-        normalized = replace(
-            base_rule,
-            catalog_group_label=group_label,
-            label=product_label,
-        )
-        base_rules[rule_key] = normalized
-        if isinstance(effective_rules, dict) and dict.__contains__(effective_rules, rule_key):
-            dict.__setitem__(effective_rules, rule_key, normalized)
 
 
 # Public storefront presentation uses a short shared snapshot/cache so normal
@@ -164,9 +81,7 @@ for _spec in _order_groups.GROUP_SPECS:
 
 del _spec, _description, _category, _key
 
-# Normalize code rules only after all storefront copy/variant adjustments above
-# have finished, otherwise the admin page could inherit stale legacy labels.
-_install_builtin_catalog_columns()
+# Built-in rule identity now comes directly from services/order_rules.py.
 
 # Load the established checkout module once, then attach the promotion-benefit
 # policy adapter. All public-order entry points import the same module object, so

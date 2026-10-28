@@ -284,3 +284,21 @@ def test_latest_approved_game_prices_are_direct_source_values() -> None:
     }
     for key, price in expected.items():
         assert order_rules.get_base_rule(key).price == price, key
+
+
+def test_web_service_import_never_rewrites_authoritative_order_rules() -> None:
+    from services.order_rules import get_base_rule
+
+    expected = {
+        "basic_tech_secret_single": "技術陪〈端遊〉｜機密",
+        "basic_entertain_single": "娛樂陪〈端遊〉｜不限",
+        "valorant_sweet_female": "特戰英豪｜甜蜜單｜女陪",
+    }
+    before = {key: get_base_rule(key).label for key in expected}
+
+    import web.app.services  # noqa: F401
+
+    after = {key: get_base_rule(key).label for key in expected}
+    assert before == expected
+    assert after == expected
+

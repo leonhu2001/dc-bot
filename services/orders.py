@@ -7,6 +7,7 @@ import discord
 from services.order_rules import (
     CATEGORY_LABELS as RULE_CATEGORY_LABELS,
     ORDER_RULES,
+    SOURCE_AUTHORITY_RULE_KEYS,
     get_rules_by_category,
 )
 
@@ -384,17 +385,7 @@ ORDER_ITEM_TO_CATEGORY = {
 
 # 這些是已遷移成「規格與人數分離」的內建商品。即使資料庫還留著
 # 舊 label override，也不能把單陪／雙陪字樣重新塞回第三欄。
-CANONICAL_DETAIL_LABEL_RULE_KEYS = {
-    "basic_tech_secret_single", "basic_tech_topsecret_single",
-    "basic_mobile_tech_secret_single", "basic_mobile_tech_topsecret_single",
-    "basic_entertain_single", "basic_entertain_female_single", "basic_entertain_male_single",
-    "basic_mobile_entertain_single", "basic_mobile_entertain_female_single", "basic_mobile_entertain_male_single",
-    "basic_black_tide_entertain", "basic_black_tide_tech", "steam_play",
-    *[f"valorant_{tier}_{mode}" for tier in ("entertain", "ascendant", "immortal", "radiant") for mode in ("ng", "ranked")],
-    *[f"lol_{tier}_{mode}" for tier in ("entertain", "master", "grandmaster", "elite") for mode in ("aram", "ng", "ranked")],
-    *[f"apex_{tier}_{mode}" for tier in ("entertain", "diamond", "master", "predator") for mode in ("ng", "ranked")],
-    *[f"{prefix}_sweet_{suffix}" for prefix in ("delta_desktop", "delta_mobile", "steam", "valorant", "lol", "apex") for suffix in ("female", "male", "any")],
-}
+CANONICAL_DETAIL_LABEL_RULE_KEYS = set(SOURCE_AUTHORITY_RULE_KEYS)
 
 DYNAMIC_ADMIN_GROUP_LABEL = "後台新增商品"
 

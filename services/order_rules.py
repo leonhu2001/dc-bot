@@ -1513,6 +1513,14 @@ validate_rules()
 
 _BASE_ORDER_RULES = dict(ORDER_RULES)
 
+# 後來核准為「規格 / 類型 + 獨立陪玩人數」的內建規則，以程式來源為準。
+# 舊後台 override 不得再把這些商品改回單陪／雙陪或舊分組。
+SOURCE_AUTHORITY_RULE_KEYS = frozenset(
+    key
+    for key, rule in _BASE_ORDER_RULES.items()
+    if bool(rule.player_count_enabled) and key != "custom_custom_order"
+)
+
 
 class EffectiveOrderRules(dict):
     """Read-through mapping for code rules + manager-created rules + overrides.
@@ -1596,9 +1604,14 @@ class EffectiveOrderRules(dict):
 
             # 後來核准的人數結構是程式規則的一部分。舊後台 override 仍可改價、
             # 福利、分類等商務欄位，但不能把已遷移商品重新變回 fixed 單／雙陪。
-            if bool(base.player_count_enabled):
+            if key in SOURCE_AUTHORITY_RULE_KEYS:
                 rule = replace(
                     rule,
+                    label=base.label,
+                    catalog_group_label=base.catalog_group_label,
+                    allowed_roles=base.allowed_roles,
+                    allowed_game_roles=base.allowed_game_roles,
+                    required_game_roles=base.required_game_roles,
                     required_staff_count=base.required_staff_count,
                     player_count_enabled=base.player_count_enabled,
                     min_player_count=base.min_player_count,
@@ -1720,6 +1733,7 @@ __all__ = [
     "PriceResult",
     "ROLE_IDS",
     "ROLE_LABELS",
+    "SOURCE_AUTHORITY_RULE_KEYS",
     "RoleKey",
     "OrderRule",
     "calculate_price",

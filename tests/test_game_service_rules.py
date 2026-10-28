@@ -567,16 +567,14 @@ def test_web_catalog_uses_game_specific_shared_services():
             for group in get_grouped_order_catalog(category)
         }
         sweet = groups[f"{prefix}_sweet"]
-        assert sweet["selector_label"] == "陪玩性別／人數"
+        assert sweet["selector_label"] == "陪玩類型"
         assert [
             variant["rule_key"]
             for variant in sweet["variants"]
         ] == [
-            f"{prefix}_sweet_female_single",
-            f"{prefix}_sweet_male_single",
-            f"{prefix}_sweet_female_double",
-            f"{prefix}_sweet_male_double",
-            f"{prefix}_sweet_double_any",
+            f"{prefix}_sweet_female",
+            f"{prefix}_sweet_male",
+            f"{prefix}_sweet_any",
         ]
 
     steam_groups = {
@@ -609,18 +607,18 @@ def test_delta_desktop_and_mobile_pricing_are_separate():
 
 def test_delta_platform_labels_are_direct_catalog_rules():
     expected = {
-        "basic_tech_secret_single": "機密｜單陪",
-        "basic_tech_secret_double": "機密｜雙陪",
-        "basic_tech_topsecret_single": "絕密｜單陪",
-        "basic_tech_topsecret_double": "絕密｜雙陪",
-        "basic_mobile_tech_secret_single": "機密｜單陪",
-        "basic_mobile_tech_secret_double": "機密｜雙陪",
-        "basic_mobile_tech_topsecret_single": "絕密｜單陪",
-        "basic_mobile_tech_topsecret_double": "絕密｜雙陪",
-        "basic_entertain_single": "單陪",
-        "basic_entertain_double": "雙陪",
-        "basic_mobile_entertain_single": "單陪",
-        "basic_mobile_entertain_double": "雙陪",
+        "basic_tech_secret_single": "技術陪〈端遊〉｜機密",
+        "basic_tech_secret_double": "技術陪〈端遊〉｜機密雙陪",
+        "basic_tech_topsecret_single": "技術陪〈端遊〉｜絕密",
+        "basic_tech_topsecret_double": "技術陪〈端遊〉｜絕密雙陪",
+        "basic_mobile_tech_secret_single": "技術陪〈手遊〉｜機密",
+        "basic_mobile_tech_secret_double": "技術陪〈手遊〉｜機密雙陪",
+        "basic_mobile_tech_topsecret_single": "技術陪〈手遊〉｜絕密",
+        "basic_mobile_tech_topsecret_double": "技術陪〈手遊〉｜絕密雙陪",
+        "basic_entertain_single": "娛樂陪〈端遊〉｜不限",
+        "basic_entertain_double": "娛樂陪〈端遊〉｜雙陪",
+        "basic_mobile_entertain_single": "娛樂陪〈手遊〉｜不限",
+        "basic_mobile_entertain_double": "娛樂陪〈手遊〉｜雙陪",
     }
     for key, label in expected.items():
         rule = ORDER_RULES[key]
@@ -704,14 +702,12 @@ def test_web_delta_catalog_exposes_split_desktop_and_mobile_categories():
         for variant in mobile_groups["tech_play_mobile"]["variants"]
     ] == [
         "basic_mobile_tech_secret_single",
-        "basic_mobile_tech_secret_double",
         "basic_mobile_tech_topsecret_single",
-        "basic_mobile_tech_topsecret_double",
     ]
     assert [
         variant["price"]
         for variant in mobile_groups["tech_play_mobile"]["variants"]
-    ] == [380, 760, 420, 840]
+    ] == [380, 420]
 
 
 

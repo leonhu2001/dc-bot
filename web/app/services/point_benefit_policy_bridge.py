@@ -1,32 +1,6 @@
 from __future__ import annotations
 
 
-def _patch_entertainment_variants(order_groups) -> None:
-    # Companion TYPE is independent from companion COUNT. Historical double keys
-    # remain in ORDER_RULES for old orders, but new Web checkout only exposes the
-    # three type choices and lets the shared player-count field choose 1-2 people.
-    variants_by_key = {
-        "entertain": [
-            ("basic_entertain_single", "不限"),
-            ("basic_entertain_female_single", "女陪"),
-            ("basic_entertain_male_single", "男陪"),
-        ],
-        "entertain_mobile": [
-            ("basic_mobile_entertain_single", "不限"),
-            ("basic_mobile_entertain_female_single", "女陪"),
-            ("basic_mobile_entertain_male_single", "男陪"),
-        ],
-    }
-
-    for spec in order_groups.GROUP_SPECS:
-        key = str(spec.get("key") or "")
-        variants = variants_by_key.get(key)
-        if variants is None:
-            continue
-        spec["selector_label"] = "陪玩類型"
-        spec["variants"] = list(variants)
-
-
 def _legacy_service_alias_name(rule, item: dict) -> str:
     tier = str(item.get("service_tier") or "")
     prefix = "娛樂陪" if tier == "entertainment" else "技術陪"
@@ -46,12 +20,9 @@ def install_shared_point_benefit_policy() -> None:
         check_order_point_benefit_allowed,
     )
     from web.app.services import checkout_preview as checkout
-    from web.app.services import order_groups
 
     if getattr(checkout, "_shared_point_benefit_policy_installed", False):
         return
-
-    _patch_entertainment_variants(order_groups)
 
     def point_item_status(
         *,
