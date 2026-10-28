@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 
 def _patch_entertainment_variants(order_groups) -> None:
     variants_by_key = {
@@ -30,6 +28,17 @@ def _patch_entertainment_variants(order_groups) -> None:
             continue
         spec["selector_label"] = "陪玩規格"
         spec["variants"] = list(variants)
+
+
+def _legacy_service_alias_name(rule, item: dict) -> str:
+    tier = str(item.get("service_tier") or "")
+    prefix = "娛樂陪" if tier == "entertainment" else "技術陪"
+    size = str(item.get("bonus_size") or "")
+    pricing_type = str(getattr(rule, "pricing_type", "") or "")
+    if pricing_type == "game":
+        units = 1 if size == "small" else 2
+        return f"{prefix}加贈｜{units} 局"
+    return f"{prefix}加贈｜{'30 分鐘' if size == 'small' else '1 小時'}"
 
 
 def install_shared_point_benefit_policy() -> None:
@@ -83,6 +92,59 @@ def install_shared_point_benefit_policy() -> None:
 
     checkout.point_item_status = point_item_status
 
+    # Keep the four superseded service keys resolvable for historical callers and
+    # old tests/in-flight state, but mark them as aliases. Public checkout options
+    # filter these rows below, so customers can only newly select the seat-aware keys.
+    original_list_point_options = checkout.list_point_options
+
+    def list_point_options(
+        *,
+        rule_key: str,
+        point_balance: int,
+        quantity: int,
+        has_specified_staff: bool,
+    ) -> list[dict]:
+        result = list(
+            original_list_point_options(
+                rule_key=rule_key,
+                point_balance=point_balance,
+                quantity=quantity,
+                has_specified_staff=has_specified_staff,
+            )
+            or []
+        )
+        rule = checkout.ORDER_RULES.get(str(rule_key))
+        if rule is None:
+            return result
+
+        existing = {str(item.get("key") or "") for item in result}
+        for key in (
+            "entertain_service_small",
+            "entertain_service_large",
+            "tech_service_small",
+            "tech_service_large",
+        ):
+            if key in existing:
+                continue
+            raw = checkout.POINT_ITEM_MAP.get(key)
+            if raw is None:
+                continue
+            adapted = checkout._point_item_for_rule(rule, raw)
+            adapted["name"] = _legacy_service_alias_name(rule, raw)
+            adapted["legacy_alias"] = True
+            status = point_item_status(
+                rule_key=rule_key,
+                point_item_key=key,
+                point_balance=point_balance,
+                quantity=quantity,
+                has_specified_staff=has_specified_staff,
+            )
+            adapted.update(status)
+            result.append(adapted)
+        return result
+
+    checkout.list_point_options = list_point_options
+
     original_build_options = checkout.build_checkout_options
 
     def build_checkout_options(*args, **kwargs):
@@ -108,6 +170,13 @@ def install_shared_point_benefit_policy() -> None:
             if reward_seats > 0 and reward_seats != selected_seats:
                 option["allowed"] = False
                 option["reason"] = "這張服務加贈券不適用此單陪／雙陪規格。"
+
+        if isinstance(result, dict):
+            result["point_options"] = [
+                option
+                for option in result.get("point_options", [])
+                if not bool(option.get("legacy_alias"))
+            ]
         return result
 
     checkout.build_checkout_options = build_checkout_options
