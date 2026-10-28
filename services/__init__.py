@@ -30,8 +30,12 @@ from .entertainment_companion_policy_20261028 import (
 
 _install_entertainment_companion_policy_20261028()
 
-# Expand storefront seat selection and service rewards to 1-4 companions while
-# preserving the existing rule engine, legacy voucher lookup, and manager switches.
+# Shared companion-count policy:
+# - third field is gameplay / companion type only,
+# - companion count is selected independently,
+# - explicit 1-4 price tables are used where prices are not safely linear,
+# - service point rewards remain seat-aware and game categories can disable only
+#   service-type point rewards without disabling the other point products.
 from .multi_seat_order_policy_20261028 import (
     install_multi_seat_order_policy_20261028 as _install_multi_seat_order_policy_20261028,
 )
@@ -39,8 +43,8 @@ from .multi_seat_order_policy_20261028 import (
 _install_multi_seat_order_policy_20261028()
 _order_rules.validate_rules()
 
-# Changing the customer-facing names to 單陪（不限）/雙陪（不限） must not change
-# the old selector values saved in existing self-service state.
+# Changing customer-facing companion choices must not delete historical selector
+# values saved by already-created tickets/orders.
 from .entertainment_companion_compat_20261028 import (
     install_entertainment_companion_selector_compat_20261028 as _install_entertainment_companion_selector_compat_20261028,
 )
@@ -123,3 +127,11 @@ from .order_ticket_ui_policy import (
 )
 
 _install_order_ticket_ui_policy()
+
+# Install the Discord shared player-count control after core benefit policies are
+# ready. Importing this patches the UI class before bot.py imports self_service_runtime.
+from .self_service_companion_count_runtime import (
+    install_self_service_companion_count_runtime as _install_self_service_companion_count_runtime,
+)
+
+_install_self_service_companion_count_runtime()
