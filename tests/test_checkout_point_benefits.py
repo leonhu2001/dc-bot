@@ -22,21 +22,33 @@ def test_point_catalog_prices_and_legacy_rewards_hidden_from_new_selection():
     assert items["discount_50"]["cost"] == 20
     assert items["free_specify_fee"]["cost"] == 30
     assert items["discount_100"]["cost"] == 45
-    assert items["entertain_service_small"]["cost"] == 80
-    assert items["tech_service_small"]["cost"] == 110
-    assert items["entertain_service_large"]["cost"] == 140
-    assert items["tech_service_large"]["cost"] == 200
+    assert items["entertain_single_service_small"]["cost"] == 80
+    assert items["entertain_single_service_large"]["cost"] == 140
+    assert items["entertain_double_service_small"]["cost"] == 160
+    assert items["entertain_double_service_large"]["cost"] == 280
+    assert items["tech_single_service_small"]["cost"] == 110
+    assert items["tech_single_service_large"]["cost"] == 200
+    assert items["tech_double_service_small"]["cost"] == 220
+    assert items["tech_double_service_large"]["cost"] == 400
 
-    assert "discount_20" not in items
-    assert "discount_30" not in items
-    assert "extra_hour_30m" not in items
-    assert "extra_hour_1h" not in items
-    assert "extra_game_1" not in items
-    assert "extra_game_2" not in items
+    for key in (
+        "discount_20",
+        "discount_30",
+        "extra_hour_30m",
+        "extra_hour_1h",
+        "extra_game_1",
+        "extra_game_2",
+        "entertain_service_small",
+        "entertain_service_large",
+        "tech_service_small",
+        "tech_service_large",
+    ):
+        assert key not in items
 
     # Pending orders created before the migration can still resolve their key.
     assert checkout.POINT_ITEM_MAP["extra_hour_1h"]["hours"] == 1
     assert checkout.POINT_ITEM_MAP["extra_game_2"]["games"] == 2
+    assert checkout.POINT_ITEM_MAP["entertain_service_large"]["service_tier"] == "entertainment"
 
 
 def test_entertainment_reward_adapts_to_hourly_or_game(monkeypatch):
@@ -63,18 +75,20 @@ def test_entertainment_reward_adapts_to_hourly_or_game(monkeypatch):
     hourly_by_key = {item["key"]: item for item in hourly}
     game_by_key = {item["key"]: item for item in game}
 
-    assert hourly_by_key["entertain_service_small"]["allowed"] is True
-    assert hourly_by_key["entertain_service_small"]["kind"] == "extra_hours"
-    assert hourly_by_key["entertain_service_small"]["hours"] == 0.5
-    assert hourly_by_key["entertain_service_large"]["hours"] == 1
+    assert hourly_by_key["entertain_single_service_small"]["allowed"] is True
+    assert hourly_by_key["entertain_single_service_small"]["kind"] == "extra_hours"
+    assert hourly_by_key["entertain_single_service_small"]["hours"] == 0.5
+    assert hourly_by_key["entertain_single_service_large"]["hours"] == 1
+    assert hourly_by_key["entertain_double_service_small"]["allowed"] is False
 
-    assert game_by_key["entertain_service_small"]["allowed"] is True
-    assert game_by_key["entertain_service_small"]["kind"] == "extra_games"
-    assert game_by_key["entertain_service_small"]["games"] == 1
-    assert game_by_key["entertain_service_large"]["games"] == 2
+    assert game_by_key["entertain_single_service_small"]["allowed"] is True
+    assert game_by_key["entertain_single_service_small"]["kind"] == "extra_games"
+    assert game_by_key["entertain_single_service_small"]["games"] == 1
+    assert game_by_key["entertain_single_service_large"]["games"] == 2
+    assert game_by_key["entertain_double_service_large"]["allowed"] is False
 
-    assert hourly_by_key["tech_service_small"]["allowed"] is False
-    assert game_by_key["tech_service_large"]["allowed"] is False
+    assert hourly_by_key["tech_single_service_small"]["allowed"] is False
+    assert game_by_key["tech_single_service_large"]["allowed"] is False
 
     shared = {"discount_50", "free_specify_fee", "discount_100"}
     assert shared <= hourly_by_key.keys()
@@ -95,9 +109,10 @@ def test_technical_reward_is_separate_from_entertainment(monkeypatch):
     )
     by_key = {item["key"]: item for item in options}
 
-    assert by_key["tech_service_small"]["allowed"] is True
-    assert by_key["tech_service_small"]["kind"] == "extra_hours"
-    assert by_key["entertain_service_small"]["allowed"] is False
+    assert by_key["tech_single_service_small"]["allowed"] is True
+    assert by_key["tech_single_service_small"]["kind"] == "extra_hours"
+    assert by_key["tech_double_service_small"]["allowed"] is False
+    assert by_key["entertain_single_service_small"]["allowed"] is False
 
 
 def test_store_absorbs_waived_specify_fee_without_reducing_payout_base():
@@ -143,7 +158,7 @@ def test_store_absorbs_extra_service_and_keeps_customer_price_unchanged():
     assert finance["point_service_note"] == "服務時間 +30 分鐘（1 位陪玩）"
 
 
-def test_multi_companion_reward_only_funds_one_seat():
+def test_legacy_multi_companion_reward_without_seat_metadata_only_funds_one_seat():
     point_item = {"kind": "extra_hours", "hours": 1}
     service_value = checkout.calculate_point_service_value(
         quote={
@@ -155,6 +170,33 @@ def test_multi_companion_reward_only_funds_one_seat():
         point_item=point_item,
     )
     assert service_value == 300
+
+
+def test_new_double_companion_reward_funds_both_seats():
+    point_item = {"kind": "extra_hours", "hours": 1, "seat_count": 2}
+    service_value = checkout.calculate_point_service_value(
+        quote={
+            "quantity": 2,
+            "required_staff_count": 2,
+            "customer_pay_amount": 1200,
+        },
+        vip_pay_rate=100,
+        point_item=point_item,
+    )
+    assert service_value == 600
+
+    finance = checkout.calculate_checkout_financials(
+        service_amount=1200,
+        vip_pay_rate=100,
+        specify_fee=0,
+        point_item=point_item,
+        point_service_value=service_value,
+        wallet_balance=0,
+        use_wallet=False,
+    )
+    assert finance["payout_base_amount"] == 1800
+    assert finance["store_absorbed_amount"] == 600
+    assert finance["point_service_note"] == "服務時間 +1 小時（2 位陪玩同步加贈）"
 
 
 def test_point_cash_coupon_is_shared_after_policy_change():
