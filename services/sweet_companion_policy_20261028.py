@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import sys
 
 
 SWEET_COMPANION_ROLE_KEY = "sweet_companion"
 SWEET_COMPANION_ROLE_ID = "1564966706407940248"
 SWEET_COMPANION_ROLE_LABEL = "甜蜜陪"
-SWEET_RULE_PREFIX = "basic_sweet_"
 
 _INSTALLED = False
 
 
+def is_sweet_rule_key(rule_key: str) -> bool:
+    return "_sweet_" in str(rule_key or "")
+
+
 def _enforce_sweet_requirement(rule_key: str, rule):
-    if not str(rule_key).startswith(SWEET_RULE_PREFIX):
+    if not is_sweet_rule_key(rule_key):
         return rule
 
     required = tuple(str(item) for item in (getattr(rule, "required_game_roles", ()) or ()))
@@ -25,15 +29,59 @@ def _enforce_sweet_requirement(rule_key: str, rule):
     )
 
 
-def install_sweet_companion_policy_20261028() -> None:
-    """Make the sweet-companion role an additional AND gate for sweet orders.
+def _install_and_matcher(order_rules) -> None:
+    if getattr(order_rules, "_sweet_companion_and_matcher_installed", False):
+        return
 
-    The existing required_game_roles acceptance/dispatch field is deliberately a
-    generic second-stage AND qualification. Reusing it keeps Discord claims, Web
-    claims, smart-dispatch candidate filtering, specified-staff validation and order
-    snapshots on the same source of truth without turning 甜蜜陪 into a normal
-    service-position role.
-    """
+    original_match = order_rules.role_ids_match_requirements
+
+    def role_ids_match_requirements(
+        member_role_ids,
+        allowed_role_ids,
+        required_game_role_ids=(),
+    ) -> bool:
+        member_roles = {
+            str(role_id).strip()
+            for role_id in (member_role_ids or [])
+            if str(role_id).strip()
+        }
+        required_games = [
+            str(role_id).strip()
+            for role_id in (required_game_role_ids or [])
+            if str(role_id).strip()
+        ]
+
+        # required_game_role_ids normally means "at least one of these game roles".
+        # Sweet companion is different: it is an additional qualification and must
+        # be held together with the normal service/game qualification.
+        if SWEET_COMPANION_ROLE_ID in required_games:
+            if SWEET_COMPANION_ROLE_ID not in member_roles:
+                return False
+            required_games = [
+                role_id
+                for role_id in required_games
+                if role_id != SWEET_COMPANION_ROLE_ID
+            ]
+
+        return original_match(
+            member_roles,
+            allowed_role_ids,
+            required_games,
+        )
+
+    order_rules.role_ids_match_requirements = role_ids_match_requirements
+    order_rules._sweet_companion_and_matcher_installed = True
+
+    # These modules normally import the matcher after services/__init__ finishes.
+    # Patch already-loaded copies too, so test/reload order cannot weaken the gate.
+    for module_name in ("views.smart_dispatch", "shared.order_acceptance"):
+        module = sys.modules.get(module_name)
+        if module is not None:
+            setattr(module, "role_ids_match_requirements", role_ids_match_requirements)
+
+
+def install_sweet_companion_policy_20261028() -> None:
+    """Require the 甜蜜陪 role in addition to every sweet order's normal roles."""
     global _INSTALLED
     if _INSTALLED:
         return
@@ -41,7 +89,7 @@ def install_sweet_companion_policy_20261028() -> None:
     from services import order_rules
 
     # Register this system qualification only in the shared role lookup used by
-    # rule snapshots/validation. It is not added to the public game/rank catalog.
+    # rule snapshots/validation. It is intentionally not a public game/rank option.
     order_rules.GAME_ROLE_IDS_BY_KEY[SWEET_COMPANION_ROLE_KEY] = SWEET_COMPANION_ROLE_ID
     order_rules.GAME_ROLE_LABELS_BY_KEY[SWEET_COMPANION_ROLE_KEY] = SWEET_COMPANION_ROLE_LABEL
     order_rules.ALL_ROLE_IDS[SWEET_COMPANION_ROLE_KEY] = SWEET_COMPANION_ROLE_ID
@@ -50,8 +98,7 @@ def install_sweet_companion_policy_20261028() -> None:
     rules = order_rules.ORDER_RULES
 
     # EffectiveOrderRules reapplies manager overrides on every read. Enforce this
-    # structural qualification after that merge so an old override cannot
-    # accidentally remove the newly required sweet role.
+    # structural qualification after that merge so an old override cannot remove it.
     if hasattr(rules, "_effective"):
         if not getattr(rules, "_sweet_companion_policy_installed", False):
             original_effective = rules._effective
@@ -66,10 +113,11 @@ def install_sweet_companion_policy_20261028() -> None:
             rules._sweet_companion_policy_installed = True
     else:
         for rule_key in list(rules):
-            if not str(rule_key).startswith(SWEET_RULE_PREFIX):
+            if not is_sweet_rule_key(str(rule_key)):
                 continue
             rules[rule_key] = _enforce_sweet_requirement(str(rule_key), rules[rule_key])
 
+    _install_and_matcher(order_rules)
     _INSTALLED = True
 
 
@@ -77,5 +125,6 @@ __all__ = [
     "SWEET_COMPANION_ROLE_ID",
     "SWEET_COMPANION_ROLE_KEY",
     "SWEET_COMPANION_ROLE_LABEL",
+    "is_sweet_rule_key",
     "install_sweet_companion_policy_20261028",
 ]
