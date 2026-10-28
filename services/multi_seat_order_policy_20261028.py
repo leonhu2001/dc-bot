@@ -82,6 +82,7 @@ def _install_black_tide_rules() -> None:
             player_count_enabled=False,
             price_multiply_player_count=False,
             max_specified_count=int(staff_count),
+            catalog_group_label="黑潮爆破",
         )
         validate_rule_definition(key, rule)
         ORDER_RULES[key] = rule
@@ -216,6 +217,32 @@ def _patch_self_service_catalog() -> None:
         group["details"] = sorted(details, key=_mode_sort_key)
 
 
+def _refresh_order_derived_maps() -> None:
+    from services import orders
+    from services.order_rules import ORDER_RULES
+
+    added_keys = {
+        *(key for key, _label, _template, _count, _price in _BLACK_TIDE_VARIANTS),
+        *(key for key, _template, _label in _LOL_TECH_ARAM_VARIANTS),
+    }
+
+    for key in added_keys:
+        rule = ORDER_RULES.get(key)
+        if rule is None:
+            continue
+        label = str(rule.label)
+        orders.ORDER_RULE_KEY_BY_LABEL[label] = key
+        orders.ORDER_ITEM_TO_CATEGORY[label] = str(rule.category)
+        items = orders.ORDER_ITEMS_BY_CATEGORY.setdefault(str(rule.category), [])
+        if label not in items:
+            items.append(label)
+        if bool(getattr(rule, "allow_specify", False)):
+            orders.SPECIAL_COMPANION_ITEMS.add(label)
+        maximum = getattr(rule, "max_quantity", None)
+        if maximum is None or int(maximum or 1) > 1:
+            orders.QUANTITY_SELECT_ITEMS.add(label)
+
+
 def _patch_loyalty_scope_aliases() -> None:
     from services import loyalty_benefits as loyalty
 
@@ -319,6 +346,7 @@ def install_multi_seat_order_policy_20261028() -> None:
     _install_black_tide_rules()
     _install_lol_tech_aram_rules()
     _patch_self_service_catalog()
+    _refresh_order_derived_maps()
     _patch_loyalty_scope_aliases()
     _replace_point_service_catalog()
     _INSTALLED = True
