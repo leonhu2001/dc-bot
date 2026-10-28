@@ -1,0 +1,81 @@
+name: Finalize direct companion rule source cleanup
+
+on:
+  push:
+    paths:
+      - '.github/workflows/finalize_direct_companion_rules_20261029.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: 'false'
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-final-source-cleanup.db
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Finish source-authority cleanup
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'missing marker in {path}: {old!r}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Manager display-name edits remain valid business configuration, but they
+          # can no longer rewrite catalog structure because the Web reverse writer is gone
+          # and canonical catalog labels/keys come from direct source definitions.
+          replace_once(
+              'services/order_rules.py',
+              '                    label=base.label,\n                    catalog_group_label=base.catalog_group_label,',
+              '                    catalog_group_label=base.catalog_group_label,'
+          )
+
+          # Keep the established public loyalty wording while documenting the new
+          # independent companion-count selection in the same direct catalog source.
+          replace_once(
+              'web/app/services/order_groups.py',
+              '"description": "娛樂陪類型與陪玩人數分開選擇；福利累積 10 個服務小時回饋 1 小時。",',
+              '"description": "娛樂陪福利累積 10 個服務小時回饋 1 小時；陪玩類型與陪玩人數分開選擇。",'
+          )
+          replace_once(
+              'web/app/services/order_groups.py',
+              '"description": "娛樂陪類型與陪玩人數分開選擇；價格與端遊相同。",',
+              '"description": "娛樂陪福利累積 10 個服務小時回饋 1 小時；陪玩類型與陪玩人數分開選擇，價格與端遊相同。",'
+          )
+          PY
+      - name: Focused regression
+        shell: bash
+        run: |
+          python -m pip install -q -r requirements.txt
+          python -m pip install -q -r web/requirements-web.txt
+          python -m pip install -q -r requirements-dev.txt
+          python -m compileall -q services web/app tests
+          python -m pytest -q \
+            tests/test_companion_count_finish_20261028.py \
+            tests/test_game_service_rules.py \
+            tests/test_order_rule_overrides.py \
+            tests/test_public_order_copy_boundary.py
+      - name: Commit direct source cleanup
+        shell: bash
+        run: |
+          git rm .github/workflows/finalize_direct_companion_rules_20261029.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add services/order_rules.py web/app/services/order_groups.py
+          git commit -m 'Finish direct companion rule source cleanup'
+          git push origin HEAD:main
