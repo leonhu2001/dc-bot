@@ -43,6 +43,15 @@ from .multi_seat_order_policy_20261028 import (
 _install_multi_seat_order_policy_20261028()
 _order_rules.validate_rules()
 
+# Old manager overrides can still carry the pre-migration fixed-single structural
+# fields. Normalize only those structural fields on effective reads while retaining
+# the manager's price/label/role/benefit settings.
+from .multi_seat_effective_rule_runtime import (
+    install_multi_seat_effective_rule_runtime as _install_multi_seat_effective_rule_runtime,
+)
+
+_install_multi_seat_effective_rule_runtime()
+
 # Changing customer-facing companion choices must not delete historical selector
 # values saved by already-created tickets/orders.
 from .entertainment_companion_compat_20261028 import (
