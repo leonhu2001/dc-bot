@@ -10,6 +10,16 @@ from . import order_rules as _order_rules
 
 _order_rules.validate_rules()
 
+# 2026-10-29: removed Black Tide fixed-seat keys can still exist in the production
+# SQLite custom-rule history. Once their code rules were deleted, those rows became
+# eligible to load as ordinary custom products and leaked 單陪／雙三四陪 back into
+# Discord/Web checkout. Tombstone them before anything imports/builds the catalog.
+from .black_tide_legacy_tombstone import (
+    install_black_tide_legacy_tombstone as _install_black_tide_legacy_tombstone,
+)
+
+_install_black_tide_legacy_tombstone()
+
 # 2026-10-29: 商品規則、人數結構、價格與 Discord catalog 已直接寫入
 # order_rules.py / orders.py。不要再用 runtime installer 改寫同一批規則，避免
 # 載入順序或舊 manager override 把後來核准的版本改回單陪／雙陪。
