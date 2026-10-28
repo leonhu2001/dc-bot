@@ -195,14 +195,14 @@ def adapt_point_benefit_for_rule(rule, benefit: dict[str, Any] | None) -> dict[s
         adapted["pricing_types"] = ("hourly",)
         unit_text = "30 分鐘" if abs(hours - 0.5) < 0.001 else "1 小時"
         adapted["name"] = f"{benefit_text}加贈｜{unit_text}"
-        adapted["summary"] = f"服務時間 +{unit_text}，每張僅補貼 1 位陪玩；店內吸收額外服務成本"
+        adapted["summary"] = f"服務時間 +{unit_text}，{seat_count} 位陪玩同步加贈；店內吸收全部額外服務成本"
     elif pricing_type == "game":
         games = 1 if bonus_size == "small" else 2
         adapted["kind"] = "extra_games"
         adapted["games"] = games
         adapted["pricing_types"] = ("game",)
         adapted["name"] = f"{benefit_text}加贈｜{games} 局"
-        adapted["summary"] = f"服務局數 +{games} 局，每張僅補貼 1 位陪玩；店內吸收額外服務成本"
+        adapted["summary"] = f"服務局數 +{games} 局，{seat_count} 位陪玩同步加贈；店內吸收全部額外服務成本"
 
     return adapted
 
