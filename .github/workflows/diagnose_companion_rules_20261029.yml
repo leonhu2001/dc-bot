@@ -11,9 +11,22 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: 'false'
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-diagnose.db
     steps:
       - uses: actions/checkout@v7
-      - name: Find stale rule installers and label mutations
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install -q -r requirements.txt
+          python -m pip install -q -r web/requirements-web.txt
+          python -m pip install -q -r requirements-dev.txt
+      - name: Diagnose effective rules and catalogs
         shell: bash
         run: |
           set -euxo pipefail
@@ -21,5 +34,25 @@ jobs:
           grep -RInE 'install_(entertainment_companion_policy|multi_seat_order_policy|companion_count_catalog_cleanup|sweet_companion_policy)|_patch_catalog\(' --include='*.py' . || true
           echo '=== direct old labels ==='
           grep -RInE '機密｜單陪|甜蜜單｜女陪|娛樂陪〈端遊〉' --include='*.py' . || true
-          echo '=== imports of compatibility/policy modules ==='
-          grep -RInE 'entertainment_companion_policy_20261028|multi_seat_order_policy_20261028|companion_count_catalog_cleanup_20261028|sweet_companion_policy_20261028' --include='*.py' . || true
+          python - <<'PY'
+          import services
+          from services import orders, order_rules
+
+          def dump(stage):
+              print('STAGE', stage)
+              for key in ('basic_tech_secret_single','basic_tech_topsecret_single','basic_entertain_single','valorant_sweet_female'):
+                  base = order_rules.get_base_rule(key)
+                  eff = order_rules.ORDER_RULES[key]
+                  print(key, 'BASE', base.label, base.catalog_group_label, base.required_staff_count, base.player_count_prices)
+                  print(key, 'EFFECTIVE', eff.label, eff.catalog_group_label, eff.required_staff_count, eff.player_count_prices)
+                  print(key, 'OVERRIDE', order_rules.get_rule_override_metadata(key))
+              print('TECH', orders.get_order_item_details_for_group('delta_desktop_basic','技術陪'))
+              print('SWEET', orders.get_order_item_details_for_group('valorant','甜蜜單'))
+
+          dump('services-only')
+          from web.app.services.order_groups import get_grouped_order_catalog
+          dump('after-web-order-groups')
+          print('WEB-DELTA', get_grouped_order_catalog('delta_desktop_basic'))
+          PY
+          echo '=== isolated targeted tests ==='
+          python -m pytest -q tests/test_companion_count_finish_20261028.py tests/test_game_service_rules.py
