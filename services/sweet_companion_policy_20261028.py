@@ -12,7 +12,14 @@ _INSTALLED = False
 
 
 def is_sweet_rule_key(rule_key: str) -> bool:
-    return "_sweet_" in str(rule_key or "")
+    """Return whether this is a new public count-neutral Sweet rule.
+
+    Legacy basic/game-specific single/double keys stay unchanged so historical
+    orders and saved selections preserve their original rule snapshot semantics.
+    New Discord Sweet checkout uses *_sweet_female / *_sweet_male / *_sweet_any.
+    """
+    key = str(rule_key or "")
+    return key.endswith(("_sweet_female", "_sweet_male", "_sweet_any"))
 
 
 def _enforce_sweet_requirement(rule_key: str, rule):
@@ -81,7 +88,7 @@ def _install_and_matcher(order_rules) -> None:
 
 
 def install_sweet_companion_policy_20261028() -> None:
-    """Require the 甜蜜陪 role in addition to every sweet order's normal roles."""
+    """Require 甜蜜陪 in addition to each new Sweet rule's normal qualification."""
     global _INSTALLED
     if _INSTALLED:
         return
@@ -98,7 +105,7 @@ def install_sweet_companion_policy_20261028() -> None:
     rules = order_rules.ORDER_RULES
 
     # EffectiveOrderRules reapplies manager overrides on every read. Enforce this
-    # structural qualification after that merge so an old override cannot remove it.
+    # structural qualification after that merge so an override cannot remove it.
     if hasattr(rules, "_effective"):
         if not getattr(rules, "_sweet_companion_policy_installed", False):
             original_effective = rules._effective
