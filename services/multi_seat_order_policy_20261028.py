@@ -147,7 +147,9 @@ def normalize_rule_player_count(rule, value: Any = None) -> int:
 
 def is_service_point_benefit_enabled(rule) -> bool:
     key = str(getattr(rule, "key", "") or "")
-    return bool(SERVICE_POINT_BENEFIT_RULE_OVERRIDES.get(key, True))
+    if key in SERVICE_POINT_BENEFIT_RULE_OVERRIDES:
+        return bool(SERVICE_POINT_BENEFIT_RULE_OVERRIDES[key])
+    return str(getattr(rule, "category", "") or "") not in {"lol", "valorant", "apex"}
 
 
 def _install_delta_companion_type_rules() -> None:

@@ -180,24 +180,24 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
     ],
     "lol": [
         {"label": "娛樂陪", "details": [
-            {"label": "AR", "value": "aram", "rule_key": "lol_entertain_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "NG", "value": "ng", "rule_key": "lol_entertain_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "RK", "value": "ranked", "rule_key": "lol_entertain_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
+            {"label": "AR", "value": "aram", "rule_key": "lol_entertain_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "大師陪", "details": [
-            {"label": "AR", "value": "aram", "rule_key": "lol_master_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "NG", "value": "ng", "rule_key": "lol_master_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "RK", "value": "ranked", "rule_key": "lol_master_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
+            {"label": "AR", "value": "aram", "rule_key": "lol_master_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "宗師陪", "details": [
-            {"label": "AR", "value": "aram", "rule_key": "lol_grandmaster_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "NG", "value": "ng", "rule_key": "lol_grandmaster_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "RK", "value": "ranked", "rule_key": "lol_grandmaster_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
+            {"label": "AR", "value": "aram", "rule_key": "lol_grandmaster_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "菁英陪", "details": [
-            {"label": "AR", "value": "aram", "rule_key": "lol_elite_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "NG", "value": "ng", "rule_key": "lol_elite_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "RK", "value": "ranked", "rule_key": "lol_elite_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
+            {"label": "AR", "value": "aram", "rule_key": "lol_elite_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ]},
     ],
     "apex": [
@@ -317,6 +317,14 @@ for _prefix, _category in (
 CATALOG_HIDDEN_RULE_KEYS = {
     "basic_sweet_single",
     "basic_sweet_double",
+    "basic_black_tide_entertain_1",
+    "basic_black_tide_entertain_2",
+    "basic_black_tide_entertain_3",
+    "basic_black_tide_entertain_4",
+    "basic_black_tide_tech_1",
+    "basic_black_tide_tech_2",
+    "basic_black_tide_tech_3",
+    "basic_black_tide_tech_4",
     "farm_season_3x3_skin",
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
@@ -428,6 +436,13 @@ def _dynamic_admin_group_label(rule) -> str:
 
 
 def _effective_builtin_group_label(rule, fallback: str) -> str:
+    # 後來核准的「規格與人數分離」是這批內建商品的結構規則。
+    # 舊 manager catalog_group_label 不能再把它們合併、改名或重新帶回
+    # 單陪／雙陪；自訂商品仍照後台分組設定運作。
+    rule_key = str(getattr(rule, "key", "") or "") if rule is not None else ""
+    if rule_key in CANONICAL_DETAIL_LABEL_RULE_KEYS:
+        return str(fallback)
+
     manager_label = str(
         getattr(rule, "catalog_group_label", "")
         or ""

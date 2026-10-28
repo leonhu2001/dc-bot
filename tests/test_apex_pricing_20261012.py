@@ -10,10 +10,10 @@ ACTIVE_APEX_PRICES = {
     "apex_entertain_ranked": 350,
     "apex_diamond_ng": 400,
     "apex_diamond_ranked": 450,
-    "apex_master_ng": 500,
-    "apex_master_ranked": 550,
-    "apex_predator_ng": 600,
-    "apex_predator_ranked": 650,
+    "apex_master_ng": 480,
+    "apex_master_ranked": 530,
+    "apex_predator_ng": 580,
+    "apex_predator_ranked": 630,
 }
 
 
@@ -37,15 +37,15 @@ def test_apex_new_pricing_is_fixed_per_person_per_hour():
         assert rule.loyalty_benefits_enabled is rule_key.startswith("apex_entertain_")
 
 
-def test_apex_double_predator_ranked_two_hours_costs_2600():
+def test_apex_double_predator_ranked_two_hours_costs_2520():
     result = calculate_price(
         ORDER_RULES["apex_predator_ranked"],
         quantity=2,
         player_count=2,
     )
-    assert result.base_amount == 2600
+    assert result.base_amount == 2520
     assert result.specify_fee == 0
-    assert result.total_amount == 2600
+    assert result.total_amount == 2520
     assert result.required_staff_count == 2
 
 

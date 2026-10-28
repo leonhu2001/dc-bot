@@ -193,8 +193,8 @@ def test_new_lol_and_valorant_orders_allow_specify_with_100t_fee_and_max_four_st
 def test_same_order_buy_get_is_disabled_and_loyalty_is_entertainment_only():
     tier_rule = ORDER_RULES["valorant_radiant_ranked"]
     tier_result = calculate_price(tier_rule, quantity=8, player_count=2)
-    assert tier_rule.price == 400
-    assert tier_result.base_amount == 6400
+    assert tier_rule.price == 370
+    assert tier_result.base_amount == 5920
     assert tier_result.service_quantity == 8
     assert tier_rule.loyalty_benefits_enabled is False
     assert set(get_allowed_role_ids(tier_rule)) == {"1545357782906314782"}
@@ -540,19 +540,11 @@ def test_discord_self_service_catalog_uses_game_specific_shared_services():
             category,
             "甜蜜單",
         )
-        assert [item["label"] for item in details] == [
-            "女單陪",
-            "男單陪",
-            "女雙陪",
-            "男雙陪",
-            "雙陪(不限)",
-        ]
+        assert [item["label"] for item in details] == ["女陪", "男陪", "不限"]
         assert [item["rule_key"] for item in details] == [
-            f"{prefix}_sweet_female_single",
-            f"{prefix}_sweet_male_single",
-            f"{prefix}_sweet_female_double",
-            f"{prefix}_sweet_male_double",
-            f"{prefix}_sweet_double_any",
+            f"{prefix}_sweet_female",
+            f"{prefix}_sweet_male",
+            f"{prefix}_sweet_any",
         ]
 
     assert get_order_item_details_for_group(
@@ -744,12 +736,12 @@ def test_storefront_business_values_are_direct_rules():
 
         "valorant_entertain_ng": ("hourly", 300, "H"),
         "valorant_entertain_ranked": ("game", 250, "局"),
-        "valorant_ascendant_ng": ("hourly", 340, "H"),
-        "valorant_ascendant_ranked": ("game", 300, "局"),
-        "valorant_immortal_ng": ("hourly", 360, "H"),
-        "valorant_immortal_ranked": ("game", 350, "局"),
-        "valorant_radiant_ng": ("hourly", 400, "H"),
-        "valorant_radiant_ranked": ("game", 400, "局"),
+        "valorant_ascendant_ng": ("hourly", 330, "H"),
+        "valorant_ascendant_ranked": ("game", 290, "局"),
+        "valorant_immortal_ng": ("hourly", 350, "H"),
+        "valorant_immortal_ranked": ("game", 330, "局"),
+        "valorant_radiant_ng": ("hourly", 380, "H"),
+        "valorant_radiant_ranked": ("game", 370, "局"),
 
         "lol_entertain_aram": ("hourly", 300, "H"),
         "lol_entertain_ng": ("hourly", 300, "H"),
@@ -757,7 +749,7 @@ def test_storefront_business_values_are_direct_rules():
         "lol_master_ng": ("hourly", 340, "H"),
         "lol_master_ranked": ("game", 300, "局"),
         "lol_grandmaster_ng": ("hourly", 360, "H"),
-        "lol_grandmaster_ranked": ("game", 350, "局"),
+        "lol_grandmaster_ranked": ("game", 300, "局"),
         "lol_elite_ng": ("hourly", 400, "H"),
         "lol_elite_ranked": ("game", 400, "局"),
 
