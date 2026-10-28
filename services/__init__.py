@@ -31,6 +31,14 @@ from .entertainment_companion_policy_20261028 import (
 _install_entertainment_companion_policy_20261028()
 _order_rules.validate_rules()
 
+# Changing the customer-facing names to 單陪（不限）/雙陪（不限） must not change
+# the old selector values saved in existing self-service state.
+from .entertainment_companion_compat_20261028 import (
+    install_entertainment_companion_selector_compat_20261028 as _install_entertainment_companion_selector_compat_20261028,
+)
+
+_install_entertainment_companion_selector_compat_20261028()
+
 # Register system-owned catalog extensions before the remaining runtime wrappers are
 # installed. The extension injects its rules before services.orders builds label maps,
 # then adds the matching storefront groups for desktop and mobile Delta Force.
