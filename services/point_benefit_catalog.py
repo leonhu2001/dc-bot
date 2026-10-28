@@ -6,63 +6,49 @@ from typing import Any
 # Canonical point redemption catalog used by both Discord self-service and web checkout.
 # VIP retention / tier rewards intentionally stay out of this catalog. They belong in the
 # future gift / redemption center instead of order checkout.
+_POINT_SERVICE_COSTS = {
+    "entertainment": {1: (80, 140), 2: (160, 280), 3: (240, 420), 4: (320, 560)},
+    "technical": {1: (100, 180), 2: (200, 360), 3: (300, 540), 4: (400, 720)},
+}
+
 POINT_REDEEM_ITEMS = [
     {"key": "discount_50", "cost": 20, "name": "50T 折價券"},
     {"key": "free_specify_fee", "cost": 30, "name": "免指定費 1 次"},
     {"key": "discount_100", "cost": 45, "name": "100T 折價券"},
-    {"key": "entertain_service_small", "cost": 80, "name": "娛樂陪加贈｜30 分鐘／1 局"},
-    {"key": "tech_service_small", "cost": 110, "name": "技術陪加贈｜30 分鐘／1 局"},
-    {"key": "entertain_service_large", "cost": 140, "name": "娛樂陪加贈｜1 小時／2 局"},
-    {"key": "tech_service_large", "cost": 200, "name": "技術陪加贈｜1 小時／2 局"},
 ]
-
-
 POINT_BENEFIT_SPECS = {
-    "discount_50": {
-        "kind": "cash_discount",
-        "amount": 50,
-        "summary": "50T 折價券，共同分攤；折後金額作為陪玩／團隊分潤基準",
-    },
-    "free_specify_fee": {
-        "kind": "free_specify_fee",
-        "summary": "免指定費，指定費由店內吸收，陪玩應得不減少",
-    },
-    "discount_100": {
-        "kind": "cash_discount",
-        "amount": 100,
-        "summary": "100T 折價券，共同分攤；折後金額作為陪玩／團隊分潤基準",
-    },
-    "entertain_service_small": {
-        "kind": "service_bonus",
-        "service_tier": "entertainment",
-        "bonus_size": "small",
-        "summary": "娛樂陪加贈 30 分鐘或 1 局；依商品計價方式自動套用，每張僅補貼 1 位陪玩",
-    },
-    "entertain_service_large": {
-        "kind": "service_bonus",
-        "service_tier": "entertainment",
-        "bonus_size": "large",
-        "summary": "娛樂陪加贈 1 小時或 2 局；依商品計價方式自動套用，每張僅補貼 1 位陪玩",
-    },
-    "tech_service_small": {
-        "kind": "service_bonus",
-        "service_tier": "technical",
-        "bonus_size": "small",
-        "summary": "技術陪加贈 30 分鐘或 1 局；依商品計價方式自動套用，每張僅補貼 1 位陪玩",
-    },
-    "tech_service_large": {
-        "kind": "service_bonus",
-        "service_tier": "technical",
-        "bonus_size": "large",
-        "summary": "技術陪加贈 1 小時或 2 局；依商品計價方式自動套用，每張僅補貼 1 位陪玩",
-    },
+    "discount_50": {"kind": "cash_discount", "amount": 50, "summary": "50T 折價券，共同分攤；折後金額作為陪玩／團隊分潤基準"},
+    "free_specify_fee": {"kind": "free_specify_fee", "summary": "免指定費，指定費由店內吸收，陪玩應得不減少"},
+    "discount_100": {"kind": "cash_discount", "amount": 100, "summary": "100T 折價券，共同分攤；折後金額作為陪玩／團隊分潤基準"},
 }
+
+for tier, costs_by_seat in _POINT_SERVICE_COSTS.items():
+    prefix = "entertain" if tier == "entertainment" else "tech"
+    tier_text = "娛樂" if tier == "entertainment" else "技術"
+    for seat_count, (small_cost, large_cost) in costs_by_seat.items():
+        seat_key = {1: "single", 2: "double", 3: "triple", 4: "quad"}[seat_count]
+        seat_text = "單陪" if seat_count == 1 else "雙陪" if seat_count == 2 else f"{seat_count}陪"
+        for size, cost, service_text in (
+            ("small", small_cost, "30 分鐘／1 局"),
+            ("large", large_cost, "1 小時／2 局"),
+        ):
+            key = f"{prefix}_{seat_key}_service_{size}"
+            POINT_REDEEM_ITEMS.append({"key": key, "cost": int(cost), "name": f"{tier_text}{seat_text}加贈｜{service_text}"})
+            POINT_BENEFIT_SPECS[key] = {
+                "kind": "service_bonus", "service_tier": tier, "seat_count": seat_count,
+                "bonus_size": size,
+                "summary": f"{tier_text}{seat_text}同步加贈 {service_text}；店內吸收全部額外服務成本",
+            }
 
 
 # Legacy keys remain resolvable for orders that were created before this migration.
 # They are deliberately absent from POINT_REDEEM_ITEMS, so customers cannot newly select them.
 LEGACY_POINT_REDEEM_ITEMS = [
     {"key": "discount_20", "cost": 10, "name": "20T 折價券"},
+    {"key": "entertain_service_small", "cost": 80, "name": "娛樂陪加贈｜30 分鐘／1 局"},
+    {"key": "entertain_service_large", "cost": 140, "name": "娛樂陪加贈｜1 小時／2 局"},
+    {"key": "tech_service_small", "cost": 110, "name": "技術陪加贈｜30 分鐘／1 局"},
+    {"key": "tech_service_large", "cost": 200, "name": "技術陪加贈｜1 小時／2 局"},
     {"key": "discount_30", "cost": 15, "name": "30T 折價券"},
     {"key": "extra_hour_30m", "cost": 60, "name": "加時 30 分鐘"},
     {"key": "extra_hour_1h", "cost": 110, "name": "加時 1 小時"},
@@ -72,6 +58,10 @@ LEGACY_POINT_REDEEM_ITEMS = [
 
 
 LEGACY_POINT_BENEFIT_SPECS = {
+    "entertain_service_small": {"kind": "service_bonus", "service_tier": "entertainment", "bonus_size": "small", "summary": "歷史娛樂陪加贈；每張僅補貼 1 位陪玩"},
+    "entertain_service_large": {"kind": "service_bonus", "service_tier": "entertainment", "bonus_size": "large", "summary": "歷史娛樂陪加贈；每張僅補貼 1 位陪玩"},
+    "tech_service_small": {"kind": "service_bonus", "service_tier": "technical", "bonus_size": "small", "summary": "歷史技術陪加贈；每張僅補貼 1 位陪玩"},
+    "tech_service_large": {"kind": "service_bonus", "service_tier": "technical", "bonus_size": "large", "summary": "歷史技術陪加贈；每張僅補貼 1 位陪玩"},
     "discount_20": {
         "kind": "cash_discount",
         "amount": 20,
@@ -162,13 +152,23 @@ def get_rule_service_tier(rule) -> str | None:
 
 
 
-def is_service_bonus_allowed_for_rule(rule, benefit: dict[str, Any] | None) -> bool:
+def is_service_bonus_allowed_for_rule(rule, benefit: dict[str, Any] | None, player_count: Any = None) -> bool:
     benefit = dict(benefit or {})
     if str(benefit.get("kind") or "") != "service_bonus":
         return True
 
     expected_tier = str(benefit.get("service_tier") or "").strip().lower()
-    return bool(expected_tier and expected_tier == get_rule_service_tier(rule))
+    if not expected_tier or expected_tier != get_rule_service_tier(rule):
+        return False
+    try:
+        expected_seats = int(benefit.get("seat_count") or 0)
+    except (TypeError, ValueError):
+        expected_seats = 0
+    if expected_seats <= 0:
+        return True
+    if getattr(rule, "required_staff_count", 1) == "player_count" and player_count in (None, ""):
+        return True
+    return resolve_rule_staff_count(rule, player_count) == expected_seats
 
 
 
@@ -180,7 +180,13 @@ def adapt_point_benefit_for_rule(rule, benefit: dict[str, Any] | None) -> dict[s
     pricing_type = str(getattr(rule, "pricing_type", "") or "").strip().lower()
     bonus_size = str(adapted.get("bonus_size") or "").strip().lower()
     tier = str(adapted.get("service_tier") or "").strip().lower()
-    tier_text = "娛樂陪" if tier == "entertainment" else "技術陪"
+    try:
+        seat_count = max(1, int(adapted.get("seat_count") or 1))
+    except (TypeError, ValueError):
+        seat_count = 1
+    tier_text = "娛樂" if tier == "entertainment" else "技術"
+    seat_text = "單陪" if seat_count == 1 else "雙陪" if seat_count == 2 else f"{seat_count}陪"
+    benefit_text = f"{tier_text}{seat_text}"
 
     if pricing_type == "hourly":
         hours = 0.5 if bonus_size == "small" else 1.0
@@ -188,14 +194,14 @@ def adapt_point_benefit_for_rule(rule, benefit: dict[str, Any] | None) -> dict[s
         adapted["hours"] = hours
         adapted["pricing_types"] = ("hourly",)
         unit_text = "30 分鐘" if abs(hours - 0.5) < 0.001 else "1 小時"
-        adapted["name"] = f"{tier_text}加贈｜{unit_text}"
+        adapted["name"] = f"{benefit_text}加贈｜{unit_text}"
         adapted["summary"] = f"服務時間 +{unit_text}，每張僅補貼 1 位陪玩；店內吸收額外服務成本"
     elif pricing_type == "game":
         games = 1 if bonus_size == "small" else 2
         adapted["kind"] = "extra_games"
         adapted["games"] = games
         adapted["pricing_types"] = ("game",)
-        adapted["name"] = f"{tier_text}加贈｜{games} 局"
+        adapted["name"] = f"{benefit_text}加贈｜{games} 局"
         adapted["summary"] = f"服務局數 +{games} 局，每張僅補貼 1 位陪玩；店內吸收額外服務成本"
 
     return adapted

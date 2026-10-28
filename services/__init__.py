@@ -10,75 +10,15 @@ from . import order_rules as _order_rules
 
 _order_rules.validate_rules()
 
-# Keep the 2026-10-23 owner-approved game price list authoritative for both Web
-# checkout and Discord self-service before any catalog presentation modules read it.
-from .game_price_policy_20261023 import (
-    install_game_price_policy_20261023 as _install_game_price_policy_20261023,
-)
-
-_install_game_price_policy_20261023()
+# 2026-10-29: 商品規則、人數結構、價格與 Discord catalog 已直接寫入
+# order_rules.py / orders.py。不要再用 runtime installer 改寫同一批規則，避免
+# 載入順序或舊 manager override 把後來核准的版本改回單陪／雙陪。
 _order_rules.validate_rules()
 
-# 2026-10-28 entertainment companion split:
-# - keep the existing single/double rules as unrestricted-gender variants,
-# - add female/male single and double rules without splitting loyalty progress,
-# - replace selectable service point rewards with seat-aware single/double rewards.
+# 只保留點數服務加贈的財務結算 wrapper；它不改商品規則或 catalog。
 from .entertainment_companion_policy_20261028 import (
-    install_entertainment_companion_policy_20261028 as _install_entertainment_companion_policy_20261028,
     install_point_service_financial_runtime_20261028 as _install_point_service_financial_runtime_20261028,
 )
-
-_install_entertainment_companion_policy_20261028()
-
-# Shared companion-count policy:
-# - third field is gameplay / companion type only,
-# - companion count is selected independently,
-# - explicit 1-4 price tables are used where prices are not safely linear,
-# - service point rewards remain seat-aware and game categories can disable only
-#   service-type point rewards without disabling the other point products.
-from .multi_seat_order_policy_20261028 import (
-    install_multi_seat_order_policy_20261028 as _install_multi_seat_order_policy_20261028,
-)
-
-_install_multi_seat_order_policy_20261028()
-_order_rules.validate_rules()
-
-# Old manager overrides can still carry the pre-migration fixed-single structural
-# fields. Normalize only those structural fields on effective reads while retaining
-# the manager's price/label/role/benefit settings.
-from .multi_seat_effective_rule_runtime import (
-    install_multi_seat_effective_rule_runtime as _install_multi_seat_effective_rule_runtime,
-)
-
-_install_multi_seat_effective_rule_runtime()
-
-# Finish the independent companion-count migration. Historical fixed-seat keys and
-# the Web/admin catalog stay resolvable; Discord presentation is patched later after
-# its UI runtime modules have loaded.
-from .companion_count_catalog_cleanup_20261028 import (
-    install_companion_count_catalog_cleanup_20261028 as _install_companion_count_catalog_cleanup_20261028,
-    install_companion_count_discord_runtime_20261028 as _install_companion_count_discord_runtime_20261028,
-)
-
-_install_companion_count_catalog_cleanup_20261028()
-_order_rules.validate_rules()
-
-# New count-neutral Sweet orders require the normal service/game qualification AND
-# the dedicated 甜蜜陪 role. Historical fixed-seat Sweet keys remain unchanged.
-from .sweet_companion_policy_20261028 import (
-    install_sweet_companion_policy_20261028 as _install_sweet_companion_policy_20261028,
-)
-
-_install_sweet_companion_policy_20261028()
-_order_rules.validate_rules()
-
-# Changing customer-facing companion choices must not delete historical selector
-# values saved by already-created tickets/orders.
-from .entertainment_companion_compat_20261028 import (
-    install_entertainment_companion_selector_compat_20261028 as _install_entertainment_companion_selector_compat_20261028,
-)
-
-_install_entertainment_companion_selector_compat_20261028()
 
 # Register system-owned catalog extensions before the remaining runtime wrappers are
 # installed. The extension injects its rules before services.orders builds label maps,

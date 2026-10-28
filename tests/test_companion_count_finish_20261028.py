@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import services  # noqa: F401 - installs the production policies under test
 from services import order_rules
-from services.multi_seat_order_policy_20261028 import PLAYER_COUNT_PRICE_TABLES
 from services.sweet_companion_policy_20261028 import SWEET_COMPANION_ROLE_ID
 
 
@@ -48,7 +47,7 @@ def test_delta_technical_two_companion_prices_are_preserved() -> None:
         "basic_mobile_tech_topsecret_single": 840,
     }
     for key, expected in cases.items():
-        assert PLAYER_COUNT_PRICE_TABLES[key][2] == expected
+        assert order_rules.get_base_rule(key).player_count_prices[2] == expected
         result = order_rules.calculate_price(
             order_rules.ORDER_RULES[key],
             quantity=1,
@@ -83,7 +82,7 @@ def test_sweet_discord_specs_use_gender_type_plus_independent_count() -> None:
             assert rule.player_count_enabled is True
             assert rule.min_player_count == 1
             assert rule.max_player_count == 2
-            assert PLAYER_COUNT_PRICE_TABLES[item["rule_key"]] == {1: 520, 2: 1314}
+            assert order_rules.get_base_rule(item["rule_key"]).player_count_prices == {1: 520, 2: 1314}
 
         # Existing fixed-seat keys remain untouched for old Web/ticket selections.
         assert order_rules.ORDER_RULES[f"{prefix}_sweet_female_single"].required_staff_count == 1
@@ -175,3 +174,33 @@ def test_quick_order_notice_installed_without_replacing_locked_ticket_patch() ->
     assert quick._send_confirmation.__module__ == "services.quick_order_ticket_policy_20261028"
     assert quick._install_ticket_patch.__module__ == "services.quick_order_v2"
     assert not getattr(quick, "_unified_ticket_patch_wrapper_installed", False)
+
+
+def test_delta_technical_detail_enables_quantity_after_selection() -> None:
+    from services.orders import get_order_item_detail_for_selection, get_self_service_quantity_meta
+    from services.self_service_selection_state import apply_self_service_detail_selection
+
+    detail = get_order_item_detail_for_selection("delta_desktop_basic", "技術陪", "secret_single")
+    assert detail is not None
+    assert detail["label"] == "機密"
+    data = {"category": "delta_desktop_basic", "item_group": "技術陪"}
+    apply_self_service_detail_selection(data, detail)
+    assert data["item"]
+    assert data["order_rule_key"] == "basic_tech_secret_single"
+    assert data["player_count"] == 1
+    assert get_self_service_quantity_meta(
+        data["category"], data["item_group"], data["item_detail_value"]
+    ) == {"unit": "小時", "min": 1, "max": 24}
+
+
+def test_canonical_rules_do_not_depend_on_runtime_rule_patches() -> None:
+    # Base rules themselves must already have the final structure before any effective override.
+    for key in (
+        "basic_tech_secret_single", "basic_tech_topsecret_single",
+        "basic_entertain_single", "basic_entertain_female_single", "basic_entertain_male_single",
+    ):
+        base = order_rules.get_base_rule(key)
+        assert base.required_staff_count == "player_count"
+        assert base.player_count_enabled is True
+        assert base.max_player_count == 2
+        assert base.player_count_prices

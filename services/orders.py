@@ -44,33 +44,38 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "技術陪",
             "details": [
-                {"label": "機密單陪", "value": "secret_single", "rule_key": "basic_tech_secret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "機密雙陪", "value": "secret_double", "rule_key": "basic_tech_secret_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "絕密單陪", "value": "topsecret_single", "rule_key": "basic_tech_topsecret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "絕密雙陪", "value": "topsecret_double", "rule_key": "basic_tech_topsecret_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "機密", "value": "secret_single", "rule_key": "basic_tech_secret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "絕密", "value": "topsecret_single", "rule_key": "basic_tech_topsecret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             ],
         },
         {
             "label": "技術陪",
             "details": [
-                {"label": "機密單陪", "value": "mobile_secret_single", "rule_key": "basic_mobile_tech_secret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "機密雙陪", "value": "mobile_secret_double", "rule_key": "basic_mobile_tech_secret_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "絕密單陪", "value": "mobile_topsecret_single", "rule_key": "basic_mobile_tech_topsecret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "絕密雙陪", "value": "mobile_topsecret_double", "rule_key": "basic_mobile_tech_topsecret_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "機密", "value": "mobile_secret_single", "rule_key": "basic_mobile_tech_secret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "絕密", "value": "mobile_topsecret_single", "rule_key": "basic_mobile_tech_topsecret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             ],
         },
         {
             "label": "娛樂陪",
             "details": [
-                {"label": "單陪", "value": "single", "rule_key": "basic_entertain_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "雙陪", "value": "double", "rule_key": "basic_entertain_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "不限", "value": "single", "rule_key": "basic_entertain_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "女陪", "value": "female_single", "rule_key": "basic_entertain_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "男陪", "value": "male_single", "rule_key": "basic_entertain_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             ],
         },
         {
             "label": "娛樂陪",
             "details": [
-                {"label": "單陪", "value": "mobile_single", "rule_key": "basic_mobile_entertain_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "雙陪", "value": "mobile_double", "rule_key": "basic_mobile_entertain_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "不限", "value": "mobile_single", "rule_key": "basic_mobile_entertain_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "女陪", "value": "female_single", "rule_key": "basic_mobile_entertain_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "男陪", "value": "male_single", "rule_key": "basic_mobile_entertain_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            ],
+        },
+        {
+            "label": "黑潮爆破",
+            "details": [
+                {"label": "娛樂陪", "value": "entertain", "rule_key": "basic_black_tide_entertain", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "技術陪", "value": "tech", "rule_key": "basic_black_tide_tech", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             ],
         },
         {
@@ -101,11 +106,9 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "甜蜜單",
             "details": [
-                {"label": "女單陪", "value": "female_single", "rule_key": "basic_sweet_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "男單陪", "value": "male_single", "rule_key": "basic_sweet_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "女雙陪", "value": "female_double", "rule_key": "basic_sweet_female_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "男雙陪", "value": "male_double", "rule_key": "basic_sweet_male_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-                {"label": "雙陪(不限)", "value": "double_any", "rule_key": "basic_sweet_double_any", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "女陪", "value": "female_single", "rule_key": "basic_sweet_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "男陪", "value": "male_single", "rule_key": "basic_sweet_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "不限", "value": "double_any", "rule_key": "basic_sweet_double_any", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             ],
         },
         {
@@ -151,67 +154,55 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         },
     ],
     "steam": [
-        {
-            "label": "娛樂陪",
-            "details": [
-                {"label": f"陪玩{count}名", "value": f"players_{count}", "rule_key": "steam_play", "player_count": count, "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24}
-                for count in range(1, 5)
-            ],
-        },
+        {"label": "娛樂陪", "details": [
+            {"label": "娛樂陪", "value": "play", "rule_key": "steam_play", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+        ]},
     ],
     "valorant": [
         {"label": "娛樂陪", "details": [
-            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": ("小時" if v == "ng" else "局"), "min_quantity": 1, "max_quantity": 24}
-            for m, v, k in (("NG","ng","valorant_entertain_ng"),("積分","ranked","valorant_entertain_ranked")) for count in range(1,5)
+            {"label": "NG", "value": "ng", "rule_key": "valorant_entertain_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "RK", "value": "ranked", "rule_key": "valorant_entertain_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "超凡陪", "details": [
-            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": ("小時" if v == "ng" else "局"), "min_quantity": 1, "max_quantity": 24}
-            for m, v, k in (("NG","ng","valorant_ascendant_ng"),("積分","ranked","valorant_ascendant_ranked")) for count in range(1,5)
+            {"label": "NG", "value": "ng", "rule_key": "valorant_ascendant_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "RK", "value": "ranked", "rule_key": "valorant_ascendant_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "神話陪", "details": [
-            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": ("小時" if v == "ng" else "局"), "min_quantity": 1, "max_quantity": 24}
-            for m, v, k in (("NG","ng","valorant_immortal_ng"),("積分","ranked","valorant_immortal_ranked")) for count in range(1,5)
+            {"label": "NG", "value": "ng", "rule_key": "valorant_immortal_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "RK", "value": "ranked", "rule_key": "valorant_immortal_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "輻能陪", "details": [
-            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": ("小時" if v == "ng" else "局"), "min_quantity": 1, "max_quantity": 24}
-            for m, v, k in (("NG","ng","valorant_radiant_ng"),("積分","ranked","valorant_radiant_ranked")) for count in range(1,5)
+            {"label": "NG", "value": "ng", "rule_key": "valorant_radiant_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "RK", "value": "ranked", "rule_key": "valorant_radiant_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
         ]},
     ],
     "lol": [
         {"label": "娛樂陪", "details": [
-            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": u, "min_quantity": 1, "max_quantity": 24}
-            for m, v, k, u in (("ARAM","aram","lol_entertain_aram","小時"),("NG","ng","lol_entertain_ng","小時"),("積分","ranked","lol_entertain_ranked","局")) for count in range(1,5)
+            {"label": "AR", "value": "aram", "rule_key": "lol_entertain_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "NG", "value": "ng", "rule_key": "lol_entertain_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "RK", "value": "ranked", "rule_key": "lol_entertain_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "大師陪", "details": [
-            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": ("小時" if v == "ng" else "局"), "min_quantity": 1, "max_quantity": 24}
-            for m, v, k in (("NG","ng","lol_master_ng"),("積分","ranked","lol_master_ranked")) for count in range(1,5)
+            {"label": "AR", "value": "aram", "rule_key": "lol_master_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "NG", "value": "ng", "rule_key": "lol_master_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "RK", "value": "ranked", "rule_key": "lol_master_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "宗師陪", "details": [
-            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": ("小時" if v == "ng" else "局"), "min_quantity": 1, "max_quantity": 24}
-            for m, v, k in (("NG","ng","lol_grandmaster_ng"),("積分","ranked","lol_grandmaster_ranked")) for count in range(1,5)
+            {"label": "AR", "value": "aram", "rule_key": "lol_grandmaster_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "NG", "value": "ng", "rule_key": "lol_grandmaster_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "RK", "value": "ranked", "rule_key": "lol_grandmaster_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "菁英陪", "details": [
-            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": ("小時" if v == "ng" else "局"), "min_quantity": 1, "max_quantity": 24}
-            for m, v, k in (("NG","ng","lol_elite_ng"),("積分","ranked","lol_elite_ranked")) for count in range(1,5)
+            {"label": "AR", "value": "aram", "rule_key": "lol_elite_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "NG", "value": "ng", "rule_key": "lol_elite_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "RK", "value": "ranked", "rule_key": "lol_elite_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
         ]},
     ],
     "apex": [
-        {
-            "label": group_label,
-            "details": [
-                {
-                    "label": f"{mode_label}｜{'單陪' if count == 1 else '雙陪'}",
-                    "value": f"{mode_value}_{count}",
-                    "rule_key": f"{rule_prefix}_{mode_value}",
-                    "player_count": count,
-                    "quantity_unit": "小時",
-                    "min_quantity": 1,
-                    "max_quantity": 24,
-                }
-                for mode_label, mode_value in (("NG", "ng"), ("積分", "ranked"))
-                for count in (1, 2)
-            ],
-        }
+        {"label": group_label, "details": [
+            {"label": "NG", "value": "ng", "rule_key": f"{rule_prefix}_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "積分", "value": "ranked", "rule_key": f"{rule_prefix}_ranked", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+        ]}
         for group_label, rule_prefix in (
             ("娛樂陪", "apex_entertain"),
             ("鑽石陪", "apex_diamond"),
@@ -284,11 +275,9 @@ def _sweet_catalog_group(prefix: str) -> dict:
     return {
         "label": "甜蜜單",
         "details": [
-            {"label": "女單陪", "value": "female_single", "rule_key": f"{prefix}_sweet_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-            {"label": "男單陪", "value": "male_single", "rule_key": f"{prefix}_sweet_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-            {"label": "女雙陪", "value": "female_double", "rule_key": f"{prefix}_sweet_female_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-            {"label": "男雙陪", "value": "male_double", "rule_key": f"{prefix}_sweet_male_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-            {"label": "雙陪(不限)", "value": "double_any", "rule_key": f"{prefix}_sweet_double_any", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "女陪", "value": "female_single", "rule_key": f"{prefix}_sweet_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "男陪", "value": "male_single", "rule_key": f"{prefix}_sweet_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "不限", "value": "double_any", "rule_key": f"{prefix}_sweet_double_any", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ],
     }
 
@@ -381,6 +370,20 @@ ORDER_ITEM_TO_CATEGORY = {
     label: ORDER_RULES[rule_key].category
     for label, rule_key in ORDER_RULE_KEY_BY_LABEL.items()
     if rule_key in ORDER_RULES
+}
+
+# 這些是已遷移成「規格與人數分離」的內建商品。即使資料庫還留著
+# 舊 label override，也不能把單陪／雙陪字樣重新塞回第三欄。
+CANONICAL_DETAIL_LABEL_RULE_KEYS = {
+    "basic_tech_secret_single", "basic_tech_topsecret_single",
+    "basic_mobile_tech_secret_single", "basic_mobile_tech_topsecret_single",
+    "basic_entertain_single", "basic_entertain_female_single", "basic_entertain_male_single",
+    "basic_mobile_entertain_single", "basic_mobile_entertain_female_single", "basic_mobile_entertain_male_single",
+    "basic_black_tide_entertain", "basic_black_tide_tech", "steam_play",
+    *[f"valorant_{tier}_{mode}" for tier in ("entertain", "ascendant", "immortal", "radiant") for mode in ("ng", "ranked")],
+    *[f"lol_{tier}_{mode}" for tier in ("entertain", "master", "grandmaster", "elite") for mode in ("aram", "ng", "ranked")],
+    *[f"apex_{tier}_{mode}" for tier in ("entertain", "diamond", "master", "predator") for mode in ("ng", "ranked")],
+    *[f"{prefix}_sweet_{suffix}" for prefix in ("delta_desktop", "delta_mobile", "steam", "valorant", "lol", "apex") for suffix in ("female_single", "male_single", "double_any")],
 }
 
 DYNAMIC_ADMIN_GROUP_LABEL = "後台新增商品"
@@ -571,7 +574,11 @@ def get_order_item_details_for_group(category: str | None, group_label: str | No
                 if rule is not None
                 else ""
             )
-            if manager_group_label and rule is not None:
+            if (
+                manager_group_label
+                and rule is not None
+                and str(item.get("rule_key") or "") not in CANONICAL_DETAIL_LABEL_RULE_KEYS
+            ):
                 item["label"] = str(getattr(rule, "label", "") or item.get("label") or "")
 
             item["item"] = str(

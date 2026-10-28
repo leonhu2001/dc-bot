@@ -99,7 +99,17 @@ _SEAT_KEY_NAMES = {
 
 
 def get_player_count_price_table(rule_or_key) -> dict[int, int] | None:
+    direct = getattr(rule_or_key, "player_count_prices", None)
+    if direct:
+        return {int(key): int(value) for key, value in dict(direct).items()}
     key = str(getattr(rule_or_key, "key", rule_or_key) or "")
+    try:
+        from services.order_rules import ORDER_RULES
+        rule = ORDER_RULES.get(key)
+        if rule is not None and getattr(rule, "player_count_prices", None):
+            return {int(k): int(v) for k, v in dict(rule.player_count_prices).items()}
+    except Exception:
+        pass
     table = PLAYER_COUNT_PRICE_TABLES.get(key)
     return dict(table) if table else None
 

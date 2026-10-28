@@ -44,6 +44,15 @@ GAME_ROLE_LABELS_BY_KEY: dict[str, str] = {
     key: str(role.label)
     for key, role in GAME_ROLE_BY_KEY.items()
 }
+
+# 甜蜜陪是甜蜜單的額外必要資格，不是遊戲階級；直接登記在共用
+# role lookup，讓規則快照、智慧派單與最後接單驗證都讀同一份來源。
+SWEET_COMPANION_ROLE_KEY = "sweet_companion"
+SWEET_COMPANION_ROLE_ID = "1564966706407940248"
+SWEET_COMPANION_ROLE_LABEL = "甜蜜陪"
+GAME_ROLE_IDS_BY_KEY[SWEET_COMPANION_ROLE_KEY] = SWEET_COMPANION_ROLE_ID
+GAME_ROLE_LABELS_BY_KEY[SWEET_COMPANION_ROLE_KEY] = SWEET_COMPANION_ROLE_LABEL
+
 ALL_ROLE_IDS: dict[str, str] = {**ROLE_IDS, **GAME_ROLE_IDS_BY_KEY}
 ALL_ROLE_LABELS: dict[str, str] = {**ROLE_LABELS, **GAME_ROLE_LABELS_BY_KEY}
 
@@ -112,6 +121,9 @@ class OrderRule:
     min_player_count: int = 1
     max_player_count: int | None = None
     price_multiply_player_count: bool = False
+    # 明確的人數價目表。只要有設定就以此表為準，不假設「單價 x 人數」。
+    # 這是商品規則本身的一部分，不由 runtime patch 改寫。
+    player_count_prices: dict[int, int] = field(default_factory=dict)
 
     # 後台新增商品可自行決定 Discord 自助下單的第二層分類。
     # 空白代表沿用既有 catalog；舊的後台商品則由 services.orders
@@ -337,9 +349,15 @@ def calculate_price(
     if rule.pricing_type == "manual":
         base_amount = 0
     else:
-        base_amount = int(rule.price) * qty
-        if rule.price_multiply_player_count:
-            base_amount *= players
+        if rule.player_count_prices:
+            if players not in rule.player_count_prices:
+                raise ValueError(f"{rule.label} 不支援 {players} 位陪玩")
+            unit_price = int(rule.player_count_prices[players])
+            base_amount = unit_price * qty
+        else:
+            base_amount = int(rule.price) * qty
+            if rule.price_multiply_player_count:
+                base_amount *= players
 
     specified_roles = tuple(specified_roles or ())
     if specified_roles and not rule.allow_specify:
@@ -432,42 +450,49 @@ _add(OrderRule(
     note="保底三選一：800w / 500w + 2 沙色保險 / 4 沙色保險",
 ))
 
-for key, label, price, staff_count in [
-    ("basic_tech_secret_single", "技術陪〈端遊〉｜機密單陪", 400, 1),
-    ("basic_tech_secret_double", "技術陪〈端遊〉｜機密雙陪", 750, 2),
-    ("basic_tech_topsecret_single", "技術陪〈端遊〉｜絕密單陪", 450, 1),
-    ("basic_tech_topsecret_double", "技術陪〈端遊〉｜絕密雙陪", 850, 2),
-]:
+def _add_delta_tech_rule(*, category: str, key: str, label: str, prices: dict[int, int], game_roles: tuple[str, ...]) -> None:
     _add(OrderRule(
-        "delta_desktop_basic", key, label, "hourly", price, "H",
+        category, key, label, "hourly", int(prices[1]), "H",
         allowed_roles=PROTECTOR_ROLES,
-        required_game_roles=DELTA_DESKTOP_GAME_ROLE,
-        required_staff_count=staff_count,
+        required_game_roles=game_roles,
+        required_staff_count="player_count",
+        player_count_enabled=True,
+        min_player_count=1,
+        max_player_count=2,
+        price_multiply_player_count=False,
+        player_count_prices=dict(prices),
         allow_specify=True,
-        max_specified_count=staff_count,
+        max_specified_count=2,
         specify_fee_by_role=_protectors_fee(),
         specify_free_min_units=2,
         specify_free_basis="quantity",
     ))
 
-# 三角洲手遊技術陪：與端遊使用獨立 rule key，避免歷史訂單與平台價格互相影響。
-for key, label, price, staff_count in [
-    ("basic_mobile_tech_secret_single", "技術陪〈手遊〉｜機密單陪", 380, 1),
-    ("basic_mobile_tech_secret_double", "技術陪〈手遊〉｜機密雙陪", 760, 2),
-    ("basic_mobile_tech_topsecret_single", "技術陪〈手遊〉｜絕密單陪", 420, 1),
-    ("basic_mobile_tech_topsecret_double", "技術陪〈手遊〉｜絕密雙陪", 840, 2),
+
+_add_delta_tech_rule(category="delta_desktop_basic", key="basic_tech_secret_single", label="技術陪〈端遊〉｜機密", prices={1: 400, 2: 750}, game_roles=DELTA_DESKTOP_GAME_ROLE)
+_add_delta_tech_rule(category="delta_desktop_basic", key="basic_tech_topsecret_single", label="技術陪〈端遊〉｜絕密", prices={1: 450, 2: 850}, game_roles=DELTA_DESKTOP_GAME_ROLE)
+_add_delta_tech_rule(category="delta_mobile_basic", key="basic_mobile_tech_secret_single", label="技術陪〈手遊〉｜機密", prices={1: 380, 2: 760}, game_roles=DELTA_MOBILE_GAME_ROLE)
+_add_delta_tech_rule(category="delta_mobile_basic", key="basic_mobile_tech_topsecret_single", label="技術陪〈手遊〉｜絕密", prices={1: 420, 2: 840}, game_roles=DELTA_MOBILE_GAME_ROLE)
+
+# 舊雙陪 key 只保留歷史訂單／舊快照回查；新下單不再引用。
+for category, key, label, price, game_roles in [
+    ("delta_desktop_basic", "basic_tech_secret_double", "技術陪〈端遊〉｜機密雙陪", 750, DELTA_DESKTOP_GAME_ROLE),
+    ("delta_desktop_basic", "basic_tech_topsecret_double", "技術陪〈端遊〉｜絕密雙陪", 850, DELTA_DESKTOP_GAME_ROLE),
+    ("delta_mobile_basic", "basic_mobile_tech_secret_double", "技術陪〈手遊〉｜機密雙陪", 760, DELTA_MOBILE_GAME_ROLE),
+    ("delta_mobile_basic", "basic_mobile_tech_topsecret_double", "技術陪〈手遊〉｜絕密雙陪", 840, DELTA_MOBILE_GAME_ROLE),
 ]:
     _add(OrderRule(
-        "delta_mobile_basic", key, label, "hourly", price, "H",
+        category, key, label, "hourly", price, "H",
         allowed_roles=PROTECTOR_ROLES,
-        required_game_roles=DELTA_MOBILE_GAME_ROLE,
-        required_staff_count=staff_count,
+        required_game_roles=game_roles,
+        required_staff_count=2,
         allow_specify=True,
-        max_specified_count=staff_count,
+        max_specified_count=2,
         specify_fee_by_role=_protectors_fee(),
         specify_free_min_units=2,
         specify_free_basis="quantity",
     ))
+
 
 
 _add(OrderRule(
@@ -492,27 +517,55 @@ _add(OrderRule(
 # 舊雙導師規則不再加入 ORDER_RULES；
 # 已建立訂單仍使用建立當下保存的規則快照，不受影響。
 
-for category, key, label, price, staff_count, required_game_roles in [
-    ("delta_desktop_basic", "basic_entertain_single", "娛樂陪〈端遊〉｜單陪", 320, 1, DELTA_DESKTOP_GAME_ROLE),
-    ("delta_desktop_basic", "basic_entertain_double", "娛樂陪〈端遊〉｜雙陪", 600, 2, DELTA_DESKTOP_GAME_ROLE),
-    ("delta_mobile_basic", "basic_mobile_entertain_single", "娛樂陪〈手遊〉｜單陪", 320, 1, DELTA_MOBILE_GAME_ROLE),
-    ("delta_mobile_basic", "basic_mobile_entertain_double", "娛樂陪〈手遊〉｜雙陪", 600, 2, DELTA_MOBILE_GAME_ROLE),
-]:
+def _add_delta_entertain_rule(*, category: str, key: str, label: str, allowed_roles: tuple[RoleKey, ...], game_roles: tuple[str, ...]) -> None:
     _add(OrderRule(
-        category, key, label, "hourly", price, "H",
-        allowed_roles=COMPANION_ROLES,
-        required_game_roles=required_game_roles,
-        required_staff_count=staff_count,
+        category, key, label, "hourly", 320, "H",
+        allowed_roles=allowed_roles,
+        required_game_roles=game_roles,
+        required_staff_count="player_count",
+        player_count_enabled=True,
+        min_player_count=1,
+        max_player_count=2,
+        price_multiply_player_count=False,
+        player_count_prices={1: 320, 2: 600},
         allow_specify=True,
-        max_specified_count=staff_count,
-        specify_fee_by_role={
-            role: 100
-            for role in COMPANION_ROLES
-        },
+        max_specified_count=2,
+        specify_fee_default=100,
+        specify_fee_by_role={role: 100 for role in allowed_roles},
         specify_free_min_units=2,
         specify_free_basis="quantity",
         loyalty_benefits_enabled=True,
     ))
+
+
+for category, prefix, display, game_roles in [
+    ("delta_desktop_basic", "basic_entertain", "娛樂陪〈端遊〉", DELTA_DESKTOP_GAME_ROLE),
+    ("delta_mobile_basic", "basic_mobile_entertain", "娛樂陪〈手遊〉", DELTA_MOBILE_GAME_ROLE),
+]:
+    _add_delta_entertain_rule(category=category, key=f"{prefix}_single", label=f"{display}｜不限", allowed_roles=COMPANION_ROLES, game_roles=game_roles)
+    _add_delta_entertain_rule(category=category, key=f"{prefix}_female_single", label=f"{display}｜女陪", allowed_roles=("female_companion",), game_roles=game_roles)
+    _add_delta_entertain_rule(category=category, key=f"{prefix}_male_single", label=f"{display}｜男陪", allowed_roles=("male_companion",), game_roles=game_roles)
+
+    # 歷史 fixed-double keys 不再出現在新 catalog。
+    for suffix, text, roles in (
+        ("double", "雙陪", COMPANION_ROLES),
+        ("female_double", "女雙陪", ("female_companion",)),
+        ("male_double", "男雙陪", ("male_companion",)),
+    ):
+        _add(OrderRule(
+            category, f"{prefix}_{suffix}", f"{display}｜{text}", "hourly", 600, "H",
+            allowed_roles=roles,
+            required_game_roles=game_roles,
+            required_staff_count=2,
+            allow_specify=True,
+            max_specified_count=2,
+            specify_fee_default=100,
+            specify_fee_by_role={role: 100 for role in roles},
+            specify_free_min_units=2,
+            specify_free_basis="quantity",
+            loyalty_benefits_enabled=True,
+        ))
+
 
 # 舊甜蜜單規則保留給既有訂單／舊快照回查，不再出現在新下單選項。
 _add(OrderRule(
@@ -560,24 +613,32 @@ def _add_sweet_rule(
     category: str = "general",
     required_game_roles: tuple[str, ...] = (),
 ) -> None:
+    # 新甜蜜單只選性別／不限，人數由獨立欄位選 1～2；舊 fixed-double
+    # key 仍保留給歷史資料，但不再是新下單規格。
+    selectable_count = key.endswith(("female_single", "male_single", "double_any"))
+    effective_required_games = tuple(required_game_roles)
+    if category != "general" and SWEET_COMPANION_ROLE_KEY not in effective_required_games:
+        effective_required_games = (*effective_required_games, SWEET_COMPANION_ROLE_KEY)
     _add(OrderRule(
         category,
         key,
         label,
         "hourly",
-        price,
+        520 if selectable_count else price,
         "H",
         allowed_roles=allowed_roles,
         allowed_game_roles=(),
-        required_game_roles=required_game_roles,
-        required_staff_count=required_staff_count,
+        required_game_roles=effective_required_games,
+        required_staff_count="player_count" if selectable_count else required_staff_count,
+        player_count_enabled=selectable_count,
+        min_player_count=1,
+        max_player_count=2 if selectable_count else None,
+        price_multiply_player_count=False,
+        player_count_prices={1: 520, 2: 1314} if selectable_count else {},
         allow_specify=True,
-        max_specified_count=required_staff_count,
+        max_specified_count=2 if selectable_count else required_staff_count,
         specify_fee_default=100,
-        specify_fee_by_role={
-            role: 100
-            for role in allowed_roles
-        },
+        specify_fee_by_role={role: 100 for role in allowed_roles},
         specify_free_min_units=2,
         specify_free_basis="quantity",
     ))
@@ -932,12 +993,12 @@ def _add_game_service_rule(
 
 _add_game_service_rule(category="valorant", key="valorant_entertain_ng", label="特戰英豪｜娛樂陪｜NG", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=VALORANT_GAME_ROLE, loyalty_benefits_enabled=True)
 _add_game_service_rule(category="valorant", key="valorant_entertain_ranked", label="特戰英豪｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, required_game_roles=VALORANT_GAME_ROLE, loyalty_benefits_enabled=True)
-_add_game_service_rule(category="valorant", key="valorant_ascendant_ng", label="特戰英豪｜超凡陪｜NG", pricing_type="hourly", price=340, unit_label="H", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
-_add_game_service_rule(category="valorant", key="valorant_ascendant_ranked", label="特戰英豪｜超凡陪｜積分", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
-_add_game_service_rule(category="valorant", key="valorant_immortal_ng", label="特戰英豪｜神話陪｜NG", pricing_type="hourly", price=360, unit_label="H", allowed_game_roles=("valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
-_add_game_service_rule(category="valorant", key="valorant_immortal_ranked", label="特戰英豪｜神話陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
-_add_game_service_rule(category="valorant", key="valorant_radiant_ng", label="特戰英豪｜輻能陪｜NG", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("valorant_radiant",), required_game_roles=VALORANT_GAME_ROLE)
-_add_game_service_rule(category="valorant", key="valorant_radiant_ranked", label="特戰英豪｜輻能陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("valorant_radiant",), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_ascendant_ng", label="特戰英豪｜超凡陪｜NG", pricing_type="hourly", price=330, unit_label="H", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_ascendant_ranked", label="特戰英豪｜超凡陪｜積分", pricing_type="game", price=290, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_immortal_ng", label="特戰英豪｜神話陪｜NG", pricing_type="hourly", price=350, unit_label="H", allowed_game_roles=("valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_immortal_ranked", label="特戰英豪｜神話陪｜積分", pricing_type="game", price=330, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_radiant_ng", label="特戰英豪｜輻能陪｜NG", pricing_type="hourly", price=380, unit_label="H", allowed_game_roles=("valorant_radiant",), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_radiant_ranked", label="特戰英豪｜輻能陪｜積分", pricing_type="game", price=370, unit_label="局", allowed_game_roles=("valorant_radiant",), required_game_roles=VALORANT_GAME_ROLE)
 
 _add_game_service_rule(category="lol", key="lol_entertain_aram", label="英雄聯盟｜娛樂陪｜ARAM", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE, loyalty_benefits_enabled=True)
 _add_game_service_rule(category="lol", key="lol_entertain_ng", label="英雄聯盟｜娛樂陪｜NG", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE, loyalty_benefits_enabled=True)
@@ -948,6 +1009,31 @@ _add_game_service_rule(category="lol", key="lol_grandmaster_ng", label="英雄�
 _add_game_service_rule(category="lol", key="lol_grandmaster_ranked", label="英雄聯盟｜宗師陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
 _add_game_service_rule(category="lol", key="lol_elite_ng", label="英雄聯盟｜菁英陪｜NG", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
 _add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯盟｜菁英陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
+
+
+# LoL 技術陪 ARAM：直接沿用該階級 NG 小時價。
+_add_game_service_rule(category="lol", key="lol_master_aram", label="英雄聯盟｜大師陪｜ARAM", pricing_type="hourly", price=340, unit_label="H", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_grandmaster_aram", label="英雄聯盟｜宗師陪｜ARAM", pricing_type="hourly", price=360, unit_label="H", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_elite_aram", label="英雄聯盟｜菁英陪｜ARAM", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
+
+# 黑潮爆破：價格直接寫在商品規則，不用 runtime price patch。
+_add(OrderRule(
+    "delta_desktop_basic", "basic_black_tide_entertain", "黑潮爆破｜娛樂陪", "hourly", 320, "H",
+    allowed_roles=COMPANION_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE,
+    required_staff_count="player_count", player_count_enabled=True, min_player_count=1, max_player_count=4,
+    price_multiply_player_count=False, player_count_prices={1: 320, 2: 600, 3: 900, 4: 1200},
+    allow_specify=True, max_specified_count=4, specify_fee_default=100,
+    specify_fee_by_role={role: 100 for role in COMPANION_ROLES}, specify_free_min_units=2,
+    specify_free_basis="quantity", loyalty_benefits_enabled=True,
+))
+_add(OrderRule(
+    "delta_desktop_basic", "basic_black_tide_tech", "黑潮爆破｜技術陪", "hourly", 400, "H",
+    allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE,
+    required_staff_count="player_count", player_count_enabled=True, min_player_count=1, max_player_count=4,
+    price_multiply_player_count=False, player_count_prices={1: 400, 2: 760, 3: 1140, 4: 1520},
+    allow_specify=True, max_specified_count=4, specify_fee_default=100,
+    specify_fee_by_role=_protectors_fee(), specify_free_min_units=2, specify_free_basis="quantity",
+))
 
 
 # ========= APEX Legends 陪玩 =========
@@ -1233,6 +1319,12 @@ def role_ids_match_requirements(
     if allowed and not (member_roles & allowed):
         return False
 
+    # 甜蜜陪是額外 AND 資格；其餘遊戲身分仍維持「至少一個」語意。
+    if SWEET_COMPANION_ROLE_ID in required_games:
+        if SWEET_COMPANION_ROLE_ID not in member_roles:
+            return False
+        required_games.remove(SWEET_COMPANION_ROLE_ID)
+
     if required_games and not (member_roles & required_games):
         return False
 
@@ -1429,6 +1521,23 @@ class EffectiveOrderRules(dict):
 
         try:
             rule = build_rule_with_override(base, item.get("payload") or {})
+
+            # 後來核准的人數結構是程式規則的一部分。舊後台 override 仍可改價、
+            # 福利、分類等商務欄位，但不能把已遷移商品重新變回 fixed 單／雙陪。
+            if bool(base.player_count_enabled):
+                rule = replace(
+                    rule,
+                    required_staff_count=base.required_staff_count,
+                    player_count_enabled=base.player_count_enabled,
+                    min_player_count=base.min_player_count,
+                    max_player_count=base.max_player_count,
+                    price_multiply_player_count=base.price_multiply_player_count,
+                    player_count_prices=dict(base.player_count_prices),
+                    max_specified_count=base.max_specified_count,
+                )
+            if SWEET_COMPANION_ROLE_KEY in tuple(base.required_game_roles):
+                rule = replace(rule, required_game_roles=base.required_game_roles)
+
             validate_rule_definition(key, rule)
             return rule
         except Exception:
