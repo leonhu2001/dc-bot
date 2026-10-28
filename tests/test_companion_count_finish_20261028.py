@@ -255,3 +255,32 @@ def test_entertainment_gender_variants_share_loyalty_progress_family() -> None:
     }
     assert len(desktop) == 1
     assert len(mobile) == 1
+
+
+def test_latest_approved_game_prices_are_direct_source_values() -> None:
+    expected = {
+        "valorant_entertain_ng": 300,
+        "valorant_entertain_ranked": 250,
+        "valorant_ascendant_ng": 330,
+        "valorant_ascendant_ranked": 290,
+        "valorant_immortal_ng": 350,
+        "valorant_immortal_ranked": 330,
+        "valorant_radiant_ng": 380,
+        "valorant_radiant_ranked": 370,
+        "lol_master_ng": 340,
+        "lol_master_ranked": 300,
+        "lol_grandmaster_ng": 360,
+        "lol_grandmaster_ranked": 300,
+        "lol_elite_ng": 400,
+        "lol_elite_ranked": 400,
+        "apex_entertain_ng": 300,
+        "apex_entertain_ranked": 350,
+        "apex_diamond_ng": 400,
+        "apex_diamond_ranked": 450,
+        "apex_master_ng": 480,
+        "apex_master_ranked": 530,
+        "apex_predator_ng": 580,
+        "apex_predator_ranked": 630,
+    }
+    for key, price in expected.items():
+        assert order_rules.get_base_rule(key).price == price, key
