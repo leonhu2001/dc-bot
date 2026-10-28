@@ -1085,27 +1085,7 @@ _add(OrderRule(
 ))
 
 
-# 舊 Black Tide 1～4 人 key 只供已建立訂單／快照回查；新 catalog 不使用。
-for _key, _label, _price, _staff_count, _roles, _loyalty in (
-    ("basic_black_tide_entertain_1", "黑潮爆破｜娛樂單陪", 320, 1, COMPANION_ROLES, True),
-    ("basic_black_tide_entertain_2", "黑潮爆破｜娛樂雙陪", 600, 2, COMPANION_ROLES, True),
-    ("basic_black_tide_entertain_3", "黑潮爆破｜娛樂三陪", 900, 3, COMPANION_ROLES, True),
-    ("basic_black_tide_entertain_4", "黑潮爆破｜娛樂四陪", 1200, 4, COMPANION_ROLES, True),
-    ("basic_black_tide_tech_1", "黑潮爆破｜技術單陪", 400, 1, PROTECTOR_ROLES, False),
-    ("basic_black_tide_tech_2", "黑潮爆破｜技術雙陪", 760, 2, PROTECTOR_ROLES, False),
-    ("basic_black_tide_tech_3", "黑潮爆破｜技術三陪", 1140, 3, PROTECTOR_ROLES, False),
-    ("basic_black_tide_tech_4", "黑潮爆破｜技術四陪", 1520, 4, PROTECTOR_ROLES, False),
-):
-    _add(OrderRule(
-        "delta_desktop_basic", _key, _label, "hourly", _price, "H",
-        allowed_roles=_roles, required_game_roles=DELTA_DESKTOP_GAME_ROLE,
-        required_staff_count=_staff_count,
-        allow_specify=True, max_specified_count=_staff_count,
-        specify_fee_default=100,
-        specify_fee_by_role={role: 100 for role in _roles},
-        specify_free_min_units=2, specify_free_basis="quantity",
-        loyalty_benefits_enabled=_loyalty,
-    ))
+# 黑潮爆破新單只保留娛樂陪／技術陪；人數由獨立 1～4 人欄位決定。
 
 
 # ========= APEX Legends 陪玩 =========

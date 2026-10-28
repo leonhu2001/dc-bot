@@ -337,3 +337,44 @@ def test_final_direct_catalog_keeps_new_structure_and_loyalty_copy() -> None:
     assert specs["entertain"]["selector_label"] == "陪玩類型"
     assert "娛樂陪福利累積" in specs["entertain"]["description"]
     assert "陪玩人數分開選擇" in specs["entertain"]["description"]
+
+
+
+def test_black_tide_legacy_seat_variants_are_not_active_rules() -> None:
+    legacy = {
+        f"basic_black_tide_{tier}_{count}"
+        for tier in ("entertain", "tech")
+        for count in range(1, 5)
+    }
+    assert legacy.isdisjoint(order_rules.ORDER_RULES)
+
+
+def test_black_tide_discord_catalog_has_only_service_type_then_count() -> None:
+    details = _discord_details("delta_desktop_basic", "黑潮爆破")
+    assert [item["label"] for item in details] == ["娛樂陪", "技術陪"]
+    assert [item["rule_key"] for item in details] == [
+        "basic_black_tide_entertain",
+        "basic_black_tide_tech",
+    ]
+    for item in details:
+        rule = order_rules.ORDER_RULES[item["rule_key"]]
+        assert rule.required_staff_count == "player_count"
+        assert rule.player_count_enabled is True
+        assert rule.min_player_count == 1
+        assert rule.max_player_count == 4
+
+
+def test_black_tide_web_catalog_has_only_two_canonical_variants() -> None:
+    from web.app.services import order_groups
+
+    group = next(
+        item for item in order_groups.get_grouped_order_catalog("delta_desktop_basic")
+        if item["key"] == "black_tide"
+    )
+    assert [item["label"] for item in group["variants"]] == ["娛樂陪", "技術陪"]
+    assert [item["rule_key"] for item in group["variants"]] == [
+        "basic_black_tide_entertain",
+        "basic_black_tide_tech",
+    ]
+    assert all(item["player_count_enabled"] for item in group["variants"])
+    assert all(item["max_player_count"] == 4 for item in group["variants"])

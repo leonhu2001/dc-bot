@@ -17,16 +17,7 @@ _SEAT_LABELS = {
 
 # Historical Black Tide keys stay resolvable. New checkout uses the two canonical
 # rules below and chooses 1-4 companions through the shared player-count control.
-_BLACK_TIDE_LEGACY_VARIANTS = (
-    ("basic_black_tide_entertain_1", "娛樂單陪", "basic_entertain_single", 1, 320),
-    ("basic_black_tide_entertain_2", "娛樂雙陪", "basic_entertain_double", 2, 600),
-    ("basic_black_tide_entertain_3", "娛樂三陪", "basic_entertain_double", 3, 900),
-    ("basic_black_tide_entertain_4", "娛樂四陪", "basic_entertain_double", 4, 1200),
-    ("basic_black_tide_tech_1", "技術單陪", "basic_tech_secret_single", 1, 400),
-    ("basic_black_tide_tech_2", "技術雙陪", "basic_tech_secret_double", 2, 760),
-    ("basic_black_tide_tech_3", "技術三陪", "basic_tech_secret_double", 3, 1140),
-    ("basic_black_tide_tech_4", "技術四陪", "basic_tech_secret_double", 4, 1520),
-)
+_BLACK_TIDE_LEGACY_VARIANTS: tuple = ()
 
 _BLACK_TIDE_CANONICAL = (
     (
@@ -182,26 +173,6 @@ def _install_delta_companion_type_rules() -> None:
 
 def _install_black_tide_rules() -> None:
     from services.order_rules import ORDER_RULES, validate_rule_definition
-
-    for key, label, template_key, staff_count, price in _BLACK_TIDE_LEGACY_VARIANTS:
-        if key in ORDER_RULES:
-            continue
-        template = ORDER_RULES.get(template_key)
-        if template is None:
-            raise RuntimeError(f"missing Black Tide legacy template: {template_key}")
-        rule = replace(
-            template,
-            key=key,
-            label=f"黑潮爆破｜{label}",
-            price=int(price),
-            required_staff_count=int(staff_count),
-            player_count_enabled=False,
-            price_multiply_player_count=False,
-            max_specified_count=int(staff_count),
-            catalog_group_label="黑潮爆破",
-        )
-        validate_rule_definition(key, rule)
-        ORDER_RULES[key] = rule
 
     for key, label, template_key, price_table in _BLACK_TIDE_CANONICAL:
         template = ORDER_RULES.get(template_key)
