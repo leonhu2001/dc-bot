@@ -326,3 +326,14 @@ def test_new_catalog_never_exposes_historical_fixed_seat_variants() -> None:
         "valorant_sweet_male",
         "valorant_sweet_any",
     ]
+
+
+def test_final_direct_catalog_keeps_new_structure_and_loyalty_copy() -> None:
+    from web.app.services.order_groups import GROUP_SPECS
+
+    specs = {str(spec["key"]): spec for spec in GROUP_SPECS}
+    assert specs["tech_play"]["selector_label"] == "難度"
+    assert [row[1] for row in specs["tech_play"]["variants"]] == ["機密", "絕密"]
+    assert specs["entertain"]["selector_label"] == "陪玩類型"
+    assert "娛樂陪福利累積" in specs["entertain"]["description"]
+    assert "陪玩人數分開選擇" in specs["entertain"]["description"]
