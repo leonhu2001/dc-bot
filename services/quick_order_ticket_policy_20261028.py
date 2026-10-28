@@ -51,26 +51,18 @@ class QuickOrderNoticeConfirmView(discord.ui.View):
             return
 
         self.opening = True
-        for child in self.children:
-            child.disabled = True
-
-        # A component interaction must be acknowledged before the ticket creator
-        # performs category/channel work. Keep this acknowledgement ephemeral and
-        # leave quick_order_v2's original locked-service ticket UI untouched.
-        await interaction.response.edit_message(view=self)
+        button.disabled = True
         try:
+            # _create_ticket owns the interaction response lifecycle and starts by
+            # deferring this button interaction. Do not acknowledge it beforehand.
             await self.quick_module._create_ticket(
                 interaction,
                 category=self.category,
                 item_group=self.item_group,
                 source_channel_id=self.source_channel_id,
             )
-            self.stop()
-        except Exception:
+        finally:
             self.opening = False
-            for child in self.children:
-                child.disabled = False
-            raise
 
     @discord.ui.button(
         label="尚未閱讀",
