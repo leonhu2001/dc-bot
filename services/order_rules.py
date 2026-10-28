@@ -1607,7 +1607,6 @@ class EffectiveOrderRules(dict):
             if key in SOURCE_AUTHORITY_RULE_KEYS:
                 rule = replace(
                     rule,
-                    label=base.label,
                     catalog_group_label=base.catalog_group_label,
                     allowed_roles=base.allowed_roles,
                     allowed_game_roles=base.allowed_game_roles,
