@@ -156,6 +156,21 @@ def test_black_tide_entertainment_shares_existing_loyalty_pool():
         assert loyalty_scope_key(f"basic_black_tide_entertain_{count}") == scope
 
 
+def test_lol_rank_aram_variants_reuse_ng_hourly_price_and_default_points_off():
+    for aram_key, ng_key in (
+        ("lol_master_aram", "lol_master_ng"),
+        ("lol_grandmaster_aram", "lol_grandmaster_ng"),
+        ("lol_elite_aram", "lol_elite_ng"),
+    ):
+        aram_rule = ORDER_RULES[aram_key]
+        ng_rule = ORDER_RULES[ng_key]
+        assert aram_rule.pricing_type == "hourly"
+        assert aram_rule.price == ng_rule.price
+        assert aram_rule.required_staff_count == "player_count"
+        assert aram_rule.player_count_enabled is True
+        assert aram_rule.point_benefits_allowed is False
+
+
 def test_gendered_entertainment_variants_reuse_existing_roles_and_counts():
     cases = {
         "basic_entertain_female_single": (("female_companion",), 1),
@@ -225,9 +240,9 @@ def test_self_service_third_field_uses_mode_and_one_to_four_seats():
 
     lol_entertain = _group("lol", "娛樂陪")
     assert [item["label"] for item in lol_entertain["details"]] == [
-        "AR 單陪", "AR 雙陪", "AR 三陪", "AR 四陪",
         "NG 單陪", "NG 雙陪", "NG 三陪", "NG 四陪",
         "RK 單陪", "RK 雙陪", "RK 三陪", "RK 四陪",
+        "AR 單陪", "AR 雙陪", "AR 三陪", "AR 四陪",
     ]
 
 
@@ -247,10 +262,15 @@ def test_self_service_rank_groups_keep_dynamic_hour_and_game_units():
         and any(str(item.get("value") or "").startswith("ranked_") for item in group.get("details", []))
     ]
     assert lol_rank_groups
+    expected_labels = [
+        "NG 單陪", "NG 雙陪", "NG 三陪", "NG 四陪",
+        "RK 單陪", "RK 雙陪", "RK 三陪", "RK 四陪",
+        "AR 單陪", "AR 雙陪", "AR 三陪", "AR 四陪",
+    ]
     for group in lol_rank_groups:
-        labels = [item["label"] for item in group["details"]]
-        assert all("陪玩" not in label and "積分" not in label for label in labels)
-        assert all(label.startswith(("NG ", "RK ", "AR ")) for label in labels)
+        assert [item["label"] for item in group["details"]] == expected_labels
+        assert {item["quantity_unit"] for item in group["details"] if item["label"].startswith(("NG ", "AR "))} == {"小時"}
+        assert {item["quantity_unit"] for item in group["details"] if item["label"].startswith("RK ")} == {"局"}
 
 
 def test_legacy_one_seat_helper_stays_compatible_for_old_orders():
