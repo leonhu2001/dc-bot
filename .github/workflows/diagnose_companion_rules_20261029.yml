@@ -1,0 +1,25 @@
+name: Diagnose companion rule mutation
+
+on:
+  push:
+    paths:
+      - '.github/workflows/diagnose_companion_rules_20261029.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Find stale rule installers and label mutations
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo '=== installer call sites ==='
+          grep -RInE 'install_(entertainment_companion_policy|multi_seat_order_policy|companion_count_catalog_cleanup|sweet_companion_policy)|_patch_catalog\(' --include='*.py' . || true
+          echo '=== direct old labels ==='
+          grep -RInE '機密｜單陪|甜蜜單｜女陪|娛樂陪〈端遊〉' --include='*.py' . || true
+          echo '=== imports of compatibility/policy modules ==='
+          grep -RInE 'entertainment_companion_policy_20261028|multi_seat_order_policy_20261028|companion_count_catalog_cleanup_20261028|sweet_companion_policy_20261028' --include='*.py' . || true
