@@ -204,3 +204,54 @@ def test_canonical_rules_do_not_depend_on_runtime_rule_patches() -> None:
         assert base.player_count_enabled is True
         assert base.max_player_count == 2
         assert base.player_count_prices
+
+
+def test_actual_quantity_selector_is_enabled_after_delta_spec_selection(monkeypatch) -> None:
+    from services import order_runtime
+    from services.orders import get_order_item_detail_for_selection
+    from services.self_service_selection_state import apply_self_service_detail_selection
+
+    channel_id = 991001
+    detail = get_order_item_detail_for_selection(
+        "delta_desktop_basic", "技術陪", "secret_single"
+    )
+    assert detail is not None
+    assert detail["label"] == "機密"
+
+    data = {"category": "delta_desktop_basic", "item_group": "技術陪"}
+    apply_self_service_detail_selection(data, detail)
+    monkeypatch.setattr(
+        order_runtime,
+        "_RUNTIME_STATE",
+        SimpleNamespace(order_selections={channel_id: data}),
+    )
+
+    selector = order_runtime.SelfServiceOrderQuantitySelect(
+        customer_id=123,
+        channel_id=channel_id,
+        selected_item=data["item"],
+        selected_quantity=data["quantity"],
+    )
+    assert selector.disabled is False
+    assert selector.placeholder == "請選擇 1～24 小時"
+    assert selector.options[0].value == "1"
+    assert selector.options[-1].value == "24"
+
+
+def test_entertainment_gender_variants_share_loyalty_progress_family() -> None:
+    from services.loyalty_benefits import loyalty_scope_key
+
+    desktop = {
+        loyalty_scope_key("basic_entertain_single"),
+        loyalty_scope_key("basic_entertain_female_single"),
+        loyalty_scope_key("basic_entertain_male_single"),
+        loyalty_scope_key("basic_entertain_double"),
+    }
+    mobile = {
+        loyalty_scope_key("basic_mobile_entertain_single"),
+        loyalty_scope_key("basic_mobile_entertain_female_single"),
+        loyalty_scope_key("basic_mobile_entertain_male_single"),
+        loyalty_scope_key("basic_mobile_entertain_double"),
+    }
+    assert len(desktop) == 1
+    assert len(mobile) == 1

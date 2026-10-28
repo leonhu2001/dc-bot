@@ -208,8 +208,16 @@ _LOYALTY_SCOPE_FAMILY_ALIASES = {
     # 同一個遊戲／服務只是陪玩席位數不同，必須共用同一個老闆福利池。
     "basic_entertain_single": "basic_entertain",
     "basic_entertain_double": "basic_entertain",
+    "basic_entertain_female_single": "basic_entertain",
+    "basic_entertain_male_single": "basic_entertain",
+    "basic_entertain_female_double": "basic_entertain",
+    "basic_entertain_male_double": "basic_entertain",
     "basic_mobile_entertain_single": "basic_mobile_entertain",
     "basic_mobile_entertain_double": "basic_mobile_entertain",
+    "basic_mobile_entertain_female_single": "basic_mobile_entertain",
+    "basic_mobile_entertain_male_single": "basic_mobile_entertain",
+    "basic_mobile_entertain_female_double": "basic_mobile_entertain",
+    "basic_mobile_entertain_male_double": "basic_mobile_entertain",
     # APEX 娛樂陪 NG / 積分皆為計時制，共用同一個 10H -> 1H 福利池。
     "apex_entertain_ng": "apex_entertain",
     "apex_entertain_ranked": "apex_entertain",
