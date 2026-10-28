@@ -106,10 +106,6 @@ from .quick_order_ticket_policy_20261028 import (
 
 _install_quick_order_ticket_policy_20261028()
 
-# Patch only Discord's imported catalog helpers so the third selector stops repeating
-# single/double wording for products that already have an independent count control.
-_install_companion_count_discord_runtime_20261028()
-
 # Install the Discord shared player-count control after core benefit policies are
 # ready. Importing this patches the UI class before bot.py imports self_service_runtime.
 from .self_service_companion_count_runtime import (
