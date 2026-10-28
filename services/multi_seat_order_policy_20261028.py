@@ -24,6 +24,21 @@ _BLACK_TIDE_VARIANTS = (
     ("basic_black_tide_tech_4", "技術四陪", "basic_tech_secret_double", 4, 1520),
 )
 
+# LoL technical tiers historically had NG/RK only in self-service. AR is hourly and
+# follows the same tier price as NG until the owner publishes a separate AR price.
+# Service point rewards default off for these new tiered variants so creating AR
+# cannot bypass the currently disabled tiered-game point-benefit policy.
+_LOL_TECH_ARAM_VARIANTS = (
+    ("lol_master_aram", "lol_master_ng", "英雄聯盟｜大師陪｜ARAM"),
+    ("lol_grandmaster_aram", "lol_grandmaster_ng", "英雄聯盟｜宗師陪｜ARAM"),
+    ("lol_elite_aram", "lol_elite_ng", "英雄聯盟｜菁英陪｜ARAM"),
+)
+
+_LOL_TECH_ARAM_BY_NG_KEY = {
+    template_key: new_key
+    for new_key, template_key, _label in _LOL_TECH_ARAM_VARIANTS
+}
+
 _POINT_COSTS = {
     "entertainment": {
         1: (80, 140),
@@ -72,6 +87,25 @@ def _install_black_tide_rules() -> None:
         ORDER_RULES[key] = rule
 
 
+def _install_lol_tech_aram_rules() -> None:
+    from services.order_rules import ORDER_RULES, validate_rule_definition
+
+    for key, template_key, label in _LOL_TECH_ARAM_VARIANTS:
+        if key in ORDER_RULES:
+            continue
+        template = ORDER_RULES.get(template_key)
+        if template is None:
+            raise RuntimeError(f"missing LoL AR rule template: {template_key}")
+        rule = replace(
+            template,
+            key=key,
+            label=label,
+            point_benefits_allowed=False,
+        )
+        validate_rule_definition(key, rule)
+        ORDER_RULES[key] = rule
+
+
 def _black_tide_details() -> list[dict[str, Any]]:
     details: list[dict[str, Any]] = []
     for key, label, _template_key, _staff_count, price in _BLACK_TIDE_VARIANTS:
@@ -94,6 +128,23 @@ def _replace_or_append_group(groups: list[dict[str, Any]], label: str, details: 
             group["details"] = [dict(item) for item in details]
             return
     groups.append({"label": label, "details": [dict(item) for item in details]})
+
+
+def _mode_sort_key(detail: dict[str, Any]) -> tuple[int, int]:
+    value = str(detail.get("value") or "")
+    if value.startswith("ng_"):
+        mode_order = 0
+    elif value.startswith("ranked_"):
+        mode_order = 1
+    elif value.startswith("aram_"):
+        mode_order = 2
+    else:
+        mode_order = 9
+    try:
+        seat_count = int(detail.get("player_count") or value.rsplit("_", 1)[-1])
+    except (TypeError, ValueError):
+        seat_count = 99
+    return mode_order, seat_count
 
 
 def _patch_self_service_catalog() -> None:
@@ -124,9 +175,30 @@ def _patch_self_service_catalog() -> None:
                 detail["label"] = f"NG {_SEAT_LABELS[count]}"
             elif value.startswith("ranked_"):
                 detail["label"] = f"RK {_SEAT_LABELS[count]}"
+        group["details"] = sorted(group.get("details", []), key=_mode_sort_key)
 
     for group in orders.SELF_SERVICE_ORDER_CATALOG.get("lol", []):
-        for detail in group.get("details", []):
+        details = list(group.get("details", []))
+        existing_rule_keys = {str(item.get("rule_key") or "") for item in details}
+
+        for ng_key, aram_key in _LOL_TECH_ARAM_BY_NG_KEY.items():
+            if ng_key not in existing_rule_keys or aram_key in existing_rule_keys:
+                continue
+            details.extend(
+                {
+                    "label": f"AR {_SEAT_LABELS[count]}",
+                    "value": f"aram_{count}",
+                    "rule_key": aram_key,
+                    "player_count": count,
+                    "quantity_unit": "小時",
+                    "min_quantity": 1,
+                    "max_quantity": 24,
+                }
+                for count in range(1, 5)
+            )
+            break
+
+        for detail in details:
             value = str(detail.get("value") or "")
             try:
                 count = int(detail.get("player_count") or value.rsplit("_", 1)[-1])
@@ -140,6 +212,8 @@ def _patch_self_service_catalog() -> None:
                 detail["label"] = f"RK {_SEAT_LABELS[count]}"
             elif value.startswith("aram_"):
                 detail["label"] = f"AR {_SEAT_LABELS[count]}"
+
+        group["details"] = sorted(details, key=_mode_sort_key)
 
 
 def _patch_loyalty_scope_aliases() -> None:
@@ -243,6 +317,7 @@ def install_multi_seat_order_policy_20261028() -> None:
         return
 
     _install_black_tide_rules()
+    _install_lol_tech_aram_rules()
     _patch_self_service_catalog()
     _patch_loyalty_scope_aliases()
     _replace_point_service_catalog()
