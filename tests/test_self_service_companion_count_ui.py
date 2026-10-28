@@ -80,7 +80,7 @@ def test_selected_category_reflows_to_five_actions_then_submit(monkeypatch):
     assert labels["self_service_order_go_payment_button"] == "送出訂單"
 
 
-def test_before_category_count_control_is_visible_and_disabled(monkeypatch):
+def test_before_category_keeps_requested_action_and_submit_rows_visible(monkeypatch):
     channel_id = 12346
     _configure_runtime(monkeypatch, {channel_id: {}})
 
@@ -94,21 +94,25 @@ def test_before_category_count_control_is_visible_and_disabled(monkeypatch):
     view = asyncio.run(build_view())
     rows = _component_custom_ids(view)
 
-    assert rows[-1] == [
-        "self_service_order_player_count_button",
-        "self_service_order_specified_staff_button",
-        "self_service_order_point_benefit_button",
-        "self_service_order_staff_price_button",
-        "self_service_order_staff_discount_coupon_button",
+    assert rows == [
+        ["self_service_order_category_select"],
+        ["self_service_order_item_select"],
+        ["self_service_order_detail_select"],
+        [
+            "self_service_order_player_count_button",
+            "self_service_order_specified_staff_button",
+            "self_service_order_point_benefit_button",
+            "self_service_order_staff_price_button",
+            "self_service_order_staff_discount_coupon_button",
+        ],
+        ["self_service_order_go_payment_button"],
     ]
+
+    bottom_ids = set(rows[-2] + rows[-1])
     assert all(
         bool(child.disabled)
         for child in view.children
-        if str(getattr(child, "custom_id", "") or "") in set(rows[-1])
-    )
-    assert not any(
-        str(getattr(child, "custom_id", "") or "") == "self_service_order_go_payment_button"
-        for child in view.children
+        if str(getattr(child, "custom_id", "") or "") in bottom_ids
     )
 
 
