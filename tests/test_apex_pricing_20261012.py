@@ -1,4 +1,5 @@
 from services.loyalty_benefits import loyalty_policy_for_rule
+from services.multi_seat_order_policy_20261028 import get_rule_player_count_bounds
 from services.order_rules import ORDER_RULES, calculate_price
 from services.orders import get_order_item_details_for_group
 from web.app.services.order_groups import get_grouped_order_catalog
@@ -119,7 +120,7 @@ def test_apex_web_catalog_no_longer_asks_for_customer_rank():
             assert "回饋" not in group["description"]
 
 
-def test_apex_discord_catalog_uses_compact_mode_labels_with_player_count_metadata():
+def test_apex_discord_catalog_separates_mode_from_shared_player_count():
     for group_label, rule_prefix in (
         ("娛樂陪", "apex_entertain"),
         ("鑽石陪", "apex_diamond"),
@@ -127,19 +128,13 @@ def test_apex_discord_catalog_uses_compact_mode_labels_with_player_count_metadat
         ("頂獵陪", "apex_predator"),
     ):
         details = get_order_item_details_for_group("apex", group_label)
-        assert [item["label"] for item in details] == [
-            "NG",
-            "NG",
-            "積分",
-            "積分",
-        ]
+        assert [item["label"] for item in details] == ["NG", "積分"]
         assert [item["rule_key"] for item in details] == [
             f"{rule_prefix}_ng",
-            f"{rule_prefix}_ng",
-            f"{rule_prefix}_ranked",
             f"{rule_prefix}_ranked",
         ]
-        assert [item["player_count"] for item in details] == [1, 2, 1, 2]
+        assert all("player_count" not in item for item in details)
+        assert get_rule_player_count_bounds(ORDER_RULES[f"{rule_prefix}_ng"]) == (1, 2, 1, True)
         assert all("白金" not in item["label"] for item in details)
         assert all("鑽石以下" not in item["label"] for item in details)
 
