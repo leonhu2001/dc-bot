@@ -140,7 +140,15 @@ def is_service_point_benefit_enabled(rule) -> bool:
     key = str(getattr(rule, "key", "") or "")
     if key in SERVICE_POINT_BENEFIT_RULE_OVERRIDES:
         return bool(SERVICE_POINT_BENEFIT_RULE_OVERRIDES[key])
-    return str(getattr(rule, "category", "") or "") not in {"lol", "valorant", "apex"}
+    if not bool(getattr(rule, "point_benefits_allowed", False)):
+        return False
+    category = str(getattr(rule, "category", "") or "")
+    label = str(getattr(rule, "label", "") or "")
+    if category == "steam" or category in {"fun", "delta_desktop_fun", "title"}:
+        return False
+    if key.startswith("basic_trial_") or label.startswith("體驗單"):
+        return False
+    return str(getattr(rule, "pricing_type", "") or "") in {"hourly", "game"}
 
 
 def _install_delta_companion_type_rules() -> None:
@@ -212,12 +220,9 @@ def _install_lol_tech_aram_rules() -> None:
 
 
 def _install_service_point_rule_switches() -> None:
-    from services.order_rules import ORDER_RULES
-
-    for key, rule in ORDER_RULES.items():
-        category = str(getattr(rule, "category", "") or "")
-        if category in {"lol", "valorant", "apex"}:
-            SERVICE_POINT_BENEFIT_RULE_OVERRIDES[str(key)] = False
+    # Legacy installer kept for compatibility. Game service rewards are now
+    # seat-aware and fully funded, so there is no category-wide disable list.
+    SERVICE_POINT_BENEFIT_RULE_OVERRIDES.clear()
 
 
 def _replace_or_append_group(groups: list[dict[str, Any]], label: str, details: list[dict[str, Any]]) -> None:
