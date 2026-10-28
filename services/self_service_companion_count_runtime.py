@@ -288,15 +288,24 @@ class EnhancedSelfServiceOrderView(base_ui.SelfServiceOrderView):
             submit.label = "送出訂單"
 
         if category:
-            if category_select is not None:
-                self.remove_item(category_select)
+            # View weights cache the rendered row at add-time. Remove selects first,
+            # then set their new rows and add them back; simply assigning item.row
+            # would leave the old row occupied internally and can make row 3 reject
+            # the new five-button action bar.
+            for item in (category_select, item_select, detail_select, quantity_select):
+                if item is not None:
+                    self.remove_item(item)
+
             if item_select is not None:
                 item_select.row = 0
                 _install_change_category_option(item_select, self)
+                self.add_item(item_select)
             if detail_select is not None:
                 detail_select.row = 1
+                self.add_item(detail_select)
             if quantity_select is not None:
                 quantity_select.row = 2
+                self.add_item(quantity_select)
 
             for item in (count_button, specified, point, staff_price, discount):
                 if item is None:
