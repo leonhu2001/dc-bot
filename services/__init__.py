@@ -19,6 +19,18 @@ from .game_price_policy_20261023 import (
 _install_game_price_policy_20261023()
 _order_rules.validate_rules()
 
+# 2026-10-28 entertainment companion split:
+# - keep the existing single/double rules as unrestricted-gender variants,
+# - add female/male single and double rules without splitting loyalty progress,
+# - replace selectable service point rewards with seat-aware single/double rewards.
+from .entertainment_companion_policy_20261028 import (
+    install_entertainment_companion_policy_20261028 as _install_entertainment_companion_policy_20261028,
+    install_point_service_financial_runtime_20261028 as _install_point_service_financial_runtime_20261028,
+)
+
+_install_entertainment_companion_policy_20261028()
+_order_rules.validate_rules()
+
 # Register system-owned catalog extensions before the remaining runtime wrappers are
 # installed. The extension injects its rules before services.orders builds label maps,
 # then adds the matching storefront groups for desktop and mobile Delta Force.
@@ -65,6 +77,11 @@ _install_loyalty_policy_20261023()
 from .benefit_runtime_integration import install_root_benefit_integrations as _install_benefits
 
 _install_benefits()
+
+# Double-companion point rewards extend both companions and therefore must fund
+# both seats. Install after benefit runtime setup and before financial-copy wrappers
+# capture the calculation function used by Web and Discord.
+_install_point_service_financial_runtime_20261028()
 
 # User-facing checkout copy must describe the same funding policy as the actual
 # payroll calculation. Install after benefit integration so wrappers see the
