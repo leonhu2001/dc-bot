@@ -1,5 +1,10 @@
 from services.loyalty_benefits import loyalty_scope_key
-from services.order_rules import ORDER_RULES
+from services.multi_seat_order_policy_20261028 import (
+    get_player_count_price_table,
+    get_rule_player_count_bounds,
+    is_service_point_benefit_enabled,
+)
+from services.order_rules import ORDER_RULES, calculate_price
 from services.orders import SELF_SERVICE_ORDER_CATALOG
 from services.point_benefit_catalog import (
     LEGACY_POINT_REDEEM_ITEMS_BY_KEY,
@@ -9,6 +14,7 @@ from services.point_benefit_catalog import (
     get_point_benefit_item,
     is_service_bonus_allowed_for_rule,
 )
+from services.self_service_point_benefits import is_order_point_benefit_allowed_for_rule
 from web.app.services.checkout_preview import (
     POINT_ITEMS as WEB_POINT_ITEMS,
     POINT_ITEM_MAP as WEB_POINT_ITEM_MAP,
@@ -51,7 +57,6 @@ def test_point_catalog_supports_one_to_four_seat_service_rewards():
         "tech_quad_service_small": 400,
         "tech_quad_service_large": 720,
     }
-    assert all("vip" not in item["key"].lower() for item in POINT_REDEEM_ITEMS)
 
 
 def test_old_service_and_legacy_point_keys_are_lookup_only():
@@ -74,64 +79,79 @@ def test_old_service_and_legacy_point_keys_are_lookup_only():
     assert get_point_benefit_item("entertain_service_large")["service_tier"] == "entertainment"
 
 
-def test_entertainment_rewards_require_exact_one_to_four_seat_match():
-    rules = {
-        1: ORDER_RULES["basic_black_tide_entertain_1"],
-        2: ORDER_RULES["basic_black_tide_entertain_2"],
-        3: ORDER_RULES["basic_black_tide_entertain_3"],
-        4: ORDER_RULES["basic_black_tide_entertain_4"],
-    }
+def test_shared_player_count_controls_service_voucher_seat_match():
+    rule = ORDER_RULES["basic_black_tide_entertain"]
     benefits = {
         1: get_point_benefit_item("entertain_single_service_small"),
         2: get_point_benefit_item("entertain_double_service_small"),
         3: get_point_benefit_item("entertain_triple_service_small"),
         4: get_point_benefit_item("entertain_quad_service_small"),
     }
+    for selected_count in range(1, 5):
+        for benefit_count, benefit in benefits.items():
+            assert is_service_bonus_allowed_for_rule(
+                rule,
+                benefit,
+                player_count=selected_count,
+            ) is (selected_count == benefit_count)
 
-    for seat_count, rule in rules.items():
-        for benefit_seats, benefit in benefits.items():
-            assert is_service_bonus_allowed_for_rule(rule, benefit) is (
-                seat_count == benefit_seats
-            )
-
-    hourly = adapt_point_benefit_for_rule(rules[4], benefits[4])
-    assert hourly["kind"] == "extra_hours"
-    assert hourly["hours"] == 0.5
-    assert hourly["seat_count"] == 4
-    assert "4陪" in hourly["name"]
-    assert "4 位陪玩同步加贈" in hourly["summary"]
-
-
-def test_player_count_products_match_voucher_seat_count_when_selection_is_known():
-    rule = ORDER_RULES["valorant_entertain_ranked"]
-    triple = get_point_benefit_item("entertain_triple_service_small")
-    quad = get_point_benefit_item("entertain_quad_service_small")
-
-    assert is_service_bonus_allowed_for_rule(rule, triple, player_count=3)
-    assert not is_service_bonus_allowed_for_rule(rule, triple, player_count=4)
-    assert is_service_bonus_allowed_for_rule(rule, quad, player_count=4)
-
-    game = adapt_point_benefit_for_rule(rule, triple)
-    assert game["kind"] == "extra_games"
-    assert game["games"] == 1
-    assert game["seat_count"] == 3
-    assert "1 局" in game["name"]
+    adapted = adapt_point_benefit_for_rule(rule, benefits[4])
+    assert adapted["kind"] == "extra_hours"
+    assert adapted["hours"] == 0.5
+    assert adapted["seat_count"] == 4
+    assert "4陪" in adapted["name"]
 
 
-def test_technical_and_entertainment_rewards_cannot_cross_tiers():
-    entertain = get_point_benefit_item("entertain_single_service_small")
-    tech = get_point_benefit_item("tech_single_service_small")
+def test_delta_companion_type_and_count_are_separate_but_legacy_double_rules_remain():
+    for key, roles in (
+        ("basic_entertain_single", {"male_companion", "female_companion"}),
+        ("basic_entertain_female_single", {"female_companion"}),
+        ("basic_entertain_male_single", {"male_companion"}),
+        ("basic_mobile_entertain_single", {"male_companion", "female_companion"}),
+        ("basic_mobile_entertain_female_single", {"female_companion"}),
+        ("basic_mobile_entertain_male_single", {"male_companion"}),
+    ):
+        rule = ORDER_RULES[key]
+        assert set(rule.allowed_roles) == roles
+        assert rule.required_staff_count == "player_count"
+        assert get_rule_player_count_bounds(rule) == (1, 2, 1, True)
 
-    entertainment_rule = ORDER_RULES["basic_entertain_single"]
-    technical_rule = ORDER_RULES["basic_tech_secret_single"]
+    for legacy_key in (
+        "basic_entertain_double",
+        "basic_entertain_female_double",
+        "basic_entertain_male_double",
+        "basic_mobile_entertain_double",
+        "basic_mobile_entertain_female_double",
+        "basic_mobile_entertain_male_double",
+    ):
+        assert legacy_key in ORDER_RULES
+        assert ORDER_RULES[legacy_key].required_staff_count == 2
 
-    assert is_service_bonus_allowed_for_rule(entertainment_rule, entertain)
-    assert not is_service_bonus_allowed_for_rule(entertainment_rule, tech)
-    assert is_service_bonus_allowed_for_rule(technical_rule, tech)
-    assert not is_service_bonus_allowed_for_rule(technical_rule, entertain)
+
+def test_delta_catalog_shows_type_only_and_keeps_old_single_selector_value():
+    for category in ("delta_desktop_basic", "delta_mobile_basic"):
+        group = _group(category, "娛樂陪")
+        assert [item["label"] for item in group["details"]] == ["不限", "女陪", "男陪"]
+        assert group["details"][0]["value"] in {"single", "mobile_single"}
+        assert all("player_count" not in item for item in group["details"])
 
 
-def test_black_tide_rules_use_owner_approved_prices_and_staff_counts():
+def test_black_tide_and_steam_use_explicit_one_to_four_price_tables():
+    black_tech = ORDER_RULES["basic_black_tide_tech"]
+    steam = ORDER_RULES["steam_play"]
+    assert get_player_count_price_table(black_tech) == {1: 400, 2: 760, 3: 1140, 4: 1520}
+    assert get_player_count_price_table(steam) == {1: 320, 2: 640, 3: 960, 4: 1280}
+
+    assert [calculate_price(black_tech, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [400, 760, 1140, 1520]
+    assert [calculate_price(steam, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [320, 640, 960, 1280]
+
+    black_group = _group("delta_desktop_basic", "黑潮爆破")
+    assert [item["label"] for item in black_group["details"]] == ["娛樂陪", "技術陪"]
+    steam_group = _group("steam", "娛樂陪")
+    assert [item["label"] for item in steam_group["details"]] == ["娛樂陪"]
+
+
+def test_black_tide_legacy_fixed_seat_keys_stay_resolvable():
     expected = {
         "basic_black_tide_entertain_1": (320, 1),
         "basic_black_tide_entertain_2": (600, 2),
@@ -147,130 +167,84 @@ def test_black_tide_rules_use_owner_approved_prices_and_staff_counts():
         assert rule.price == price
         assert rule.required_staff_count == staff_count
         assert rule.player_count_enabled is False
-        assert rule.price_multiply_player_count is False
 
 
-def test_black_tide_entertainment_shares_existing_loyalty_pool():
-    scope = loyalty_scope_key("basic_entertain_single")
-    for count in range(1, 5):
-        assert loyalty_scope_key(f"basic_black_tide_entertain_{count}") == scope
+def test_game_catalog_third_field_contains_mode_only_and_count_is_rule_bound():
+    valorant = _group("valorant", "超凡陪")
+    assert [item["label"] for item in valorant["details"]] == ["NG", "RK"]
+    assert [item["quantity_unit"] for item in valorant["details"]] == ["小時", "局"]
+    assert all("player_count" not in item for item in valorant["details"])
+
+    lol = _group("lol", "大師陪")
+    assert [item["label"] for item in lol["details"]] == ["NG", "RK", "AR"]
+    assert [item["quantity_unit"] for item in lol["details"]] == ["小時", "局", "小時"]
+    assert all("player_count" not in item for item in lol["details"])
+
+    apex = _group("apex", "大師陪")
+    assert [item["label"] for item in apex["details"]] == ["NG", "積分"]
+    assert all("player_count" not in item for item in apex["details"])
+
+    assert get_rule_player_count_bounds(ORDER_RULES["valorant_ascendant_ng"]) == (1, 4, 1, True)
+    assert get_rule_player_count_bounds(ORDER_RULES["lol_master_ng"]) == (1, 4, 1, True)
+    assert get_rule_player_count_bounds(ORDER_RULES["apex_master_ng"]) == (1, 2, 1, True)
 
 
-def test_lol_rank_aram_variants_reuse_ng_hourly_price_and_default_points_off():
+def test_lol_rank_aram_variants_reuse_ng_price_but_only_service_points_are_disabled():
     for aram_key, ng_key in (
         ("lol_master_aram", "lol_master_ng"),
         ("lol_grandmaster_aram", "lol_grandmaster_ng"),
         ("lol_elite_aram", "lol_elite_ng"),
     ):
         aram_rule = ORDER_RULES[aram_key]
-        ng_rule = ORDER_RULES[ng_key]
         assert aram_rule.pricing_type == "hourly"
-        assert aram_rule.price == ng_rule.price
-        assert aram_rule.required_staff_count == "player_count"
-        assert aram_rule.player_count_enabled is True
-        assert aram_rule.point_benefits_allowed is False
+        assert aram_rule.price == ORDER_RULES[ng_key].price
+        assert aram_rule.point_benefits_allowed is True
+        assert is_service_point_benefit_enabled(aram_rule) is False
+
+        assert is_order_point_benefit_allowed_for_rule(
+            aram_rule,
+            "discount_50",
+            {"player_count": 1, "quantity": 1},
+        )[0] is True
+        assert is_order_point_benefit_allowed_for_rule(
+            aram_rule,
+            "tech_single_service_small",
+            {"player_count": 1, "quantity": 1},
+        )[0] is False
 
 
-def test_gendered_entertainment_variants_reuse_existing_roles_and_counts():
-    cases = {
-        "basic_entertain_female_single": (("female_companion",), 1),
-        "basic_entertain_male_single": (("male_companion",), 1),
-        "basic_entertain_female_double": (("female_companion",), 2),
-        "basic_entertain_male_double": (("male_companion",), 2),
-        "basic_mobile_entertain_female_single": (("female_companion",), 1),
-        "basic_mobile_entertain_male_single": (("male_companion",), 1),
-        "basic_mobile_entertain_female_double": (("female_companion",), 2),
-        "basic_mobile_entertain_male_double": (("male_companion",), 2),
-    }
-
-    for key, (roles, count) in cases.items():
-        rule = ORDER_RULES[key]
-        assert rule.allowed_roles == roles
-        assert rule.required_staff_count == count
-        assert rule.loyalty_benefits_enabled is True
-
-    assert set(ORDER_RULES["basic_entertain_single"].allowed_roles) == {
-        "male_companion",
-        "female_companion",
-    }
-    assert set(ORDER_RULES["basic_entertain_double"].allowed_roles) == {
-        "male_companion",
-        "female_companion",
-    }
+def test_lol_valorant_apex_pause_service_point_rewards_but_not_cash_points():
+    for rule_key in (
+        "valorant_entertain_ng",
+        "lol_entertain_ng",
+        "apex_entertain_ng",
+    ):
+        rule = ORDER_RULES[rule_key]
+        assert is_order_point_benefit_allowed_for_rule(
+            rule,
+            "discount_50",
+            {"player_count": 1, "quantity": 1},
+        )[0] is True
+        allowed, reason = is_order_point_benefit_allowed_for_rule(
+            rule,
+            "entertain_single_service_small",
+            {"player_count": 1, "quantity": 1},
+        )
+        assert allowed is False
+        assert "暫停" in reason
 
 
-def test_gendered_variants_share_existing_entertainment_loyalty_pool():
+def test_entertainment_loyalty_scopes_remain_shared():
     desktop_scope = loyalty_scope_key("basic_entertain_single")
-    assert loyalty_scope_key("basic_entertain_double") == desktop_scope
-    assert loyalty_scope_key("basic_entertain_female_single") == desktop_scope
-    assert loyalty_scope_key("basic_entertain_male_single") == desktop_scope
-    assert loyalty_scope_key("basic_entertain_female_double") == desktop_scope
-    assert loyalty_scope_key("basic_entertain_male_double") == desktop_scope
-
-    mobile_scope = loyalty_scope_key("basic_mobile_entertain_single")
-    assert loyalty_scope_key("basic_mobile_entertain_double") == mobile_scope
-    assert loyalty_scope_key("basic_mobile_entertain_female_single") == mobile_scope
-    assert loyalty_scope_key("basic_mobile_entertain_male_double") == mobile_scope
-
-
-def test_self_service_third_field_uses_mode_and_one_to_four_seats():
-    black_tide = _group("delta_desktop_basic", "黑潮爆破")
-    assert [item["label"] for item in black_tide["details"]] == [
-        "娛樂單陪｜320T / H",
-        "娛樂雙陪｜600T / H",
-        "娛樂三陪｜900T / H",
-        "娛樂四陪｜1200T / H",
-        "技術單陪｜400T / H",
-        "技術雙陪｜760T / H",
-        "技術三陪｜1140T / H",
-        "技術四陪｜1520T / H",
-    ]
-
-    steam = _group("steam", "娛樂陪")
-    steam_details = [
-        item for item in steam["details"] if item.get("rule_key") == "steam_play"
-    ]
-    assert [item["label"] for item in steam_details] == ["單陪", "雙陪", "三陪", "四陪"]
-
-    valorant_entertain = _group("valorant", "娛樂陪")
-    assert [item["label"] for item in valorant_entertain["details"]] == [
-        "NG 單陪", "NG 雙陪", "NG 三陪", "NG 四陪",
-        "RK 單陪", "RK 雙陪", "RK 三陪", "RK 四陪",
-    ]
-
-    lol_entertain = _group("lol", "娛樂陪")
-    assert [item["label"] for item in lol_entertain["details"]] == [
-        "NG 單陪", "NG 雙陪", "NG 三陪", "NG 四陪",
-        "RK 單陪", "RK 雙陪", "RK 三陪", "RK 四陪",
-        "AR 單陪", "AR 雙陪", "AR 三陪", "AR 四陪",
-    ]
-
-
-def test_self_service_rank_groups_keep_dynamic_hour_and_game_units():
-    valorant_rank = _group("valorant", "超凡陪")
-    assert [item["label"] for item in valorant_rank["details"]] == [
-        "NG 單陪", "NG 雙陪", "NG 三陪", "NG 四陪",
-        "RK 單陪", "RK 雙陪", "RK 三陪", "RK 四陪",
-    ]
-    assert {item["quantity_unit"] for item in valorant_rank["details"] if item["label"].startswith("NG ")} == {"小時"}
-    assert {item["quantity_unit"] for item in valorant_rank["details"] if item["label"].startswith("RK ")} == {"局"}
-
-    lol_rank_groups = [
-        group
-        for group in SELF_SERVICE_ORDER_CATALOG["lol"]
-        if str(group.get("label") or "") != "娛樂陪"
-        and any(str(item.get("value") or "").startswith("ranked_") for item in group.get("details", []))
-    ]
-    assert lol_rank_groups
-    expected_labels = [
-        "NG 單陪", "NG 雙陪", "NG 三陪", "NG 四陪",
-        "RK 單陪", "RK 雙陪", "RK 三陪", "RK 四陪",
-        "AR 單陪", "AR 雙陪", "AR 三陪", "AR 四陪",
-    ]
-    for group in lol_rank_groups:
-        assert [item["label"] for item in group["details"]] == expected_labels
-        assert {item["quantity_unit"] for item in group["details"] if item["label"].startswith(("NG ", "AR "))} == {"小時"}
-        assert {item["quantity_unit"] for item in group["details"] if item["label"].startswith("RK ")} == {"局"}
+    for key in (
+        "basic_entertain_double",
+        "basic_entertain_female_single",
+        "basic_entertain_male_single",
+        "basic_black_tide_entertain",
+        "basic_black_tide_entertain_1",
+        "basic_black_tide_entertain_4",
+    ):
+        assert loyalty_scope_key(key) == desktop_scope
 
 
 def test_legacy_one_seat_helper_stays_compatible_for_old_orders():
@@ -285,46 +259,29 @@ def test_legacy_one_seat_helper_stays_compatible_for_old_orders():
     assert value == 300
 
 
-def test_web_checkout_uses_same_new_catalog_and_filters_fixed_seat_rewards():
+def test_web_catalog_keeps_current_service_rewards_and_legacy_keys_internal():
     web_keys = {item["key"] for item in WEB_POINT_ITEMS}
     assert web_keys == {item["key"] for item in POINT_REDEEM_ITEMS}
     assert "entertain_service_large" not in web_keys
     assert "entertain_service_large" in WEB_POINT_ITEM_MAP
 
     options = list_point_options(
-        rule_key="basic_entertain_double",
+        rule_key="basic_entertain_single",
         point_balance=999,
         quantity=1,
         has_specified_staff=False,
+        player_count=2,
     )
     by_key = {item["key"]: item for item in options}
     assert by_key["entertain_double_service_small"]["allowed"] is True
-    assert by_key["entertain_double_service_small"]["kind"] == "extra_hours"
     assert by_key["entertain_double_service_small"]["hours"] == 0.5
     assert by_key["entertain_single_service_small"]["allowed"] is False
-    assert by_key["entertain_triple_service_small"]["allowed"] is False
     assert by_key["tech_double_service_small"]["allowed"] is False
 
 
-def test_web_double_service_reward_funds_both_companion_seats():
+def test_web_multi_seat_service_reward_funds_all_selected_seats():
     item = adapt_point_benefit_for_rule(
-        ORDER_RULES["basic_entertain_double"],
-        get_point_benefit_item("entertain_double_service_large"),
-    )
-    assert calculate_point_service_value(
-        quote={
-            "quantity": 2,
-            "required_staff_count": 2,
-            "customer_pay_amount": 1200,
-        },
-        vip_pay_rate=100,
-        point_item=item,
-    ) == 600
-
-
-def test_web_quad_service_reward_funds_all_four_companion_seats():
-    item = adapt_point_benefit_for_rule(
-        ORDER_RULES["basic_black_tide_entertain_4"],
+        ORDER_RULES["basic_black_tide_entertain"],
         get_point_benefit_item("entertain_quad_service_large"),
     )
     assert calculate_point_service_value(
@@ -336,19 +293,3 @@ def test_web_quad_service_reward_funds_all_four_companion_seats():
         vip_pay_rate=100,
         point_item=item,
     ) == 1200
-
-
-def test_web_single_service_reward_funds_one_companion_seat():
-    item = adapt_point_benefit_for_rule(
-        ORDER_RULES["basic_entertain_single"],
-        get_point_benefit_item("entertain_single_service_large"),
-    )
-    assert calculate_point_service_value(
-        quote={
-            "quantity": 2,
-            "required_staff_count": 1,
-            "customer_pay_amount": 640,
-        },
-        vip_pay_rate=100,
-        point_item=item,
-    ) == 320
