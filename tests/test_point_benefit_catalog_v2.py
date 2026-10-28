@@ -1,5 +1,6 @@
 from services.loyalty_benefits import loyalty_scope_key
 from services.order_rules import ORDER_RULES
+from services.orders import SELF_SERVICE_ORDER_CATALOG
 from services.point_benefit_catalog import (
     LEGACY_POINT_REDEEM_ITEMS_BY_KEY,
     POINT_REDEEM_ITEMS,
@@ -20,7 +21,15 @@ def _catalog_costs():
     return {item["key"]: int(item["cost"]) for item in POINT_REDEEM_ITEMS}
 
 
-def test_point_catalog_splits_single_and_double_service_rewards():
+def _group(category: str, label: str) -> dict:
+    return next(
+        group
+        for group in SELF_SERVICE_ORDER_CATALOG[category]
+        if str(group.get("label") or "") == label
+    )
+
+
+def test_point_catalog_supports_one_to_four_seat_service_rewards():
     assert _catalog_costs() == {
         "discount_50": 20,
         "free_specify_fee": 30,
@@ -29,10 +38,18 @@ def test_point_catalog_splits_single_and_double_service_rewards():
         "entertain_single_service_large": 140,
         "entertain_double_service_small": 160,
         "entertain_double_service_large": 280,
-        "tech_single_service_small": 110,
-        "tech_single_service_large": 200,
-        "tech_double_service_small": 220,
-        "tech_double_service_large": 400,
+        "entertain_triple_service_small": 240,
+        "entertain_triple_service_large": 420,
+        "entertain_quad_service_small": 320,
+        "entertain_quad_service_large": 560,
+        "tech_single_service_small": 100,
+        "tech_single_service_large": 180,
+        "tech_double_service_small": 200,
+        "tech_double_service_large": 360,
+        "tech_triple_service_small": 300,
+        "tech_triple_service_large": 540,
+        "tech_quad_service_small": 400,
+        "tech_quad_service_large": 720,
     }
     assert all("vip" not in item["key"].lower() for item in POINT_REDEEM_ITEMS)
 
@@ -57,34 +74,47 @@ def test_old_service_and_legacy_point_keys_are_lookup_only():
     assert get_point_benefit_item("entertain_service_large")["service_tier"] == "entertainment"
 
 
-def test_entertainment_single_and_double_rewards_match_exact_seat_count():
-    single = get_point_benefit_item("entertain_single_service_small")
-    double = get_point_benefit_item("entertain_double_service_small")
-    single_rule = ORDER_RULES["basic_entertain_single"]
-    double_rule = ORDER_RULES["basic_entertain_double"]
+def test_entertainment_rewards_require_exact_one_to_four_seat_match():
+    rules = {
+        1: ORDER_RULES["basic_black_tide_entertain_1"],
+        2: ORDER_RULES["basic_black_tide_entertain_2"],
+        3: ORDER_RULES["basic_black_tide_entertain_3"],
+        4: ORDER_RULES["basic_black_tide_entertain_4"],
+    }
+    benefits = {
+        1: get_point_benefit_item("entertain_single_service_small"),
+        2: get_point_benefit_item("entertain_double_service_small"),
+        3: get_point_benefit_item("entertain_triple_service_small"),
+        4: get_point_benefit_item("entertain_quad_service_small"),
+    }
 
-    assert is_service_bonus_allowed_for_rule(single_rule, single)
-    assert not is_service_bonus_allowed_for_rule(single_rule, double)
-    assert is_service_bonus_allowed_for_rule(double_rule, double)
-    assert not is_service_bonus_allowed_for_rule(double_rule, single)
+    for seat_count, rule in rules.items():
+        for benefit_seats, benefit in benefits.items():
+            assert is_service_bonus_allowed_for_rule(rule, benefit) is (
+                seat_count == benefit_seats
+            )
 
-    hourly = adapt_point_benefit_for_rule(double_rule, double)
+    hourly = adapt_point_benefit_for_rule(rules[4], benefits[4])
     assert hourly["kind"] == "extra_hours"
     assert hourly["hours"] == 0.5
-    assert hourly["seat_count"] == 2
-    assert "雙陪" in hourly["name"]
-    assert "2 位陪玩同步加贈" in hourly["summary"]
+    assert hourly["seat_count"] == 4
+    assert "4陪" in hourly["name"]
+    assert "4 位陪玩同步加贈" in hourly["summary"]
 
 
-def test_entertainment_reward_adapts_to_game_and_preserves_seat_requirement():
-    benefit = get_point_benefit_item("entertain_single_service_small")
-    game_rule = ORDER_RULES["valorant_entertain_ranked"]
+def test_player_count_products_match_voucher_seat_count_when_selection_is_known():
+    rule = ORDER_RULES["valorant_entertain_ranked"]
+    triple = get_point_benefit_item("entertain_triple_service_small")
+    quad = get_point_benefit_item("entertain_quad_service_small")
 
-    assert is_service_bonus_allowed_for_rule(game_rule, benefit)
-    game = adapt_point_benefit_for_rule(game_rule, benefit)
+    assert is_service_bonus_allowed_for_rule(rule, triple, player_count=3)
+    assert not is_service_bonus_allowed_for_rule(rule, triple, player_count=4)
+    assert is_service_bonus_allowed_for_rule(rule, quad, player_count=4)
+
+    game = adapt_point_benefit_for_rule(rule, triple)
     assert game["kind"] == "extra_games"
     assert game["games"] == 1
-    assert game["seat_count"] == 1
+    assert game["seat_count"] == 3
     assert "1 局" in game["name"]
 
 
@@ -99,6 +129,31 @@ def test_technical_and_entertainment_rewards_cannot_cross_tiers():
     assert not is_service_bonus_allowed_for_rule(entertainment_rule, tech)
     assert is_service_bonus_allowed_for_rule(technical_rule, tech)
     assert not is_service_bonus_allowed_for_rule(technical_rule, entertain)
+
+
+def test_black_tide_rules_use_owner_approved_prices_and_staff_counts():
+    expected = {
+        "basic_black_tide_entertain_1": (320, 1),
+        "basic_black_tide_entertain_2": (600, 2),
+        "basic_black_tide_entertain_3": (900, 3),
+        "basic_black_tide_entertain_4": (1200, 4),
+        "basic_black_tide_tech_1": (400, 1),
+        "basic_black_tide_tech_2": (760, 2),
+        "basic_black_tide_tech_3": (1140, 3),
+        "basic_black_tide_tech_4": (1520, 4),
+    }
+    for key, (price, staff_count) in expected.items():
+        rule = ORDER_RULES[key]
+        assert rule.price == price
+        assert rule.required_staff_count == staff_count
+        assert rule.player_count_enabled is False
+        assert rule.price_multiply_player_count is False
+
+
+def test_black_tide_entertainment_shares_existing_loyalty_pool():
+    scope = loyalty_scope_key("basic_entertain_single")
+    for count in range(1, 5):
+        assert loyalty_scope_key(f"basic_black_tide_entertain_{count}") == scope
 
 
 def test_gendered_entertainment_variants_reuse_existing_roles_and_counts():
@@ -143,6 +198,61 @@ def test_gendered_variants_share_existing_entertainment_loyalty_pool():
     assert loyalty_scope_key("basic_mobile_entertain_male_double") == mobile_scope
 
 
+def test_self_service_third_field_uses_mode_and_one_to_four_seats():
+    black_tide = _group("delta_desktop_basic", "黑潮爆破")
+    assert [item["label"] for item in black_tide["details"]] == [
+        "娛樂單陪｜320T / H",
+        "娛樂雙陪｜600T / H",
+        "娛樂三陪｜900T / H",
+        "娛樂四陪｜1200T / H",
+        "技術單陪｜400T / H",
+        "技術雙陪｜760T / H",
+        "技術三陪｜1140T / H",
+        "技術四陪｜1520T / H",
+    ]
+
+    steam = _group("steam", "娛樂陪")
+    steam_details = [
+        item for item in steam["details"] if item.get("rule_key") == "steam_play"
+    ]
+    assert [item["label"] for item in steam_details] == ["單陪", "雙陪", "三陪", "四陪"]
+
+    valorant_entertain = _group("valorant", "娛樂陪")
+    assert [item["label"] for item in valorant_entertain["details"]] == [
+        "NG 單陪", "NG 雙陪", "NG 三陪", "NG 四陪",
+        "RK 單陪", "RK 雙陪", "RK 三陪", "RK 四陪",
+    ]
+
+    lol_entertain = _group("lol", "娛樂陪")
+    assert [item["label"] for item in lol_entertain["details"]] == [
+        "AR 單陪", "AR 雙陪", "AR 三陪", "AR 四陪",
+        "NG 單陪", "NG 雙陪", "NG 三陪", "NG 四陪",
+        "RK 單陪", "RK 雙陪", "RK 三陪", "RK 四陪",
+    ]
+
+
+def test_self_service_rank_groups_keep_dynamic_hour_and_game_units():
+    valorant_rank = _group("valorant", "超凡陪")
+    assert [item["label"] for item in valorant_rank["details"]] == [
+        "NG 單陪", "NG 雙陪", "NG 三陪", "NG 四陪",
+        "RK 單陪", "RK 雙陪", "RK 三陪", "RK 四陪",
+    ]
+    assert {item["quantity_unit"] for item in valorant_rank["details"] if item["label"].startswith("NG ")} == {"小時"}
+    assert {item["quantity_unit"] for item in valorant_rank["details"] if item["label"].startswith("RK ")} == {"局"}
+
+    lol_rank_groups = [
+        group
+        for group in SELF_SERVICE_ORDER_CATALOG["lol"]
+        if str(group.get("label") or "") != "娛樂陪"
+        and any(str(item.get("value") or "").startswith("ranked_") for item in group.get("details", []))
+    ]
+    assert lol_rank_groups
+    for group in lol_rank_groups:
+        labels = [item["label"] for item in group["details"]]
+        assert all("陪玩" not in label and "積分" not in label for label in labels)
+        assert all(label.startswith(("NG ", "RK ", "AR ")) for label in labels)
+
+
 def test_legacy_one_seat_helper_stays_compatible_for_old_orders():
     double_rule = ORDER_RULES["basic_entertain_double"]
     value = calculate_one_seat_service_bonus_value(
@@ -172,6 +282,7 @@ def test_web_checkout_uses_same_new_catalog_and_filters_fixed_seat_rewards():
     assert by_key["entertain_double_service_small"]["kind"] == "extra_hours"
     assert by_key["entertain_double_service_small"]["hours"] == 0.5
     assert by_key["entertain_single_service_small"]["allowed"] is False
+    assert by_key["entertain_triple_service_small"]["allowed"] is False
     assert by_key["tech_double_service_small"]["allowed"] is False
 
 
@@ -189,6 +300,22 @@ def test_web_double_service_reward_funds_both_companion_seats():
         vip_pay_rate=100,
         point_item=item,
     ) == 600
+
+
+def test_web_quad_service_reward_funds_all_four_companion_seats():
+    item = adapt_point_benefit_for_rule(
+        ORDER_RULES["basic_black_tide_entertain_4"],
+        get_point_benefit_item("entertain_quad_service_large"),
+    )
+    assert calculate_point_service_value(
+        quote={
+            "quantity": 2,
+            "required_staff_count": 4,
+            "customer_pay_amount": 2400,
+        },
+        vip_pay_rate=100,
+        point_item=item,
+    ) == 1200
 
 
 def test_web_single_service_reward_funds_one_companion_seat():
