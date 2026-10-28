@@ -4,6 +4,7 @@ from dataclasses import replace
 
 
 _INSTALLED = False
+_DISCORD_RUNTIME_INSTALLED = False
 
 
 _DELTA_TECH_CANONICAL = (
@@ -11,28 +12,28 @@ _DELTA_TECH_CANONICAL = (
         "delta_desktop_basic",
         "basic_tech_secret_single",
         "機密",
-        "secret_single",
+        "secret",
         {1: 400, 2: 750},
     ),
     (
         "delta_desktop_basic",
         "basic_tech_topsecret_single",
         "絕密",
-        "topsecret_single",
+        "topsecret",
         {1: 450, 2: 850},
     ),
     (
         "delta_mobile_basic",
         "basic_mobile_tech_secret_single",
         "機密",
-        "mobile_secret_single",
+        "secret",
         {1: 380, 2: 760},
     ),
     (
         "delta_mobile_basic",
         "basic_mobile_tech_topsecret_single",
         "絕密",
-        "mobile_topsecret_single",
+        "topsecret",
         {1: 420, 2: 840},
     ),
 )
@@ -48,9 +49,8 @@ _SWEET_PREFIX_CATEGORIES = (
 
 
 def _set_code_rule(order_rules, key: str, rule) -> None:
-    # ORDER_RULES is an EffectiveOrderRules dict subclass. Update both its code-rule
-    # backing entry and get_base_rule's immutable-fallback map so every read path sees
-    # the same structural migration while historical keys remain present.
+    # EffectiveOrderRules is a dict subclass. Update both its backing entry and the
+    # immutable fallback map so get_base_rule / manager override reads agree.
     dict.__setitem__(order_rules.ORDER_RULES, str(key), rule)
     order_rules._BASE_ORDER_RULES[str(key)] = rule
 
@@ -68,6 +68,8 @@ def _as_selectable_count_rule(rule, *, maximum: int = 2):
 
 
 def _install_delta_tech_count_rules(order_rules, multi_seat) -> None:
+    # Keep the historical *_double keys untouched. New Discord checkout uses the
+    # single canonical rule plus an independent companion-count control.
     for _category, key, _label, _value, prices in _DELTA_TECH_CANONICAL:
         rule = order_rules.ORDER_RULES.get(key)
         if rule is None:
@@ -78,78 +80,38 @@ def _install_delta_tech_count_rules(order_rules, multi_seat) -> None:
         multi_seat.PLAYER_COUNT_PRICE_TABLES[key] = dict(prices)
 
 
-def _install_sweet_count_rules(order_rules, multi_seat) -> None:
+def _sweet_canonical_key(prefix: str, mode: str) -> str:
+    return f"{prefix}_sweet_{mode}"
+
+
+def _install_sweet_canonical_rules(order_rules, multi_seat) -> None:
+    """Add count-neutral Sweet rules without rewriting historical fixed-seat keys."""
     for prefix, _category in _SWEET_PREFIX_CATEGORIES:
-        for suffix in ("female_single", "male_single", "double_any"):
-            key = f"{prefix}_sweet_{suffix}"
-            rule = order_rules.ORDER_RULES.get(key)
-            if rule is None:
-                raise RuntimeError(f"missing sweet companion rule: {key}")
-            migrated = _as_selectable_count_rule(rule, maximum=2)
-            order_rules.validate_rule_definition(key, migrated)
-            _set_code_rule(order_rules, key, migrated)
+        specs = (
+            ("female", f"{prefix}_sweet_female_single", "女陪", 520),
+            ("male", f"{prefix}_sweet_male_single", "男陪", 520),
+            ("any", f"{prefix}_sweet_double_any", "不限", 520),
+        )
+        for mode, template_key, semantic_label, one_seat_price in specs:
+            key = _sweet_canonical_key(prefix, mode)
+            if dict.__contains__(order_rules.ORDER_RULES, key):
+                rule = dict.__getitem__(order_rules.ORDER_RULES, key)
+            else:
+                template = order_rules.ORDER_RULES.get(template_key)
+                if template is None:
+                    raise RuntimeError(f"missing sweet companion template: {template_key}")
+                game_label = str(template.label).split("｜甜蜜單｜", 1)[0]
+                rule = replace(
+                    template,
+                    key=key,
+                    label=f"{game_label}｜甜蜜單｜{semantic_label}",
+                    price=int(one_seat_price),
+                    catalog_group_label="甜蜜單",
+                )
+            rule = _as_selectable_count_rule(rule, maximum=2)
+            order_rules.validate_rule_definition(key, rule)
+            _set_code_rule(order_rules, key, rule)
             multi_seat.PLAYER_COUNT_PRICE_TABLES[key] = {1: 520, 2: 1314}
-
-
-def _replace_delta_tech_catalog(orders) -> None:
-    by_category: dict[str, list[dict]] = {}
-    for category, key, label, value, _prices in _DELTA_TECH_CANONICAL:
-        by_category.setdefault(category, []).append({
-            "label": label,
-            "value": value,
-            "rule_key": key,
-            "quantity_unit": "小時",
-            "min_quantity": 1,
-            "max_quantity": 24,
-        })
-
-    for category, details in by_category.items():
-        groups = orders.SELF_SERVICE_ORDER_CATALOG.get(category, [])
-        target_keys = {str(item["rule_key"]) for item in details}
-        for group in groups:
-            current_keys = {
-                str(item.get("rule_key") or "")
-                for item in group.get("details", [])
-            }
-            if not (current_keys & target_keys):
-                continue
-            group["details"] = [dict(item) for item in details]
-            break
-
-
-def _replace_sweet_catalog(orders) -> None:
-    for prefix, category in _SWEET_PREFIX_CATEGORIES:
-        groups = orders.SELF_SERVICE_ORDER_CATALOG.get(category, [])
-        for group in groups:
-            if str(group.get("label") or "") != "甜蜜單":
-                continue
-            group["details"] = [
-                {
-                    "label": "女陪",
-                    "value": "female_single",
-                    "rule_key": f"{prefix}_sweet_female_single",
-                    "quantity_unit": "小時",
-                    "min_quantity": 1,
-                    "max_quantity": 24,
-                },
-                {
-                    "label": "男陪",
-                    "value": "male_single",
-                    "rule_key": f"{prefix}_sweet_male_single",
-                    "quantity_unit": "小時",
-                    "min_quantity": 1,
-                    "max_quantity": 24,
-                },
-                {
-                    "label": "不限",
-                    "value": "double_any",
-                    "rule_key": f"{prefix}_sweet_double_any",
-                    "quantity_unit": "小時",
-                    "min_quantity": 1,
-                    "max_quantity": 24,
-                },
-            ]
-            break
 
 
 def _install_effective_rule_normalizer(order_rules) -> None:
@@ -162,9 +124,9 @@ def _install_effective_rule_normalizer(order_rules) -> None:
         for _category, key, _label, _value, _prices in _DELTA_TECH_CANONICAL
     }
     structural_keys.update(
-        f"{prefix}_sweet_{suffix}"
+        _sweet_canonical_key(prefix, mode)
         for prefix, _category in _SWEET_PREFIX_CATEGORIES
-        for suffix in ("female_single", "male_single", "double_any")
+        for mode in ("female", "male", "any")
     )
 
     original_effective = rules._effective
@@ -182,27 +144,123 @@ def _install_effective_rule_normalizer(order_rules) -> None:
     rules._companion_count_catalog_cleanup_installed = True
 
 
-def install_companion_count_catalog_cleanup_20261028() -> None:
-    """Keep spec selectors semantic while companion count lives in its own control.
+def _discord_detail_rows(category: str | None, group_label: str | None) -> list[dict] | None:
+    category_text = str(category or "")
+    group_text = str(group_label or "")
 
-    Old single/double rule keys are intentionally retained for order snapshots and
-    saved selections. New checkout uses one canonical rule per semantic choice and
-    the shared companion-count selector for 1/2 seats.
+    if group_text == "技術陪" and category_text in {"delta_desktop_basic", "delta_mobile_basic"}:
+        return [
+            {
+                "label": label,
+                "value": value,
+                "rule_key": key,
+                "quantity_unit": "小時",
+                "min_quantity": 1,
+                "max_quantity": 24,
+                "item": label,
+            }
+            for row_category, key, label, value, _prices in _DELTA_TECH_CANONICAL
+            if row_category == category_text
+        ]
+
+    if group_text == "甜蜜單":
+        prefix = next(
+            (prefix for prefix, mapped_category in _SWEET_PREFIX_CATEGORIES if mapped_category == category_text),
+            None,
+        )
+        if prefix is not None:
+            return [
+                {
+                    "label": "女陪",
+                    "value": "female",
+                    "rule_key": _sweet_canonical_key(prefix, "female"),
+                    "quantity_unit": "小時",
+                    "min_quantity": 1,
+                    "max_quantity": 24,
+                    "item": "女陪",
+                },
+                {
+                    "label": "男陪",
+                    "value": "male",
+                    "rule_key": _sweet_canonical_key(prefix, "male"),
+                    "quantity_unit": "小時",
+                    "min_quantity": 1,
+                    "max_quantity": 24,
+                    "item": "男陪",
+                },
+                {
+                    "label": "不限",
+                    "value": "any",
+                    "rule_key": _sweet_canonical_key(prefix, "any"),
+                    "quantity_unit": "小時",
+                    "min_quantity": 1,
+                    "max_quantity": 24,
+                    "item": "不限",
+                },
+            ]
+
+    return None
+
+
+def install_companion_count_discord_runtime_20261028() -> None:
+    """Collapse count-duplicated Discord specs without changing historical catalogs.
+
+    The Web/admin catalog and old selector values remain intact for compatibility.
+    Discord self-service gets semantic specs and uses the existing companion-count
+    control as the only customer-facing seat-count source.
     """
+    global _DISCORD_RUNTIME_INSTALLED
+    if _DISCORD_RUNTIME_INSTALLED:
+        return
+
+    from services import order_runtime, orders, self_service_selection_state, self_service_ui_runtime
+
+    original_details = orders.get_order_item_details_for_group
+    original_detail = orders.get_order_item_detail_for_selection
+
+    def discord_details(category, group_label):
+        rows = _discord_detail_rows(category, group_label)
+        if rows is not None:
+            return [dict(item) for item in rows]
+        return original_details(category, group_label)
+
+    def discord_detail(category, group_label, detail_value):
+        rows = _discord_detail_rows(category, group_label)
+        if rows is not None:
+            target = str(detail_value or "")
+            return next(
+                (dict(item) for item in rows if str(item.get("value") or "") == target),
+                None,
+            )
+        return original_detail(category, group_label, detail_value)
+
+    # These modules import the helpers directly. Patch only their Discord runtime
+    # references; services.orders itself intentionally keeps the legacy catalog so
+    # historical Web selections and old tickets remain resolvable.
+    order_runtime.get_order_item_details_for_group = discord_details
+    order_runtime.get_order_item_detail_for_selection = discord_detail
+    self_service_selection_state.get_order_item_details_for_group = discord_details
+    self_service_ui_runtime.get_order_item_detail_for_selection = discord_detail
+
+    _DISCORD_RUNTIME_INSTALLED = True
+
+
+def install_companion_count_catalog_cleanup_20261028() -> None:
+    """Install count-neutral business rules while retaining historical rule keys."""
     global _INSTALLED
     if _INSTALLED:
         return
 
     from services import multi_seat_order_policy_20261028 as multi_seat
     from services import order_rules
-    from services import orders
 
     _install_delta_tech_count_rules(order_rules, multi_seat)
-    _install_sweet_count_rules(order_rules, multi_seat)
-    _replace_delta_tech_catalog(orders)
-    _replace_sweet_catalog(orders)
+    _install_sweet_canonical_rules(order_rules, multi_seat)
     _install_effective_rule_normalizer(order_rules)
     _INSTALLED = True
 
 
-__all__ = ["install_companion_count_catalog_cleanup_20261028"]
+__all__ = [
+    "install_companion_count_catalog_cleanup_20261028",
+    "install_companion_count_discord_runtime_20261028",
+]
