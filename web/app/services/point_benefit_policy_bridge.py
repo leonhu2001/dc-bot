@@ -2,22 +2,19 @@ from __future__ import annotations
 
 
 def _patch_entertainment_variants(order_groups) -> None:
+    # Companion TYPE is independent from companion COUNT. Historical double keys
+    # remain in ORDER_RULES for old orders, but new Web checkout only exposes the
+    # three type choices and lets the shared player-count field choose 1-2 people.
     variants_by_key = {
         "entertain": [
-            ("basic_entertain_single", "單陪（不限）"),
-            ("basic_entertain_female_single", "女單陪"),
-            ("basic_entertain_male_single", "男單陪"),
-            ("basic_entertain_double", "雙陪（不限）"),
-            ("basic_entertain_female_double", "女雙陪"),
-            ("basic_entertain_male_double", "男雙陪"),
+            ("basic_entertain_single", "不限"),
+            ("basic_entertain_female_single", "女陪"),
+            ("basic_entertain_male_single", "男陪"),
         ],
         "entertain_mobile": [
-            ("basic_mobile_entertain_single", "單陪（不限）"),
-            ("basic_mobile_entertain_female_single", "女單陪"),
-            ("basic_mobile_entertain_male_single", "男單陪"),
-            ("basic_mobile_entertain_double", "雙陪（不限）"),
-            ("basic_mobile_entertain_female_double", "女雙陪"),
-            ("basic_mobile_entertain_male_double", "男雙陪"),
+            ("basic_mobile_entertain_single", "不限"),
+            ("basic_mobile_entertain_female_single", "女陪"),
+            ("basic_mobile_entertain_male_single", "男陪"),
         ],
     }
 
@@ -26,7 +23,7 @@ def _patch_entertainment_variants(order_groups) -> None:
         variants = variants_by_key.get(key)
         if variants is None:
             continue
-        spec["selector_label"] = "陪玩規格"
+        spec["selector_label"] = "陪玩類型"
         spec["variants"] = list(variants)
 
 
@@ -63,6 +60,7 @@ def install_shared_point_benefit_policy() -> None:
         point_balance: int,
         quantity: int,
         has_specified_staff: bool,
+        player_count: int | None = None,
     ) -> dict:
         rule = checkout.ORDER_RULES.get(str(rule_key))
         item = checkout.POINT_ITEM_MAP.get(str(point_item_key))
@@ -71,13 +69,20 @@ def install_shared_point_benefit_policy() -> None:
         if int(point_balance or 0) < int(item["cost"]):
             return {"allowed": False, "reason": "點數不足。"}
 
+        payload = {
+            "quantity": max(1, int(quantity or 1)),
+            "specified_staff_ids": ["selected"] if has_specified_staff else [],
+        }
+        if player_count not in (None, ""):
+            try:
+                payload["player_count"] = max(1, int(player_count or 1))
+            except (TypeError, ValueError):
+                payload["player_count"] = 1
+
         allowed, reason = check_order_point_benefit_allowed(
             rule,
             item,
-            {
-                "quantity": max(1, int(quantity or 1)),
-                "specified_staff_ids": ["selected"] if has_specified_staff else [],
-            },
+            payload,
         )
         if allowed:
             return {"allowed": True, "reason": ""}
@@ -92,9 +97,9 @@ def install_shared_point_benefit_policy() -> None:
 
     checkout.point_item_status = point_item_status
 
-    # Keep the four superseded service keys resolvable for historical callers and
-    # old tests/in-flight state, but mark them as aliases. Public checkout options
-    # filter these rows below, so customers can only newly select the seat-aware keys.
+    # Keep superseded service keys resolvable for historical callers and in-flight
+    # orders. Public checkout hides these aliases, while current seat-aware options
+    # are validated against the selected companion count.
     original_list_point_options = checkout.list_point_options
 
     def list_point_options(
@@ -103,6 +108,7 @@ def install_shared_point_benefit_policy() -> None:
         point_balance: int,
         quantity: int,
         has_specified_staff: bool,
+        player_count: int | None = None,
     ) -> list[dict]:
         result = list(
             original_list_point_options(
@@ -116,6 +122,26 @@ def install_shared_point_benefit_policy() -> None:
         rule = checkout.ORDER_RULES.get(str(rule_key))
         if rule is None:
             return result
+
+        # original_list_point_options calls the patched point_item_status without a
+        # count because its legacy signature predates the shared count field. Re-run
+        # status here whenever the caller has a concrete count so 1/2/3/4-seat
+        # service rewards are exact rather than inferred.
+        if player_count not in (None, ""):
+            for row in result:
+                key = str(row.get("key") or "")
+                if not key:
+                    continue
+                row.update(
+                    point_item_status(
+                        rule_key=rule_key,
+                        point_item_key=key,
+                        point_balance=point_balance,
+                        quantity=quantity,
+                        has_specified_staff=has_specified_staff,
+                        player_count=player_count,
+                    )
+                )
 
         existing = {str(item.get("key") or "") for item in result}
         for key in (
@@ -138,6 +164,7 @@ def install_shared_point_benefit_policy() -> None:
                 point_balance=point_balance,
                 quantity=quantity,
                 has_specified_staff=has_specified_staff,
+                player_count=player_count,
             )
             adapted.update(status)
             result.append(adapted)
@@ -162,21 +189,36 @@ def install_shared_point_benefit_policy() -> None:
             ),
         )
 
-        for option in result.get("point_options", []) if isinstance(result, dict) else []:
-            try:
-                reward_seats = int(option.get("seat_count") or 0)
-            except (TypeError, ValueError):
-                reward_seats = 0
-            if reward_seats > 0 and reward_seats != selected_seats:
-                option["allowed"] = False
-                option["reason"] = "這張服務加贈券不適用此單陪／雙陪規格。"
-
         if isinstance(result, dict):
-            result["point_options"] = [
-                option
-                for option in result.get("point_options", [])
-                if not bool(option.get("legacy_alias"))
-            ]
+            customer = result.get("customer") if isinstance(result.get("customer"), dict) else {}
+            preselected = (
+                result.get("staff", {}).get("preselected_staff")
+                if isinstance(result.get("staff"), dict)
+                else None
+            )
+            point_options = list_point_options(
+                rule_key=str(kwargs.get("rule_key") or ""),
+                point_balance=int(customer.get("points") or 0),
+                quantity=max(1, int(quote.get("quantity") or kwargs.get("quantity") or 1)),
+                has_specified_staff=bool(preselected),
+                player_count=selected_seats,
+            )
+
+            visible_options: list[dict] = []
+            for option in point_options:
+                if bool(option.get("legacy_alias")):
+                    continue
+                try:
+                    reward_seats = int(option.get("seat_count") or 0)
+                except (TypeError, ValueError):
+                    reward_seats = 0
+                # Public UI only shows the service reward for the CURRENT count.
+                # Other point products are untouched.
+                if reward_seats > 0 and reward_seats != selected_seats:
+                    continue
+                visible_options.append(option)
+
+            result["point_options"] = visible_options
         return result
 
     checkout.build_checkout_options = build_checkout_options
@@ -189,17 +231,37 @@ def install_shared_point_benefit_policy() -> None:
         if rule_key and point_item_key:
             rule = checkout.ORDER_RULES.get(rule_key)
             item = checkout.POINT_ITEM_MAP.get(point_item_key)
-            if rule is not None and item is not None and str(item.get("kind") or "") == "service_bonus":
+            if rule is not None and item is not None:
                 try:
                     selected_players = max(1, int(kwargs.get("player_count") or 1))
                 except (TypeError, ValueError):
                     selected_players = 1
-                if not point_catalog.is_service_bonus_allowed_for_rule(
+                try:
+                    selected_quantity = max(1, int(kwargs.get("quantity") or 1))
+                except (TypeError, ValueError):
+                    selected_quantity = 1
+                specified_ids = kwargs.get("specified_staff_ids")
+                if not isinstance(specified_ids, list):
+                    specified_ids = []
+
+                allowed, reason = check_order_point_benefit_allowed(
+                    rule,
+                    item,
+                    {
+                        "quantity": selected_quantity,
+                        "player_count": selected_players,
+                        "specified_staff_ids": specified_ids,
+                    },
+                )
+                if not allowed:
+                    raise ValueError(reason or "目前選擇的點數福利已不適用。")
+
+                if str(item.get("kind") or "") == "service_bonus" and not point_catalog.is_service_bonus_allowed_for_rule(
                     rule,
                     item,
                     player_count=selected_players,
                 ):
-                    raise ValueError("這張服務加贈券不適用此單陪／雙陪規格。")
+                    raise ValueError("這張服務加贈券不適用目前的陪玩人數規格。")
         return original_build_preview(*args, **kwargs)
 
     checkout.build_checkout_preview = build_checkout_preview
