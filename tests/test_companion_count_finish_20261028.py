@@ -302,3 +302,27 @@ def test_web_service_import_never_rewrites_authoritative_order_rules() -> None:
     assert before == expected
     assert after == expected
 
+
+def test_new_catalog_never_exposes_historical_fixed_seat_variants() -> None:
+    from web.app.services.order_groups import get_grouped_order_catalog
+
+    desktop = {group["key"]: group for group in get_grouped_order_catalog("delta_desktop_basic")}
+    tech = desktop["tech_play"]
+    assert [variant["label"] for variant in tech["variants"]] == ["機密", "絕密"]
+    assert [variant["rule_key"] for variant in tech["variants"]] == [
+        "basic_tech_secret_single",
+        "basic_tech_topsecret_single",
+    ]
+
+    entertain = desktop["entertain"]
+    assert [variant["label"] for variant in entertain["variants"]] == ["不限", "女陪", "男陪"]
+    assert all("double" not in variant["rule_key"] for variant in entertain["variants"])
+
+    valorant = {group["key"]: group for group in get_grouped_order_catalog("valorant")}
+    sweet = valorant["valorant_sweet"]
+    assert [variant["label"] for variant in sweet["variants"]] == ["女陪", "男陪", "不限"]
+    assert [variant["rule_key"] for variant in sweet["variants"]] == [
+        "valorant_sweet_female",
+        "valorant_sweet_male",
+        "valorant_sweet_any",
+    ]
