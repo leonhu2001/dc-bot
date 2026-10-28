@@ -12,12 +12,7 @@ _INSTALLED = False
 
 
 def is_sweet_rule_key(rule_key: str) -> bool:
-    """Return whether this is a new public count-neutral Sweet rule.
-
-    Legacy basic/game-specific single/double keys stay unchanged so historical
-    orders and saved selections preserve their original rule snapshot semantics.
-    New Discord Sweet checkout uses *_sweet_female / *_sweet_male / *_sweet_any.
-    """
+    """Return whether this is a new public count-neutral Sweet rule."""
     key = str(rule_key or "")
     return key.endswith(("_sweet_female", "_sweet_male", "_sweet_any"))
 
@@ -34,6 +29,74 @@ def _enforce_sweet_requirement(rule_key: str, rule):
         rule,
         required_game_roles=(*required, SWEET_COMPANION_ROLE_KEY),
     )
+
+
+def _persist_sweet_override_migration(order_rules) -> None:
+    """Write the Sweet qualification into saved manager overrides once.
+
+    This replaces the old strategy of wrapping EffectiveOrderRules._effective on
+    every read. Existing manager price/role/benefit settings stay intact; only the
+    new mandatory Sweet qualification is added to the stored rule payload.
+    """
+    try:
+        from services.order_rule_store import load_active_overrides, publish_rule_override
+    except Exception:
+        return
+
+    active = load_active_overrides()
+    changed = False
+    for key, item in active.items():
+        if not is_sweet_rule_key(key):
+            continue
+
+        original_payload = dict(item.get("payload") or {})
+        payload = dict(original_payload)
+        required = [
+            str(value)
+            for value in (payload.get("required_game_roles") or [])
+            if str(value).strip()
+        ]
+        if SWEET_COMPANION_ROLE_KEY not in required:
+            required.append(SWEET_COMPANION_ROLE_KEY)
+        payload["required_game_roles"] = required
+        payload["catalog_group_label"] = ""
+
+        if payload == original_payload:
+            continue
+
+        try:
+            publish_rule_override(
+                rule_key=key,
+                payload=payload,
+                actor_discord_id="system",
+                actor_display_name="2026-10-28 sweet qualification migration",
+                expected_active_version=int(item.get("version") or 0),
+                action="system_migrate_sweet_qualification_20261028",
+            )
+            changed = True
+        except Exception as exc:
+            print(
+                f"[sweet-companion] override migration skipped {key}: {exc}",
+                flush=True,
+            )
+
+    if changed:
+        order_rules.invalidate_rule_override_cache()
+
+
+def _install_direct_sweet_rules(order_rules) -> None:
+    rules = order_rules.ORDER_RULES
+    for key in list(dict.keys(rules)):
+        text_key = str(key)
+        if not is_sweet_rule_key(text_key):
+            continue
+        base = dict.__getitem__(rules, text_key)
+        guarded = _enforce_sweet_requirement(text_key, base)
+        order_rules.validate_rule_definition(text_key, guarded)
+        dict.__setitem__(rules, text_key, guarded)
+        order_rules._BASE_ORDER_RULES[text_key] = guarded
+
+    _persist_sweet_override_migration(order_rules)
 
 
 def _install_and_matcher(order_rules) -> None:
@@ -59,8 +122,8 @@ def _install_and_matcher(order_rules) -> None:
         ]
 
         # required_game_role_ids normally means "at least one of these game roles".
-        # Sweet companion is different: it is an additional qualification and must
-        # be held together with the normal service/game qualification.
+        # 甜蜜陪 is an additional qualification and therefore must be held together
+        # with the normal game/service qualification.
         if SWEET_COMPANION_ROLE_ID in required_games:
             if SWEET_COMPANION_ROLE_ID not in member_roles:
                 return False
@@ -79,8 +142,8 @@ def _install_and_matcher(order_rules) -> None:
     order_rules.role_ids_match_requirements = role_ids_match_requirements
     order_rules._sweet_companion_and_matcher_installed = True
 
-    # These modules normally import the matcher after services/__init__ finishes.
-    # Patch already-loaded copies too, so test/reload order cannot weaken the gate.
+    # Some modules can already hold a direct import of the matcher. Keep those
+    # references synchronized with the one canonical matcher implementation.
     for module_name in ("views.smart_dispatch", "shared.order_acceptance"):
         module = sys.modules.get(module_name)
         if module is not None:
@@ -88,7 +151,7 @@ def _install_and_matcher(order_rules) -> None:
 
 
 def install_sweet_companion_policy_20261028() -> None:
-    """Require 甜蜜陪 in addition to each new Sweet rule's normal qualification."""
+    """Require 甜蜜陪 in addition to every new count-neutral Sweet qualification."""
     global _INSTALLED
     if _INSTALLED:
         return
@@ -102,28 +165,7 @@ def install_sweet_companion_policy_20261028() -> None:
     order_rules.ALL_ROLE_IDS[SWEET_COMPANION_ROLE_KEY] = SWEET_COMPANION_ROLE_ID
     order_rules.ALL_ROLE_LABELS[SWEET_COMPANION_ROLE_KEY] = SWEET_COMPANION_ROLE_LABEL
 
-    rules = order_rules.ORDER_RULES
-
-    # EffectiveOrderRules reapplies manager overrides on every read. Enforce this
-    # structural qualification after that merge so an override cannot remove it.
-    if hasattr(rules, "_effective"):
-        if not getattr(rules, "_sweet_companion_policy_installed", False):
-            original_effective = rules._effective
-
-            def _effective(rule_key: str):
-                rule = original_effective(str(rule_key))
-                guarded = _enforce_sweet_requirement(str(rule_key), rule)
-                order_rules.validate_rule_definition(str(rule_key), guarded)
-                return guarded
-
-            rules._effective = _effective
-            rules._sweet_companion_policy_installed = True
-    else:
-        for rule_key in list(rules):
-            if not is_sweet_rule_key(str(rule_key)):
-                continue
-            rules[rule_key] = _enforce_sweet_requirement(str(rule_key), rules[rule_key])
-
+    _install_direct_sweet_rules(order_rules)
     _install_and_matcher(order_rules)
     _INSTALLED = True
 
