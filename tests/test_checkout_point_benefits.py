@@ -22,14 +22,27 @@ def test_point_catalog_prices_and_legacy_rewards_hidden_from_new_selection():
     assert items["discount_50"]["cost"] == 20
     assert items["free_specify_fee"]["cost"] == 30
     assert items["discount_100"]["cost"] == 45
-    assert items["entertain_single_service_small"]["cost"] == 80
-    assert items["entertain_single_service_large"]["cost"] == 140
-    assert items["entertain_double_service_small"]["cost"] == 160
-    assert items["entertain_double_service_large"]["cost"] == 280
-    assert items["tech_single_service_small"]["cost"] == 110
-    assert items["tech_single_service_large"]["cost"] == 200
-    assert items["tech_double_service_small"]["cost"] == 220
-    assert items["tech_double_service_large"]["cost"] == 400
+
+    expected_service_costs = {
+        "entertain_single_service_small": 80,
+        "entertain_single_service_large": 140,
+        "entertain_double_service_small": 160,
+        "entertain_double_service_large": 280,
+        "entertain_triple_service_small": 240,
+        "entertain_triple_service_large": 420,
+        "entertain_quad_service_small": 320,
+        "entertain_quad_service_large": 560,
+        "tech_single_service_small": 100,
+        "tech_single_service_large": 180,
+        "tech_double_service_small": 200,
+        "tech_double_service_large": 360,
+        "tech_triple_service_small": 300,
+        "tech_triple_service_large": 540,
+        "tech_quad_service_small": 400,
+        "tech_quad_service_large": 720,
+    }
+    for key, cost in expected_service_costs.items():
+        assert items[key]["cost"] == cost
 
     for key in (
         "discount_20",
@@ -80,12 +93,14 @@ def test_entertainment_reward_adapts_to_hourly_or_game(monkeypatch):
     assert hourly_by_key["entertain_single_service_small"]["hours"] == 0.5
     assert hourly_by_key["entertain_single_service_large"]["hours"] == 1
     assert hourly_by_key["entertain_double_service_small"]["allowed"] is False
+    assert hourly_by_key["entertain_quad_service_small"]["allowed"] is False
 
     assert game_by_key["entertain_single_service_small"]["allowed"] is True
     assert game_by_key["entertain_single_service_small"]["kind"] == "extra_games"
     assert game_by_key["entertain_single_service_small"]["games"] == 1
     assert game_by_key["entertain_single_service_large"]["games"] == 2
     assert game_by_key["entertain_double_service_large"]["allowed"] is False
+    assert game_by_key["entertain_quad_service_large"]["allowed"] is False
 
     assert hourly_by_key["tech_single_service_small"]["allowed"] is False
     assert game_by_key["tech_single_service_large"]["allowed"] is False
@@ -112,6 +127,7 @@ def test_technical_reward_is_separate_from_entertainment(monkeypatch):
     assert by_key["tech_single_service_small"]["allowed"] is True
     assert by_key["tech_single_service_small"]["kind"] == "extra_hours"
     assert by_key["tech_double_service_small"]["allowed"] is False
+    assert by_key["tech_quad_service_small"]["allowed"] is False
     assert by_key["entertain_single_service_small"]["allowed"] is False
 
 
@@ -197,6 +213,33 @@ def test_new_double_companion_reward_funds_both_seats():
     assert finance["payout_base_amount"] == 1800
     assert finance["store_absorbed_amount"] == 600
     assert finance["point_service_note"] == "服務時間 +1 小時（2 位陪玩同步加贈）"
+
+
+def test_new_quad_companion_reward_funds_all_four_seats():
+    point_item = {"kind": "extra_hours", "hours": 1, "seat_count": 4}
+    service_value = checkout.calculate_point_service_value(
+        quote={
+            "quantity": 2,
+            "required_staff_count": 4,
+            "customer_pay_amount": 2400,
+        },
+        vip_pay_rate=100,
+        point_item=point_item,
+    )
+    assert service_value == 1200
+
+    finance = checkout.calculate_checkout_financials(
+        service_amount=2400,
+        vip_pay_rate=100,
+        specify_fee=0,
+        point_item=point_item,
+        point_service_value=service_value,
+        wallet_balance=0,
+        use_wallet=False,
+    )
+    assert finance["payout_base_amount"] == 3600
+    assert finance["store_absorbed_amount"] == 1200
+    assert finance["point_service_note"] == "服務時間 +1 小時（4 位陪玩同步加贈）"
 
 
 def test_point_cash_coupon_is_shared_after_policy_change():
