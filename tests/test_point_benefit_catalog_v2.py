@@ -137,13 +137,21 @@ def test_delta_catalog_shows_type_only_and_keeps_old_single_selector_value():
 
 
 def test_black_tide_and_steam_use_explicit_one_to_four_price_tables():
+    black_entertain = ORDER_RULES["basic_black_tide_entertain"]
     black_tech = ORDER_RULES["basic_black_tide_tech"]
     steam = ORDER_RULES["steam_play"]
+    assert get_player_count_price_table(black_entertain) == {1: 320, 2: 600, 3: 900, 4: 1200}
     assert get_player_count_price_table(black_tech) == {1: 400, 2: 760, 3: 1140, 4: 1520}
     assert get_player_count_price_table(steam) == {1: 320, 2: 640, 3: 960, 4: 1280}
 
+    assert [calculate_price(black_entertain, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [320, 600, 900, 1200]
     assert [calculate_price(black_tech, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [400, 760, 1140, 1520]
     assert [calculate_price(steam, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [320, 640, 960, 1280]
+
+    for rule in (black_entertain, black_tech):
+        assert rule.required_staff_count == "player_count"
+        assert rule.player_count_enabled is True
+        assert get_rule_player_count_bounds(rule) == (1, 4, 1, True)
 
     black_group = _group("delta_desktop_basic", "黑潮爆破")
     assert [item["label"] for item in black_group["details"]] == ["娛樂陪", "技術陪"]
@@ -151,22 +159,13 @@ def test_black_tide_and_steam_use_explicit_one_to_four_price_tables():
     assert [item["label"] for item in steam_group["details"]] == ["娛樂陪"]
 
 
-def test_black_tide_legacy_fixed_seat_keys_stay_resolvable():
-    expected = {
-        "basic_black_tide_entertain_1": (320, 1),
-        "basic_black_tide_entertain_2": (600, 2),
-        "basic_black_tide_entertain_3": (900, 3),
-        "basic_black_tide_entertain_4": (1200, 4),
-        "basic_black_tide_tech_1": (400, 1),
-        "basic_black_tide_tech_2": (760, 2),
-        "basic_black_tide_tech_3": (1140, 3),
-        "basic_black_tide_tech_4": (1520, 4),
+def test_black_tide_legacy_fixed_seat_keys_are_removed_from_active_rules():
+    legacy_keys = {
+        f"basic_black_tide_{tier}_{count}"
+        for tier in ("entertain", "tech")
+        for count in range(1, 5)
     }
-    for key, (price, staff_count) in expected.items():
-        rule = ORDER_RULES[key]
-        assert rule.price == price
-        assert rule.required_staff_count == staff_count
-        assert rule.player_count_enabled is False
+    assert legacy_keys.isdisjoint(ORDER_RULES)
 
 
 def test_game_catalog_third_field_contains_mode_only_and_count_is_rule_bound():
@@ -241,8 +240,6 @@ def test_entertainment_loyalty_scopes_remain_shared():
         "basic_entertain_female_single",
         "basic_entertain_male_single",
         "basic_black_tide_entertain",
-        "basic_black_tide_entertain_1",
-        "basic_black_tide_entertain_4",
     ):
         assert loyalty_scope_key(key) == desktop_scope
 
