@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import replace
 from types import SimpleNamespace
 
 from services import order_runtime
@@ -117,9 +118,18 @@ def test_before_category_keeps_requested_action_and_submit_rows_visible(monkeypa
 
 
 def test_fixed_count_product_shows_locked_count_button():
+    fixed_single_rule = replace(
+        ORDER_RULES["basic_trial_500"],
+        key="test_fixed_single",
+        required_staff_count=1,
+        player_count_enabled=False,
+        min_player_count=1,
+        max_player_count=None,
+    )
+
     async def build_button():
         return SelfServicePlayerCountButton(
-            rule=ORDER_RULES["basic_trial_500"],
+            rule=fixed_single_rule,
             current_count=1,
             disabled=False,
         )
