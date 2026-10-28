@@ -1,0 +1,151 @@
+name: Repair Web catalog parity after Discord rule updates
+
+on:
+  push:
+    paths:
+      - .github/workflows/web_catalog_sync_audit_20261029.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Sync Web catalog copy and hide historical manager rows
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          # 1) Public Web catalog: align hard-coded presentation copy with the
+          # authoritative catalog/rules already used by Discord checkout.
+          path = Path('web/app/services/order_groups.py')
+          s = path.read_text(encoding='utf-8')
+          replacements = {
+              '("basic_exbar_gamble_leiguan", "淚冠")': '("basic_exbar_gamble_leiguan", "萬金淚冠")',
+              '("basic_bet_1000", "1000T")': '("basic_bet_1000", "800w")',
+              '("basic_bet_1500", "1500T")': '("basic_bet_1500", "1000w")',
+              '("basic_bet_2500", "2500T")': '("basic_bet_2500", "1200w")',
+              '("basic_trial_500", "500T")': '("basic_trial_500", "777w")',
+              '("basic_trial_1000", "1000T")': '("basic_trial_1000", "1688w")',
+              '積分累積 10 個服務局回饋 1 局': '積分累積 15 個服務局回饋 1 局',
+              '"description": "NG 500T/人/H、積分 550T/人/H；指定每位 +100T，2H 以上免指定費。"': '"description": "NG 480T/人/H、積分 530T/人/H；指定每位 +100T，2H 以上免指定費。"',
+              '"description": "NG 600T/人/H、積分 650T/人/H；指定每位 +100T，2H 以上免指定費。"': '"description": "NG 580T/人/H、積分 630T/人/H；指定每位 +100T，2H 以上免指定費。"',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'order_groups sync anchor missing: {old}')
+              s = s.replace(old, new)
+          path.write_text(s, encoding='utf-8')
+
+          # 2) Manager page: historical fixed-seat rules are retained only so old
+          # orders/snapshots can resolve. They must not look like live products in
+          # 商品與規則, and direct edit URLs must reject them too.
+          path = Path('web/app/routers/admin_order_rules.py')
+          s = path.read_text(encoding='utf-8')
+          anchor = 'ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}\n\n'
+          block = '''ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}\n\n# 只供歷史訂單 / 舊快照回查，不是現在可販售商品。\n# 公開 Web/Discord catalog 都已改用 canonical 規則，管理頁也不應再讓\n# 這些 fixed-seat aliases 看起來像可維護的現役商品。\nADMIN_HISTORICAL_ONLY_RULE_KEYS = {\n    "basic_tech_secret_double",\n    "basic_tech_topsecret_double",\n    "basic_mobile_tech_secret_double",\n    "basic_mobile_tech_topsecret_double",\n    "basic_entertain_double",\n    "basic_entertain_female_double",\n    "basic_entertain_male_double",\n    "basic_mobile_entertain_double",\n    "basic_mobile_entertain_female_double",\n    "basic_mobile_entertain_male_double",\n    "farm_season_3x3_skin",\n    "farm_season_3x3_dc_skin",\n    "farm_season_3x3_dc_loss",\n    "farm_season_3x3_dc_skin_loss",\n    "valorant_entertain",\n    "valorant_tech",\n    "valorant_top_tech",\n}\nfor _legacy_prefix in (\n    "delta_desktop",\n    "delta_mobile",\n    "steam",\n    "valorant",\n    "lol",\n    "apex",\n):\n    ADMIN_HISTORICAL_ONLY_RULE_KEYS.update({\n        f"{_legacy_prefix}_sweet_female_single",\n        f"{_legacy_prefix}_sweet_male_single",\n        f"{_legacy_prefix}_sweet_female_double",\n        f"{_legacy_prefix}_sweet_male_double",\n        f"{_legacy_prefix}_sweet_double_any",\n    })\n\n'''
+          if anchor not in s:
+              raise SystemExit('admin hidden categories anchor missing')
+          s = s.replace(anchor, block, 1)
+
+          old = '''def _is_admin_editable_rule(rule_key: str) -> bool:\n    rule = ORDER_RULES.get(str(rule_key))\n    return bool(\n        rule is not None\n        and str(rule.category) not in ADMIN_HIDDEN_RULE_CATEGORIES\n    )\n'''
+          new = '''def _is_admin_editable_rule(rule_key: str) -> bool:\n    key = str(rule_key)\n    rule = ORDER_RULES.get(key)\n    return bool(\n        rule is not None\n        and str(rule.category) not in ADMIN_HIDDEN_RULE_CATEGORIES\n        and key not in ADMIN_HISTORICAL_ONLY_RULE_KEYS\n    )\n'''
+          if old not in s:
+              raise SystemExit('admin editable helper anchor missing')
+          s = s.replace(old, new, 1)
+
+          old = '''            _rule_row(str(key))\n            for key, rule in ORDER_RULES.items()\n            if str(rule.category) not in ADMIN_HIDDEN_RULE_CATEGORIES\n'''
+          new = '''            _rule_row(str(key))\n            for key, rule in ORDER_RULES.items()\n            if _is_admin_editable_rule(str(key))\n'''
+          if old not in s:
+              raise SystemExit('admin rule_rows filter anchor missing')
+          s = s.replace(old, new, 1)
+          path.write_text(s, encoding='utf-8')
+
+          # 3) Cross-surface contract: catch stale Web copy/catalog the next time
+          # Discord/shared rules change.
+          path = Path('tests/test_web_catalog_parity_20261029.py')
+          path.write_text(r'''from __future__ import annotations
+
+import services  # noqa: F401
+from services import order_rules, order_runtime
+from web.app.routers import admin_order_rules
+from web.app.services import order_groups
+
+
+def _web_group(category: str, key: str) -> dict:
+    return next(
+        group
+        for group in order_groups.get_grouped_order_catalog(category)
+        if group["key"] == key
+    )
+
+
+def test_web_fixed_option_labels_match_current_discord_catalog() -> None:
+    desktop = {group["key"]: group for group in order_groups.get_grouped_order_catalog("delta_desktop_basic")}
+
+    assert [row["label"] for row in desktop["exbar_gamble"]["variants"]] == [
+        "縱橫", "萬金淚冠", "天圓地方", "測距儀"
+    ]
+    assert [row["label"] for row in desktop["bet"]["variants"]] == [
+        "800w", "1000w", "1200w"
+    ]
+    assert [row["label"] for row in desktop["trial"]["variants"]] == [
+        "777w", "1688w"
+    ]
+
+    assert [row["label"] for row in order_runtime.get_order_item_details_for_group(
+        "delta_desktop_basic", "賭約單"
+    )] == ["800w", "1000w", "1200w"]
+    assert [row["label"] for row in order_runtime.get_order_item_details_for_group(
+        "delta_desktop_basic", "體驗單"
+    )] == ["777w", "1688w"]
+
+
+def test_web_loyalty_and_apex_copy_matches_authoritative_rules() -> None:
+    valorant = _web_group("valorant", "valorant_entertain")
+    lol = _web_group("lol", "lol_entertain")
+    assert "積分累積 15 個服務局回饋 1 局" in valorant["description"]
+    assert "積分累積 15 個服務局回饋 1 局" in lol["description"]
+
+    apex_master = _web_group("apex", "apex_master")
+    apex_predator = _web_group("apex", "apex_predator")
+    assert order_rules.ORDER_RULES["apex_master_ng"].price == 480
+    assert order_rules.ORDER_RULES["apex_master_ranked"].price == 530
+    assert order_rules.ORDER_RULES["apex_predator_ng"].price == 580
+    assert order_rules.ORDER_RULES["apex_predator_ranked"].price == 630
+    assert "NG 480T/人/H、積分 530T/人/H" in apex_master["description"]
+    assert "NG 580T/人/H、積分 630T/人/H" in apex_predator["description"]
+
+
+def test_web_manager_hides_historical_fixed_seat_rules() -> None:
+    historical = (
+        "basic_tech_secret_double",
+        "basic_entertain_double",
+        "valorant_sweet_female_single",
+        "valorant_sweet_female_double",
+    )
+    for key in historical:
+        assert key in order_rules.ORDER_RULES
+        assert admin_order_rules._is_admin_editable_rule(key) is False
+
+    for key in (
+        "basic_tech_secret_single",
+        "basic_entertain_single",
+        "valorant_sweet_female",
+        "apex_master_ng",
+    ):
+        assert key in order_rules.ORDER_RULES
+        assert admin_order_rules._is_admin_editable_rule(key) is True
+''', encoding='utf-8')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/app/services/order_groups.py web/app/routers/admin_order_rules.py tests/test_web_catalog_parity_20261029.py
+          git commit -m "Sync Web catalog with current checkout rules"
+          git push origin HEAD:main
