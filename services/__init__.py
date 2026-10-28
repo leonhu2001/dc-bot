@@ -20,9 +20,9 @@ _install_game_price_policy_20261023()
 _order_rules.validate_rules()
 
 # 2026-10-28 entertainment companion split:
-# - keep the existing single/double rules as unrestricted-gender variants,
-# - add female/male single and double rules without splitting loyalty progress,
-# - replace selectable service point rewards with seat-aware single/double rewards.
+# - keep historical fixed-seat keys for existing order snapshots,
+# - add female/male variants,
+# - keep the point-service financial lifecycle compatible with issued benefits.
 from .entertainment_companion_policy_20261028 import (
     install_entertainment_companion_policy_20261028 as _install_entertainment_companion_policy_20261028,
     install_point_service_financial_runtime_20261028 as _install_point_service_financial_runtime_20261028,
@@ -30,12 +30,8 @@ from .entertainment_companion_policy_20261028 import (
 
 _install_entertainment_companion_policy_20261028()
 
-# Shared companion-count policy:
-# - third field is gameplay / companion type only,
-# - companion count is selected independently,
-# - explicit 1-4 price tables are used where prices are not safely linear,
-# - service point rewards remain seat-aware and game categories can disable only
-#   service-type point rewards without disabling the other point products.
+# Shared 1-4 companion pricing/point helpers. Structural Delta/Sweet rules are made
+# authoritative by the direct migration below instead of being repaired per read.
 from .multi_seat_order_policy_20261028 import (
     install_multi_seat_order_policy_20261028 as _install_multi_seat_order_policy_20261028,
 )
@@ -43,28 +39,20 @@ from .multi_seat_order_policy_20261028 import (
 _install_multi_seat_order_policy_20261028()
 _order_rules.validate_rules()
 
-# Old manager overrides can still carry the pre-migration fixed-single structural
-# fields. Normalize only those structural fields on effective reads while retaining
-# the manager's price/label/role/benefit settings.
-from .multi_seat_effective_rule_runtime import (
-    install_multi_seat_effective_rule_runtime as _install_multi_seat_effective_rule_runtime,
-)
-
-_install_multi_seat_effective_rule_runtime()
-
-# Finish the independent companion-count migration. Historical fixed-seat keys and
-# the Web/admin catalog stay resolvable; Discord presentation is patched later after
-# its UI runtime modules have loaded.
+# Direct companion-count migration:
+# - rewrites the actual base rule + fallback registry,
+# - rewrites the canonical catalog rows (no Discord-only helper monkey patch),
+# - persists stale manager overrides into the new structure so old database rules
+#   cannot turn 「機密」 back into 「機密｜單陪」 after restart.
 from .companion_count_catalog_cleanup_20261028 import (
     install_companion_count_catalog_cleanup_20261028 as _install_companion_count_catalog_cleanup_20261028,
-    install_companion_count_discord_runtime_20261028 as _install_companion_count_discord_runtime_20261028,
 )
 
 _install_companion_count_catalog_cleanup_20261028()
 _order_rules.validate_rules()
 
-# New count-neutral Sweet orders require the normal service/game qualification AND
-# the dedicated 甜蜜陪 role. Historical fixed-seat Sweet keys remain unchanged.
+# Count-neutral Sweet orders require the normal service/game qualification AND the
+# dedicated 甜蜜陪 role. Historical fixed-seat keys remain available for snapshots.
 from .sweet_companion_policy_20261028 import (
     install_sweet_companion_policy_20261028 as _install_sweet_companion_policy_20261028,
 )
@@ -166,12 +154,8 @@ from .quick_order_ticket_policy_20261028 import (
 
 _install_quick_order_ticket_policy_20261028()
 
-# Patch only Discord's imported catalog helpers so the third selector stops repeating
-# single/double wording for products that already have an independent count control.
-_install_companion_count_discord_runtime_20261028()
-
-# Install the Discord shared player-count control after core benefit policies are
-# ready. Importing this patches the UI class before bot.py imports self_service_runtime.
+# Install the shared player-count control after the canonical catalog/rules are final.
+# There is no separate Discord catalog overlay anymore; every UI reads the same rows.
 from .self_service_companion_count_runtime import (
     install_self_service_companion_count_runtime as _install_self_service_companion_count_runtime,
 )

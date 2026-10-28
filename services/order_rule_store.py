@@ -7,6 +7,82 @@ from pathlib import Path
 from typing import Any
 
 
+SWEET_COMPANION_ROLE_KEY = "sweet_companion"
+
+# These built-in products have a dedicated companion-count control. Their headcount
+# structure is system-owned and must never be reverted by an old manager override or
+# by rolling back to a pre-migration version.
+_COUNT_RULE_REQUIRED_GAME_ROLE = {
+    "basic_tech_secret_single": "delta_desktop",
+    "basic_tech_topsecret_single": "delta_desktop",
+    "basic_mobile_tech_secret_single": "delta_mobile",
+    "basic_mobile_tech_topsecret_single": "delta_mobile",
+    "basic_entertain_single": "delta_desktop",
+    "basic_entertain_female_single": "delta_desktop",
+    "basic_entertain_male_single": "delta_desktop",
+    "basic_mobile_entertain_single": "delta_mobile",
+    "basic_mobile_entertain_female_single": "delta_mobile",
+    "basic_mobile_entertain_male_single": "delta_mobile",
+}
+
+_SWEET_CANONICAL_REQUIRED_GAME_ROLE = {
+    "delta_desktop": "delta_desktop",
+    "delta_mobile": "delta_mobile",
+    "steam": "steam_game",
+    "valorant": "valorant_game",
+    "lol": "lol_game",
+    "apex": "apex_game",
+}
+
+for _prefix, _game_role in _SWEET_CANONICAL_REQUIRED_GAME_ROLE.items():
+    for _mode in ("female", "male", "any"):
+        _COUNT_RULE_REQUIRED_GAME_ROLE[f"{_prefix}_sweet_{_mode}"] = _game_role
+
+_SWEET_CANONICAL_KEYS = {
+    f"{prefix}_sweet_{mode}"
+    for prefix in _SWEET_CANONICAL_REQUIRED_GAME_ROLE
+    for mode in ("female", "male", "any")
+}
+
+
+def normalize_builtin_rule_override_payload(
+    rule_key: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Apply non-editable structural invariants before a built-in rule is stored.
+
+    Price, service roles, benefit switches and normal manager-editable fields remain
+    untouched. Only fields that define the new companion-count contract are forced.
+    This happens at persistence time, so later reads do not need a monkey-patch or an
+    EffectiveOrderRules wrapper to repair stale data.
+    """
+    key = str(rule_key or "").strip()
+    result = dict(payload or {})
+    game_role = _COUNT_RULE_REQUIRED_GAME_ROLE.get(key)
+    if game_role is None:
+        return result
+
+    result.update({
+        "required_staff_count": "player_count",
+        "player_count_enabled": True,
+        "min_player_count": 1,
+        "max_player_count": 2,
+        "price_multiply_player_count": False,
+        "max_specified_count": 2,
+        # The built-in catalog owns the second/third-field wording for these rules.
+        # A stale manager group override would otherwise make the UI fall back to the
+        # old rule label such as 「機密｜單陪」.
+        "catalog_group_label": "",
+    })
+
+    if key in _SWEET_CANONICAL_KEYS:
+        result["required_game_roles"] = [game_role, SWEET_COMPANION_ROLE_KEY]
+    else:
+        result["required_game_roles"] = [game_role]
+
+    return result
+
+
 def default_db_path() -> Path:
     return Path(__file__).resolve().parents[1] / "web_dashboard.db"
 
@@ -128,12 +204,8 @@ def load_active_overrides(
         result[key] = {
             "version": int(row["version"] or 0),
             "payload": _decode_payload(row["payload_json"]),
-            "updated_by_discord_id": str(
-                row["updated_by_discord_id"] or ""
-            ),
-            "updated_by_display_name": str(
-                row["updated_by_display_name"] or ""
-            ),
+            "updated_by_discord_id": str(row["updated_by_discord_id"] or ""),
+            "updated_by_display_name": str(row["updated_by_display_name"] or ""),
             "updated_at": str(row["updated_at"] or ""),
         }
     return result
@@ -144,7 +216,6 @@ def get_active_override(
     db_file: str | Path | None = None,
 ) -> dict[str, Any] | None:
     return load_active_overrides(db_file).get(str(rule_key))
-
 
 
 def load_custom_rule_definitions(
@@ -206,12 +277,8 @@ def load_custom_rule_definitions(
             "rule_key": key,
             "category": category,
             "payload": payload,
-            "created_by_discord_id": str(
-                row["created_by_discord_id"] or ""
-            ),
-            "created_by_display_name": str(
-                row["created_by_display_name"] or ""
-            ),
+            "created_by_discord_id": str(row["created_by_discord_id"] or ""),
+            "created_by_display_name": str(row["created_by_display_name"] or ""),
             "created_at": str(row["created_at"] or ""),
         }
     return result
@@ -222,6 +289,18 @@ def get_custom_rule_definition(
     db_file: str | Path | None = None,
 ) -> dict[str, Any] | None:
     return load_custom_rule_definitions(db_file).get(str(rule_key))
+
+
+def _next_version(conn: sqlite3.Connection, rule_key: str) -> int:
+    row = conn.execute(
+        """
+        SELECT COALESCE(MAX(version), 0)
+        FROM order_rule_override_versions
+        WHERE rule_key = ?
+        """,
+        (str(rule_key),),
+    ).fetchone()
+    return int((row[0] if row else 0) or 0) + 1
 
 
 def create_custom_order_rule(
@@ -235,7 +314,6 @@ def create_custom_order_rule(
 ) -> dict[str, Any]:
     key = str(rule_key or "").strip()
     category_value = str(category or "").strip()
-
     if not key:
         raise ValueError("缺少商品代碼。")
     if not category_value:
@@ -256,34 +334,22 @@ def create_custom_order_rule(
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
-
         existing = conn.execute(
             """
-            SELECT 1
-            FROM custom_order_rules
-            WHERE rule_key = ?
-            LIMIT 1
+            SELECT 1 FROM custom_order_rules WHERE rule_key = ? LIMIT 1
             """,
             (key,),
         ).fetchone()
         if existing is not None:
             raise ValueError("這個商品代碼已存在，請重新建立。")
 
-        # A code-defined rule may already use this key even if no custom row
-        # exists. The caller validates that separately; this check protects
-        # against duplicate custom records at the persistence layer.
         conn.execute(
             """
             INSERT INTO custom_order_rules (
-                rule_key,
-                category,
-                payload_json,
-                created_by_discord_id,
-                created_by_display_name,
-                created_at,
-                is_active
-            )
-            VALUES (?, ?, ?, ?, ?, ?, 1)
+                rule_key, category, payload_json,
+                created_by_discord_id, created_by_display_name,
+                created_at, is_active
+            ) VALUES (?, ?, ?, ?, ?, ?, 1)
             """,
             (
                 key,
@@ -299,16 +365,9 @@ def create_custom_order_rule(
         conn.execute(
             """
             INSERT INTO order_rule_override_versions (
-                rule_key,
-                version,
-                action,
-                payload_json,
-                source_version,
-                actor_discord_id,
-                actor_display_name,
-                created_at
-            )
-            VALUES (?, ?, 'create', ?, NULL, ?, ?, ?)
+                rule_key, version, action, payload_json, source_version,
+                actor_discord_id, actor_display_name, created_at
+            ) VALUES (?, ?, 'create', ?, NULL, ?, ?, ?)
             """,
             (
                 key,
@@ -339,21 +398,13 @@ def list_rule_versions(
 ) -> list[dict[str, Any]]:
     path = _path(db_file)
     ensure_order_rule_store(path)
-
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
             SELECT
-                id,
-                rule_key,
-                version,
-                action,
-                payload_json,
-                source_version,
-                actor_discord_id,
-                actor_display_name,
-                created_at
+                id, rule_key, version, action, payload_json, source_version,
+                actor_discord_id, actor_display_name, created_at
             FROM order_rule_override_versions
             WHERE rule_key = ?
             ORDER BY version DESC
@@ -363,27 +414,9 @@ def list_rule_versions(
         ).fetchall()
 
     return [
-        {
-            **dict(row),
-            "payload": _decode_payload(row["payload_json"]),
-        }
+        {**dict(row), "payload": _decode_payload(row["payload_json"])}
         for row in rows
     ]
-
-
-def _next_version(
-    conn: sqlite3.Connection,
-    rule_key: str,
-) -> int:
-    row = conn.execute(
-        """
-        SELECT COALESCE(MAX(version), 0)
-        FROM order_rule_override_versions
-        WHERE rule_key = ?
-        """,
-        (str(rule_key),),
-    ).fetchone()
-    return int((row[0] if row else 0) or 0) + 1
 
 
 def publish_rule_override(
@@ -403,6 +436,11 @@ def publish_rule_override(
     if not isinstance(payload, dict) or not payload:
         raise ValueError("規則內容不能為空。")
 
+    # Structural migrations are enforced here, at the write boundary. This makes
+    # admin saves and rollbacks safe and means production reads consume already-
+    # canonical data instead of repairing it with runtime overlays.
+    stored_payload = normalize_builtin_rule_override_payload(key, payload)
+
     path = _path(db_file)
     ensure_order_rule_store(path)
     now = _now_iso()
@@ -410,13 +448,8 @@ def publish_rule_override(
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
-
         active = conn.execute(
-            """
-            SELECT version
-            FROM order_rule_overrides
-            WHERE rule_key = ?
-            """,
+            "SELECT version FROM order_rule_overrides WHERE rule_key = ?",
             (key,),
         ).fetchone()
         active_version = int(active["version"] or 0) if active else 0
@@ -425,13 +458,11 @@ def publish_rule_override(
             expected_active_version is not None
             and int(expected_active_version) != active_version
         ):
-            raise ValueError(
-                "這個商品規則已被其他人更新，請重新整理後再發布。"
-            )
+            raise ValueError("這個商品規則已被其他人更新，請重新整理後再發布。")
 
         version = _next_version(conn, key)
         payload_json = json.dumps(
-            payload,
+            stored_payload,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
@@ -440,16 +471,9 @@ def publish_rule_override(
         conn.execute(
             """
             INSERT INTO order_rule_override_versions (
-                rule_key,
-                version,
-                action,
-                payload_json,
-                source_version,
-                actor_discord_id,
-                actor_display_name,
-                created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                rule_key, version, action, payload_json, source_version,
+                actor_discord_id, actor_display_name, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 key,
@@ -462,20 +486,13 @@ def publish_rule_override(
                 now,
             ),
         )
-
         conn.execute(
             """
             INSERT INTO order_rule_overrides (
-                rule_key,
-                version,
-                payload_json,
-                updated_by_discord_id,
-                updated_by_display_name,
-                updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(rule_key)
-            DO UPDATE SET
+                rule_key, version, payload_json,
+                updated_by_discord_id, updated_by_display_name, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(rule_key) DO UPDATE SET
                 version = excluded.version,
                 payload_json = excluded.payload_json,
                 updated_by_discord_id = excluded.updated_by_discord_id,
@@ -496,7 +513,7 @@ def publish_rule_override(
     return {
         "rule_key": key,
         "version": version,
-        "payload": dict(payload),
+        "payload": dict(stored_payload),
         "action": str(action or "publish"),
         "source_version": source_version,
         "updated_at": now,
@@ -515,16 +532,13 @@ def rollback_rule_override(
     key = str(rule_key or "").strip()
     path = _path(db_file)
     ensure_order_rule_store(path)
-
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
             """
             SELECT payload_json
             FROM order_rule_override_versions
-            WHERE rule_key = ?
-              AND version = ?
-              AND payload_json IS NOT NULL
+            WHERE rule_key = ? AND version = ? AND payload_json IS NOT NULL
             LIMIT 1
             """,
             (key, int(target_version)),
@@ -532,7 +546,6 @@ def rollback_rule_override(
 
     if row is None:
         raise ValueError("找不到可回復的規則版本。")
-
     payload = _decode_payload(row["payload_json"])
     if not payload:
         raise ValueError("該版本沒有可發布的規則內容。")
@@ -565,43 +578,27 @@ def reset_rule_override(
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
-
         active = conn.execute(
-            """
-            SELECT version
-            FROM order_rule_overrides
-            WHERE rule_key = ?
-            """,
+            "SELECT version FROM order_rule_overrides WHERE rule_key = ?",
             (key,),
         ).fetchone()
         active_version = int(active["version"] or 0) if active else 0
 
         if active is None:
             raise ValueError("這個商品目前沒有後台覆寫，不需要重設。")
-
         if (
             expected_active_version is not None
             and int(expected_active_version) != active_version
         ):
-            raise ValueError(
-                "這個商品規則已被其他人更新，請重新整理後再重設。"
-            )
+            raise ValueError("這個商品規則已被其他人更新，請重新整理後再重設。")
 
         version = _next_version(conn, key)
-
         conn.execute(
             """
             INSERT INTO order_rule_override_versions (
-                rule_key,
-                version,
-                action,
-                payload_json,
-                source_version,
-                actor_discord_id,
-                actor_display_name,
-                created_at
-            )
-            VALUES (?, ?, 'reset', NULL, ?, ?, ?, ?)
+                rule_key, version, action, payload_json, source_version,
+                actor_discord_id, actor_display_name, created_at
+            ) VALUES (?, ?, 'reset', NULL, ?, ?, ?, ?)
             """,
             (
                 key,
@@ -612,10 +609,7 @@ def reset_rule_override(
                 now,
             ),
         )
-        conn.execute(
-            "DELETE FROM order_rule_overrides WHERE rule_key = ?",
-            (key,),
-        )
+        conn.execute("DELETE FROM order_rule_overrides WHERE rule_key = ?", (key,))
         conn.commit()
 
     return {
