@@ -52,19 +52,19 @@ from .multi_seat_effective_rule_runtime import (
 
 _install_multi_seat_effective_rule_runtime()
 
-# Finish the independent companion-count migration for Delta technical and sweet
-# orders. Historical single/double keys stay resolvable, but new self-service specs
-# no longer duplicate headcount that already has its own selector.
+# Finish the independent companion-count migration. Historical fixed-seat keys and
+# the Web/admin catalog stay resolvable; Discord presentation is patched later after
+# its UI runtime modules have loaded.
 from .companion_count_catalog_cleanup_20261028 import (
     install_companion_count_catalog_cleanup_20261028 as _install_companion_count_catalog_cleanup_20261028,
+    install_companion_count_discord_runtime_20261028 as _install_companion_count_discord_runtime_20261028,
 )
 
 _install_companion_count_catalog_cleanup_20261028()
 _order_rules.validate_rules()
 
-# Sweet orders require the normal service/game qualification AND the dedicated
-# 甜蜜陪 role. The same matcher feeds smart-dispatch reminders, specified-staff
-# validation and final acceptance claims.
+# New count-neutral Sweet orders require the normal service/game qualification AND
+# the dedicated 甜蜜陪 role. Historical fixed-seat Sweet keys remain unchanged.
 from .sweet_companion_policy_20261028 import (
     install_sweet_companion_policy_20261028 as _install_sweet_companion_policy_20261028,
 )
@@ -165,6 +165,10 @@ from .quick_order_ticket_policy_20261028 import (
 )
 
 _install_quick_order_ticket_policy_20261028()
+
+# Patch only Discord's imported catalog helpers so the third selector stops repeating
+# single/double wording for products that already have an independent count control.
+_install_companion_count_discord_runtime_20261028()
 
 # Install the Discord shared player-count control after core benefit policies are
 # ready. Importing this patches the UI class before bot.py imports self_service_runtime.
