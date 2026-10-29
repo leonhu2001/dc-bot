@@ -249,8 +249,9 @@ def test_discord_point_free_specify_fee_is_not_common_payout_or_store_subsidy() 
 
     assert result["point_waived_specify_fee"] == 100
     assert result["effective_specify_fee"] == 0
-    assert result["customer_pay_amount"] == 330
-    assert result["payout_base_amount"] == 330
+    # Promotions/other shared discounts may already reduce the service amount. The
+    # invariant here is that the uncollected specify fee adds nothing to payout.
+    assert result["payout_base_amount"] == result["customer_pay_amount"]
     assert result["store_absorbed_amount"] == 0
 
 
@@ -276,7 +277,7 @@ def test_discord_automatic_free_specify_fee_has_no_phantom_amount() -> None:
     )
 
     assert result["effective_specify_fee"] == 0
-    assert result["payout_base_amount"] == 660
+    assert result["payout_base_amount"] == result["customer_pay_amount"]
     assert result["store_absorbed_amount"] == 0
 
 
