@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 
 import discord
@@ -8,6 +9,7 @@ from core.time_utils import get_taipei_now
 
 
 _RECRUIT_APPLICANT_ROLE_ID = 0
+_BACKGROUND_RENAME_TASKS: set[asyncio.Task] = set()
 
 
 def configure_ticket_identity(*, recruit_applicant_role_id: int) -> None:
@@ -56,12 +58,24 @@ async def rename_ticket_channel(
     if channel.name == new_name:
         return
 
-    try:
-        await channel.edit(name=new_name, reason=f"Ticket status changed: {prefix}")
-    except discord.Forbidden:
-        print(f"Bot 權限不足，無法更改票口名稱：{channel.id} -> {new_name}")
-    except discord.HTTPException as exc:
-        print(f"更改票口名稱失敗：{channel.id} -> {new_name}：{exc}")
+    async def _apply_rename() -> None:
+        try:
+            await channel.edit(name=new_name, reason=f"Ticket status changed: {prefix}")
+        except discord.Forbidden:
+            print(f"Bot 權限不足，無法更改票口名稱：{channel.id} -> {new_name}")
+        except discord.HTTPException as exc:
+            print(f"更改票口名稱失敗：{channel.id} -> {new_name}：{exc}")
+
+    # Discord 對頻道改名有獨立且偏嚴格的 rate limit。存單流程若直接 await，
+    # discord.py 會在 429 時自動等待，導致「已存單」通知與 interaction followup
+    # 一起被卡住。存單改名改為背景執行；真正的改名仍會在限流解除後完成。
+    if str(prefix).startswith("存單-"):
+        task = asyncio.create_task(_apply_rename())
+        _BACKGROUND_RENAME_TASKS.add(task)
+        task.add_done_callback(_BACKGROUND_RENAME_TASKS.discard)
+        return
+
+    await _apply_rename()
 
 
 def is_agree_answer(text: str) -> bool:
