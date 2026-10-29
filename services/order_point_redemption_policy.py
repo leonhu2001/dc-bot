@@ -4,10 +4,13 @@ from typing import Any, Callable
 
 from services.point_benefit_catalog import (
     adapt_point_benefit_for_rule,
-    calculate_service_bonus_point_cost,
     get_point_benefit_item,
     is_service_bonus_allowed_for_rule,
-    uses_dynamic_service_point_cost,
+)
+from services.unified_service_point_policy import (
+    calculate_rule_price_service_point_cost,
+    is_current_service_bonus,
+    is_rule_service_bonus_supported,
 )
 
 
@@ -43,18 +46,13 @@ def _resolve_order_rule(data: dict):
     return None
 
 
-def _is_dynamic_game_rule_hint(data: dict) -> bool:
-    key = str(data.get("order_rule_key") or "").strip().lower()
-    return key.startswith(("lol_", "valorant_", "apex_"))
-
-
 def get_pending_point_benefit_info(
     data: dict,
     *,
     point_item_lookup: Callable[[str], Any],
     to_int: Callable[..., int],
 ) -> dict | None:
-    """Return the point charge due at payment, recalculating dynamic games live."""
+    """Return point charge due at payment from the authoritative formal rule."""
     if data.get("website_finance_settled"):
         return None
 
@@ -70,7 +68,14 @@ def get_pending_point_benefit_info(
     item = get_point_benefit_item(benefit_key) or injected_item or {}
     rule = _resolve_order_rule(data)
 
-    if rule is not None and uses_dynamic_service_point_cost(rule, item):
+    # Current seat-aware service rewards must always resolve a formal product and
+    # must be explicitly service-extendable. This is the payment-time backstop for
+    # clients that try to bypass Discord/Web option filtering.
+    if is_current_service_bonus(item):
+        if rule is None:
+            raise ValueError("找不到正式商品規則，無法安全計算點數成本；請重新選擇商品後再付款。")
+        if not is_rule_service_bonus_supported(rule):
+            raise ValueError("此正式商品不支援加時／加局，不能使用服務加贈點數福利。")
         if not is_service_bonus_allowed_for_rule(
             rule,
             item,
@@ -78,7 +83,7 @@ def get_pending_point_benefit_info(
         ):
             raise ValueError("這張點數加時／加局福利與目前陪玩人數或商品類型不一致，請重新選擇。")
 
-        cost = calculate_service_bonus_point_cost(
+        cost = calculate_rule_price_service_point_cost(
             rule=rule,
             benefit=item,
             player_count=data.get("player_count"),
@@ -88,18 +93,13 @@ def get_pending_point_benefit_info(
         if cost <= 0:
             raise ValueError("無法依正式商品規則重新計算點數成本，請重新選擇點數福利。")
 
-        # Snapshot is output-only for dynamic products; payment never trusts it.
+        # Snapshot is output-only for current service products; payment never trusts it.
         data["point_benefit_cost"] = int(cost)
         data["point_benefit_name"] = name
         return {"key": benefit_key, "name": name, "cost": int(cost)}
 
-    if (
-        _is_dynamic_game_rule_hint(data)
-        and str(item.get("kind") or "") == "service_bonus"
-        and rule is None
-    ):
-        raise ValueError("找不到正式商品規則，無法安全計算點數成本；請重新選擇商品後再付款。")
-
+    # Historical non-seat-aware service aliases and non-service point products keep
+    # their stored snapshot behavior so this deployment does not rewrite old orders.
     name = str(data.get("point_benefit_name") or item.get("name") or benefit_key)
     cost = to_int(
         data.get("point_benefit_cost"),
