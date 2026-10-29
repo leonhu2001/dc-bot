@@ -25,11 +25,6 @@ _install_black_tide_legacy_tombstone()
 # 載入順序或舊 manager override 把後來核准的版本改回單陪／雙陪。
 _order_rules.validate_rules()
 
-# 只保留點數服務加贈的財務結算 wrapper；它不改商品規則或 catalog。
-from .entertainment_companion_policy_20261028 import (
-    install_point_service_financial_runtime_20261028 as _install_point_service_financial_runtime_20261028,
-)
-
 # Register system-owned catalog extensions before the remaining runtime wrappers are
 # installed. The extension injects its rules before services.orders builds label maps,
 # then adds the matching storefront groups for desktop and mobile Delta Force.
@@ -72,14 +67,11 @@ from .loyalty_policy_20261023 import (
 _install_loyalty_policy_20261023()
 
 # Keep coupon reservation / release / redemption and the VIP monthly entitlement
-# policy centralized for both Discord and Web entry points.
+# policy centralized for both Discord and Web entry points. Point/loyalty pricing
+# itself is already defined directly in the canonical modules above.
 from .benefit_runtime_integration import install_root_benefit_integrations as _install_benefits
 
 _install_benefits()
-
-# Multi-companion point rewards extend every selected companion and therefore must
-# fund every seat. The shared financial wrapper is seat-count generic (1-4).
-_install_point_service_financial_runtime_20261028()
 
 # User-facing checkout copy must describe the same funding policy as the actual
 # payroll calculation. Install after benefit integration so wrappers see the
