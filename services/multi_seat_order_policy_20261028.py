@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+from services.unified_service_point_policy import is_rule_service_bonus_supported
+
 
 _INSTALLED = False
-_PRICE_PATCHED = False
-_POINT_POLICY_PATCHED = False
 
 _SEAT_LABELS = {
     1: "單陪",
@@ -47,8 +47,9 @@ _LOL_TECH_ARAM_BY_NG_KEY = {
     for new_key, template_key, _label in _LOL_TECH_ARAM_VARIANTS
 }
 
-# Explicit seat-price tables. Even when values happen to be linear (Steam), keeping
-# the table explicit prevents future products from silently assuming base x people.
+# Kept as compatibility metadata for callers that still inspect this map. Pricing
+# itself is authoritative on OrderRule.player_count_prices and calculate_price()
+# now reads that field directly; this table no longer patches calculate_price.
 PLAYER_COUNT_PRICE_TABLES: dict[str, dict[int, int]] = {
     "basic_entertain_single": {1: 320, 2: 600},
     "basic_entertain_female_single": {1: 320, 2: 600},
@@ -61,32 +62,9 @@ PLAYER_COUNT_PRICE_TABLES: dict[str, dict[int, int]] = {
     "steam_play": {1: 320, 2: 640, 3: 960, 4: 1280},
 }
 
-# Service-type point rewards are a product-rule policy, not a UI exception. Cash
-# coupons / free-specify and all other point products remain governed by the normal
-# point_benefits_allowed flag.
+# Compatibility map only. Eligibility is now calculated from the formal rule by
+# unified_service_point_policy instead of being installed as a runtime override.
 SERVICE_POINT_BENEFIT_RULE_OVERRIDES: dict[str, bool] = {}
-
-_POINT_COSTS = {
-    "entertainment": {
-        1: (80, 140),
-        2: (160, 280),
-        3: (240, 420),
-        4: (320, 560),
-    },
-    "technical": {
-        1: (100, 180),
-        2: (200, 360),
-        3: (300, 540),
-        4: (400, 720),
-    },
-}
-
-_SEAT_KEY_NAMES = {
-    1: "single",
-    2: "double",
-    3: "triple",
-    4: "quad",
-}
 
 
 def get_player_count_price_table(rule_or_key) -> dict[int, int] | None:
@@ -96,6 +74,7 @@ def get_player_count_price_table(rule_or_key) -> dict[int, int] | None:
     key = str(getattr(rule_or_key, "key", rule_or_key) or "")
     try:
         from services.order_rules import ORDER_RULES
+
         rule = ORDER_RULES.get(key)
         if rule is not None and getattr(rule, "player_count_prices", None):
             return {int(k): int(v) for k, v in dict(rule.player_count_prices).items()}
@@ -137,38 +116,9 @@ def normalize_rule_player_count(rule, value: Any = None) -> int:
 
 
 def is_service_point_benefit_enabled(rule) -> bool:
-    key = str(getattr(rule, "key", "") or "")
-    if key in SERVICE_POINT_BENEFIT_RULE_OVERRIDES:
-        return bool(SERVICE_POINT_BENEFIT_RULE_OVERRIDES[key])
-    return str(getattr(rule, "category", "") or "") not in {"lol", "valorant", "apex"}
+    """Compatibility entry point backed by the canonical formal-rule policy."""
 
-
-def _install_delta_companion_type_rules() -> None:
-    from services.order_rules import ORDER_RULES, validate_rule_definition
-
-    canonical_keys = (
-        "basic_entertain_single",
-        "basic_entertain_female_single",
-        "basic_entertain_male_single",
-        "basic_mobile_entertain_single",
-        "basic_mobile_entertain_female_single",
-        "basic_mobile_entertain_male_single",
-    )
-    for key in canonical_keys:
-        rule = ORDER_RULES.get(key)
-        if rule is None:
-            continue
-        new_rule = replace(
-            rule,
-            required_staff_count="player_count",
-            player_count_enabled=True,
-            min_player_count=1,
-            max_player_count=2,
-            price_multiply_player_count=False,
-            max_specified_count=2,
-        )
-        validate_rule_definition(key, new_rule)
-        ORDER_RULES[key] = new_rule
+    return bool(is_rule_service_bonus_supported(rule))
 
 
 def _install_black_tide_rules() -> None:
@@ -190,6 +140,7 @@ def _install_black_tide_rules() -> None:
             min_player_count=1,
             max_player_count=4,
             price_multiply_player_count=False,
+            player_count_prices=dict(price_table),
             max_specified_count=4,
             catalog_group_label="黑潮爆破",
         )
@@ -205,7 +156,7 @@ def _install_lol_tech_aram_rules() -> None:
             continue
         template = ORDER_RULES.get(template_key)
         if template is None:
-            raise RuntimeError(f"missing LoL AR rule template: {template_key}")
+            raise RuntimeError(f"missing LoL AR canonical template: {template_key}")
         rule = replace(template, key=key, label=label)
         validate_rule_definition(key, rule)
         ORDER_RULES[key] = rule
@@ -214,10 +165,11 @@ def _install_lol_tech_aram_rules() -> None:
 def _install_service_point_rule_switches() -> None:
     from services.order_rules import ORDER_RULES
 
-    for key, rule in ORDER_RULES.items():
-        category = str(getattr(rule, "category", "") or "")
-        if category in {"lol", "valorant", "apex"}:
-            SERVICE_POINT_BENEFIT_RULE_OVERRIDES[str(key)] = False
+    SERVICE_POINT_BENEFIT_RULE_OVERRIDES.clear()
+    SERVICE_POINT_BENEFIT_RULE_OVERRIDES.update({
+        str(key): bool(is_rule_service_bonus_supported(rule))
+        for key, rule in ORDER_RULES.items()
+    })
 
 
 def _replace_or_append_group(groups: list[dict[str, Any]], label: str, details: list[dict[str, Any]]) -> None:
@@ -407,172 +359,19 @@ def _refresh_order_derived_maps() -> None:
             orders.QUANTITY_SELECT_ITEMS.add(label)
 
 
-def _patch_loyalty_scope_aliases() -> None:
-    from services import loyalty_benefits as loyalty
-
-    aliases = getattr(loyalty, "_LOYALTY_SCOPE_FAMILY_ALIASES", None)
-    if not isinstance(aliases, dict):
-        return
-    for key in (
-        "basic_black_tide_entertain",
-        "basic_black_tide_entertain_1",
-        "basic_black_tide_entertain_2",
-        "basic_black_tide_entertain_3",
-        "basic_black_tide_entertain_4",
-    ):
-        aliases[key] = "basic_entertain"
-
-
-def _point_rows() -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
-    items: list[dict[str, Any]] = []
-    specs: dict[str, dict[str, Any]] = {}
-    for tier, costs_by_seat in _POINT_COSTS.items():
-        prefix = "entertain" if tier == "entertainment" else "tech"
-        tier_text = "娛樂" if tier == "entertainment" else "技術"
-        for seat_count in range(1, 5):
-            seat_key = _SEAT_KEY_NAMES[seat_count]
-            small_cost, large_cost = costs_by_seat[seat_count]
-            for size, cost, service_text in (
-                ("small", small_cost, "30 分鐘／1 局"),
-                ("large", large_cost, "1 小時／2 局"),
-            ):
-                key = f"{prefix}_{seat_key}_service_{size}"
-                items.append({
-                    "key": key,
-                    "cost": int(cost),
-                    "name": f"{tier_text}{seat_count}陪加贈｜{service_text}",
-                })
-                specs[key] = {
-                    "kind": "service_bonus",
-                    "service_tier": tier,
-                    "seat_count": seat_count,
-                    "bonus_size": size,
-                    "summary": f"{tier_text}{seat_count}陪同步加贈 {service_text}；店內吸收全部額外服務成本",
-                }
-    return items, specs
-
-
-def _replace_point_service_catalog() -> None:
-    from services import point_benefit_catalog as catalog
-
-    new_items, new_specs = _point_rows()
-    new_keys = set(new_specs)
-
-    def _is_current_seat_service_key(key: str) -> bool:
-        if key in new_keys:
-            return True
-        return any(
-            key.startswith(f"{prefix}_{seat_key}_service_")
-            for prefix in ("entertain", "tech")
-            for seat_key in _SEAT_KEY_NAMES.values()
-        )
-
-    non_service_items = [
-        dict(item)
-        for item in catalog.POINT_REDEEM_ITEMS
-        if not _is_current_seat_service_key(str(item.get("key") or ""))
-    ]
-    catalog.POINT_REDEEM_ITEMS[:] = non_service_items + [dict(item) for item in new_items]
-    catalog.POINT_REDEEM_ITEMS_BY_KEY.clear()
-    catalog.POINT_REDEEM_ITEMS_BY_KEY.update({
-        str(item["key"]): dict(item)
-        for item in catalog.POINT_REDEEM_ITEMS
-    })
-    for key in list(catalog.POINT_BENEFIT_SPECS):
-        if _is_current_seat_service_key(str(key)):
-            catalog.POINT_BENEFIT_SPECS.pop(key, None)
-    catalog.POINT_BENEFIT_SPECS.update({key: dict(value) for key, value in new_specs.items()})
-    catalog.ALL_POINT_BENEFIT_SPECS.clear()
-    catalog.ALL_POINT_BENEFIT_SPECS.update({
-        **catalog.LEGACY_POINT_BENEFIT_SPECS,
-        **catalog.POINT_BENEFIT_SPECS,
-    })
-
-
-def _install_price_table_runtime() -> None:
-    global _PRICE_PATCHED
-    if _PRICE_PATCHED:
-        return
-
-    from services import order_rules
-
-    original = order_rules.calculate_price
-
-    def calculate_price(rule, *, quantity=None, player_count=None, specified_roles=None, staff_adjustments=None):
-        table = get_player_count_price_table(rule)
-        if not table:
-            return original(
-                rule,
-                quantity=quantity,
-                player_count=player_count,
-                specified_roles=specified_roles,
-                staff_adjustments=staff_adjustments,
-            )
-        count = normalize_rule_player_count(rule, player_count)
-        if count not in table:
-            raise ValueError(f"{rule.label} 不支援 {count} 位陪玩")
-        priced_rule = replace(
-            rule,
-            price=int(table[count]),
-            price_multiply_player_count=False,
-        )
-        return original(
-            priced_rule,
-            quantity=quantity,
-            player_count=count,
-            specified_roles=specified_roles,
-            staff_adjustments=staff_adjustments,
-        )
-
-    order_rules.calculate_price = calculate_price
-    order_rules._multi_seat_price_table_20261028 = PLAYER_COUNT_PRICE_TABLES
-    _PRICE_PATCHED = True
-
-
-def _install_service_point_policy_runtime() -> None:
-    global _POINT_POLICY_PATCHED
-    if _POINT_POLICY_PATCHED:
-        return
-
-    from services import self_service_point_benefit_policy as point_policy
-
-    original_check = point_policy.check_order_point_benefit_allowed
-
-    def check_order_point_benefit_allowed(rule, benefit, data: dict | None = None):
-        allowed, reason = original_check(rule, benefit, data)
-        if not allowed:
-            return allowed, reason
-        spec = dict(benefit or {})
-        # The new seat-aware service catalog is paused for LoL/VALORANT/APEX.
-        # Historical service vouchers intentionally have no seat_count metadata and
-        # remain resolvable for old orders / already-selected legacy benefits.
-        if (
-            str(spec.get("kind") or "") == "service_bonus"
-            and int(spec.get("seat_count") or 0) > 0
-            and not is_service_point_benefit_enabled(rule)
-        ):
-            return False, "這個商品目前暫停使用點數加時／加局券。"
-        return True, ""
-
-    point_policy.check_order_point_benefit_allowed = check_order_point_benefit_allowed
-    _POINT_POLICY_PATCHED = True
-
-
 def install_multi_seat_order_policy_20261028() -> None:
     global _INSTALLED
     if _INSTALLED:
         return
 
-    _install_delta_companion_type_rules()
+    # Current OrderRule definitions already own Delta/Steam player-count pricing.
+    # Keep this compatibility module limited to the two still-missing rule families
+    # and catalog presentation; do not replace calculate_price or point functions.
     _install_black_tide_rules()
     _install_lol_tech_aram_rules()
     _install_service_point_rule_switches()
     _patch_self_service_catalog()
     _refresh_order_derived_maps()
-    _patch_loyalty_scope_aliases()
-    _replace_point_service_catalog()
-    _install_price_table_runtime()
-    _install_service_point_policy_runtime()
     _INSTALLED = True
 
 
