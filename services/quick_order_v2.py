@@ -376,7 +376,7 @@ class QuickOrderConfirmView(discord.ui.View):
         self.opening = False
 
     @discord.ui.button(
-        label="確認下單",
+        label="已閱讀下單須知，建立票口",
         emoji="✅",
         style=discord.ButtonStyle.success,
     )
@@ -411,8 +411,8 @@ class QuickOrderConfirmView(discord.ui.View):
             self.opening = False
 
     @discord.ui.button(
-        label="取消",
-        emoji="✖️",
+        label="尚未閱讀",
+        emoji="📖",
         style=discord.ButtonStyle.secondary,
     )
     async def cancel(
@@ -427,10 +427,9 @@ class QuickOrderConfirmView(discord.ui.View):
             )
             return
 
-        await interaction.response.edit_message(
-            content="已取消本次下單。",
-            embed=None,
-            view=None,
+        await interaction.response.send_message(
+            "請先閱讀店內下單須知；確認看完後，再按「已閱讀下單須知，建立票口」。",
+            ephemeral=True,
         )
 
 
@@ -449,17 +448,21 @@ async def _send_confirmation(
         return
 
     timer = category == VIP_TIMER_CATEGORY
+    category_label = (
+        VIP_TIMER_CATEGORY_LABEL
+        if timer
+        else ORDER_CATEGORY_LABELS.get(category, category)
+    )
     embed = discord.Embed(
-        title="💎 VIP 自由計時｜確認下單" if timer else "🛒 確認下單",
+        title="📖 下單須知確認",
         description=(
-            f"**遊戲／類型：** "
-            f"{VIP_TIMER_CATEGORY_LABEL if timer else ORDER_CATEGORY_LABELS.get(category, category)}\n"
+            f"**遊戲／類型：** {category_label}\n"
             f"**{'起始遊戲' if timer else '服務'}：** {item_group}\n\n"
-            "按下 **確認下單** 後才會建立私人票口。\n"
-            "票口內再完成剩餘規格與數量。\n\n"
-            "確認下單即表示已閱讀並同意店內下單規章。"
+            "開票前請先確認：**你是否已閱讀店內下單須知？**\n"
+            "只有確認已閱讀後才會建立私人票口。\n\n"
+            "票口建立後會沿用目前選擇的服務，再完成規格、陪玩人數與時長／數量。"
         ),
-        color=discord.Color.green(),
+        color=discord.Color.gold(),
     )
 
     await interaction.response.send_message(
@@ -585,7 +588,6 @@ async def _create_ticket(
 
         selection_state.apply_self_service_item_group_selection(data, item_group)
         if category == VIP_TIMER_CATEGORY:
-            # item-group selection clears product-dependent flags; restore timer identity.
             data["vip_timer_order"] = True
 
         data.update(
