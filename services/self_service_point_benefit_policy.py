@@ -4,6 +4,10 @@ from typing import Any
 
 from services.order_rule_manager_policy import get_manager_point_benefit_setting
 from services.point_benefit_catalog import is_service_bonus_allowed_for_rule
+from services.unified_service_point_policy import (
+    is_current_service_bonus,
+    is_rule_service_bonus_supported,
+)
 
 
 _POINT_DISABLED_TEXT = "此商品目前不開放點數福利；會員福利券仍可使用。"
@@ -49,6 +53,12 @@ def check_order_point_benefit_allowed(
     if kind == "service_bonus":
         if pricing_type not in {"hourly", "game"}:
             return False, "服務加贈只適用計時或計局方案。"
+        # Current seat-aware service rewards are a product capability, not a
+        # generic point-benefit toggle. Formal teaching/sweet/themed products that
+        # cannot extend service stay disabled even when cash point coupons remain
+        # available on the same product.
+        if is_current_service_bonus(spec) and not is_rule_service_bonus_supported(rule):
+            return False, "此正式商品不支援加時／加局，因此不能使用服務加贈點數福利。"
         if not is_service_bonus_allowed_for_rule(rule, spec, player_count=data.get("player_count")):
             return False, "這張服務加贈券不適用目前選擇的陪玩人數／類型。"
 
