@@ -23,7 +23,7 @@ POINT_REDEEM_ITEMS = [
 ]
 POINT_BENEFIT_SPECS = {
     "discount_50": {"kind": "cash_discount", "amount": 50, "summary": "50T 折價券，共同分攤；折後金額作為陪玩／團隊分潤基準"},
-    "free_specify_fee": {"kind": "free_specify_fee", "summary": "免指定費，指定費由店內吸收，陪玩應得不減少"},
+    "free_specify_fee": {"kind": "free_specify_fee", "summary": "免指定費；未實收的指定費不計入共同分潤基準"},
     "discount_100": {"kind": "cash_discount", "amount": 100, "summary": "100T 折價券，共同分攤；折後金額作為陪玩／團隊分潤基準"},
 }
 
