@@ -161,6 +161,10 @@ def install_shared_point_benefit_policy() -> None:
                 player_count=player_count,
             )
             adapted.update(status)
+            # Hidden legacy aliases are lookup-only compatibility rows. Keep their
+            # historic fixed catalog cost for old callers; current seat-aware rows
+            # above carry the new dynamic rule price and are the only public options.
+            adapted["cost"] = int(raw.get("cost") or 0)
             result.append(adapted)
         return result
 
