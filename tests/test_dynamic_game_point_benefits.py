@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from services import order_point_redemption as redemption
+from services import self_service_financials as financials
 from services.order_rules import ORDER_RULES, calculate_price
 from services.point_benefit_catalog import (
     adapt_point_benefit_for_rule,
@@ -114,6 +115,27 @@ def test_service_bonus_salary_value_covers_all_actual_companions_without_point_d
         player_count=3,
         extra_hours=1.0,
     ) == 1080
+
+
+def test_discord_financial_runtime_funds_three_seats_once_not_twice() -> None:
+    rule = ORDER_RULES["lol_grandmaster_ng"]
+    price = calculate_price(rule, quantity=1, player_count=3)
+    result = financials.calculate_self_service_financials(
+        rule,
+        price,
+        {
+            "quantity": 1,
+            "player_count": 3,
+            "selected_point_benefit_key": "tech_triple_service_large",
+        },
+    )
+
+    # Purchased service is 360 x 3 = 1080. +1H adds the same 1080 salary value
+    # across the three workers. It must not stay at one-seat 360 or double-multiply
+    # to 3240 through stacked runtime wrappers.
+    assert result["point_service_value"] == 1080
+    assert result["store_absorbed_amount"] == 1080
+    assert "3 位陪玩同步加贈" in result["service_bonus_text"]
 
 
 def test_game_service_point_policy_is_no_longer_blocked() -> None:
