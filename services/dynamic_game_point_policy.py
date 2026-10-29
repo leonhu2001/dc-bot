@@ -19,6 +19,7 @@ def install_dynamic_game_point_policy() -> None:
     from services import multi_seat_order_policy_20261028 as multi_seat_policy
     from services.order_rules import ORDER_RULES
     from services.unified_service_point_policy import (
+        calculate_rule_price_service_point_cost,
         is_current_service_bonus,
         is_rule_service_bonus_supported,
         uses_rule_price_service_point_cost,
@@ -39,12 +40,14 @@ def install_dynamic_game_point_policy() -> None:
 
         point_catalog.is_service_bonus_allowed_for_rule = is_service_bonus_allowed_for_rule
         point_catalog.uses_dynamic_service_point_cost = uses_rule_price_service_point_cost
+        point_catalog.calculate_service_bonus_point_cost = calculate_rule_price_service_point_cost
 
     # These modules imported the catalog callables by name. Rebind their module
     # globals so Discord selection and payment use the exact same live policy.
     point_policy.is_service_bonus_allowed_for_rule = point_catalog.is_service_bonus_allowed_for_rule
     redemption_policy.is_service_bonus_allowed_for_rule = point_catalog.is_service_bonus_allowed_for_rule
     redemption_policy.uses_dynamic_service_point_cost = point_catalog.uses_dynamic_service_point_cost
+    redemption_policy.calculate_service_bonus_point_cost = point_catalog.calculate_service_bonus_point_cost
 
     # The older multi-seat migration has its own service switch. Make it a strict
     # projection of the formal rule capability instead of default-enabling every
