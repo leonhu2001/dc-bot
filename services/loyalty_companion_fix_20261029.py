@@ -147,15 +147,24 @@ def calculate_for_rule(
 
 
 def _repair_existing_progress(loyalty) -> dict[str, int]:
-    """One-time data reconciliation only; never rebind production functions."""
+    """One-time data reconciliation only; never rebind production functions.
+
+    The migration row is claimed as the first write in the same transaction. SQLite
+    serializes competing writers, so Bot/Web concurrent startup cannot both run the
+    reconciliation. A failed transaction rolls the claim back and a later startup
+    can safely retry it.
+    """
 
     loyalty.ensure_loyalty_tables()
     with loyalty.engine.begin() as conn:
-        applied = conn.execute(text("""
-            SELECT migration_key FROM loyalty_migrations
-            WHERE migration_key = :migration_key LIMIT 1
-        """), {"migration_key": _MIGRATION_KEY}).first()
-        if applied is not None:
+        claimed = conn.execute(text("""
+            INSERT OR IGNORE INTO loyalty_migrations (migration_key, applied_at, note)
+            VALUES (:migration_key, :applied_at, 'in_progress')
+        """), {
+            "migration_key": _MIGRATION_KEY,
+            "applied_at": loyalty.get_taipei_now_iso(),
+        })
+        if int(claimed.rowcount or 0) == 0:
             return {"customers": 0, "issued": 0, "revoked": 0}
 
         has_orders = conn.execute(text("""
@@ -164,9 +173,10 @@ def _repair_existing_progress(loyalty) -> dict[str, int]:
         """)).first()
         if has_orders is None:
             conn.execute(text("""
-                INSERT INTO loyalty_migrations (migration_key, applied_at, note)
-                VALUES (:migration_key, :applied_at, 'no_web_orders_table')
-            """), {"migration_key": _MIGRATION_KEY, "applied_at": loyalty.get_taipei_now_iso()})
+                UPDATE loyalty_migrations
+                SET note = 'no_web_orders_table'
+                WHERE migration_key = :migration_key
+            """), {"migration_key": _MIGRATION_KEY})
             return {"customers": 0, "issued": 0, "revoked": 0}
 
         rows = conn.execute(text("""
@@ -189,8 +199,9 @@ def _repair_existing_progress(loyalty) -> dict[str, int]:
             revoked += int(summary.get("revoked") or 0)
 
         conn.execute(text("""
-            INSERT INTO loyalty_migrations (migration_key, applied_at, note)
-            VALUES (:migration_key, :applied_at, :note)
+            UPDATE loyalty_migrations
+            SET applied_at = :applied_at, note = :note
+            WHERE migration_key = :migration_key
         """), {
             "migration_key": _MIGRATION_KEY,
             "applied_at": loyalty.get_taipei_now_iso(),
