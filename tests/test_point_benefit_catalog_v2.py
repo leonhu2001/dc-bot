@@ -1,3 +1,4 @@
+from services.dynamic_game_point_policy import install_dynamic_game_point_policy
 from services.loyalty_benefits import loyalty_scope_key
 from services.multi_seat_order_policy_20261028 import (
     get_player_count_price_table,
@@ -188,7 +189,8 @@ def test_game_catalog_third_field_contains_mode_only_and_count_is_rule_bound():
     assert get_rule_player_count_bounds(ORDER_RULES["apex_master_ng"]) == (1, 2, 1, True)
 
 
-def test_lol_rank_aram_variants_reuse_ng_price_but_only_service_points_are_disabled():
+def test_lol_rank_aram_variants_reuse_ng_price_and_enable_dynamic_service_points():
+    install_dynamic_game_point_policy()
     for aram_key, ng_key in (
         ("lol_master_aram", "lol_master_ng"),
         ("lol_grandmaster_aram", "lol_grandmaster_ng"),
@@ -198,7 +200,7 @@ def test_lol_rank_aram_variants_reuse_ng_price_but_only_service_points_are_disab
         assert aram_rule.pricing_type == "hourly"
         assert aram_rule.price == ORDER_RULES[ng_key].price
         assert aram_rule.point_benefits_allowed is True
-        assert is_service_point_benefit_enabled(aram_rule) is False
+        assert is_service_point_benefit_enabled(aram_rule) is True
 
         assert is_order_point_benefit_allowed_for_rule(
             aram_rule,
@@ -209,10 +211,11 @@ def test_lol_rank_aram_variants_reuse_ng_price_but_only_service_points_are_disab
             aram_rule,
             "tech_single_service_small",
             {"player_count": 1, "quantity": 1},
-        )[0] is False
+        )[0] is True
 
 
-def test_lol_valorant_apex_pause_service_point_rewards_but_not_cash_points():
+def test_lol_valorant_apex_enable_service_point_rewards_and_cash_points():
+    install_dynamic_game_point_policy()
     for rule_key in (
         "valorant_entertain_ng",
         "lol_entertain_ng",
@@ -229,8 +232,9 @@ def test_lol_valorant_apex_pause_service_point_rewards_but_not_cash_points():
             "entertain_single_service_small",
             {"player_count": 1, "quantity": 1},
         )
-        assert allowed is False
-        assert "暫停" in reason
+        assert allowed is True
+        assert reason == ""
+        assert is_service_point_benefit_enabled(rule) is True
 
 
 def test_entertainment_loyalty_scopes_remain_shared():
