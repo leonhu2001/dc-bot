@@ -13,10 +13,23 @@ def install_dynamic_game_point_policy() -> None:
 
     from services import self_service_financials as financials
     from services import self_service_selection_runtime as selection
+    from services.multi_seat_order_policy_20261028 import (
+        SERVICE_POINT_BENEFIT_RULE_OVERRIDES,
+    )
+    from services.order_rules import ORDER_RULES
     from services.point_benefit_catalog import (
+        DYNAMIC_GAME_POINT_CATEGORIES,
         calculate_service_bonus_value,
         resolve_rule_staff_count,
     )
+
+    # The 2026-10-28 migration intentionally paused seat-aware service rewards for
+    # these game catalogs while their pricing model was undecided. The dynamic
+    # rule-price policy is now confirmed, so explicitly lift that pause for every
+    # current LoL / VALORANT / APEX rule (including LoL ARAM variants).
+    for key, rule in ORDER_RULES.items():
+        if str(getattr(rule, "category", "") or "").strip().lower() in DYNAMIC_GAME_POINT_CATEGORIES:
+            SERVICE_POINT_BENEFIT_RULE_OVERRIDES[str(key)] = True
 
     # Discord historically added only one worker's service value to payout_base.
     # Keep the existing per-seat formula, but fund it for every actual worker.
