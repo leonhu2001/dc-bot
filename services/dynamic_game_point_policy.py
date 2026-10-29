@@ -5,31 +5,55 @@ _INSTALLED = False
 
 
 def install_dynamic_game_point_policy() -> None:
-    """Keep Discord point-service UI and payout on the shared authoritative policy."""
+    """Install the shared formal-product point-service policy for Discord/Web."""
 
     global _INSTALLED
     if _INSTALLED:
         return
 
+    from services import point_benefit_catalog as point_catalog
     from services import self_service_financials as financials
+    from services import self_service_point_benefit_policy as point_policy
     from services import self_service_selection_runtime as selection
-    from services.multi_seat_order_policy_20261028 import (
-        SERVICE_POINT_BENEFIT_RULE_OVERRIDES,
-    )
+    from services import order_point_redemption_policy as redemption_policy
+    from services import multi_seat_order_policy_20261028 as multi_seat_policy
     from services.order_rules import ORDER_RULES
-    from services.point_benefit_catalog import (
-        DYNAMIC_GAME_POINT_CATEGORIES,
-        get_point_benefit_item,
-        resolve_rule_staff_count,
+    from services.unified_service_point_policy import (
+        is_current_service_bonus,
+        is_rule_service_bonus_supported,
+        uses_rule_price_service_point_cost,
     )
 
-    # The 2026-10-28 migration intentionally paused seat-aware service rewards for
-    # these game catalogs while their pricing model was undecided. The dynamic
-    # rule-price policy is now confirmed, so explicitly lift that pause for every
-    # current LoL / VALORANT / APEX rule (including LoL ARAM variants).
+    # Service rewards are now a formal-product capability rather than a hard-coded
+    # game-category switch. Teaching / sweet / trial / fun / Steam products stay
+    # disabled even when they are hourly/game products and generic point coupons
+    # remain available. Historical service aliases are not re-priced.
+    if not hasattr(point_catalog, "_unified_service_original_allowed"):
+        original_service_allowed = point_catalog.is_service_bonus_allowed_for_rule
+        point_catalog._unified_service_original_allowed = original_service_allowed
+
+        def is_service_bonus_allowed_for_rule(rule, benefit, player_count=None) -> bool:
+            if is_current_service_bonus(benefit) and not is_rule_service_bonus_supported(rule):
+                return False
+            return bool(original_service_allowed(rule, benefit, player_count=player_count))
+
+        point_catalog.is_service_bonus_allowed_for_rule = is_service_bonus_allowed_for_rule
+        point_catalog.uses_dynamic_service_point_cost = uses_rule_price_service_point_cost
+
+    # These modules imported the catalog callables by name. Rebind their module
+    # globals so Discord selection and payment use the exact same live policy.
+    point_policy.is_service_bonus_allowed_for_rule = point_catalog.is_service_bonus_allowed_for_rule
+    redemption_policy.is_service_bonus_allowed_for_rule = point_catalog.is_service_bonus_allowed_for_rule
+    redemption_policy.uses_dynamic_service_point_cost = point_catalog.uses_dynamic_service_point_cost
+
+    # The older multi-seat migration has its own service switch. Make it a strict
+    # projection of the formal rule capability instead of default-enabling every
+    # non-LoL/VALORANT/APEX product.
+    multi_seat_policy.is_service_point_benefit_enabled = is_rule_service_bonus_supported
     for key, rule in ORDER_RULES.items():
-        if str(getattr(rule, "category", "") or "").strip().lower() in DYNAMIC_GAME_POINT_CATEGORIES:
-            SERVICE_POINT_BENEFIT_RULE_OVERRIDES[str(key)] = True
+        multi_seat_policy.SERVICE_POINT_BENEFIT_RULE_OVERRIDES[str(key)] = (
+            is_rule_service_bonus_supported(rule)
+        )
 
     # Discord's older seat-funding wrapper reads point_benefit_key only from the
     # financial result. Some self-service flows keep the selected key only on order
@@ -52,15 +76,20 @@ def install_dynamic_game_point_policy() -> None:
                 or (data or {}).get("selected_point_benefit_key")
                 or ""
             ).strip()
-            benefit = get_point_benefit_item(key)
-            if not benefit:
+            benefit = point_catalog.get_point_benefit_item(key)
+            if not benefit or not is_current_service_bonus(benefit):
+                return result
+            if not is_rule_service_bonus_supported(rule):
                 return result
 
             try:
                 funded_seats = max(1, int(benefit.get("seat_count") or 1))
             except (TypeError, ValueError):
                 funded_seats = 1
-            actual_seats = resolve_rule_staff_count(rule, (data or {}).get("player_count", 1))
+            actual_seats = point_catalog.resolve_rule_staff_count(
+                rule,
+                (data or {}).get("player_count", 1),
+            )
             funded_seats = min(funded_seats, max(1, int(actual_seats or 1)))
             if funded_seats <= 1:
                 return result
