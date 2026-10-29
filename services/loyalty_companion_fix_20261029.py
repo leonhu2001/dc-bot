@@ -46,6 +46,8 @@ def _find_player_count(value: Any) -> int | None:
 
 
 def extract_player_count(row: dict[str, Any]) -> int:
+    """Compatibility helper matching loyalty_benefits' canonical parser."""
+
     for column in ("price_snapshot_json", "quote_snapshot_json"):
         raw = row.get(column)
         if not raw:
@@ -62,18 +64,23 @@ def extract_player_count(row: dict[str, Any]) -> int:
 
 
 def _selected_unit_total(rule: Any, player_count: int) -> int:
+    """Read the selected tier directly from the formal OrderRule."""
+
     requested = max(1, int(player_count or 1))
-    try:
-        from services.multi_seat_order_policy_20261028 import (
-            get_player_count_price_table,
-            normalize_rule_player_count,
-        )
-        requested = normalize_rule_player_count(rule, requested)
-        table = get_player_count_price_table(rule)
-        if table:
-            return max(0, int(table.get(requested, 0)))
-    except Exception:
-        pass
+    if bool(getattr(rule, "player_count_enabled", False)):
+        minimum = max(1, int(getattr(rule, "min_player_count", 1) or 1))
+        maximum_raw = getattr(rule, "max_player_count", None)
+        maximum = int(maximum_raw) if maximum_raw is not None else minimum
+        maximum = max(minimum, maximum)
+        if requested < minimum or requested > maximum:
+            requested = minimum
+
+    table = dict(getattr(rule, "player_count_prices", None) or {})
+    if table:
+        normalized = {int(count): int(price) for count, price in table.items()}
+        if requested in normalized:
+            return max(0, normalized[requested])
+
     amount = max(0, int(getattr(rule, "price", 0) or 0))
     if bool(getattr(rule, "price_multiply_player_count", False)):
         amount *= requested
@@ -87,7 +94,8 @@ def calculate_for_rule(
     coupon: dict[str, Any] | None,
     companion_count: int | None = None,
 ) -> int:
-    """Value one reward as one companion's share of the selected formal tier."""
+    """Compatibility helper for one companion's share of the selected formal tier."""
+
     if rule is None or not coupon:
         return 0
     kind = str(coupon.get("benefit_kind") or "")
@@ -118,6 +126,8 @@ def calculate_for_rule(
 
 
 def _repair_existing_progress(loyalty) -> dict[str, int]:
+    """One-time data reconciliation only; never rebind production functions."""
+
     loyalty.ensure_loyalty_tables()
     with loyalty.engine.begin() as conn:
         applied = conn.execute(text("""
@@ -168,26 +178,21 @@ def _repair_existing_progress(loyalty) -> dict[str, int]:
         return {"customers": len(customers), "issued": issued, "revoked": revoked}
 
 
-def install_loyalty_companion_fix_20261029() -> None:
+def run_loyalty_companion_repair_20261029() -> dict[str, int]:
     from services import loyalty_benefits as loyalty
 
-    if bool(getattr(loyalty, "_loyalty_companion_fix_20261029_installed", False)):
-        return
-
-    loyalty._extract_player_count = extract_player_count
-
-    def calculate_coupon_service_value(*, rule_key: str, player_count: int, coupon: dict[str, Any] | None) -> int:
-        rule = loyalty._rule_for_key(rule_key)
-        return calculate_for_rule(
-            rule,
-            player_count=player_count,
-            coupon=coupon,
-            companion_count=loyalty._service_companion_count(rule, player_count),
-        )
-
-    loyalty.calculate_coupon_service_value = calculate_coupon_service_value
-    loyalty._loyalty_companion_fix_20261029_installed = True
-    _repair_existing_progress(loyalty)
+    return _repair_existing_progress(loyalty)
 
 
-__all__ = ["calculate_for_rule", "extract_player_count", "install_loyalty_companion_fix_20261029"]
+def install_loyalty_companion_fix_20261029() -> None:
+    """Deprecated compatibility entrypoint; now performs data repair only."""
+
+    run_loyalty_companion_repair_20261029()
+
+
+__all__ = [
+    "calculate_for_rule",
+    "extract_player_count",
+    "run_loyalty_companion_repair_20261029",
+    "install_loyalty_companion_fix_20261029",
+]
