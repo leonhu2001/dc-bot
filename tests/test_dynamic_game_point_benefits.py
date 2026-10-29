@@ -24,6 +24,22 @@ def _benefit(key: str) -> dict:
     return item
 
 
+def _configure_redemption_lookup(monkeypatch) -> None:
+    monkeypatch.setattr(redemption, "get_order_point_item", get_point_benefit_item, raising=False)
+
+    def _test_to_int(value, default=0):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    # Production injects this adapter through configure_order_point_redemption().
+    # These focused unit tests call the private pre-payment resolver directly, so
+    # mirror that one required runtime dependency instead of weakening production
+    # fail-fast configuration.
+    monkeypatch.setattr(redemption, "_to_int", _test_to_int, raising=False)
+
+
 def test_lol_grandmaster_ng_dynamic_points_round_per_seat_before_multiplying() -> None:
     rule = ORDER_RULES["lol_grandmaster_ng"]
     small = _benefit("tech_triple_service_small")
@@ -152,7 +168,7 @@ def test_game_service_point_policy_is_no_longer_blocked() -> None:
 
 
 def test_discord_payment_recomputes_dynamic_cost_and_ignores_stored_snapshot(monkeypatch) -> None:
-    monkeypatch.setattr(redemption, "get_order_point_item", get_point_benefit_item, raising=False)
+    _configure_redemption_lookup(monkeypatch)
 
     data = {
         "order_rule_key": "lol_grandmaster_ng",
@@ -175,7 +191,7 @@ def test_discord_payment_recomputes_dynamic_cost_and_ignores_stored_snapshot(mon
 
 
 def test_discord_payment_rejects_dynamic_service_reward_for_wrong_seat_count(monkeypatch) -> None:
-    monkeypatch.setattr(redemption, "get_order_point_item", get_point_benefit_item, raising=False)
+    _configure_redemption_lookup(monkeypatch)
 
     data = {
         "order_rule_key": "lol_grandmaster_ng",
