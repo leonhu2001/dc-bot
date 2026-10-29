@@ -62,7 +62,7 @@ def install_shared_point_benefit_policy() -> None:
                 result["requires_specified"] = True
             return result
 
-        # Adapt before checking the point balance. LoL / VALORANT / APEX service
+        # Adapt before checking the point balance. Current formal-product service
         # rewards derive cost from the selected rule price, so the raw catalog
         # placeholder must never decide whether an option is affordable.
         adapted = checkout._point_item_for_rule(rule, item)
@@ -297,6 +297,33 @@ def install_shared_point_benefit_policy() -> None:
 
     def calculate_checkout_financials(*args, **kwargs):
         result = original_financials(*args, **kwargs)
+        if not isinstance(result, dict):
+            return result
+
+        # The existing shared-funding policy already makes point cash coupons reduce
+        # the common payout base. This bridge only removes the legacy treatment of a
+        # waived specify fee as store-funded: no fee was collected, so it contributes
+        # neither payout basis nor store subsidy.
+        try:
+            waived_specify = max(0, int(result.get("point_waived_specify_fee") or 0))
+        except (TypeError, ValueError):
+            waived_specify = 0
+        if waived_specify > 0:
+            for key in ("payout_base_amount", "payout_base_preview"):
+                result[key] = max(
+                    0,
+                    int(result.get(key) or 0) - waived_specify,
+                )
+            result["point_store_absorbed_amount"] = max(
+                0,
+                int(result.get("point_store_absorbed_amount") or 0) - waived_specify,
+            )
+            for key in ("store_absorbed_amount", "store_absorbed_preview"):
+                result[key] = max(
+                    0,
+                    int(result.get(key) or 0) - waived_specify,
+                )
+
         point_item = kwargs.get("point_item")
         if not isinstance(point_item, dict):
             return result

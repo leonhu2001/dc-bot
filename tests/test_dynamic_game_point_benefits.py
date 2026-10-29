@@ -16,6 +16,7 @@ from services.point_benefit_catalog import (
 )
 from services.quick_order_v2_price_lists import _valorant_price_list
 from services.self_service_point_benefit_policy import check_order_point_benefit_allowed
+from web.app.services.point_benefit_policy_bridge import install_shared_point_benefit_policy
 
 
 def _benefit(key: str) -> dict:
@@ -102,16 +103,19 @@ def test_dynamic_catalog_is_enabled_for_lol_valorant_and_apex() -> None:
         )
 
 
-def test_non_dynamic_catalog_keeps_existing_fixed_point_cost() -> None:
-    rule = ORDER_RULES["basic_black_tide_tech"]
-    benefit = _benefit("tech_double_service_large")
+def test_black_tide_uses_formal_one_seat_price_instead_of_nonlinear_checkout_total() -> None:
+    rule = ORDER_RULES["basic_black_tide_entertain"]
+    benefit = _benefit("entertain_double_service_large")
 
-    assert not uses_dynamic_service_point_cost(rule, benefit)
+    assert uses_dynamic_service_point_cost(rule, benefit)
+    # 黑潮雙陪本體是非線性總價 600，但點數服務福利要用單陪正式價 320
+    # 計算：320 / 2 * 0.9 = 144 -> 單席進位 150，再乘 2 席 = 300。
     assert calculate_service_bonus_point_cost(
         rule=rule,
         benefit=benefit,
         player_count=2,
-    ) == int(benefit["cost"])
+    ) == 300
+    assert int(benefit["cost"]) == 280
 
 
 def test_service_bonus_salary_value_covers_all_actual_companions_without_point_discount() -> None:
@@ -220,3 +224,101 @@ def test_valorant_two_units_are_free_specify_fee_in_rule_and_copy() -> None:
     text = _valorant_price_list(SimpleNamespace(guild=None))
     assert "2H 或 2局以上免指定費" in text
     assert "500T" not in text
+
+
+def test_discord_point_free_specify_fee_is_not_common_payout_or_store_subsidy() -> None:
+    rule = ORDER_RULES["valorant_ascendant_ng"]
+    price = calculate_price(
+        rule,
+        quantity=1,
+        player_count=1,
+        specified_roles=["valorant_ascendant"],
+    )
+    assert price.specify_fee == 100
+
+    result = financials.calculate_self_service_financials(
+        rule,
+        price,
+        {
+            "quantity": 1,
+            "player_count": 1,
+            "specified_staff_ids": ["123"],
+            "selected_point_benefit_key": "free_specify_fee",
+        },
+    )
+
+    assert result["point_waived_specify_fee"] == 100
+    assert result["effective_specify_fee"] == 0
+    # Promotions/other shared discounts may already reduce the service amount. The
+    # invariant here is that the uncollected specify fee adds nothing to payout.
+    assert result["payout_base_amount"] == result["customer_pay_amount"]
+    assert result["store_absorbed_amount"] == 0
+
+
+def test_discord_automatic_free_specify_fee_has_no_phantom_amount() -> None:
+    rule = ORDER_RULES["valorant_ascendant_ng"]
+    price = calculate_price(
+        rule,
+        quantity=2,
+        player_count=1,
+        specified_roles=["valorant_ascendant"],
+    )
+    assert price.free_specify_fee is True
+    assert price.specify_fee == 0
+
+    result = financials.calculate_self_service_financials(
+        rule,
+        price,
+        {
+            "quantity": 2,
+            "player_count": 1,
+            "specified_staff_ids": ["123"],
+        },
+    )
+
+    assert result["effective_specify_fee"] == 0
+    assert result["payout_base_amount"] == result["customer_pay_amount"]
+    assert result["store_absorbed_amount"] == 0
+
+
+def test_web_specify_fee_accounting_matches_discord_and_shared_cash_policy() -> None:
+    install_shared_point_benefit_policy()
+    from web.app.services import checkout_preview as checkout
+
+    collected = checkout.calculate_checkout_financials(
+        service_amount=330,
+        vip_pay_rate=100,
+        specify_fee=100,
+        point_item=None,
+        wallet_balance=0,
+        use_wallet=False,
+    )
+    assert collected["customer_pay_amount"] == 430
+    assert collected["payout_base_amount"] == 430
+    assert collected["store_absorbed_amount"] == 0
+
+    waived = checkout.calculate_checkout_financials(
+        service_amount=330,
+        vip_pay_rate=100,
+        specify_fee=100,
+        point_item=_benefit("free_specify_fee"),
+        wallet_balance=0,
+        use_wallet=False,
+    )
+    assert waived["customer_pay_amount"] == 330
+    assert waived["payout_base_amount"] == 330
+    assert waived["point_store_absorbed_amount"] == 0
+    assert waived["store_absorbed_amount"] == 0
+
+    cash = checkout.calculate_checkout_financials(
+        service_amount=330,
+        vip_pay_rate=100,
+        specify_fee=0,
+        point_item=_benefit("discount_50"),
+        wallet_balance=0,
+        use_wallet=False,
+    )
+    assert cash["customer_pay_amount"] == 280
+    assert cash["payout_base_amount"] == 280
+    assert cash["point_store_absorbed_amount"] == 0
+    assert cash["store_absorbed_amount"] == 0

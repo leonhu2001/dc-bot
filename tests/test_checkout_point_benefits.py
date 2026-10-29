@@ -131,7 +131,7 @@ def test_technical_reward_is_separate_from_entertainment(monkeypatch):
     assert by_key["entertain_single_service_small"]["allowed"] is False
 
 
-def test_store_absorbs_waived_specify_fee_without_reducing_payout_base():
+def test_waived_specify_fee_is_not_common_payout_or_store_subsidy():
     finance = checkout.calculate_checkout_financials(
         service_amount=600,
         vip_pay_rate=100,
@@ -141,8 +141,8 @@ def test_store_absorbs_waived_specify_fee_without_reducing_payout_base():
         use_wallet=False,
     )
     assert finance["customer_pay_amount"] == 600
-    assert finance["payout_base_amount"] == 700
-    assert finance["store_absorbed_amount"] == 100
+    assert finance["payout_base_amount"] == 600
+    assert finance["store_absorbed_amount"] == 0
     assert finance["point_waived_specify_fee"] == 100
 
 
