@@ -81,7 +81,7 @@ NG｜每人 **380T / H**
 
 📌 **指定陪玩**
 指定打手／陪玩｜每人 **+100T**
-單筆消費滿 **500T** 免指定費"""
+⚠️ **2H 或 2局以上免指定費**"""
 
 
 def _apex_price_list(interaction: discord.Interaction) -> str:

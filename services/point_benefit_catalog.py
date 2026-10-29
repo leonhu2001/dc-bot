@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal, ROUND_CEILING
 from typing import Any
 
 
@@ -10,6 +11,11 @@ _POINT_SERVICE_COSTS = {
     "entertainment": {1: (80, 140), 2: (160, 280), 3: (240, 420), 4: (320, 560)},
     "technical": {1: (100, 180), 2: (200, 360), 3: (300, 540), 4: (400, 720)},
 }
+
+# These three game catalogs have authoritative per-person unit prices on their order
+# rules. Their point-service price follows that live rule price instead of the legacy
+# fixed point table so price changes cannot leave checkout and redemption out of sync.
+DYNAMIC_GAME_POINT_CATEGORIES = frozenset({"lol", "valorant", "apex"})
 
 POINT_REDEEM_ITEMS = [
     {"key": "discount_50", "cost": 20, "name": "50T 折價券"},
@@ -172,10 +178,93 @@ def is_service_bonus_allowed_for_rule(rule, benefit: dict[str, Any] | None, play
 
 
 
+def uses_dynamic_service_point_cost(rule, benefit: dict[str, Any] | None) -> bool:
+    benefit = dict(benefit or {})
+    return (
+        str(getattr(rule, "category", "") or "").strip().lower()
+        in DYNAMIC_GAME_POINT_CATEGORIES
+        and str(benefit.get("kind") or "").strip().lower() == "service_bonus"
+        and str(getattr(rule, "pricing_type", "") or "").strip().lower()
+        in {"hourly", "game"}
+    )
+
+
+
+def _ceil_points_to_ten(value: Decimal) -> int:
+    if value <= 0:
+        return 0
+    return int((value / Decimal("10")).to_integral_value(rounding=ROUND_CEILING) * Decimal("10"))
+
+
+
+def calculate_service_bonus_point_cost(
+    *,
+    rule,
+    benefit: dict[str, Any] | None,
+    player_count: Any = None,
+) -> int:
+    """Return the authoritative point cost for one service-bonus selection.
+
+    LoL / VALORANT / APEX are rule-price driven. The per-seat point amount is
+    rounded up to 10 points first and only then multiplied by the actual seat
+    count. The large reward receives the 0.9 point-price discount; salary value
+    is deliberately calculated elsewhere without this discount.
+    """
+
+    benefit = dict(benefit or {})
+    if not uses_dynamic_service_point_cost(rule, benefit):
+        try:
+            return max(0, int(benefit.get("cost") or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    try:
+        unit_price = max(0, int(getattr(rule, "price", 0) or 0))
+    except (TypeError, ValueError):
+        unit_price = 0
+    if unit_price <= 0:
+        return 0
+
+    pricing_type = str(getattr(rule, "pricing_type", "") or "").strip().lower()
+    bonus_size = str(benefit.get("bonus_size") or "").strip().lower()
+    if bonus_size not in {"small", "large"}:
+        return 0
+
+    # Regular added-service value for ONE companion.
+    if pricing_type == "hourly":
+        service_units = Decimal("0.5") if bonus_size == "small" else Decimal("1")
+    else:
+        service_units = Decimal("1") if bonus_size == "small" else Decimal("2")
+
+    per_seat_points = Decimal(unit_price) * service_units / Decimal("2")
+    if bonus_size == "large":
+        per_seat_points *= Decimal("0.9")
+    rounded_per_seat = _ceil_points_to_ten(per_seat_points)
+
+    if player_count not in (None, ""):
+        seats = resolve_rule_staff_count(rule, player_count)
+    else:
+        try:
+            seats = max(1, int(benefit.get("seat_count") or 1))
+        except (TypeError, ValueError):
+            seats = 1
+
+    return int(rounded_per_seat * seats)
+
+
+
 def adapt_point_benefit_for_rule(rule, benefit: dict[str, Any] | None) -> dict[str, Any]:
     adapted = dict(benefit or {})
     if str(adapted.get("kind") or "") != "service_bonus":
         return adapted
+
+    # Dynamic games derive cost from the authoritative rule price. Do this before
+    # changing kind to extra_hours / extra_games so the service-bonus metadata is
+    # still available to the shared calculator.
+    adapted["cost"] = calculate_service_bonus_point_cost(
+        rule=rule,
+        benefit=adapted,
+    )
 
     pricing_type = str(getattr(rule, "pricing_type", "") or "").strip().lower()
     bonus_size = str(adapted.get("bonus_size") or "").strip().lower()
@@ -195,14 +284,14 @@ def adapt_point_benefit_for_rule(rule, benefit: dict[str, Any] | None) -> dict[s
         adapted["pricing_types"] = ("hourly",)
         unit_text = "30 分鐘" if abs(hours - 0.5) < 0.001 else "1 小時"
         adapted["name"] = f"{benefit_text}加贈｜{unit_text}"
-        adapted["summary"] = f"服務時間 +{unit_text}，每張僅補貼 1 位陪玩；店內吸收額外服務成本"
+        adapted["summary"] = f"服務時間 +{unit_text}，{seat_count} 位陪玩同步加贈；店內吸收全部額外服務成本"
     elif pricing_type == "game":
         games = 1 if bonus_size == "small" else 2
         adapted["kind"] = "extra_games"
         adapted["games"] = games
         adapted["pricing_types"] = ("game",)
         adapted["name"] = f"{benefit_text}加贈｜{games} 局"
-        adapted["summary"] = f"服務局數 +{games} 局，每張僅補貼 1 位陪玩；店內吸收額外服務成本"
+        adapted["summary"] = f"服務局數 +{games} 局，{seat_count} 位陪玩同步加贈；店內吸收全部額外服務成本"
 
     return adapted
 
@@ -246,3 +335,26 @@ def calculate_one_seat_service_bonus_value(
     if extra_games > 0:
         return max(0, int(round(base_per_unit_per_seat * int(extra_games))))
     return 0
+
+
+
+def calculate_service_bonus_value(
+    *,
+    rule,
+    service_original: int,
+    quantity: Any,
+    player_count: Any,
+    extra_hours: float = 0.0,
+    extra_games: int = 0,
+) -> int:
+    """Return the full extra-service salary value across every actual worker."""
+
+    one_seat = calculate_one_seat_service_bonus_value(
+        rule=rule,
+        service_original=service_original,
+        quantity=quantity,
+        player_count=player_count,
+        extra_hours=extra_hours,
+        extra_games=extra_games,
+    )
+    return max(0, int(one_seat) * resolve_rule_staff_count(rule, player_count))

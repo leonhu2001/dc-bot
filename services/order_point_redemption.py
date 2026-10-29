@@ -4,6 +4,8 @@ from typing import Any, Callable
 
 import discord
 
+from services.order_point_redemption_policy import get_pending_point_benefit_info
+
 
 CUSTOMER_REWARDS: dict
 _to_int: Callable[..., int]
@@ -50,54 +52,20 @@ def configure_order_point_redemption(
 
 
 def _get_pending_order_point_benefit_info(data: dict) -> dict | None:
-    # zYao 3C3B website finance point safety v1
-    if data.get("website_finance_settled"):
-        return None
-
-    benefit_key = str(
-        data.get("point_benefit_key")
-        or data.get("selected_point_benefit_key")
-        or ""
-    ).strip()
-
-    if not benefit_key:
-        return None
-
-    item = get_order_point_item(benefit_key)
-
-    benefit_name = str(
-        data.get("point_benefit_name")
-        or (item or {}).get("name")
-        or benefit_key
+    return get_pending_point_benefit_info(
+        data,
+        point_item_lookup=get_order_point_item,
+        to_int=_to_int,
     )
-
-    benefit_cost = _to_int(
-        data.get("point_benefit_cost"),
-        _to_int((item or {}).get("cost"), 0) if item else 0,
-    ) or 0
-
-    if benefit_cost <= 0:
-        return None
-
-    return {
-        "key": benefit_key,
-        "name": benefit_name,
-        "cost": int(benefit_cost),
-    }
 
 
 def precheck_order_point_benefit_for_payment(data: dict, customer_id: int) -> None:
     info = _get_pending_order_point_benefit_info(data)
-
-    if info is None:
-        return
-
-    if data.get("point_benefit_redeemed"):
+    if info is None or data.get("point_benefit_redeemed"):
         return
 
     reward_data = get_customer_reward_data(int(customer_id))
     before_points = int(get_current_reward_points(reward_data))
-
     if before_points < int(info["cost"]):
         raise ValueError(
             f"點數不足，無法使用「{info['name']}」。"
@@ -113,7 +81,6 @@ async def redeem_order_point_benefit_on_payment(
     channel_id: int,
 ) -> str | None:
     info = _get_pending_order_point_benefit_info(data)
-
     if info is None:
         return None
 
@@ -124,7 +91,6 @@ async def redeem_order_point_benefit_on_payment(
 
     reward_data = get_customer_reward_data(int(customer_id))
     before_points = int(get_current_reward_points(reward_data))
-
     if before_points < int(info["cost"]):
         raise ValueError(
             f"點數不足，無法使用「{info['name']}」。"
@@ -132,7 +98,6 @@ async def redeem_order_point_benefit_on_payment(
         )
 
     logs = reward_data.setdefault("point_adjustment_logs", [])
-
     if not isinstance(logs, list):
         logs = []
         reward_data["point_adjustment_logs"] = logs
@@ -140,7 +105,6 @@ async def redeem_order_point_benefit_on_payment(
     reward_data["point_adjustment"] = int(reward_data.get("point_adjustment", 0) or 0) - int(info["cost"])
     after_points = int(get_current_reward_points(reward_data))
     reward_data["points"] = after_points
-
     logs.append(
         {
             "created_at": get_taipei_now_iso(),
@@ -158,7 +122,6 @@ async def redeem_order_point_benefit_on_payment(
     )
 
     CUSTOMER_REWARDS[int(customer_id)] = reward_data
-
     data["point_benefit_redeemed"] = True
     data["point_benefit_redeemed_at"] = get_taipei_now_iso()
     data["point_benefit_before_points"] = before_points

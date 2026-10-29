@@ -51,21 +51,20 @@ def check_order_point_benefit_allowed(
             return False, "服務加贈只適用計時或計局方案。"
         if not is_service_bonus_allowed_for_rule(rule, spec, player_count=data.get("player_count")):
             return False, "這張服務加贈券不適用目前選擇的陪玩人數／類型。"
-        if category in {"lol", "valorant", "apex"} and int(spec.get("seat_count") or 0) > 0:
-            return False, "這個商品目前暫停使用點數加時／加局券。"
 
     if kind == "free_specify_fee":
         if not getattr(rule, "allow_specify", False):
             return False, "此項目不開放指定，因此不能使用免指定費。"
         if not data.get("specified_staff_ids"):
             return False, "請先指定人員，再使用免指定費。"
-        if pricing_type == "hourly":
+        if pricing_type in {"hourly", "game"}:
             try:
                 quantity = max(1, int(data.get("quantity") or 1))
             except (TypeError, ValueError):
                 quantity = 1
             if quantity >= 2:
-                return False, "2 小時以上本來就免指定費，不需要再使用免指定費福利。"
+                unit_text = "小時" if pricing_type == "hourly" else "局"
+                return False, f"2 {unit_text}以上本來就免指定費，不需要再使用免指定費福利。"
 
     pricing_types = tuple(spec.get("pricing_types") or ())
     if pricing_types and pricing_type not in pricing_types:

@@ -37,8 +37,6 @@ def install_shared_point_benefit_policy() -> None:
         item = checkout.POINT_ITEM_MAP.get(str(point_item_key))
         if rule is None or item is None:
             return {"allowed": False, "reason": "不支援這個點數福利。"}
-        if int(point_balance or 0) < int(item["cost"]):
-            return {"allowed": False, "reason": "點數不足。"}
 
         payload = {
             "quantity": max(1, int(quantity or 1)),
@@ -55,16 +53,32 @@ def install_shared_point_benefit_policy() -> None:
             item,
             payload,
         )
-        if allowed:
-            return {"allowed": True, "reason": ""}
+        if not allowed:
+            result = {"allowed": False, "reason": reason or "此點數福利目前不可使用。"}
+            if (
+                str(item.get("kind") or "") == "free_specify_fee"
+                and not has_specified_staff
+            ):
+                result["requires_specified"] = True
+            return result
 
-        result = {"allowed": False, "reason": reason or "此點數福利目前不可使用。"}
-        if (
-            str(item.get("kind") or "") == "free_specify_fee"
-            and not has_specified_staff
-        ):
-            result["requires_specified"] = True
-        return result
+        # Adapt before checking the point balance. LoL / VALORANT / APEX service
+        # rewards derive cost from the selected rule price, so the raw catalog
+        # placeholder must never decide whether an option is affordable.
+        adapted = checkout._point_item_for_rule(rule, item)
+        try:
+            authoritative_cost = max(0, int(adapted.get("cost") or 0))
+        except (TypeError, ValueError):
+            authoritative_cost = 0
+
+        if int(point_balance or 0) < authoritative_cost:
+            return {
+                "allowed": False,
+                "reason": "點數不足。",
+                "cost": authoritative_cost,
+            }
+
+        return {"allowed": True, "reason": "", "cost": authoritative_cost}
 
     checkout.point_item_status = point_item_status
 
@@ -113,6 +127,15 @@ def install_shared_point_benefit_policy() -> None:
                         player_count=player_count,
                     )
                 )
+                raw = checkout.POINT_ITEM_MAP.get(key)
+                if raw is not None:
+                    adapted = checkout._point_item_for_rule(rule, raw)
+                    if "cost" in adapted:
+                        row["cost"] = adapted["cost"]
+                    if "name" in adapted:
+                        row["name"] = adapted["name"]
+                    if "summary" in adapted:
+                        row["summary"] = adapted["summary"]
 
         existing = {str(item.get("key") or "") for item in result}
         for key in (
@@ -138,6 +161,10 @@ def install_shared_point_benefit_policy() -> None:
                 player_count=player_count,
             )
             adapted.update(status)
+            # Hidden legacy aliases are lookup-only compatibility rows. Keep their
+            # historic fixed catalog cost for old callers; current seat-aware rows
+            # above carry the new dynamic rule price and are the only public options.
+            adapted["cost"] = int(raw.get("cost") or 0)
             result.append(adapted)
         return result
 
