@@ -63,9 +63,30 @@ def extract_player_count(row: dict[str, Any]) -> int:
     return parsed if parsed is not None else 1
 
 
+def _canonical_rule_for_compat(rule: Any) -> Any:
+    """Resolve a partial legacy/test rule to the formal rule when possible.
+
+    Older callers passed lightweight objects that carried only ``key`` and ``price``.
+    Reading the live rule by key preserves the old compatibility API without copying
+    any player-count price table back into this dated migration module.
+    """
+
+    key = str(getattr(rule, "key", "") or "").strip()
+    if not key:
+        return rule
+    try:
+        from services.order_rules import ORDER_RULES
+
+        canonical = ORDER_RULES.get(key)
+    except Exception:
+        canonical = None
+    return canonical or rule
+
+
 def _selected_unit_total(rule: Any, player_count: int) -> int:
     """Read the selected tier directly from the formal OrderRule."""
 
+    rule = _canonical_rule_for_compat(rule)
     requested = max(1, int(player_count or 1))
     if bool(getattr(rule, "player_count_enabled", False)):
         minimum = max(1, int(getattr(rule, "min_player_count", 1) or 1))
