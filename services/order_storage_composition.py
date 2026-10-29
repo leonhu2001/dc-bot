@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from core.database import (
     delete_claim_row_from_db,
     remember_claim_data,
@@ -17,6 +19,53 @@ from views.smart_dispatch import (
     send_initial_smart_dispatch_alert,
     send_specified_staff_dispatch_dms,
 )
+
+
+_WEB_SYNC_TASKS: set[asyncio.Task] = set()
+_WEB_SYNC_TAILS: dict[int, asyncio.Task] = {}
+
+
+def _schedule_web_order_status_sync(**kwargs) -> None:
+    """Run blocking web DB sync off the Discord event loop, preserving ticket order."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # Startup/maintenance callers without an event loop keep the old synchronous behavior.
+        sync_web_order_status_from_bot(**kwargs)
+        return
+
+    ticket_channel_id = _to_int(kwargs.get("ticket_channel_id"), 0) or 0
+    previous = _WEB_SYNC_TAILS.get(ticket_channel_id)
+
+    async def _run() -> None:
+        if previous is not None:
+            try:
+                await asyncio.shield(previous)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # A failed earlier sync must not permanently block newer states.
+                pass
+
+        try:
+            await asyncio.to_thread(sync_web_order_status_from_bot, **kwargs)
+        except Exception as exc:
+            print(
+                f"[web-sync] 背景同步訂單狀態失敗 "
+                f"ticket_channel_id={ticket_channel_id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+    task = loop.create_task(_run())
+    _WEB_SYNC_TASKS.add(task)
+    _WEB_SYNC_TAILS[ticket_channel_id] = task
+
+    def _cleanup(done_task: asyncio.Task) -> None:
+        _WEB_SYNC_TASKS.discard(done_task)
+        if _WEB_SYNC_TAILS.get(ticket_channel_id) is done_task:
+            _WEB_SYNC_TAILS.pop(ticket_channel_id, None)
+
+    task.add_done_callback(_cleanup)
 
 
 def configure_order_storage_composition(
@@ -48,5 +97,5 @@ def configure_order_storage_composition(
         initial_dispatch_alert_sender=send_initial_smart_dispatch_alert,
         specified_staff_dm_sender=send_specified_staff_dispatch_dms,
         specified_dm_result_setter=set_specified_dm_results,
-        web_order_status_syncer=sync_web_order_status_from_bot,
+        web_order_status_syncer=_schedule_web_order_status_sync,
     )
