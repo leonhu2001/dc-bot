@@ -81,15 +81,6 @@ _install_benefits()
 # fund every seat. The shared financial wrapper is seat-count generic (1-4).
 _install_point_service_financial_runtime_20261028()
 
-# User-facing checkout copy must describe the same funding policy as the actual
-# payroll calculation. Install after benefit integration so wrappers see the
-# final calculation/runtime hooks.
-from .self_service_financial_copy import (
-    install_self_service_financial_copy_policy as _install_financial_copy,
-)
-
-_install_financial_copy()
-
 # A VIP timer session row alone is not enough to redefine an order's accounting
 # semantics. Install the shared identity/deletion guard for both Discord and Web
 # processes so retracted timer metadata cannot later attach to a normal order ID.
