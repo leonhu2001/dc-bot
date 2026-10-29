@@ -4,6 +4,8 @@ from typing import Any
 
 from services.unified_service_point_policy import (
     calculate_rule_price_service_point_cost,
+    is_current_service_bonus,
+    is_rule_service_bonus_supported,
     uses_rule_price_service_point_cost,
 )
 
@@ -158,6 +160,12 @@ def is_service_bonus_allowed_for_rule(rule, benefit: dict[str, Any] | None, play
     benefit = dict(benefit or {})
     if str(benefit.get("kind") or "") != "service_bonus":
         return True
+
+    # Current seat-aware service rewards are a formal product capability. Keep the
+    # eligibility decision here in the canonical catalog instead of replacing this
+    # function later from dynamic_game_point_policy at process startup.
+    if is_current_service_bonus(benefit) and not is_rule_service_bonus_supported(rule):
+        return False
 
     expected_tier = str(benefit.get("service_tier") or "").strip().lower()
     if not expected_tier or expected_tier != get_rule_service_tier(rule):
