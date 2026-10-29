@@ -73,6 +73,24 @@ def install_dynamic_game_point_policy() -> None:
             if not isinstance(result, dict):
                 return result
 
+            # A redeemed free-specify benefit means the fee was never collected.
+            # The legacy calculator treated that missing fee as store-funded and
+            # added it back into both payout basis and store subsidy. Remove that
+            # phantom amount before any service-seat funding is applied.
+            try:
+                waived_specify = max(0, int(result.get("point_waived_specify_fee") or 0))
+            except (TypeError, ValueError):
+                waived_specify = 0
+            if waived_specify > 0:
+                result["payout_base_amount"] = max(
+                    0,
+                    int(result.get("payout_base_amount") or 0) - waived_specify,
+                )
+                result["store_absorbed_amount"] = max(
+                    0,
+                    int(result.get("store_absorbed_amount") or 0) - waived_specify,
+                )
+
             key = str(
                 result.get("point_benefit_key")
                 or (data or {}).get("point_benefit_key")
