@@ -5,7 +5,13 @@ _INSTALLED = False
 
 
 def install_dynamic_game_point_policy() -> None:
-    """Install the shared formal-product point-service policy for Discord/Web."""
+    """Install only the two legacy bridges not yet owned by their canonical modules.
+
+    Service eligibility, dynamic point cost, redemption validation and multi-seat
+    rule capability now live directly in point_benefit_catalog,
+    self_service_point_benefit_policy, order_point_redemption_policy and
+    multi_seat_order_policy_20261028. Do not rebind those functions here.
+    """
 
     global _INSTALLED
     if _INSTALLED:
@@ -13,56 +19,15 @@ def install_dynamic_game_point_policy() -> None:
 
     from services import point_benefit_catalog as point_catalog
     from services import self_service_financials as financials
-    from services import self_service_point_benefit_policy as point_policy
     from services import self_service_selection_runtime as selection
-    from services import order_point_redemption_policy as redemption_policy
-    from services import multi_seat_order_policy_20261028 as multi_seat_policy
-    from services.order_rules import ORDER_RULES
     from services.unified_service_point_policy import (
-        calculate_rule_price_service_point_cost,
         is_current_service_bonus,
         is_rule_service_bonus_supported,
-        uses_rule_price_service_point_cost,
     )
 
-    # Service rewards are now a formal-product capability rather than a hard-coded
-    # game-category switch. Teaching / sweet / trial / fun / Steam products stay
-    # disabled even when they are hourly/game products and generic point coupons
-    # remain available. Historical service aliases are not re-priced.
-    if not hasattr(point_catalog, "_unified_service_original_allowed"):
-        original_service_allowed = point_catalog.is_service_bonus_allowed_for_rule
-        point_catalog._unified_service_original_allowed = original_service_allowed
-
-        def is_service_bonus_allowed_for_rule(rule, benefit, player_count=None) -> bool:
-            if is_current_service_bonus(benefit) and not is_rule_service_bonus_supported(rule):
-                return False
-            return bool(original_service_allowed(rule, benefit, player_count=player_count))
-
-        point_catalog.is_service_bonus_allowed_for_rule = is_service_bonus_allowed_for_rule
-        point_catalog.uses_dynamic_service_point_cost = uses_rule_price_service_point_cost
-        point_catalog.calculate_service_bonus_point_cost = calculate_rule_price_service_point_cost
-
-    # These modules imported the catalog callables by name. Rebind their module
-    # globals so Discord selection and payment use the exact same live policy.
-    point_policy.is_service_bonus_allowed_for_rule = point_catalog.is_service_bonus_allowed_for_rule
-    redemption_policy.is_service_bonus_allowed_for_rule = point_catalog.is_service_bonus_allowed_for_rule
-    redemption_policy.uses_dynamic_service_point_cost = point_catalog.uses_dynamic_service_point_cost
-    redemption_policy.calculate_service_bonus_point_cost = point_catalog.calculate_service_bonus_point_cost
-
-    # The older multi-seat migration has its own service switch. Make it a strict
-    # projection of the formal rule capability instead of default-enabling every
-    # non-LoL/VALORANT/APEX product.
-    multi_seat_policy.is_service_point_benefit_enabled = is_rule_service_bonus_supported
-    for key, rule in ORDER_RULES.items():
-        multi_seat_policy.SERVICE_POINT_BENEFIT_RULE_OVERRIDES[str(key)] = (
-            is_rule_service_bonus_supported(rule)
-        )
-
-    # Discord's older seat-funding wrapper reads point_benefit_key only from the
-    # financial result. Some self-service flows keep the selected key only on order
-    # data, which made that wrapper silently fall back to one worker. Fund current
-    # seat-aware rewards here using BOTH sources, then mark the old wrapper as
-    # superseded so startup cannot multiply the amount a second time.
+    # Remaining legacy bridge #1: Discord financial calculation predates a
+    # seat-aware service value. Keep this narrowly scoped until the calculation is
+    # moved into calculate_self_service_financials itself.
     if not hasattr(financials, "_dynamic_point_original_financials"):
         original_financials = financials.calculate_self_service_financials
         financials._dynamic_point_original_financials = original_financials
@@ -73,10 +38,6 @@ def install_dynamic_game_point_policy() -> None:
             if not isinstance(result, dict):
                 return result
 
-            # A redeemed free-specify benefit means the fee was never collected.
-            # The legacy calculator treated that missing fee as store-funded and
-            # added it back into both payout basis and store subsidy. Remove that
-            # phantom amount before any service-seat funding is applied.
             try:
                 waived_specify = max(0, int(result.get("point_waived_specify_fee") or 0))
             except (TypeError, ValueError):
@@ -138,9 +99,9 @@ def install_dynamic_game_point_policy() -> None:
 
         financials.calculate_self_service_financials = calculate_self_service_financials
 
-    # Discord used the raw fixed catalog cost to hide unaffordable options before
-    # adapting the reward to the selected rule. Adapt first, then compare balance,
-    # so the visible cost and the final server-side cost are the same number.
+    # Remaining legacy bridge #2: the old Discord selector checks raw catalog cost
+    # before adapting a reward to the selected formal rule. Adapt first so the
+    # displayed and charged point cost are identical.
     if not hasattr(selection.SelfServicePointBenefitView, "_dynamic_point_original_build_available_items"):
         selection.SelfServicePointBenefitView._dynamic_point_original_build_available_items = (
             selection.SelfServicePointBenefitView.build_available_items
