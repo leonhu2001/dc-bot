@@ -1,3 +1,5 @@
+import asyncio
+
 from services import order_storage_composition as composition
 
 
@@ -29,4 +31,39 @@ def test_order_storage_composition_binds_service_owned_dependencies(monkeypatch)
     assert captured["initial_dispatch_alert_sender"] is composition.send_initial_smart_dispatch_alert
     assert captured["specified_staff_dm_sender"] is composition.send_specified_staff_dispatch_dms
     assert captured["specified_dm_result_setter"] is composition.set_specified_dm_results
-    assert captured["web_order_status_syncer"] is composition.sync_web_order_status_from_bot
+    assert captured["web_order_status_syncer"] is composition._schedule_web_order_status_sync
+
+
+def test_web_order_status_sync_scheduler_is_non_blocking_and_preserves_ticket_order(monkeypatch):
+    calls = []
+
+    async def fake_to_thread(func, **kwargs):
+        calls.append((kwargs["ticket_channel_id"], kwargs["status"]))
+        await asyncio.sleep(0)
+
+    monkeypatch.setattr(composition.asyncio, "to_thread", fake_to_thread)
+    monkeypatch.setattr(composition, "sync_web_order_status_from_bot", lambda **kwargs: None)
+    composition._WEB_SYNC_TASKS.clear()
+    composition._WEB_SYNC_TAILS.clear()
+
+    async def run_scenario():
+        composition._schedule_web_order_status_sync(
+            ticket_channel_id=123,
+            status="stored",
+        )
+        composition._schedule_web_order_status_sync(
+            ticket_channel_id=123,
+            status="pending",
+        )
+
+        # Scheduling itself must not wait for the blocking DB sync.
+        assert calls == []
+
+        tasks = list(composition._WEB_SYNC_TASKS)
+        await asyncio.gather(*tasks)
+
+    asyncio.run(run_scenario())
+
+    assert calls == [(123, "stored"), (123, "pending")]
+    assert composition._WEB_SYNC_TASKS == set()
+    assert composition._WEB_SYNC_TAILS == {}
