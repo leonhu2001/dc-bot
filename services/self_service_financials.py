@@ -5,7 +5,10 @@ from typing import Any, Callable
 
 import discord
 
-from services.point_benefit_catalog import calculate_one_seat_service_bonus_value
+from services.point_benefit_catalog import (
+    calculate_one_seat_service_bonus_value,
+    resolve_rule_staff_count,
+)
 from services.self_service_point_benefits import (
     _adapt_order_point_benefit_for_rule,
     configure_self_service_point_benefits,
@@ -598,7 +601,7 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
     )
     benefit_service_value = loyalty_discount["service_value"]
     benefit_discount_amount = loyalty_discount["discount_amount"]
-    point_service_value = calculate_one_seat_service_bonus_value(
+    one_seat_point_service_value = calculate_one_seat_service_bonus_value(
         rule=rule,
         service_original=service_original,
         quantity=data.get("quantity"),
@@ -606,17 +609,42 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
         extra_hours=extra_hours,
         extra_games=extra_games,
     )
+    funded_point_service_seats = 1
+    if benefit and one_seat_point_service_value > 0:
+        try:
+            requested_funded_seats = int(benefit.get("seat_count") or 0)
+        except (TypeError, ValueError):
+            requested_funded_seats = 0
+        if requested_funded_seats > 0:
+            actual_seats = resolve_rule_staff_count(rule, data.get("player_count", 1))
+            funded_point_service_seats = min(
+                max(1, requested_funded_seats),
+                max(1, int(actual_seats or 1)),
+            )
+    point_service_value = one_seat_point_service_value * funded_point_service_seats
 
-    payout_base = allocation.payout_base_amount + point_specify + point_service_value
+    # Waived specify fees were never collected, so they are not payout/store value.
+    # Current seat-aware service rewards, however, fund every selected seat directly.
+    payout_base = allocation.payout_base_amount + point_service_value
     customer_pay = max(0, allocation.customer_pay_amount - benefit_discount_amount)
     notes: list[str] = []
     if legacy_free_hour:
         notes.append(f"舊版福利：首小時免費 -{_format_plain_amount(legacy_free_hour)}")
     if extra_hours:
-        notes.append(f"服務時間 +{_format_point_hours(extra_hours)}（1 位陪玩）")
+        seat_note = (
+            f"{funded_point_service_seats} 位陪玩同步加贈"
+            if funded_point_service_seats > 1
+            else "1 位陪玩"
+        )
+        notes.append(f"服務時間 +{_format_point_hours(extra_hours)}（{seat_note}）")
     if extra_games:
         if bkind == "extra_games":
-            notes.append(f"服務局數 +{extra_games} 局（1 位陪玩）")
+            seat_note = (
+                f"{funded_point_service_seats} 位陪玩同步加贈"
+                if funded_point_service_seats > 1
+                else "1 位陪玩"
+            )
+            notes.append(f"服務局數 +{extra_games} 局（{seat_note}）")
         else:
             notes.append(f"加場 {extra_games} 場保撤")
     if point_specify:
@@ -696,7 +724,6 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
         "store_absorbed_amount": (
             allocation.store_absorbed_amount
             + benefit_discount_amount
-            + point_specify
             + point_service_value
         ),
         "customer_pay_amount": customer_pay,
