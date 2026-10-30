@@ -1,11 +1,15 @@
 param(
     [string]$Target = "https://app.852941.xyz/",
-    [string]$Output = "data/market_source_probe_852941.json"
+    [string]$Output = ""
 )
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RepoRoot
+
+if (-not $Output) {
+    $Output = Join-Path ([System.IO.Path]::GetTempPath()) "market_source_probe_852941.json"
+}
 
 $Candidates = @(
     (Join-Path $RepoRoot "venv\Scripts\python.exe"),
