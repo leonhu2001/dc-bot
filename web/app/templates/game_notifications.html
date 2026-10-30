@@ -2,7 +2,8 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
-<link rel="stylesheet" href="/static/css/pages/game_notifications.css?v=20261030-1">
+<link rel="stylesheet" href="/static/css/pages/game_notifications.css?v=20261030-2">
+<script src="/static/js/pages/game_notifications.js?v=20261030-1" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -13,7 +14,7 @@
         <div>
             <div class="game-tool-kicker">{{ game.eyebrow }} · NOTIFICATIONS</div>
             <h1>{{ game.notifications_title }}</h1>
-            <p>管理你的關注清單與價格提醒。提醒只會使用未過期的正式行情；Web Push 會在後續階段接入。</p>
+            <p>管理你的關注清單、價格提醒與這台裝置的網站推播。只有 fresh 正式行情會觸發價格條件。</p>
         </div>
         <nav class="game-tool-tabs" aria-label="{{ game.name }}工具">
             {% for feature in game_features %}
@@ -29,6 +30,26 @@
             <span>PERSONALIZATION</span>
             <h2>個人化行情資料庫尚未就緒</h2>
             <p>關注與提醒目前暫停寫入；既有網站與訂單功能不受影響。</p>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if alert_items %}
+    <section
+        class="game-market-panel game-notification-push"
+        data-market-push
+        data-config-url="/games/{{ game.slug }}/notifications/push/config"
+        data-subscribe-url="/games/{{ game.slug }}/notifications/push/subscribe"
+        data-unsubscribe-url="/games/{{ game.slug }}/notifications/push/unsubscribe"
+    >
+        <div class="game-notification-push-copy">
+            <span class="game-market-label">WEB PUSH</span>
+            <h2>價格達標時通知這台裝置</h2>
+            <p>只有你主動按下開啟後，瀏覽器才會詢問通知權限。關閉推播不會刪除網站內的價格提醒。</p>
+        </div>
+        <div class="game-notification-push-controls">
+            <button type="button" data-market-push-button disabled>檢查推播支援…</button>
+            <small data-market-push-status aria-live="polite">正在確認這台裝置的推播狀態。</small>
         </div>
     </section>
     {% endif %}
@@ -118,7 +139,7 @@
             {% else %}
             <div class="game-market-empty game-notification-empty">
                 <strong>還沒有價格提醒</strong>
-                <span>在品項頁設定「低於或等於」或「高於或等於」目標價格。</span>
+                <span>在品項頁設定「低於或等於」或「高於或等於」目標價格；建立後才會出現推播開關。</span>
             </div>
             {% endif %}
         </article>
@@ -128,7 +149,7 @@
         <strong>提醒狀態</strong>
         <p>
             目前行情狀態：{{ market_status }}。只有 fresh/ready 行情才會進行價格條件判斷；stale、來源中斷或無資料時不觸發。
-            網站已保存提醒與觸發狀態，手機 Web Push 尚未啟用，因此現在不會跳出瀏覽器通知權限視窗。
+            推播採裝置個別訂閱與送達紀錄；若推播服務暫時失敗會重試，已失效的瀏覽器 endpoint 會自動停用。
         </p>
     </section>
 </section>
