@@ -1,0 +1,77 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
+<link rel="stylesheet" href="/static/css/pages/game_news.css?v=20261030-1">
+{% endblock %}
+
+{% block content %}
+<section class="game-tool-shell game-news-shell">
+    <a class="game-tool-back" href="/games/{{ game.slug }}">← 回到 {{ game.name }}</a>
+
+    <header class="game-tool-hero">
+        <div>
+            <div class="game-tool-kicker">{{ game.eyebrow }} · NEWS</div>
+            <h1>{{ game.news_title }}</h1>
+            <p>集中查看 Garena 台灣官方版本資訊、公告與活動，不混入未驗證的第三方消息。</p>
+        </div>
+        <nav class="game-tool-tabs" aria-label="{{ game.name }}工具">
+            {% for feature in game_features %}
+            <a href="{{ feature.href }}" class="{% if feature.key == 'news' %}is-active{% endif %}">{{ feature.title }}</a>
+            {% endfor %}
+        </nav>
+    </header>
+
+    {% if news_feed.status != 'ready' %}
+    <section class="game-news-status {% if news_feed.status == 'unavailable' %}is-error{% endif %}" aria-live="polite">
+        <strong>{% if news_feed.status == 'stale' %}官方來源暫時無法更新{% else %}官方消息暫時無法讀取{% endif %}</strong>
+        <span>{{ news_feed.message }}</span>
+    </section>
+    {% endif %}
+
+    <section class="game-news-toolbar">
+        <form method="get" action="/games/{{ game.slug }}/news" class="game-news-search">
+            {% if news_category != 'all' %}<input type="hidden" name="category" value="{{ news_category }}">{% endif %}
+            <input type="search" name="q" value="{{ news_query }}" maxlength="80" placeholder="搜尋官方消息" aria-label="搜尋官方消息">
+            <button type="submit">搜尋</button>
+        </form>
+        <div class="game-news-source">
+            <span>來源</span>
+            <a href="{{ news_feed.source_url }}" target="_blank" rel="noopener noreferrer">{{ news_feed.source_name }} ↗</a>
+        </div>
+    </section>
+
+    <nav class="game-news-categories" aria-label="消息分類">
+        <a href="/games/{{ game.slug }}/news" class="{% if news_category == 'all' %}is-active{% endif %}">全部</a>
+        <a href="/games/{{ game.slug }}/news?category=system" class="{% if news_category == 'system' %}is-active{% endif %}">版本資訊</a>
+        <a href="/games/{{ game.slug }}/news?category=announcement" class="{% if news_category == 'announcement' %}is-active{% endif %}">公告</a>
+        <a href="/games/{{ game.slug }}/news?category=event" class="{% if news_category == 'event' %}is-active{% endif %}">活動</a>
+    </nav>
+
+    <div class="game-news-meta">
+        <span>{{ news_result_count }} 則消息</span>
+        {% if news_feed.fetched_at %}<span>最近同步：{{ news_feed.fetched_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>{% endif %}
+    </div>
+
+    {% if news_articles %}
+    <section class="game-news-grid" aria-label="官方消息列表">
+        {% for article in news_articles %}
+        <article class="game-news-card">
+            <div class="game-news-card-meta">
+                <span class="game-news-category">{{ article.category_label }}</span>
+                <time>{% if article.published_on %}{{ article.published_on.strftime('%Y/%m/%d') }}{% else %}日期未提供{% endif %}</time>
+            </div>
+            <h2>{{ article.title }}</h2>
+            {% if article.excerpt %}<p>{{ article.excerpt }}</p>{% endif %}
+            <a href="{{ article.url }}" target="_blank" rel="noopener noreferrer">查看 Garena 官方原文 →</a>
+        </article>
+        {% endfor %}
+    </section>
+    {% else %}
+    <section class="game-news-empty">
+        <strong>{% if news_feed.status == 'unavailable' %}官方消息目前不可用{% else %}找不到符合條件的消息{% endif %}</strong>
+        <span>{% if news_query or news_category != 'all' %}換個關鍵字或分類再試一次。{% else %}Garena 官方來源恢復後會自動重新同步。{% endif %}</span>
+    </section>
+    {% endif %}
+</section>
+{% endblock %}
