@@ -9,6 +9,9 @@ from services.market.runtime import get_market_repository
 from services.market.storage import MarketRepository
 
 
+_RECOMMENDATION_DISCOUNT_PCT = 3.0
+
+
 @dataclass(frozen=True)
 class MarketItemSummary:
     item_key: str
@@ -65,6 +68,33 @@ def _movers(items: tuple[MarketItemSummary, ...]) -> tuple[
         )[:3]
     )
     return gainers, losers
+
+
+def _recommended_item(items: tuple[MarketItemSummary, ...]) -> MarketItemSummary | None:
+    """Pick a transparent seven-day price opportunity from our own history.
+
+    This is deliberately not a predictive score. A candidate must already have
+    a mature seven-day average and be at least a few percent below that average.
+    If no item clears the threshold, the public page should say so instead of
+    manufacturing a recommendation from thin data.
+    """
+    candidates: list[tuple[float, MarketItemSummary]] = []
+    for item in items:
+        if item.current_price is None or item.avg_7d is None or item.avg_7d <= 0:
+            continue
+        discount_pct = ((item.avg_7d - item.current_price) / item.avg_7d) * 100.0
+        if discount_pct < _RECOMMENDATION_DISCOUNT_PCT:
+            continue
+        candidates.append((discount_pct, item))
+
+    if not candidates:
+        return None
+
+    discount_pct, item = max(candidates, key=lambda candidate: candidate[0])
+    return replace(
+        item,
+        recommendation_label=f"低於 7D 均價 {discount_pct:.1f}%",
+    )
 
 
 def get_public_market_snapshot(
@@ -162,6 +192,7 @@ def get_public_market_snapshot(
         game_key=clean_game_key,
         status="stale" if stale else "ready",
         updated_at=updated_at,
+        recommended_item=None if stale else _recommended_item(items),
         items=items,
         gainers=gainers,
         losers=losers,
