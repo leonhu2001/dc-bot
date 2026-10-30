@@ -79,6 +79,10 @@ def _stats_for_item(
         span_hours = (updated_at - baseline_at).total_seconds() / 3600.0
         if 0 <= baseline_gap <= 6 * 3600 and span_hours >= 20:
             change_24h_pct = _change_pct(item.current_price, baseline.price)
+            # Use the same accepted baseline for range statistics so clock
+            # drift of a few milliseconds cannot make 24H change and 24H
+            # high/low disagree about which starting observation is valid.
+            prices_24h.append(baseline.price)
 
     # Seven-day labels only appear after at least six days of actual coverage.
     seven_day_ready = coverage_hours >= 6 * 24
