@@ -34,10 +34,10 @@
     </section>
     {% endif %}
 
-    {% if alert_items %}
     <section
         class="game-market-panel game-notification-push"
         data-market-push
+        data-can-enable="{% if alert_items %}1{% else %}0{% endif %}"
         data-config-url="/games/{{ game.slug }}/notifications/push/config"
         data-subscribe-url="/games/{{ game.slug }}/notifications/push/subscribe"
         data-unsubscribe-url="/games/{{ game.slug }}/notifications/push/unsubscribe"
@@ -45,14 +45,13 @@
         <div class="game-notification-push-copy">
             <span class="game-market-label">WEB PUSH</span>
             <h2>價格達標時通知這台裝置</h2>
-            <p>只有你主動按下開啟後，瀏覽器才會詢問通知權限。關閉推播不會刪除網站內的價格提醒。</p>
+            <p>只有你主動按下開啟後，瀏覽器才會詢問通知權限。沒有價格提醒時不會新增推播訂閱；既有訂閱仍可在這裡關閉。</p>
         </div>
         <div class="game-notification-push-controls">
             <button type="button" data-market-push-button disabled>檢查推播支援…</button>
             <small data-market-push-status aria-live="polite">正在確認這台裝置的推播狀態。</small>
         </div>
     </section>
-    {% endif %}
 
     <section class="game-notifications-grid">
         <article class="game-market-panel">
@@ -139,7 +138,7 @@
             {% else %}
             <div class="game-market-empty game-notification-empty">
                 <strong>還沒有價格提醒</strong>
-                <span>在品項頁設定「低於或等於」或「高於或等於」目標價格；建立後才會出現推播開關。</span>
+                <span>在品項頁設定「低於或等於」或「高於或等於」目標價格；建立後才可為新裝置開啟推播。</span>
             </div>
             {% endif %}
         </article>
