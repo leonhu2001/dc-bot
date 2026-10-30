@@ -7,13 +7,33 @@
     const stage = root.querySelector("[data-market-chart-stage]");
     const empty = root.querySelector("[data-market-chart-empty]");
     const foot = root.querySelector("[data-market-chart-foot]");
+    const chartStatus = root.querySelector("[data-market-chart-status]");
     const rangeButtons = Array.from(root.querySelectorAll("[data-market-range]"));
     const historyUrl = String(root.dataset.historyUrl || "").trim();
+    const latestTime = document.querySelector("[data-market-latest-at]");
+    const change24 = document.querySelector("[data-market-change-24h]");
+    const change24Note = document.querySelector("[data-market-change-24h-note]");
+    const range24 = document.querySelector("[data-market-range-24h]");
+    const average7d = document.querySelector("[data-market-average-7d]");
+    const range7d = document.querySelector("[data-market-range-7d]");
+    const coverage = document.querySelector("[data-market-coverage]");
+    const coverageNote = document.querySelector("[data-market-coverage-note]");
     const svgNS = "http://www.w3.org/2000/svg";
+    const HOUR = 60 * 60 * 1000;
     let allPoints = [];
 
     const formatPrice = (value) => `$${Math.round(value).toLocaleString("zh-TW")}`;
     const formatTime = (date) => new Intl.DateTimeFormat("zh-TW", {
+        timeZone: "Asia/Taipei",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    }).format(date);
+    const formatFullTime = (date) => new Intl.DateTimeFormat("zh-TW", {
+        timeZone: "Asia/Taipei",
+        year: "numeric",
         month: "2-digit",
         day: "2-digit",
         hour: "2-digit",
@@ -36,10 +56,80 @@
         return node;
     };
 
+    const setText = (node, value) => {
+        if (node) node.textContent = value;
+    };
+
+    const coverageHours = () => {
+        if (allPoints.length < 2) return 0;
+        return Math.max(0, (allPoints[allPoints.length - 1].at - allPoints[0].at) / HOUR);
+    };
+
+    const describeCoverage = (hours) => {
+        if (hours < 1) return `${Math.max(0, Math.round(hours * 60))} 分鐘`;
+        if (hours < 48) return `${hours.toFixed(1)} 小時`;
+        return `${(hours / 24).toFixed(1)} 天`;
+    };
+
+    const updateLatestTime = () => {
+        if (!latestTime) return;
+        const parsed = new Date(latestTime.getAttribute("datetime") || "");
+        if (!Number.isNaN(parsed.getTime())) latestTime.textContent = `${formatFullTime(parsed)}（台灣時間）`;
+    };
+
+    const calculateSummary = () => {
+        if (!allPoints.length) return;
+
+        const latest = allPoints[allPoints.length - 1];
+        const totalCoverage = coverageHours();
+        const cutoff24 = latest.at.getTime() - 24 * HOUR;
+        const cutoff7d = latest.at.getTime() - 7 * 24 * HOUR;
+        const baselineCandidates = allPoints.filter((point) => point.at.getTime() <= cutoff24);
+        const baseline = baselineCandidates.length ? baselineCandidates[baselineCandidates.length - 1] : null;
+        const baselineGap = baseline ? cutoff24 - baseline.at.getTime() : Number.POSITIVE_INFINITY;
+        const baselineSpan = baseline ? (latest.at.getTime() - baseline.at.getTime()) / HOUR : 0;
+        const ready24 = Boolean(baseline && baselineGap >= 0 && baselineGap <= 6 * HOUR && baselineSpan >= 20);
+
+        if (ready24 && baseline) {
+            const pct = ((latest.price - baseline.price) / baseline.price) * 100;
+            const sign = pct > 0 ? "+" : "";
+            setText(change24, `${sign}${pct.toFixed(1)}%`);
+            change24?.classList.toggle("is-positive", pct > 0);
+            change24?.classList.toggle("is-negative", pct < 0);
+            setText(change24Note, `${formatPrice(baseline.price)} → ${formatPrice(latest.price)}`);
+
+            const points24 = allPoints.filter((point) => point.at.getTime() >= cutoff24);
+            const prices24 = [baseline.price, ...points24.map((point) => point.price)];
+            setText(range24, `${formatPrice(Math.min(...prices24))} – ${formatPrice(Math.max(...prices24))}`);
+        } else {
+            setText(change24, "累積中");
+            setText(range24, "累積中");
+            setText(change24Note, `目前 ${describeCoverage(totalCoverage)}，至少需約 20 小時可信歷史`);
+        }
+
+        const points7d = allPoints.filter((point) => point.at.getTime() >= cutoff7d);
+        const ready7d = totalCoverage >= 6 * 24 && points7d.length > 1;
+        if (ready7d) {
+            const prices7d = points7d.map((point) => point.price);
+            const avg = prices7d.reduce((sum, value) => sum + value, 0) / prices7d.length;
+            setText(average7d, formatPrice(avg));
+            setText(range7d, `${formatPrice(Math.min(...prices7d))} – ${formatPrice(Math.max(...prices7d))}`);
+        } else {
+            setText(average7d, "累積中");
+            setText(range7d, "累積中");
+        }
+
+        setText(coverage, describeCoverage(totalCoverage));
+        setText(
+            coverageNote,
+            `${allPoints.length} 筆 · ${formatTime(allPoints[0].at)} → ${formatTime(latest.at)}`,
+        );
+    };
+
     const filterPoints = (hours) => {
         if (!allPoints.length) return [];
         const newest = allPoints[allPoints.length - 1].at.getTime();
-        const cutoff = newest - (hours * 60 * 60 * 1000);
+        const cutoff = newest - (hours * HOUR);
         const filtered = allPoints.filter((point) => point.at.getTime() >= cutoff);
         return filtered.length ? filtered : allPoints.slice(-1);
     };
@@ -53,11 +143,12 @@
 
         const width = 1000;
         const height = 320;
-        const padX = 34;
-        const padY = 28;
+        const padX = 54;
+        const padY = 30;
         const prices = points.map((point) => point.price);
         let minPrice = Math.min(...prices);
         let maxPrice = Math.max(...prices);
+        const average = prices.reduce((sum, value) => sum + value, 0) / prices.length;
 
         if (minPrice === maxPrice) {
             const padding = Math.max(1, Math.round(minPrice * 0.03));
@@ -91,12 +182,39 @@
             }));
         }
 
+        const averageLine = makeSvgNode("line", {
+            x1: padX,
+            x2: width - padX,
+            y1: yFor(average),
+            y2: yFor(average),
+            class: "market-item-chart-average-line",
+        });
+        svg.appendChild(averageLine);
+
+        const highLabel = makeSvgNode("text", {
+            x: width - padX,
+            y: padY - 8,
+            "text-anchor": "end",
+            class: "market-item-chart-axis-label",
+        });
+        highLabel.textContent = formatPrice(Math.max(...prices));
+        svg.appendChild(highLabel);
+
+        const lowLabel = makeSvgNode("text", {
+            x: width - padX,
+            y: height - 8,
+            "text-anchor": "end",
+            class: "market-item-chart-axis-label",
+        });
+        lowLabel.textContent = formatPrice(Math.min(...prices));
+        svg.appendChild(lowLabel);
+
         if (points.length === 1) {
             svg.appendChild(makeSvgNode("circle", {
                 cx: width / 2,
                 cy: yFor(points[0].price),
                 r: 5,
-                class: "market-item-chart-line",
+                class: "market-item-chart-point",
             }));
         } else {
             const polylinePoints = points
@@ -112,11 +230,20 @@
         if (empty) empty.hidden = true;
         stage.appendChild(svg);
 
+        const availableHours = Math.max(0, (lastTime - firstTime) / HOUR);
+        if (chartStatus) {
+            const requestedLabel = hours === 24 ? "24H" : hours === 168 ? "7D" : "30D";
+            chartStatus.textContent = availableHours + 0.1 < hours
+                ? `${requestedLabel} 視圖 · 目前實際累積 ${describeCoverage(coverageHours())}`
+                : `${requestedLabel} 視圖 · 魔丸自有台服歷史`;
+        }
+
         if (foot) {
             foot.textContent = [
                 `${formatTime(points[0].at)} → ${formatTime(points[points.length - 1].at)}`,
                 `低 ${formatPrice(Math.min(...prices))}`,
                 `高 ${formatPrice(Math.max(...prices))}`,
+                `均 ${formatPrice(average)}`,
                 `${points.length} 筆`,
             ].join(" · ");
         }
@@ -131,6 +258,8 @@
     rangeButtons.forEach((button) => {
         button.addEventListener("click", () => activateRange(button));
     });
+
+    updateLatestTime();
 
     if (!historyUrl) {
         setEmpty("歷史行情 API 尚未設定。");
@@ -157,11 +286,13 @@
                 return;
             }
 
+            calculateSummary();
             const activeButton = rangeButtons.find((button) => button.classList.contains("is-active")) || rangeButtons[0];
             if (activeButton) activateRange(activeButton);
             else renderChart(168);
         })
         .catch(() => {
             setEmpty("歷史價格暫時無法讀取，請以交易所行情頁的資料狀態為準。");
+            setText(coverageNote, "歷史資料暫時無法讀取");
         });
 })();
