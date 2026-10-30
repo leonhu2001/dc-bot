@@ -1,3 +1,6 @@
+import asyncio
+
+import services.news.garena_delta as garena_news
 from services.news.garena_delta import parse_garena_news_html
 
 
@@ -41,3 +44,24 @@ def test_parse_garena_news_html_deduplicates_urls_and_survives_missing_date():
     assert articles[0].title == "聯名活動"
     assert articles[0].published_on is None
     assert articles[0].category_label == "活動"
+
+
+def test_failed_official_fetch_is_negatively_cached(monkeypatch):
+    calls = 0
+
+    async def fail_fetch():
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("offline")
+
+    monkeypatch.setattr(garena_news, "_fetch", fail_fetch)
+    monkeypatch.setattr(garena_news, "_cache", None)
+    monkeypatch.setattr(garena_news, "_deadline", 0.0)
+    monkeypatch.setattr(garena_news, "_lock", None)
+
+    first = asyncio.run(garena_news.get_delta_force_news())
+    second = asyncio.run(garena_news.get_delta_force_news())
+
+    assert first.status == "unavailable"
+    assert second.status == "unavailable"
+    assert calls == 1
