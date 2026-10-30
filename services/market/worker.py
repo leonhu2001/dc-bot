@@ -4,11 +4,13 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 from services.market.ingest import ingest_market_snapshot
+from services.market.personalization import MarketPersonalizationRepository
 from services.market.provider_registry import build_configured_provider, configured_provider_name
 from services.market.providers.base import MarketPriceProvider, MarketSourceUnavailable
 from services.market.storage import MarketRepository
@@ -24,6 +26,7 @@ class MarketCycleResult:
     game_key: str
     status: str
     inserted_price_count: int = 0
+    alert_trigger_count: int = 0
     message: str = ""
 
 
@@ -43,11 +46,72 @@ def _poll_seconds() -> int:
         return 300
 
 
+def _stale_seconds() -> int:
+    try:
+        return max(900, int(os.getenv("MARKET_STALE_SECONDS", "2700")))
+    except (TypeError, ValueError):
+        return 2700
+
+
+def _evaluate_fresh_alerts(
+    *,
+    repository: MarketRepository,
+    personalization: MarketPersonalizationRepository | None,
+    game_key: str,
+) -> int:
+    if personalization is None:
+        return 0
+
+    latest = repository.list_latest(game_key)
+    if not latest:
+        return 0
+
+    updated_at = max(item.source_updated_at for item in latest)
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    else:
+        updated_at = updated_at.astimezone(timezone.utc)
+
+    now = datetime.now(timezone.utc)
+    age_seconds = max(0.0, (now - updated_at).total_seconds())
+    if age_seconds > _stale_seconds():
+        logger.info(
+            "skip alert evaluation for stale market game=%s age_seconds=%.0f",
+            game_key,
+            age_seconds,
+        )
+        return 0
+
+    current_prices = {
+        item.source_item_id: item.current_price
+        for item in latest
+        if item.current_price > 0
+    }
+    triggers = personalization.evaluate_alerts(
+        game_key,
+        current_prices,
+        evaluated_at=now,
+    )
+    for trigger in triggers:
+        logger.info(
+            "market alert triggered alert_id=%s user=%s game=%s item=%s condition=%s target=%s price=%s",
+            trigger.alert_id,
+            trigger.discord_user_id,
+            trigger.game_key,
+            trigger.item_key,
+            trigger.condition_type,
+            trigger.target_price,
+            trigger.current_price,
+        )
+    return len(triggers)
+
+
 async def run_market_cycle(
     *,
     provider: MarketPriceProvider,
     repository: MarketRepository,
     game_keys: tuple[str, ...],
+    personalization: MarketPersonalizationRepository | None = None,
 ) -> tuple[MarketCycleResult, ...]:
     results: list[MarketCycleResult] = []
     for game_key in game_keys:
@@ -55,6 +119,11 @@ async def run_market_cycle(
             ingest_result = await ingest_market_snapshot(
                 provider=provider,
                 repository=repository,
+                game_key=game_key,
+            )
+            alert_trigger_count = _evaluate_fresh_alerts(
+                repository=repository,
+                personalization=personalization,
                 game_key=game_key,
             )
         except MarketSourceUnavailable as exc:
@@ -80,6 +149,7 @@ async def run_market_cycle(
                     game_key=game_key,
                     status=("duplicate" if ingest_result.duplicate_snapshot else "stored"),
                     inserted_price_count=ingest_result.inserted_price_count,
+                    alert_trigger_count=alert_trigger_count,
                     message=ingest_result.source_name,
                 )
             )
@@ -90,6 +160,7 @@ async def run_worker(
     *,
     provider: MarketPriceProvider,
     repository: MarketRepository,
+    personalization: MarketPersonalizationRepository | None,
     game_keys: tuple[str, ...],
     poll_seconds: int,
 ) -> None:
@@ -97,14 +168,16 @@ async def run_worker(
         results = await run_market_cycle(
             provider=provider,
             repository=repository,
+            personalization=personalization,
             game_keys=game_keys,
         )
         for result in results:
             logger.info(
-                "market cycle game=%s status=%s inserted=%s source_or_error=%s",
+                "market cycle game=%s status=%s inserted=%s alert_triggers=%s source_or_error=%s",
                 result.game_key,
                 result.status,
                 result.inserted_price_count,
+                result.alert_trigger_count,
                 result.message,
             )
         await asyncio.sleep(poll_seconds)
@@ -138,6 +211,8 @@ def main() -> int:
 
     repository = MarketRepository(database_url)
     repository.create_all()
+    personalization = MarketPersonalizationRepository(repository)
+    personalization.create_all()
 
     logger.info(
         "starting market worker provider=%s games=%s poll_seconds=%s",
@@ -149,6 +224,7 @@ def main() -> int:
         run_worker(
             provider=provider,
             repository=repository,
+            personalization=personalization,
             game_keys=_game_keys(),
             poll_seconds=_poll_seconds(),
         )

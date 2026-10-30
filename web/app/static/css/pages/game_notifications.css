@@ -1,0 +1,164 @@
+.game-notifications-shell {
+    max-width: 1180px;
+}
+
+.game-notifications-grid {
+    display: grid;
+    grid-template-columns: 0.9fr 1.1fr;
+    gap: 18px;
+    margin-top: 22px;
+}
+
+.game-notification-list {
+    display: grid;
+    gap: 0;
+    margin-top: 18px;
+}
+
+.game-notification-watch {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 16px;
+    align-items: center;
+    padding: 15px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    color: inherit;
+    text-decoration: none;
+}
+
+.game-notification-watch:first-child,
+.game-notification-alert:first-child {
+    border-top: 0;
+}
+
+.game-notification-watch strong,
+.game-notification-watch small {
+    display: block;
+}
+
+.game-notification-watch small,
+.game-notification-alert small {
+    color: rgba(255, 255, 255, 0.46);
+}
+
+.game-notification-price {
+    text-align: right;
+}
+
+.game-notification-alert {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: center;
+    padding: 16px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.game-notification-alert-main {
+    display: grid;
+    gap: 5px;
+}
+
+.game-notification-alert-main > a {
+    color: rgba(255, 255, 255, 0.92);
+    text-decoration: none;
+}
+
+.game-notification-alert-main > span {
+    font-size: 19px;
+    font-weight: 800;
+}
+
+.game-notification-alert-actions {
+    display: flex;
+    gap: 7px;
+}
+
+.game-notification-alert-actions button {
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.78);
+    background: rgba(255, 255, 255, 0.035);
+    font: inherit;
+    cursor: pointer;
+}
+
+.game-notification-alert-actions button.is-danger {
+    border-color: rgba(255, 118, 118, 0.22);
+    color: rgba(255, 170, 170, 0.92);
+}
+
+.game-notification-watch:focus-visible,
+.game-notification-alert-main > a:focus-visible,
+.game-notification-alert-actions button:focus-visible,
+.game-notification-empty a:focus-visible {
+    outline: 2px solid rgba(176, 151, 255, 0.72);
+    outline-offset: 3px;
+}
+
+.game-notification-empty {
+    display: grid;
+    gap: 7px;
+}
+
+.game-notification-empty strong {
+    color: rgba(255, 255, 255, 0.86);
+}
+
+.game-notification-empty a {
+    width: fit-content;
+    margin-top: 5px;
+    color: rgba(202, 190, 255, 0.9);
+    text-decoration: none;
+}
+
+.game-notification-note {
+    margin-top: 18px;
+    padding: 20px 22px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.game-notification-note p {
+    margin: 8px 0 0;
+    color: rgba(255, 255, 255, 0.56);
+    line-height: 1.7;
+}
+
+.is-positive { color: #66d99a !important; }
+.is-negative { color: #ff8585 !important; }
+
+@media (max-width: 900px) {
+    .game-notifications-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 620px) {
+    .game-notification-alert {
+        grid-template-columns: 1fr;
+    }
+
+    .game-notification-alert-actions {
+        width: 100%;
+    }
+
+    .game-notification-alert-actions form {
+        flex: 1;
+    }
+
+    .game-notification-alert-actions button {
+        width: 100%;
+    }
+
+    .game-notification-watch {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .game-notification-watch > span:last-child {
+        display: none;
+    }
+}

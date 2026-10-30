@@ -17,7 +17,10 @@ from services.market.public_snapshot import (
     filter_market_snapshot,
     get_public_market_snapshot,
 )
-from services.market.runtime import get_market_repository
+from services.market.runtime import (
+    get_market_personalization_repository,
+    get_market_repository,
+)
 from web.app.services.seo import build_seo
 
 
@@ -27,6 +30,7 @@ TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 _MARKET_SORTS = {"name", "price_desc", "price_asc", "change_desc", "change_asc"}
+_MAX_ALERTS_PER_GAME = 50
 
 
 def _game_or_404(game_slug: str) -> GameHub:
@@ -90,6 +94,29 @@ def _safe_market_repository():
         return None
 
 
+def _safe_personalization_repository():
+    try:
+        return get_market_personalization_repository()
+    except Exception:
+        return None
+
+
+def _session_user_id(request: Request) -> str:
+    user = request.session.get("user") or {}
+    return str(user.get("id") or "").strip()
+
+
+def _login_redirect(path: str) -> RedirectResponse:
+    return RedirectResponse(
+        url="/auth/discord/login?next=" + quote(path, safe=""),
+        status_code=303,
+    )
+
+
+def _item_path(game: GameHub, item_key: str) -> str:
+    return f"/games/{game.slug}/market/items/{quote(str(item_key), safe='')}"
+
+
 def _market_tier(value: str | None) -> int | None:
     try:
         tier = int(str(value or "").strip())
@@ -127,6 +154,17 @@ def _market_filter_href(
     encoded = urlencode(params)
     base = f"/games/{game_slug}/market"
     return f"{base}?{encoded}" if encoded else base
+
+
+def _parse_target_price(value) -> int:
+    text = str(value or "").replace(",", "").replace("$", "").strip()
+    try:
+        price = int(text)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="提醒價格格式不正確。") from exc
+    if price <= 0 or price > 2_147_483_647:
+        raise HTTPException(status_code=400, detail="提醒價格必須是有效的正整數。")
+    return price
 
 
 @router.get("/games")
@@ -234,10 +272,26 @@ async def game_market_item_detail(
     except Exception as exc:
         raise HTTPException(status_code=503, detail="行情資料暫時無法讀取。") from exc
 
+    user_id = _session_user_id(request)
+    watched = False
+    item_alerts = ()
+    personalization = _safe_personalization_repository() if user_id else None
+    if personalization is not None:
+        try:
+            watched = personalization.is_watched(user_id, game.key, item.source_item_id)
+            item_alerts = tuple(
+                alert
+                for alert in personalization.list_alerts(user_id, game.key)
+                if alert.item_key == item.source_item_id
+            )
+        except Exception:
+            watched = False
+            item_alerts = ()
+
     prices = [point.price for point in points]
     current_price = prices[-1] if prices else None
     latest_at = points[-1].source_updated_at if points else None
-    path = f"/games/{game.slug}/market/items/{quote(item.source_item_id, safe='')}"
+    path = _item_path(game, item.source_item_id)
     seo = build_seo(
         path=path,
         title=f"{item.name} 價格走勢｜{game.market_title}｜魔丸娛樂",
@@ -259,8 +313,79 @@ async def game_market_item_detail(
             low_price=min(prices) if prices else None,
             high_price=max(prices) if prices else None,
             point_count=len(points),
+            watched=watched,
+            item_alerts=item_alerts,
         ),
     )
+
+
+@router.post("/games/{game_slug}/market/items/{source_item_id}/watch")
+async def game_market_item_watch(
+    request: Request,
+    game_slug: str,
+    source_item_id: str,
+):
+    game = _market_game_or_404(game_slug)
+    path = _item_path(game, source_item_id)
+    user_id = _session_user_id(request)
+    if not user_id:
+        return _login_redirect(path)
+
+    market_repository = _safe_market_repository()
+    personalization = _safe_personalization_repository()
+    if market_repository is None or personalization is None:
+        raise HTTPException(status_code=503, detail="行情個人化功能目前尚未啟用。")
+
+    item = market_repository.get_item(game.key, source_item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="找不到這個行情品項。")
+
+    form = await request.form()
+    watched = str(form.get("watched") or "").strip() == "1"
+    personalization.set_watched(user_id, game.key, item.source_item_id, watched=watched)
+    return RedirectResponse(url=path, status_code=303)
+
+
+@router.post("/games/{game_slug}/market/items/{source_item_id}/alerts")
+async def game_market_item_create_alert(
+    request: Request,
+    game_slug: str,
+    source_item_id: str,
+):
+    game = _market_game_or_404(game_slug)
+    path = _item_path(game, source_item_id)
+    user_id = _session_user_id(request)
+    if not user_id:
+        return _login_redirect(path)
+
+    market_repository = _safe_market_repository()
+    personalization = _safe_personalization_repository()
+    if market_repository is None or personalization is None:
+        raise HTTPException(status_code=503, detail="價格提醒目前尚未啟用。")
+
+    item = market_repository.get_item(game.key, source_item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="找不到這個行情品項。")
+
+    existing_alerts = personalization.list_alerts(user_id, game.key)
+    if len(existing_alerts) >= _MAX_ALERTS_PER_GAME:
+        raise HTTPException(status_code=400, detail="每個遊戲最多可建立 50 個價格提醒。")
+
+    form = await request.form()
+    condition_type = str(form.get("condition_type") or "").strip().lower()
+    if condition_type not in {"below", "above"}:
+        raise HTTPException(status_code=400, detail="提醒條件不正確。")
+    target_price = _parse_target_price(form.get("target_price"))
+
+    personalization.create_alert(
+        user_id,
+        game.key,
+        item.source_item_id,
+        condition_type=condition_type,
+        target_price=target_price,
+    )
+    personalization.set_watched(user_id, game.key, item.source_item_id, watched=True)
+    return RedirectResponse(url=path + "#price-alerts", status_code=303)
 
 
 @router.get("/games/{game_slug}/market/api/items/{source_item_id}/history")
@@ -347,33 +472,118 @@ async def game_notifications(request: Request, game_slug: str):
 
     path = f"/games/{game.slug}/notifications"
     user = request.session.get("user")
-    if not user:
-        return RedirectResponse(
-            url="/auth/discord/login?next=" + quote(path, safe=""),
-            status_code=303,
-        )
+    user_id = _session_user_id(request)
+    if not user or not user_id:
+        return _login_redirect(path)
+
+    personalization = _safe_personalization_repository()
+    watchlist = ()
+    alerts = ()
+    personalization_ready = personalization is not None
+    if personalization is not None:
+        try:
+            watchlist = personalization.list_watchlist(user_id, game.key)
+            alerts = personalization.list_alerts(user_id, game.key)
+        except Exception:
+            personalization_ready = False
+            watchlist = ()
+            alerts = ()
+
+    snapshot = get_public_market_snapshot(game.key)
+    market_by_key = {item.item_key: item for item in snapshot.items}
+    watched_items = tuple(
+        {
+            "item_key": row.item_key,
+            "name": market_by_key[row.item_key].name if row.item_key in market_by_key else row.item_key,
+            "current_price": (
+                market_by_key[row.item_key].current_price if row.item_key in market_by_key else None
+            ),
+            "change_24h_pct": (
+                market_by_key[row.item_key].change_24h_pct if row.item_key in market_by_key else None
+            ),
+            "href": _item_path(game, row.item_key),
+            "created_at": row.created_at,
+        }
+        for row in watchlist
+    )
+    alert_items = tuple(
+        {
+            "alert": alert,
+            "name": market_by_key[alert.item_key].name if alert.item_key in market_by_key else alert.item_key,
+            "current_price": (
+                market_by_key[alert.item_key].current_price if alert.item_key in market_by_key else alert.last_price
+            ),
+            "href": _item_path(game, alert.item_key),
+        }
+        for alert in alerts
+    )
 
     seo = build_seo(
         path=path,
         title=f"{game.notifications_title}｜魔丸娛樂",
-        description=f"管理{game.name}的網站與手機通知設定。",
+        description=f"管理{game.name}的關注清單與價格提醒。",
         noindex=True,
     )
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
-        name="game_tool_placeholder.html",
+        name="game_notifications.html",
         context=_base_context(
             request,
             game,
             title=seo["title"],
             seo=seo,
             page_name=f"game_{game.key}_notifications",
-            tool_key="notifications",
-            tool_title=game.notifications_title,
-            tool_description="通知設定會在行情資料與 Web Push 接好後於此開放。",
+            watched_items=watched_items,
+            alert_items=alert_items,
+            personalization_ready=personalization_ready,
+            market_status=snapshot.status,
         ),
     )
+    response.headers["Cache-Control"] = "no-store, private, max-age=0"
+    return response
+
+
+@router.post("/games/{game_slug}/notifications/alerts/{alert_id}/toggle")
+async def game_notification_toggle_alert(
+    request: Request,
+    game_slug: str,
+    alert_id: int,
+):
+    game = _game_or_404(game_slug)
+    path = f"/games/{game.slug}/notifications"
+    user_id = _session_user_id(request)
+    if not user_id:
+        return _login_redirect(path)
+
+    personalization = _safe_personalization_repository()
+    if personalization is None:
+        raise HTTPException(status_code=503, detail="價格提醒目前尚未啟用。")
+    form = await request.form()
+    enabled = str(form.get("enabled") or "").strip() == "1"
+    if not personalization.set_alert_enabled(user_id, alert_id, enabled=enabled):
+        raise HTTPException(status_code=404, detail="找不到這個價格提醒。")
+    return RedirectResponse(url=path, status_code=303)
+
+
+@router.post("/games/{game_slug}/notifications/alerts/{alert_id}/delete")
+async def game_notification_delete_alert(
+    request: Request,
+    game_slug: str,
+    alert_id: int,
+):
+    game = _game_or_404(game_slug)
+    path = f"/games/{game.slug}/notifications"
+    user_id = _session_user_id(request)
+    if not user_id:
+        return _login_redirect(path)
+
+    personalization = _safe_personalization_repository()
+    if personalization is None:
+        raise HTTPException(status_code=503, detail="價格提醒目前尚未啟用。")
+    if not personalization.delete_alert(user_id, alert_id):
+        raise HTTPException(status_code=404, detail="找不到這個價格提醒。")
+    return RedirectResponse(url=path, status_code=303)
 
 
 @router.get("/games/{game_slug}")
