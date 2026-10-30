@@ -99,3 +99,23 @@ def test_market_health_database_error_is_sanitized(monkeypatch):
     assert status.status == "database_error"
     assert status.database is False
     assert "secret" not in status.message
+
+
+def test_market_health_repository_initialization_error_is_sanitized(monkeypatch):
+    monkeypatch.setattr("web.app.services.market_health.configured_provider_name", lambda: "852941-tw")
+
+    def fail_repository():
+        raise RuntimeError("postgres password leak")
+
+    monkeypatch.setattr("web.app.services.market_health.get_market_repository", fail_repository)
+    monkeypatch.setattr(
+        "web.app.services.market_health.get_web_push_config",
+        lambda: SimpleNamespace(enabled=True),
+    )
+
+    status = check_market_health()
+
+    assert status.ok is False
+    assert status.status == "database_error"
+    assert status.database is False
+    assert "password" not in status.message
