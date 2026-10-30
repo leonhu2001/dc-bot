@@ -2,7 +2,8 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
-<link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261030-2">
+<link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261031-1">
+<script src="/static/js/pages/game_market_live.js?v=20261031-1" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -39,6 +40,37 @@
             </h2>
             <p>{{ snapshot.message }}</p>
         </div>
+    </section>
+    {% endif %}
+
+    {% set readiness = namespace(day=0, week=0, max_hours=0) %}
+    {% for item in snapshot.items %}
+        {% if item.change_24h_pct is not none %}{% set readiness.day = readiness.day + 1 %}{% endif %}
+        {% if item.avg_7d is not none %}{% set readiness.week = readiness.week + 1 %}{% endif %}
+        {% if item.coverage_hours > readiness.max_hours %}{% set readiness.max_hours = item.coverage_hours %}{% endif %}
+    {% endfor %}
+
+    {% if snapshot.items %}
+    <section class="game-market-livebar" aria-label="行情資料狀態">
+        <div class="game-market-livebar-main">
+            <span class="game-market-live-dot" aria-hidden="true"></span>
+            <div>
+                <strong>台服公開行情 · {{ snapshot.items|length }} 個品項</strong>
+                {% if snapshot.updated_at %}
+                <small>
+                    <time data-market-updated-at datetime="{{ snapshot.updated_at.isoformat() }}">{{ snapshot.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</time>
+                    <span class="game-market-live-separator">·</span>
+                    <span data-market-age>計算更新時間中…</span>
+                </small>
+                {% endif %}
+            </div>
+        </div>
+        <div class="game-market-readiness" title="只用我們自己的歷史資料計算，不採用第三方推薦分數">
+            <span>24H 統計 <strong>{{ readiness.day }}/{{ snapshot.items|length }}</strong></span>
+            <span>7D 統計 <strong>{{ readiness.week }}/{{ snapshot.items|length }}</strong></span>
+            <span>最長歷史 <strong>{{ "%.1f"|format(readiness.max_hours / 24) }} 天</strong></span>
+        </div>
+        <span class="game-market-live-state" data-market-live-state>自動更新中</span>
     </section>
     {% endif %}
 
@@ -100,7 +132,7 @@
                 <span class="game-market-label">EXCHANGE</span>
                 <h2>交易所行情</h2>
                 {% if snapshot.updated_at %}
-                <small>最後資料時間：{{ snapshot.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</small>
+                <small>資料時間：<time datetime="{{ snapshot.updated_at.isoformat() }}">{{ snapshot.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</time></small>
                 {% endif %}
             </div>
             <div class="game-market-filters" aria-label="行情篩選">
@@ -113,7 +145,7 @@
         <form class="game-market-search" method="get" action="/games/{{ game.slug }}/market">
             <label>
                 <span class="sr-only">搜尋行情品項</span>
-                <input type="search" name="q" value="{{ market_query }}" maxlength="80" placeholder="搜尋彈藥名稱或品項 ID">
+                <input type="search" name="q" value="{{ market_query }}" maxlength="80" placeholder="搜尋彈藥名稱、口徑或品項 ID">
             </label>
             {% if market_tier %}<input type="hidden" name="tier" value="{{ market_tier }}">{% endif %}
             <label>
@@ -133,16 +165,23 @@
         </form>
 
         {% if snapshot.items %}
-        <div class="game-market-result-meta">顯示 {{ market_result_count }} 個品項</div>
+        <div class="game-market-category-filters" data-market-category-filters hidden aria-label="口徑快速篩選"></div>
+        <div class="game-market-result-meta" data-market-result-meta>顯示 {{ market_result_count }} 個品項</div>
         <div class="game-market-list">
             <div class="game-market-row game-market-row-head" aria-hidden="true">
                 <div>品項</div><div>現價</div><div>24H</div><div>7D 均價</div>
             </div>
             {% for item in snapshot.items %}
-            <a class="game-market-row" href="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}">
+            <a
+                class="game-market-row"
+                href="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}"
+                data-market-row
+                data-market-category="{{ item.category }}"
+                data-market-tier="{{ item.tier or '' }}"
+            >
                 <div>
                     <strong>{{ item.name }}</strong>
-                    <small>{% if item.tier %}{{ item.tier }}級 · {% endif %}{{ item.item_key }}</small>
+                    <small>{% if item.tier %}{{ item.tier }}級 · {% endif %}{% if item.category %}{{ item.category }} · {% endif %}{{ item.item_key }}</small>
                 </div>
                 <div>{% if item.current_price is not none %}${{ "{:,}".format(item.current_price) }}{% else %}—{% endif %}</div>
                 <div class="{% if item.change_24h_pct is not none and item.change_24h_pct > 0 %}is-positive{% elif item.change_24h_pct is not none and item.change_24h_pct < 0 %}is-negative{% endif %}">
@@ -177,7 +216,7 @@
         <a href="/games/{{ game.slug }}/notifications">
             <span>NOTIFICATIONS</span>
             <strong>{{ game.notifications_title }}</strong>
-            <small>之後在這裡管理價格與遊戲通知 →</small>
+            <small>管理價格提醒與瀏覽器推播 →</small>
         </a>
     </section>
 </section>
