@@ -41,7 +41,7 @@ def test_market_page_has_live_freshness_history_and_category_controls():
     assert "Asia/Taipei" in script
     assert "/api/items" in script
     assert "window.location.reload()" in script
-    assert "data-market-category" in script
+    assert "dataset.marketCategory" in script
     assert "document.hidden" in script
 
     assert ".game-market-livebar" in stylesheet
