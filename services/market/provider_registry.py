@@ -4,10 +4,13 @@ import os
 from collections.abc import Callable
 
 from services.market.providers.base import MarketPriceProvider
+from services.market.providers.public_852941 import Public852941Provider
 
 
 ProviderFactory = Callable[[], MarketPriceProvider]
-_PROVIDER_FACTORIES: dict[str, ProviderFactory] = {}
+_PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
+    "852941-tw": Public852941Provider,
+}
 
 
 def register_market_provider(name: str, factory: ProviderFactory) -> None:
