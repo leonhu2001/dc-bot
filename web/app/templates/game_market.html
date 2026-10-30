@@ -3,7 +3,7 @@
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
 <link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261031-1">
-<script src="/static/js/pages/game_market_live.js?v=20261031-1" defer></script>
+<script src="/static/js/pages/game_market_live.js?v=20261031-2" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -135,7 +135,7 @@
                 <small>資料時間：<time datetime="{{ snapshot.updated_at.isoformat() }}">{{ snapshot.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</time></small>
                 {% endif %}
             </div>
-            <div class="game-market-filters" aria-label="行情篩選">
+            <div class="game-market-filters" data-market-tier-filters aria-label="行情等級篩選">
                 <a href="{{ market_filter_links.all }}" class="{% if not market_tier %}is-active{% endif %}">全部</a>
                 <a href="{{ market_filter_links['5'] }}" class="{% if market_tier == 5 %}is-active{% endif %}">5級</a>
                 <a href="{{ market_filter_links['6'] }}" class="{% if market_tier == 6 %}is-active{% endif %}">6級</a>

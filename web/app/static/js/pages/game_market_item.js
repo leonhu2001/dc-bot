@@ -18,6 +18,9 @@
     const range7d = document.querySelector("[data-market-range-7d]");
     const coverage = document.querySelector("[data-market-coverage]");
     const coverageNote = document.querySelector("[data-market-coverage-note]");
+    const compareRoot = document.querySelector("[data-market-compare]");
+    const compareList = compareRoot?.querySelector("[data-market-compare-list]") || null;
+    const compareCount = compareRoot?.querySelector("[data-market-compare-count]") || null;
     const svgNS = "http://www.w3.org/2000/svg";
     const HOUR = 60 * 60 * 1000;
     let allPoints = [];
@@ -255,11 +258,97 @@
         renderChart(Number.isFinite(hours) ? hours : 168);
     };
 
+    const renderCompareEmpty = (message) => {
+        if (!compareList) return;
+        const node = document.createElement("div");
+        node.className = "market-item-compare-empty";
+        node.textContent = message;
+        compareList.replaceChildren(node);
+    };
+
+    const loadComparison = async () => {
+        if (!compareRoot || !compareList) return;
+        const itemsUrl = String(compareRoot.dataset.marketItemsUrl || "").trim();
+        const baseUrl = String(compareRoot.dataset.marketItemBaseUrl || "").trim();
+        const currentCategory = String(compareRoot.dataset.marketCurrentCategory || "").trim();
+        const currentKey = String(compareRoot.dataset.marketCurrentItemKey || "").trim();
+        const currentPrice = Number(compareRoot.dataset.marketCurrentPrice || "0");
+        if (!itemsUrl || !baseUrl || !currentCategory) {
+            renderCompareEmpty("目前沒有可比較的同口徑資料。");
+            setText(compareCount, "0 個品項");
+            return;
+        }
+
+        try {
+            const response = await fetch(itemsUrl, {
+                cache: "no-store",
+                credentials: "same-origin",
+                headers: { Accept: "application/json" },
+            });
+            if (!response.ok) throw new Error(`comparison request failed: ${response.status}`);
+            const payload = await response.json();
+            const items = (Array.isArray(payload?.items) ? payload.items : [])
+                .filter((item) => String(item?.category || "").trim() === currentCategory)
+                .filter((item) => String(item?.item_key || "").trim() !== currentKey)
+                .filter((item) => Number(item?.current_price) > 0)
+                .sort((left, right) => {
+                    const tierLeft = Number(left?.tier) || 99;
+                    const tierRight = Number(right?.tier) || 99;
+                    if (tierLeft !== tierRight) return tierLeft - tierRight;
+                    return Number(left?.current_price) - Number(right?.current_price);
+                });
+
+            setText(compareCount, `${items.length} 個同口徑品項`);
+            if (!items.length) {
+                renderCompareEmpty("目前沒有其他同口徑品項可比較。");
+                return;
+            }
+
+            compareList.replaceChildren();
+            items.forEach((item) => {
+                const price = Number(item.current_price);
+                const delta = Number.isFinite(currentPrice) && currentPrice > 0 ? price - currentPrice : null;
+                const link = document.createElement("a");
+                link.className = "market-item-compare-row";
+                link.href = `${baseUrl}${encodeURIComponent(String(item.item_key || ""))}`;
+
+                const identity = document.createElement("div");
+                const name = document.createElement("strong");
+                name.textContent = String(item.name || item.item_key || "未命名品項");
+                const meta = document.createElement("small");
+                const tier = Number(item.tier);
+                meta.textContent = Number.isInteger(tier) && tier > 0 ? `${tier}級 · ${currentCategory}` : currentCategory;
+                identity.append(name, meta);
+
+                const priceNode = document.createElement("strong");
+                priceNode.className = "market-item-compare-price";
+                priceNode.textContent = formatPrice(price);
+
+                const deltaNode = document.createElement("span");
+                deltaNode.className = "market-item-compare-delta";
+                if (delta === null || delta === 0) {
+                    deltaNode.textContent = delta === 0 ? "與本品同價" : "—";
+                } else {
+                    const sign = delta > 0 ? "+" : "−";
+                    deltaNode.textContent = `比本品 ${sign}${formatPrice(Math.abs(delta))}`;
+                    deltaNode.classList.add(delta > 0 ? "is-higher" : "is-lower");
+                }
+
+                link.append(identity, priceNode, deltaNode);
+                compareList.appendChild(link);
+            });
+        } catch (_error) {
+            renderCompareEmpty("同口徑比較暫時無法讀取，現價與歷史走勢仍可正常查看。");
+            setText(compareCount, "讀取失敗");
+        }
+    };
+
     rangeButtons.forEach((button) => {
         button.addEventListener("click", () => activateRange(button));
     });
 
     updateLatestTime();
+    loadComparison();
 
     if (!historyUrl) {
         setEmpty("歷史行情 API 尚未設定。");

@@ -2,8 +2,8 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
-<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261031-1">
-<script src="/static/js/pages/game_market_item.js?v=20261031-1" defer></script>
+<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261031-2">
+<script src="/static/js/pages/game_market_item.js?v=20261031-2" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -62,6 +62,29 @@
             <strong data-market-coverage>{{ point_count }} 筆</strong>
             <small data-market-coverage-note>讀取正式 Market DB 中…</small>
         </article>
+    </section>
+
+    <section
+        class="market-item-compare"
+        data-market-compare
+        data-market-items-url="/games/{{ game.slug }}/market/api/items?sort=price_asc"
+        data-market-item-base-url="/games/{{ game.slug }}/market/items/"
+        data-market-current-category="{{ item.category }}"
+        data-market-current-item-key="{{ item.source_item_id }}"
+        data-market-current-price="{% if current_price is not none %}{{ current_price }}{% endif %}"
+        aria-label="同口徑價格比較"
+    >
+        <div class="market-item-compare-head">
+            <div>
+                <span class="game-market-label">SAME CALIBER</span>
+                <h2>同口徑比較</h2>
+                <small>直接比較目前台服價格；不把不同彈種硬算成推薦分數。</small>
+            </div>
+            <span data-market-compare-count>載入中…</span>
+        </div>
+        <div class="market-item-compare-list" data-market-compare-list>
+            <div class="market-item-compare-empty">正在讀取同口徑品項…</div>
+        </div>
     </section>
 
     <section class="market-item-personal" id="price-alerts" aria-label="關注與價格提醒">
