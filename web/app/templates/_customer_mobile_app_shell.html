@@ -14,6 +14,14 @@
     {% set _customer_title = '錢包・儲值' %}
 {% elif _customer_path.startswith('/me') %}
     {% set _customer_title = '我的專區' %}
+{% elif _customer_path.startswith('/games/delta-force/market') %}
+    {% set _customer_title = '三角洲交易所行情' %}
+{% elif _customer_path.startswith('/games/delta-force/news') %}
+    {% set _customer_title = '三角洲消息' %}
+{% elif _customer_path.startswith('/games/delta-force/notifications') %}
+    {% set _customer_title = '三角洲通知' %}
+{% elif _customer_path.startswith('/games/delta-force') %}
+    {% set _customer_title = '三角洲行動' %}
 {% elif _customer_path.startswith('/games/') %}
     {% set _customer_title = '遊戲服務' %}
 {% else %}
@@ -47,6 +55,7 @@
     </div>
     <nav class="mobile-v6-quick-grid" aria-label="首頁快捷功能">
         <a href="/order"><span>＋</span><span>快速下單</span></a>
+        <a href="/games/delta-force"><span>△</span><span>三角洲情報</span></a>
         <a href="{% if user %}/me/orders{% else %}/auth/discord/login{% endif %}"><span>▣</span><span>訂單紀錄</span></a>
         <a href="/vip"><span>◆</span><span>VIP 權益</span></a>
         <a href="{% if user %}/me{% else %}/auth/discord/login{% endif %}"><span>◎</span><span>個人中心</span></a>
