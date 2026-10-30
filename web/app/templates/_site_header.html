@@ -15,7 +15,7 @@
     <nav class="site-desktop-nav" aria-label="主要導覽">
       <a href="/" class="{% if current_path == '/' %}is-active{% endif %}">首頁</a>
       <a href="/order" class="{% if current_path.startswith('/order') %}is-active{% endif %}">立即下單</a>
-      <a href="/games/delta-force" class="{% if current_path == '/games/delta-force' %}is-active{% endif %}">三角洲行動</a>
+      <a href="/games/delta-force" class="{% if current_path.startswith('/games/delta-force') %}is-active{% endif %}">三角洲行動</a>
       <a href="/staff" class="{% if current_path.startswith('/staff') %}is-active{% endif %}">陪玩陣容</a>
       <a href="/vip" class="{% if current_path.startswith('/vip') %}is-active{% endif %}">VIP</a>
       <a href="/#about">關於我們</a>
