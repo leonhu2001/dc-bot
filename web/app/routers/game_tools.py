@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -13,7 +13,10 @@ from services.game_registry import (
     get_game_hub,
     list_game_hubs,
 )
-from services.market.public_snapshot import get_public_market_snapshot
+from services.market.public_snapshot import (
+    filter_market_snapshot,
+    get_public_market_snapshot,
+)
 from services.market.runtime import get_market_repository
 from web.app.services.seo import build_seo
 
@@ -22,6 +25,8 @@ router = APIRouter(tags=["game-tools"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+_MARKET_SORTS = {"name", "price_desc", "price_asc", "change_desc", "change_asc"}
 
 
 def _game_or_404(game_slug: str) -> GameHub:
@@ -48,23 +53,33 @@ def _base_context(request: Request, game: GameHub, **extra) -> dict:
     return context
 
 
+def _item_payload(item) -> dict:
+    return {
+        "item_key": item.item_key,
+        "name": item.name,
+        "current_price": item.current_price,
+        "change_24h_pct": item.change_24h_pct,
+        "recommendation_label": item.recommendation_label,
+        "category": item.category,
+        "tier": item.tier,
+        "low_24h": item.low_24h,
+        "high_24h": item.high_24h,
+        "avg_7d": item.avg_7d,
+        "low_7d": item.low_7d,
+        "high_7d": item.high_7d,
+        "history_points_7d": item.history_points_7d,
+        "coverage_hours": item.coverage_hours,
+    }
+
+
 def _snapshot_payload(snapshot) -> dict:
     return {
         "status": snapshot.status,
         "updated_at": snapshot.updated_at.isoformat() if snapshot.updated_at else None,
         "message": snapshot.message,
-        "items": [
-            {
-                "item_key": item.item_key,
-                "name": item.name,
-                "current_price": item.current_price,
-                "change_24h_pct": item.change_24h_pct,
-                "recommendation_label": item.recommendation_label,
-                "category": item.category,
-                "tier": item.tier,
-            }
-            for item in snapshot.items
-        ],
+        "items": [_item_payload(item) for item in snapshot.items],
+        "gainers": [_item_payload(item) for item in snapshot.gainers],
+        "losers": [_item_payload(item) for item in snapshot.losers],
     }
 
 
@@ -73,6 +88,45 @@ def _safe_market_repository():
         return get_market_repository()
     except Exception:
         return None
+
+
+def _market_tier(value: str | None) -> int | None:
+    try:
+        tier = int(str(value or "").strip())
+    except (TypeError, ValueError):
+        return None
+    return tier if 1 <= tier <= 10 else None
+
+
+def _market_sort(value: str | None) -> str:
+    clean = str(value or "").strip().lower()
+    return clean if clean in _MARKET_SORTS else "name"
+
+
+def _market_query_state(request: Request) -> tuple[str, int | None, str]:
+    query = str(request.query_params.get("q", "")).strip()[:80]
+    tier = _market_tier(request.query_params.get("tier"))
+    sort = _market_sort(request.query_params.get("sort"))
+    return query, tier, sort
+
+
+def _market_filter_href(
+    game_slug: str,
+    *,
+    query: str,
+    tier: int | None,
+    sort: str,
+) -> str:
+    params: dict[str, str] = {}
+    if query:
+        params["q"] = query
+    if tier is not None:
+        params["tier"] = str(tier)
+    if sort != "name":
+        params["sort"] = sort
+    encoded = urlencode(params)
+    base = f"/games/{game_slug}/market"
+    return f"{base}?{encoded}" if encoded else base
 
 
 @router.get("/games")
@@ -99,7 +153,13 @@ async def games_directory(request: Request):
 @router.get("/games/{game_slug}/market")
 async def game_market(request: Request, game_slug: str):
     game = _market_game_or_404(game_slug)
-    snapshot = get_public_market_snapshot(game.key)
+    query, tier, sort = _market_query_state(request)
+    snapshot = filter_market_snapshot(
+        get_public_market_snapshot(game.key),
+        query=query,
+        tier=tier,
+        sort=sort,
+    )
     path = f"/games/{game.slug}/market"
     seo = build_seo(
         path=path,
@@ -109,6 +169,12 @@ async def game_market(request: Request, game_slug: str):
             or f"查看{game.name}市場行情、價格走勢與通知功能。"
         ),
     )
+
+    filter_links = {
+        "all": _market_filter_href(game.slug, query=query, tier=None, sort=sort),
+        "5": _market_filter_href(game.slug, query=query, tier=5, sort=sort),
+        "6": _market_filter_href(game.slug, query=query, tier=6, sort=sort),
+    }
 
     return templates.TemplateResponse(
         request=request,
@@ -120,17 +186,29 @@ async def game_market(request: Request, game_slug: str):
             seo=seo,
             page_name=f"game_{game.key}_market",
             snapshot=snapshot,
+            market_query=query,
+            market_tier=tier,
+            market_sort=sort,
+            market_filter_links=filter_links,
+            market_result_count=len(snapshot.items),
         ),
     )
 
 
 @router.get("/games/{game_slug}/market/api/items")
-async def game_market_items_api(game_slug: str):
+async def game_market_items_api(request: Request, game_slug: str):
     game = _market_game_or_404(game_slug)
-    snapshot = get_public_market_snapshot(game.key)
+    query, tier, sort = _market_query_state(request)
+    snapshot = filter_market_snapshot(
+        get_public_market_snapshot(game.key),
+        query=query,
+        tier=tier,
+        sort=sort,
+    )
     return {
         "ok": True,
         "game": game.key,
+        "filters": {"q": query, "tier": tier, "sort": sort},
         **_snapshot_payload(snapshot),
     }
 

@@ -2,7 +2,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
-<link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261030-1">
+<link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261030-2">
 {% endblock %}
 
 {% block content %}
@@ -71,14 +71,31 @@
         </article>
 
         <article class="game-market-panel">
-            <span class="game-market-label">MARKET MOVERS</span>
+            <span class="game-market-label">MARKET MOVERS · 24H</span>
             <h2>市場異動</h2>
-            <div class="game-market-empty">歷史資料累積後顯示近期漲幅、跌幅與異常波動。</div>
+            {% if snapshot.gainers or snapshot.losers %}
+            <div class="game-market-movers">
+                {% for item in snapshot.gainers %}
+                <a href="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}">
+                    <span>{{ item.name }}</span>
+                    <strong class="is-positive">+{{ "%.1f"|format(item.change_24h_pct) }}%</strong>
+                </a>
+                {% endfor %}
+                {% for item in snapshot.losers %}
+                <a href="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}">
+                    <span>{{ item.name }}</span>
+                    <strong class="is-negative">{{ "%.1f"|format(item.change_24h_pct) }}%</strong>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="game-market-empty">至少累積約 24 小時可信歷史後，才會顯示漲幅與跌幅排行。</div>
+            {% endif %}
         </article>
     </section>
 
     <section class="game-market-panel game-market-list-panel">
-        <div class="game-market-panel-head">
+        <div class="game-market-panel-head game-market-list-head">
             <div>
                 <span class="game-market-label">EXCHANGE</span>
                 <h2>交易所行情</h2>
@@ -87,14 +104,40 @@
                 {% endif %}
             </div>
             <div class="game-market-filters" aria-label="行情篩選">
-                <button type="button" class="is-active" disabled>全部</button>
-                <button type="button" disabled>5級</button>
-                <button type="button" disabled>6級</button>
+                <a href="{{ market_filter_links.all }}" class="{% if not market_tier %}is-active{% endif %}">全部</a>
+                <a href="{{ market_filter_links['5'] }}" class="{% if market_tier == 5 %}is-active{% endif %}">5級</a>
+                <a href="{{ market_filter_links['6'] }}" class="{% if market_tier == 6 %}is-active{% endif %}">6級</a>
             </div>
         </div>
 
+        <form class="game-market-search" method="get" action="/games/{{ game.slug }}/market">
+            <label>
+                <span class="sr-only">搜尋行情品項</span>
+                <input type="search" name="q" value="{{ market_query }}" maxlength="80" placeholder="搜尋彈藥名稱或品項 ID">
+            </label>
+            {% if market_tier %}<input type="hidden" name="tier" value="{{ market_tier }}">{% endif %}
+            <label>
+                <span class="sr-only">行情排序</span>
+                <select name="sort">
+                    <option value="name" {% if market_sort == 'name' %}selected{% endif %}>預設排序</option>
+                    <option value="price_desc" {% if market_sort == 'price_desc' %}selected{% endif %}>價格：高到低</option>
+                    <option value="price_asc" {% if market_sort == 'price_asc' %}selected{% endif %}>價格：低到高</option>
+                    <option value="change_desc" {% if market_sort == 'change_desc' %}selected{% endif %}>24H：漲幅優先</option>
+                    <option value="change_asc" {% if market_sort == 'change_asc' %}selected{% endif %}>24H：跌幅優先</option>
+                </select>
+            </label>
+            <button type="submit">套用</button>
+            {% if market_query or market_tier or market_sort != 'name' %}
+            <a class="game-market-clear" href="/games/{{ game.slug }}/market">清除</a>
+            {% endif %}
+        </form>
+
         {% if snapshot.items %}
+        <div class="game-market-result-meta">顯示 {{ market_result_count }} 個品項</div>
         <div class="game-market-list">
+            <div class="game-market-row game-market-row-head" aria-hidden="true">
+                <div>品項</div><div>現價</div><div>24H</div><div>7D 均價</div>
+            </div>
             {% for item in snapshot.items %}
             <a class="game-market-row" href="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}">
                 <div>
@@ -102,15 +145,25 @@
                     <small>{% if item.tier %}{{ item.tier }}級 · {% endif %}{{ item.item_key }}</small>
                 </div>
                 <div>{% if item.current_price is not none %}${{ "{:,}".format(item.current_price) }}{% else %}—{% endif %}</div>
-                <div>{% if item.change_24h_pct is not none %}{{ "%.1f"|format(item.change_24h_pct) }}%{% else %}—{% endif %}</div>
-                <div>{{ item.recommendation_label or '—' }} <span class="game-market-row-arrow" aria-hidden="true">→</span></div>
+                <div class="{% if item.change_24h_pct is not none and item.change_24h_pct > 0 %}is-positive{% elif item.change_24h_pct is not none and item.change_24h_pct < 0 %}is-negative{% endif %}">
+                    {% if item.change_24h_pct is not none %}{% if item.change_24h_pct > 0 %}+{% endif %}{{ "%.1f"|format(item.change_24h_pct) }}%{% else %}—{% endif %}
+                </div>
+                <div>
+                    {% if item.avg_7d is not none %}${{ "{:,.0f}".format(item.avg_7d) }}{% else %}—{% endif %}
+                    <span class="game-market-row-arrow" aria-hidden="true">→</span>
+                </div>
             </a>
             {% endfor %}
         </div>
         {% else %}
         <div class="game-market-empty game-market-empty-large">
+            {% if market_query or market_tier %}
+            <strong>沒有符合條件的品項</strong>
+            <span>換個關鍵字或清除等級篩選後再查看。</span>
+            {% else %}
             <strong>尚未啟用正式價格</strong>
             <span>只接受可驗證的台服行情；資料源未確認前不顯示模擬價格。</span>
+            {% endif %}
         </div>
         {% endif %}
     </section>
