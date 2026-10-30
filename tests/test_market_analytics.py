@@ -47,6 +47,7 @@ def test_market_analytics_withholds_partial_windows(tmp_path):
     assert by_key["m995"].avg_7d is None
     assert snapshot.gainers == ()
     assert snapshot.losers == ()
+    assert snapshot.recommended_item is None
 
 
 def test_market_analytics_reports_mature_24h_and_7d_stats(tmp_path):
@@ -74,6 +75,25 @@ def test_market_analytics_reports_mature_24h_and_7d_stats(tmp_path):
     assert by_key["m61"].change_24h_pct == -11.11
     assert snapshot.gainers[0].item_key == "m995"
     assert snapshot.losers[0].item_key == "m61"
+    assert snapshot.recommended_item is not None
+    assert snapshot.recommended_item.item_key == "m61"
+    assert snapshot.recommended_item.recommendation_label == "低於 7D 均價 9.9%"
+
+
+def test_market_price_opportunity_requires_meaningful_discount(tmp_path):
+    repository = MarketRepository(f"sqlite:///{tmp_path / 'market.db'}")
+    repository.create_all()
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+
+    _store(repository, now - timedelta(days=6, hours=23), m995=100, m61=200)
+    _store(repository, now - timedelta(days=4), m995=101, m61=201)
+    _store(repository, now - timedelta(days=2), m995=100, m61=199)
+    _store(repository, now, m995=99, m61=198)
+
+    snapshot = get_public_market_snapshot("delta_force", repository=repository)
+
+    assert all(item.avg_7d is not None for item in snapshot.items)
+    assert snapshot.recommended_item is None
 
 
 def test_market_snapshot_search_tier_and_sort(tmp_path):

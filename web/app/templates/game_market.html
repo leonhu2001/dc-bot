@@ -2,7 +2,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
-<link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261031-1">
+<link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261031-2">
 <script src="/static/js/pages/game_market_live.js?v=20261031-2" defer></script>
 {% endblock %}
 
@@ -78,10 +78,15 @@
         <article class="game-market-panel game-market-featured">
             <div class="game-market-panel-head">
                 <div>
-                    <span class="game-market-label">RECOMMENDATION</span>
-                    <h2>目前推薦品項</h2>
+                    <span class="game-market-label">PRICE OPPORTUNITY · 7D</span>
+                    <h2>7D 價格機會</h2>
                 </div>
-                <span class="game-market-badge">{% if snapshot.items %}等待回測{% else %}等待資料{% endif %}</span>
+                <span class="game-market-badge">
+                    {% if snapshot.recommended_item %}低於均價
+                    {% elif readiness.week > 0 %}目前無明顯低價
+                    {% else %}等待 7D 資料
+                    {% endif %}
+                </span>
             </div>
 
             {% if snapshot.recommended_item %}
@@ -91,12 +96,18 @@
                 <span>${{ "{:,}".format(snapshot.recommended_item.current_price) }}</span>
                 {% endif %}
             </div>
+            <div class="game-market-opportunity-note">
+                <span>{{ snapshot.recommended_item.recommendation_label }}</span>
+                <a href="/games/{{ game.slug }}/market/items/{{ snapshot.recommended_item.item_key|urlencode }}">查看走勢 →</a>
+            </div>
             {% else %}
             <div class="game-market-empty">
-                {% if snapshot.items %}
-                正式價格已可讀取；推薦模型會等歷史資料累積並完成回測後才啟用，不用假分數湊版面。
+                {% if snapshot.items and readiness.week > 0 %}
+                已有 {{ readiness.week }} 個品項具備成熟 7D 統計；目前沒有任何品項低於自己的 7D 均價 3% 以上。
+                {% elif snapshot.items %}
+                至少累積約 6 天可信歷史後，才會用我們自己的 7D 均價找出明顯偏低的價格；資料不足時不硬湊推薦。
                 {% else %}
-                接上正式行情資料後，這裡會顯示目前最值得關注的品項與推薦理由。
+                接上正式行情資料後，這裡會依我們自己的歷史價格顯示值得關注的低價品項。
                 {% endif %}
             </div>
             {% endif %}
