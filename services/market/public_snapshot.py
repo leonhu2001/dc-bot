@@ -43,9 +43,9 @@ def get_public_market_snapshot(
 ) -> MarketSnapshot:
     """Return trusted persisted market data for website/Discord presentation.
 
-    No configured market DB means the feature remains safely pending. Once a
-    provider has stored real data, the same function automatically exposes the
-    latest snapshot without presentation code knowing the upstream source.
+    Market failures are intentionally isolated from the existing site. A bad
+    market connection must degrade this feature to an explicit status instead
+    of turning unrelated order/customer pages into HTTP 500 responses.
     """
     clean_game_key = str(game_key or "").strip()
     if not clean_game_key:
@@ -55,7 +55,15 @@ def get_public_market_snapshot(
             message="行情遊戲識別不存在。",
         )
 
-    market_repository = repository or get_market_repository()
+    try:
+        market_repository = repository or get_market_repository()
+    except Exception:
+        return MarketSnapshot(
+            game_key=clean_game_key,
+            status="source_error",
+            message="行情資料庫暫時無法連線，其他網站功能不受影響。",
+        )
+
     if market_repository is None:
         return MarketSnapshot(
             game_key=clean_game_key,
@@ -63,7 +71,15 @@ def get_public_market_snapshot(
             message="行情資料源正在接入中，啟用前不會顯示模擬價格。",
         )
 
-    latest = market_repository.list_latest(clean_game_key)
+    try:
+        latest = market_repository.list_latest(clean_game_key)
+    except Exception:
+        return MarketSnapshot(
+            game_key=clean_game_key,
+            status="source_error",
+            message="行情資料暫時讀取失敗，已停止顯示未確認的新價格。",
+        )
+
     if not latest:
         return MarketSnapshot(
             game_key=clean_game_key,
