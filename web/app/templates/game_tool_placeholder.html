@@ -1,0 +1,48 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-1">
+{% endblock %}
+
+{% block content %}
+<section class="game-tool-shell">
+    <a class="game-tool-back" href="/games/{{ game.slug }}">← 回到 {{ game.name }}</a>
+
+    <header class="game-tool-hero">
+        <div>
+            <div class="game-tool-kicker">{{ game.eyebrow }}</div>
+            <h1>{{ tool_title }}</h1>
+            <p>{{ tool_description }}</p>
+        </div>
+        <nav class="game-tool-tabs" aria-label="{{ game.name }}工具">
+            {% for feature in game_features %}
+            <a
+                href="{{ feature.href }}"
+                class="{% if feature.key == tool_key %}is-active{% endif %}"
+            >{{ feature.title }}</a>
+            {% endfor %}
+        </nav>
+    </header>
+
+    <section class="game-market-status" aria-live="polite">
+        <div class="game-market-status-mark">⌁</div>
+        <div>
+            <span>COMING NEXT</span>
+            <h2>{{ tool_title }}正在準備</h2>
+            <p>{{ tool_description }}</p>
+        </div>
+    </section>
+
+    <section class="game-market-actions">
+        {% for feature in game_features %}
+            {% if feature.key != tool_key %}
+            <a href="{{ feature.href }}">
+                <span>{{ feature.status }}</span>
+                <strong>{{ feature.title }}</strong>
+                <small>{{ feature.description }} →</small>
+            </a>
+            {% endif %}
+        {% endfor %}
+    </section>
+</section>
+{% endblock %}
