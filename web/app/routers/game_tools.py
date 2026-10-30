@@ -130,3 +130,32 @@ async def game_notifications(request: Request, game_slug: str):
             tool_description="通知設定會在行情資料與 Web Push 接好後於此開放。",
         ),
     )
+
+
+@router.get("/games/{game_slug}")
+async def generic_game_hub(request: Request, game_slug: str):
+    """Fallback landing page for games without a bespoke website surface.
+
+    Existing dedicated game routes keep precedence because the site router is
+    registered before this router. New registry entries can therefore launch a
+    usable hub immediately and be upgraded to a custom page later.
+    """
+    game = _game_or_404(game_slug)
+    path = f"/games/{game.slug}"
+    seo = build_seo(
+        path=path,
+        title=f"{game.name}｜魔丸娛樂",
+        description=f"查看{game.name}的魔丸服務、遊戲消息、行情與通知。",
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="game_hub.html",
+        context=_base_context(
+            request,
+            game,
+            title=seo["title"],
+            seo=seo,
+            page_name=f"game_{game.key}",
+        ),
+    )
