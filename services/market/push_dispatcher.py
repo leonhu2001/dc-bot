@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from urllib.parse import quote
 
 from pywebpush import WebPushException, webpush
 
@@ -51,7 +52,7 @@ def _payload(event: StoredOutboxEvent, market_repository: MarketRepository) -> s
     item_name = item.name if item is not None else event.item_key
     relation = "低於或等於" if event.condition_type == "below" else "高於或等於"
     url = (
-        f"/games/{game_slug}/market/items/{event.item_key}"
+        f"/games/{game_slug}/market/items/{quote(event.item_key, safe='')}"
         if game_slug
         else "/games"
     )
