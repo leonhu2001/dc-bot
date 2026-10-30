@@ -2,7 +2,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
-<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261030-1">
+<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261030-2">
 <script src="/static/js/pages/game_market_item.js?v=20261030-1" defer></script>
 {% endblock %}
 
@@ -45,6 +45,67 @@
         </article>
     </section>
 
+    <section class="market-item-personal" id="price-alerts" aria-label="關注與價格提醒">
+        <article class="market-item-personal-card">
+            <span class="game-market-label">WATCHLIST</span>
+            <h2>關注這個品項</h2>
+            {% if user %}
+            <p>加入關注後，可在「{{ game.notifications_title }}」集中查看。</p>
+            <form method="post" action="/games/{{ game.slug }}/market/items/{{ item.source_item_id|urlencode }}/watch">
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                <input type="hidden" name="watched" value="{% if watched %}0{% else %}1{% endif %}">
+                <button class="market-item-watch-button{% if watched %} is-watched{% endif %}" type="submit">
+                    {% if watched %}★ 已關注 · 點擊取消{% else %}☆ 加入關注{% endif %}
+                </button>
+            </form>
+            {% else %}
+            <p>使用 Discord 登入後即可建立自己的關注清單與價格提醒。</p>
+            <a class="market-item-login" href="/auth/discord/login?next={{ request.url.path|urlencode }}">Discord 登入後關注</a>
+            {% endif %}
+        </article>
+
+        <article class="market-item-personal-card">
+            <span class="game-market-label">PRICE ALERT</span>
+            <h2>設定價格提醒</h2>
+            {% if user %}
+            <p>價格跨過目標值時才記錄一次觸發；離開條件後再次跨入才會重新觸發。</p>
+            <form class="market-item-alert-form" method="post" action="/games/{{ game.slug }}/market/items/{{ item.source_item_id|urlencode }}/alerts">
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                <label>
+                    <span>條件</span>
+                    <select name="condition_type" required>
+                        <option value="below">低於或等於</option>
+                        <option value="above">高於或等於</option>
+                    </select>
+                </label>
+                <label>
+                    <span>目標價格</span>
+                    <input
+                        type="number"
+                        name="target_price"
+                        inputmode="numeric"
+                        min="1"
+                        max="2147483647"
+                        step="1"
+                        {% if current_price is not none %}value="{{ current_price }}"{% endif %}
+                        required
+                    >
+                </label>
+                <button type="submit">建立提醒</button>
+            </form>
+            {% if item_alerts %}
+            <div class="market-item-alert-existing">
+                <span>這個品項已有 {{ item_alerts|length }} 個提醒</span>
+                <a href="/games/{{ game.slug }}/notifications">管理提醒 →</a>
+            </div>
+            {% endif %}
+            {% else %}
+            <p>登入後可設定「低於」或「高於」指定價格的提醒。</p>
+            <a class="market-item-login" href="/auth/discord/login?next={{ request.url.path|urlencode }}">Discord 登入後設定</a>
+            {% endif %}
+        </article>
+    </section>
+
     <section
         class="market-item-chart-panel"
         data-market-chart
@@ -70,7 +131,7 @@
 
     <section class="market-item-note">
         <strong>資料說明</strong>
-        <p>行情只顯示已寫入正式 Market DB 的來源資料。來源過期或中斷時會保留最後價格，但網站會標示 stale，未來價格提醒也不會在 stale 狀態觸發。</p>
+        <p>行情只顯示已寫入正式 Market DB 的來源資料。來源過期或中斷時會保留最後價格，但網站會標示 stale，價格提醒不會在 stale 狀態觸發。建立提醒目前只保存於網站帳號；手機 Web Push 會在下一階段接入。</p>
     </section>
 </section>
 {% endblock %}
