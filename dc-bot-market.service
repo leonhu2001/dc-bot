@@ -1,0 +1,40 @@
+[Unit]
+Description=DC Bot Market Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/dc-bot
+EnvironmentFile=/opt/dc-bot/web/.env
+ExecStart=/opt/dc-bot/venv/bin/python -m services.market.worker
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=20
+User=dc-bot-web
+Group=dc-bot-web
+
+# The market worker is isolated from the Discord gateway and web process.
+# With MARKET_PROVIDER unset it exits successfully and remains disabled.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ReadWritePaths=/opt/dc-bot/data
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
