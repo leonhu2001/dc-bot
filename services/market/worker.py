@@ -5,6 +5,7 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -13,6 +14,8 @@ from services.market.ingest import ingest_market_snapshot
 from services.market.personalization import MarketPersonalizationRepository
 from services.market.provider_registry import build_configured_provider, configured_provider_name
 from services.market.providers.base import MarketPriceProvider, MarketSourceUnavailable
+from services.market.push import MarketPushRepository
+from services.market.push_dispatcher import dispatch_pending_pushes
 from services.market.storage import MarketRepository
 
 
@@ -94,9 +97,8 @@ def _evaluate_fresh_alerts(
     )
     for trigger in triggers:
         logger.info(
-            "market alert triggered alert_id=%s user=%s game=%s item=%s condition=%s target=%s price=%s",
+            "market alert triggered alert_id=%s game=%s item=%s condition=%s target=%s price=%s",
             trigger.alert_id,
-            trigger.discord_user_id,
             trigger.game_key,
             trigger.item_key,
             trigger.condition_type,
@@ -161,6 +163,7 @@ async def run_worker(
     provider: MarketPriceProvider,
     repository: MarketRepository,
     personalization: MarketPersonalizationRepository | None,
+    push_repository: MarketPushRepository | None,
     game_keys: tuple[str, ...],
     poll_seconds: int,
 ) -> None:
@@ -180,6 +183,24 @@ async def run_worker(
                 result.alert_trigger_count,
                 result.message,
             )
+
+        if push_repository is not None:
+            summary = await asyncio.to_thread(
+                partial(
+                    dispatch_pending_pushes,
+                    market_repository=repository,
+                    push_repository=push_repository,
+                )
+            )
+            if summary.processed:
+                logger.info(
+                    "push dispatch processed=%s sent=%s retried=%s no_subscription=%s",
+                    summary.processed,
+                    summary.sent,
+                    summary.retried,
+                    summary.no_subscription,
+                )
+
         await asyncio.sleep(poll_seconds)
 
 
@@ -213,6 +234,8 @@ def main() -> int:
     repository.create_all()
     personalization = MarketPersonalizationRepository(repository)
     personalization.create_all()
+    push_repository = MarketPushRepository(repository)
+    push_repository.create_all()
 
     logger.info(
         "starting market worker provider=%s games=%s poll_seconds=%s",
@@ -225,6 +248,7 @@ def main() -> int:
             provider=provider,
             repository=repository,
             personalization=personalization,
+            push_repository=push_repository,
             game_keys=_game_keys(),
             poll_seconds=_poll_seconds(),
         )
