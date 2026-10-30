@@ -2,6 +2,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
+<link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261030-1">
 {% endblock %}
 
 {% block content %}
@@ -95,15 +96,15 @@
         {% if snapshot.items %}
         <div class="game-market-list">
             {% for item in snapshot.items %}
-            <article class="game-market-row">
+            <a class="game-market-row" href="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}">
                 <div>
                     <strong>{{ item.name }}</strong>
                     <small>{% if item.tier %}{{ item.tier }}級 · {% endif %}{{ item.item_key }}</small>
                 </div>
                 <div>{% if item.current_price is not none %}${{ "{:,}".format(item.current_price) }}{% else %}—{% endif %}</div>
                 <div>{% if item.change_24h_pct is not none %}{{ "%.1f"|format(item.change_24h_pct) }}%{% else %}—{% endif %}</div>
-                <div>{{ item.recommendation_label or '—' }}</div>
-            </article>
+                <div>{{ item.recommendation_label or '—' }} <span class="game-market-row-arrow" aria-hidden="true">→</span></div>
+            </a>
             {% endfor %}
         </div>
         {% else %}
