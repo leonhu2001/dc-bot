@@ -2,6 +2,79 @@
     max-width: 1180px;
 }
 
+.game-notification-push {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 24px;
+    align-items: center;
+    margin-top: 22px;
+    background:
+        radial-gradient(circle at 88% 20%, rgba(109, 81, 255, 0.13), transparent 36%),
+        rgba(255, 255, 255, 0.026);
+}
+
+.game-notification-push-copy h2 {
+    margin: 5px 0 8px;
+}
+
+.game-notification-push-copy p {
+    max-width: 720px;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.56);
+    line-height: 1.65;
+}
+
+.game-notification-push-controls {
+    display: grid;
+    justify-items: end;
+    gap: 8px;
+    min-width: 220px;
+}
+
+.game-notification-push-controls button {
+    min-height: 42px;
+    padding: 0 17px;
+    border: 1px solid rgba(176, 151, 255, 0.34);
+    border-radius: 12px;
+    color: #fff;
+    background: rgba(126, 92, 255, 0.15);
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.game-notification-push-controls button[data-subscribed="1"] {
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.game-notification-push-controls button:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.game-notification-push-controls button:focus-visible {
+    outline: 2px solid rgba(176, 151, 255, 0.72);
+    outline-offset: 3px;
+}
+
+.game-notification-push-controls small {
+    max-width: 320px;
+    color: rgba(255, 255, 255, 0.46);
+    text-align: right;
+    line-height: 1.5;
+}
+
+.game-notification-push-controls small[data-kind="enabled"] {
+    color: #72dda5;
+}
+
+.game-notification-push-controls small[data-kind="denied"],
+.game-notification-push-controls small[data-kind="error"] {
+    color: #ff9a9a;
+}
+
 .game-notifications-grid {
     display: grid;
     grid-template-columns: 0.9fr 1.1fr;
@@ -132,12 +205,28 @@
 .is-negative { color: #ff8585 !important; }
 
 @media (max-width: 900px) {
+    .game-notification-push,
     .game-notifications-grid {
         grid-template-columns: 1fr;
+    }
+
+    .game-notification-push-controls {
+        justify-items: start;
+        min-width: 0;
+    }
+
+    .game-notification-push-controls small {
+        max-width: 100%;
+        text-align: left;
     }
 }
 
 @media (max-width: 620px) {
+    .game-notification-push-controls,
+    .game-notification-push-controls button {
+        width: 100%;
+    }
+
     .game-notification-alert {
         grid-template-columns: 1fr;
     }
