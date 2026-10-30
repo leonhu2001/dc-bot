@@ -36,6 +36,33 @@ def _parse_source_time(payload: dict) -> datetime:
     return local.astimezone(timezone.utc)
 
 
+def _display_name(source_item_id: str, category: str, tier: int | None) -> str:
+    """Keep the source's real ammunition identity whenever it has one.
+
+    Some 852941 rows expose only a synthetic key such as ``.300BLK_3``. Those
+    need a readable fallback. Other rows expose the actual ammunition name in
+    ``bullet_name`` (for example ``.357 Magnum FMJ`` or ``.45 ACP AP``); using
+    category+tier for those rows would collapse multiple distinct rounds into
+    the same visible label.
+    """
+    item_id = str(source_item_id or "").strip()
+    caliber = str(category or "").strip()
+    if not item_id:
+        return f"{caliber} {tier}級" if tier is not None else caliber
+
+    if tier is not None and caliber:
+        normalized = item_id.casefold()
+        generic_ids = {
+            f"{caliber}_{tier}".casefold(),
+            f"{caliber}-{tier}".casefold(),
+            f"{caliber} {tier}".casefold(),
+        }
+        if normalized in generic_ids:
+            return f"{caliber} {tier}級"
+
+    return item_id
+
+
 def _build_snapshot(
     *,
     game_key: str,
@@ -79,14 +106,10 @@ def _build_snapshot(
             if tier is not None and not 1 <= tier <= 10:
                 tier = None
 
-            display_name = category
-            if tier is not None:
-                display_name = f"{category} {tier}級"
-
             items.append(
                 MarketSourceItem(
                     source_item_id=source_item_id,
-                    name=display_name,
+                    name=_display_name(source_item_id, category, tier),
                     price=price,
                     category=category,
                     tier=tier,

@@ -2,8 +2,8 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
-<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261030-2">
-<script src="/static/js/pages/game_market_item.js?v=20261030-1" defer></script>
+<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261031-1">
+<script src="/static/js/pages/game_market_item.js?v=20261031-1" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -22,26 +22,45 @@
         <div class="market-item-price">
             <span>目前價格</span>
             <strong>{% if current_price is not none %}${{ "{:,}".format(current_price) }}{% else %}—{% endif %}</strong>
-            {% if latest_at %}<small>資料時間 {{ latest_at.strftime('%Y-%m-%d %H:%M') }} UTC</small>{% endif %}
+            {% if latest_at %}
+            <small>
+                資料時間
+                <time data-market-latest-at datetime="{{ latest_at.isoformat() }}">{{ latest_at.strftime('%Y-%m-%d %H:%M') }} UTC</time>
+            </small>
+            {% endif %}
         </div>
     </header>
 
-    <section class="market-item-stats" aria-label="品項行情摘要">
+    <section class="market-item-stats" data-market-summary aria-label="品項行情摘要">
         <article>
             <span>目前</span>
             <strong>{% if current_price is not none %}${{ "{:,}".format(current_price) }}{% else %}—{% endif %}</strong>
+            <small>最新台服成交掛價快照</small>
         </article>
         <article>
-            <span>歷史區間低點</span>
-            <strong>{% if low_price is not none %}${{ "{:,}".format(low_price) }}{% else %}—{% endif %}</strong>
+            <span>24H 漲跌</span>
+            <strong data-market-change-24h>累積中</strong>
+            <small data-market-change-24h-note>至少需要約 20 小時可信歷史</small>
         </article>
         <article>
-            <span>歷史區間高點</span>
-            <strong>{% if high_price is not none %}${{ "{:,}".format(high_price) }}{% else %}—{% endif %}</strong>
+            <span>24H 區間</span>
+            <strong data-market-range-24h>累積中</strong>
+            <small>低點 → 高點</small>
         </article>
         <article>
-            <span>資料點</span>
-            <strong>{{ point_count }}</strong>
+            <span>7D 均價</span>
+            <strong data-market-average-7d>累積中</strong>
+            <small>至少需要約 6 天實際覆蓋</small>
+        </article>
+        <article>
+            <span>7D 區間</span>
+            <strong data-market-range-7d>累積中</strong>
+            <small>低點 → 高點</small>
+        </article>
+        <article>
+            <span>歷史覆蓋</span>
+            <strong data-market-coverage>{{ point_count }} 筆</strong>
+            <small data-market-coverage-note>讀取正式 Market DB 中…</small>
         </article>
     </section>
 
@@ -109,12 +128,13 @@
     <section
         class="market-item-chart-panel"
         data-market-chart
-        data-history-url="/games/{{ game.slug }}/market/api/items/{{ item.source_item_id|urlencode }}/history?limit=500"
+        data-history-url="/games/{{ game.slug }}/market/api/items/{{ item.source_item_id|urlencode }}/history?limit=1000"
     >
         <div class="market-item-chart-head">
             <div>
                 <span class="game-market-label">PRICE HISTORY</span>
                 <h2>價格走勢</h2>
+                <small data-market-chart-status>只使用魔丸自己累積的台服正式歷史</small>
             </div>
             <div class="market-item-chart-range" aria-label="走勢時間範圍">
                 <button type="button" data-market-range="24">24H</button>
@@ -131,7 +151,7 @@
 
     <section class="market-item-note">
         <strong>資料說明</strong>
-        <p>行情只顯示已寫入正式 Market DB 的來源資料。來源過期或中斷時會保留最後價格，但網站會標示 stale，價格提醒不會在 stale 狀態觸發。建立提醒目前只保存於網站帳號；手機 Web Push 會在下一階段接入。</p>
+        <p>行情只使用已寫入正式 Market DB 的台服公開來源資料。24H 指標至少需要約 20 小時實際覆蓋，7D 指標至少需要約 6 天才顯示；資料不足時寧可標示「累積中」，不拿第三方推薦或統計分數補洞。來源過期或中斷時會保留最後價格，但價格提醒不會在 stale 狀態觸發。Web Push 已正式啟用，已訂閱的裝置可接收價格穿越門檻通知。</p>
     </section>
 </section>
 {% endblock %}

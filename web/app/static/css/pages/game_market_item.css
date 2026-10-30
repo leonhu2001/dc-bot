@@ -22,7 +22,8 @@
 .market-item-hero p,
 .market-item-price small,
 .market-item-note p,
-.market-item-personal-card p {
+.market-item-personal-card p,
+.market-item-chart-head small {
     color: rgba(255, 255, 255, 0.58);
 }
 
@@ -48,21 +49,34 @@
 
 .market-item-stats {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
     margin-top: 18px;
 }
 
 .market-item-stats article {
     display: grid;
-    gap: 8px;
+    gap: 7px;
+    min-width: 0;
     padding: 18px;
     border: 1px solid rgba(255, 255, 255, 0.075);
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.025);
 }
 
-.market-item-stats strong { font-size: 20px; }
+.market-item-stats strong {
+    overflow-wrap: anywhere;
+    font-size: 20px;
+}
+
+.market-item-stats small {
+    color: rgba(255, 255, 255, 0.38);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.market-item-stats .is-positive { color: #66d99a; }
+.market-item-stats .is-negative { color: #ff8585; }
 
 .market-item-personal {
     display: grid;
@@ -150,7 +164,8 @@
 .market-item-login:focus-visible,
 .market-item-alert-form select:focus-visible,
 .market-item-alert-form input:focus-visible,
-.market-item-alert-form button:focus-visible {
+.market-item-alert-form button:focus-visible,
+.market-item-chart-range button:focus-visible {
     outline: 2px solid rgba(176, 151, 255, 0.72);
     outline-offset: 3px;
 }
@@ -187,7 +202,8 @@
     gap: 16px;
 }
 
-.market-item-chart-head h2 { margin: 5px 0 0; }
+.market-item-chart-head h2 { margin: 5px 0 4px; }
+.market-item-chart-head small { display: block; font-size: 12px; }
 
 .market-item-chart-range {
     display: flex;
@@ -230,10 +246,30 @@
     stroke-width: 1;
 }
 
+.market-item-chart-average-line {
+    stroke: rgba(176, 151, 255, 0.42);
+    stroke-width: 1.5;
+    stroke-dasharray: 7 7;
+    vector-effect: non-scaling-stroke;
+}
+
+.market-item-chart-axis-label {
+    fill: rgba(255, 255, 255, 0.52);
+    font-size: 18px;
+    font-weight: 700;
+}
+
 .market-item-chart-line {
     fill: none;
     stroke: currentColor;
     stroke-width: 3;
+    vector-effect: non-scaling-stroke;
+}
+
+.market-item-chart-point {
+    fill: currentColor;
+    stroke: rgba(255, 255, 255, 0.7);
+    stroke-width: 2;
     vector-effect: non-scaling-stroke;
 }
 
@@ -287,6 +323,8 @@
 }
 
 @media (max-width: 520px) {
+    .market-item-stats { grid-template-columns: 1fr; }
+
     .market-item-alert-form {
         grid-template-columns: 1fr;
     }
