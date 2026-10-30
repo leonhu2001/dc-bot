@@ -81,6 +81,7 @@ class MarketSourceRun(MarketBase):
 @dataclass(frozen=True)
 class StoredMarketItem:
     item_id: int
+    source_name: str
     source_item_id: str
     name: str
     category: str
@@ -197,14 +198,37 @@ class MarketRepository:
 
         return inserted_prices
 
+    def latest_source_name(self, game_key: str) -> str | None:
+        clean_game_key = str(game_key or "").strip()
+        if not clean_game_key:
+            return None
+
+        stmt = (
+            select(MarketSourceRun.source_name)
+            .where(MarketSourceRun.game_key == clean_game_key)
+            .order_by(
+                MarketSourceRun.source_updated_at.desc(),
+                MarketSourceRun.id.desc(),
+            )
+            .limit(1)
+        )
+        with self.SessionLocal() as db:
+            value = db.scalar(stmt)
+        return str(value).strip() if value else None
+
     def list_latest(
         self,
         game_key: str,
         *,
+        source_name: str | None = None,
         limit: int = 200,
     ) -> tuple[StoredMarketItem, ...]:
         clean_game_key = str(game_key or "").strip()
         if not clean_game_key:
+            return ()
+
+        clean_source_name = str(source_name or "").strip() or self.latest_source_name(clean_game_key)
+        if not clean_source_name:
             return ()
 
         latest_price = (
@@ -224,7 +248,10 @@ class MarketRepository:
                 (MarketPrice.item_id == latest_price.c.item_id)
                 & (MarketPrice.source_updated_at == latest_price.c.max_source_updated_at),
             )
-            .where(MarketItem.game_key == clean_game_key)
+            .where(
+                MarketItem.game_key == clean_game_key,
+                MarketItem.source_name == clean_source_name,
+            )
             .order_by(
                 MarketItem.tier.is_(None),
                 MarketItem.tier.desc(),
@@ -239,6 +266,7 @@ class MarketRepository:
         return tuple(
             StoredMarketItem(
                 item_id=item.id,
+                source_name=item.source_name,
                 source_item_id=item.source_item_id,
                 name=item.name,
                 category=item.category,
@@ -253,16 +281,23 @@ class MarketRepository:
         self,
         game_key: str,
         source_item_id: str,
+        *,
+        source_name: str | None = None,
     ) -> MarketItem | None:
         clean_game_key = str(game_key or "").strip()
         clean_source_item_id = str(source_item_id or "").strip()
         if not clean_game_key or not clean_source_item_id:
             return None
 
+        clean_source_name = str(source_name or "").strip() or self.latest_source_name(clean_game_key)
+        if not clean_source_name:
+            return None
+
         with self.SessionLocal() as db:
             item = db.scalar(
                 select(MarketItem).where(
                     MarketItem.game_key == clean_game_key,
+                    MarketItem.source_name == clean_source_name,
                     MarketItem.source_item_id == clean_source_item_id,
                 )
             )
