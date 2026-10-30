@@ -1,0 +1,135 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
+<link rel="stylesheet" href="/static/css/pages/game_notifications.css?v=20261030-1">
+{% endblock %}
+
+{% block content %}
+<section class="game-tool-shell game-notifications-shell">
+    <a class="game-tool-back" href="/games/{{ game.slug }}">← 回到 {{ game.name }}</a>
+
+    <header class="game-tool-hero">
+        <div>
+            <div class="game-tool-kicker">{{ game.eyebrow }} · NOTIFICATIONS</div>
+            <h1>{{ game.notifications_title }}</h1>
+            <p>管理你的關注清單與價格提醒。提醒只會使用未過期的正式行情；Web Push 會在後續階段接入。</p>
+        </div>
+        <nav class="game-tool-tabs" aria-label="{{ game.name }}工具">
+            {% for feature in game_features %}
+            <a href="{{ feature.href }}" class="{% if feature.key == 'notifications' %}is-active{% endif %}">{{ feature.title }}</a>
+            {% endfor %}
+        </nav>
+    </header>
+
+    {% if not personalization_ready %}
+    <section class="game-market-status" aria-live="polite">
+        <div class="game-market-status-mark">!</div>
+        <div>
+            <span>PERSONALIZATION</span>
+            <h2>個人化行情資料庫尚未就緒</h2>
+            <p>關注與提醒目前暫停寫入；既有網站與訂單功能不受影響。</p>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="game-notifications-grid">
+        <article class="game-market-panel">
+            <div class="game-market-panel-head">
+                <div>
+                    <span class="game-market-label">WATCHLIST</span>
+                    <h2>我的關注</h2>
+                </div>
+                <span class="game-market-badge">{{ watched_items|length }} 個</span>
+            </div>
+
+            {% if watched_items %}
+            <div class="game-notification-list">
+                {% for item in watched_items %}
+                <a class="game-notification-watch" href="{{ item.href }}">
+                    <div>
+                        <strong>{{ item.name }}</strong>
+                        <small>{{ item.item_key }}</small>
+                    </div>
+                    <div class="game-notification-price">
+                        <strong>{% if item.current_price is not none %}${{ "{:,}".format(item.current_price) }}{% else %}—{% endif %}</strong>
+                        {% if item.change_24h_pct is not none %}
+                        <small class="{% if item.change_24h_pct > 0 %}is-positive{% elif item.change_24h_pct < 0 %}is-negative{% endif %}">
+                            {% if item.change_24h_pct > 0 %}+{% endif %}{{ "%.1f"|format(item.change_24h_pct) }}%
+                        </small>
+                        {% endif %}
+                    </div>
+                    <span aria-hidden="true">→</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="game-market-empty game-notification-empty">
+                <strong>還沒有關注品項</strong>
+                <span>到交易所行情打開任一品項，按「加入關注」即可放進這裡。</span>
+                <a href="/games/{{ game.slug }}/market">前往 {{ game.market_title }} →</a>
+            </div>
+            {% endif %}
+        </article>
+
+        <article class="game-market-panel">
+            <div class="game-market-panel-head">
+                <div>
+                    <span class="game-market-label">PRICE ALERTS</span>
+                    <h2>價格提醒</h2>
+                </div>
+                <span class="game-market-badge">{{ alert_items|length }} 個</span>
+            </div>
+
+            {% if alert_items %}
+            <div class="game-notification-list">
+                {% for row in alert_items %}
+                {% set alert = row.alert %}
+                <section class="game-notification-alert">
+                    <div class="game-notification-alert-main">
+                        <a href="{{ row.href }}"><strong>{{ row.name }}</strong></a>
+                        <span>
+                            {% if alert.condition_type == 'below' %}≤{% else %}≥{% endif %}
+                            ${{ "{:,}".format(alert.target_price) }}
+                        </span>
+                        <small>
+                            目前 {% if row.current_price is not none %}${{ "{:,}".format(row.current_price) }}{% else %}—{% endif %}
+                            · {% if alert.enabled %}啟用中{% else %}已暫停{% endif %}
+                            {% if alert.condition_met %} · 已進入條件{% endif %}
+                        </small>
+                        {% if alert.last_triggered_at %}
+                        <small>最近觸發 {{ alert.last_triggered_at.strftime('%Y-%m-%d %H:%M') }} UTC</small>
+                        {% endif %}
+                    </div>
+                    <div class="game-notification-alert-actions">
+                        <form method="post" action="/games/{{ game.slug }}/notifications/alerts/{{ alert.id }}/toggle">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <input type="hidden" name="enabled" value="{% if alert.enabled %}0{% else %}1{% endif %}">
+                            <button type="submit">{% if alert.enabled %}暫停{% else %}啟用{% endif %}</button>
+                        </form>
+                        <form method="post" action="/games/{{ game.slug }}/notifications/alerts/{{ alert.id }}/delete">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <button class="is-danger" type="submit">刪除</button>
+                        </form>
+                    </div>
+                </section>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="game-market-empty game-notification-empty">
+                <strong>還沒有價格提醒</strong>
+                <span>在品項頁設定「低於或等於」或「高於或等於」目標價格。</span>
+            </div>
+            {% endif %}
+        </article>
+    </section>
+
+    <section class="market-item-note game-notification-note">
+        <strong>提醒狀態</strong>
+        <p>
+            目前行情狀態：{{ market_status }}。只有 fresh/ready 行情才會進行價格條件判斷；stale、來源中斷或無資料時不觸發。
+            網站已保存提醒與觸發狀態，手機 Web Push 尚未啟用，因此現在不會跳出瀏覽器通知權限視窗。
+        </p>
+    </section>
+</section>
+{% endblock %}
