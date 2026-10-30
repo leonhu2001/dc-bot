@@ -130,13 +130,14 @@ systemctl enable "$MARKET_SERVICE" >/dev/null
 
 echo "Running market DB/provider preflight and first ingest..."
 runuser -u dc-bot-web -- env PYTHONPATH="$APP" \
-    "$APP/venv/bin/python" - <<'PY'
+    "$APP/venv/bin/python" - "$APP" <<'PY'
 import asyncio
 import os
+import sys
 from dotenv import load_dotenv
 
-APP = "/opt/dc-bot"
-load_dotenv(f"{APP}/web/.env", override=True)
+app = sys.argv[1]
+load_dotenv(f"{app}/web/.env", override=True)
 
 from services.market.personalization import MarketPersonalizationRepository
 from services.market.provider_registry import build_configured_provider
