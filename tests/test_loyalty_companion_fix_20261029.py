@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import create_engine, text
 
-from services.loyalty_companion_fix_20261029 import calculate_for_rule, extract_player_count
+from services.loyalty_companion_fix_20261029 import (
+    _repair_existing_progress,
+    calculate_for_rule,
+    extract_player_count,
+)
 
 
 def _rule(key: str, *, price: int, max_players: int = 4):
@@ -90,3 +97,66 @@ def test_extract_player_count_supports_old_and_new_snapshots(snapshot):
 
 def test_extract_player_count_falls_back_to_one():
     assert extract_player_count({"price_snapshot_json": "{}"}) == 1
+
+
+def test_loyalty_repair_is_claimed_once_during_concurrent_startup(tmp_path):
+    db_path = tmp_path / "loyalty-race.db"
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False, "timeout": 5},
+    )
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE loyalty_migrations (
+                migration_key TEXT PRIMARY KEY,
+                applied_at TEXT NOT NULL,
+                note TEXT
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE web_orders (
+                customer_discord_id TEXT,
+                order_rule_key TEXT,
+                status TEXT
+            )
+        """))
+        conn.execute(text("""
+            INSERT INTO web_orders (customer_discord_id, order_rule_key, status)
+            VALUES ('customer-a', 'basic_entertain_single', 'closed'),
+                   ('customer-b', 'basic_entertain_single', 'closed')
+        """))
+
+    reconcile_calls: list[str] = []
+    calls_lock = threading.Lock()
+    start = threading.Barrier(2)
+
+    def reconcile(_conn, customer_id: str):
+        with calls_lock:
+            reconcile_calls.append(customer_id)
+        return {"issued": 1, "revoked": 0}
+
+    loyalty = SimpleNamespace(
+        engine=engine,
+        ensure_loyalty_tables=lambda: None,
+        get_taipei_now_iso=lambda: "2026-10-29T23:00:00+08:00",
+        loyalty_policy_for_rule=lambda _key: {"enabled": True},
+        reconcile_customer_loyalty_in_connection=reconcile,
+    )
+
+    def run_repair():
+        start.wait(timeout=5)
+        return _repair_existing_progress(loyalty)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _index: run_repair(), range(2)))
+
+    assert sorted(result["customers"] for result in results) == [0, 2]
+    assert sorted(result["issued"] for result in results) == [0, 2]
+    assert sorted(reconcile_calls) == ["customer-a", "customer-b"]
+
+    with engine.connect() as conn:
+        row = conn.execute(text("""
+            SELECT note FROM loyalty_migrations
+            WHERE migration_key = '20261029_loyalty_companion_price_and_units_v5'
+        """)).one()
+    assert row[0] == "reconciled_customers=2;issued=2;revoked=0"

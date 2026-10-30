@@ -484,6 +484,7 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
             if item is None:
                 await interaction.response.send_message("找不到這個點數福利，請重新選擇。", ephemeral=True)
                 return
+            item = _adapt_order_point_benefit_for_rule(view.rule, item)
             data["selected_point_benefit_key"] = point_key
             data["point_benefit_key"] = point_key
             data["point_benefit_name"] = str(item.get("name") or point_key)
@@ -565,22 +566,23 @@ class SelfServicePointBenefitView(discord.ui.View):
             if not spec:
                 continue
 
-            cost = int(item.get("cost") or 0)
-
-            if cost > self.point_balance:
-                continue
-
             allowed, _ = is_order_point_benefit_allowed_for_rule(self.rule, key, data)
 
             if not allowed:
                 continue
 
+            # Adapt first so dynamic formal-product pricing is authoritative before
+            # comparing against the customer's balance. The previous runtime wrapper
+            # existed only to repair this ordering after import.
             merged = dict(item)
             merged.update(spec)
             merged = _adapt_order_point_benefit_for_rule(
                 self.rule,
                 merged,
             )
+            cost = int(merged.get("cost") or 0)
+            if cost > self.point_balance:
+                continue
             result.append(merged)
 
         return result

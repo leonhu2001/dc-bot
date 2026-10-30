@@ -184,6 +184,7 @@ RULE_OVERRIDE_FIELDS = {
     "min_player_count",
     "max_player_count",
     "price_multiply_player_count",
+    "player_count_prices",
     "catalog_group_label",
     "vip_discount_allowed",
     "point_benefits_allowed",
@@ -209,7 +210,31 @@ _DICT_OVERRIDE_FIELDS = {
     "staff_adjustments",
     "staff_adjustment_labels",
     "specify_fee_by_game_role",
+    "player_count_prices",
 }
+
+
+def _normalize_player_count_prices(value: Any) -> dict[int, int]:
+    if not isinstance(value, dict):
+        raise ValueError("player_count_prices 必須是物件。")
+
+    normalized: dict[int, int] = {}
+    for raw_count, raw_price in value.items():
+        try:
+            count = int(raw_count)
+            price = int(raw_price)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("player_count_prices 的人數與價格都必須是整數。") from exc
+
+        if count <= 0:
+            raise ValueError("player_count_prices 的人數必須大於 0。")
+        if price <= 0:
+            raise ValueError("player_count_prices 的價格必須大於 0。")
+        if count in normalized:
+            raise ValueError(f"player_count_prices 重複定義 {count} 人價格。")
+        normalized[count] = price
+
+    return normalized
 
 
 def rule_to_override_payload(rule: OrderRule) -> dict[str, Any]:
@@ -241,7 +266,10 @@ def build_rule_with_override(
         elif key in _DICT_OVERRIDE_FIELDS:
             if not isinstance(value, dict):
                 raise ValueError(f"{key} 必須是物件。")
-            value = dict(value)
+            if key == "player_count_prices":
+                value = _normalize_player_count_prices(value)
+            else:
+                value = dict(value)
         elif key == "catalog_group_label":
             value = str(value or "").strip()
         changes[key] = value
@@ -1432,6 +1460,25 @@ def validate_rule_definition(key: str, rule: OrderRule) -> None:
             and int(rule.max_player_count) < int(rule.min_player_count)
         ):
             raise RuntimeError(f"{key}: maximum player count is below minimum")
+
+    if rule.player_count_prices:
+        if not rule.player_count_enabled:
+            raise RuntimeError(f"{key}: player count prices require player count selection")
+        if rule.max_player_count is None:
+            raise RuntimeError(f"{key}: player count prices require a maximum player count")
+        try:
+            normalized_prices = _normalize_player_count_prices(rule.player_count_prices)
+        except ValueError as exc:
+            raise RuntimeError(f"{key}: {exc}") from exc
+        if normalized_prices != rule.player_count_prices:
+            raise RuntimeError(f"{key}: player count price keys must be normalized integers")
+        expected_counts = set(range(int(rule.min_player_count), int(rule.max_player_count) + 1))
+        actual_counts = set(normalized_prices)
+        if actual_counts != expected_counts:
+            raise RuntimeError(
+                f"{key}: player count prices must cover every count from "
+                f"{rule.min_player_count} to {rule.max_player_count}"
+            )
 
     if len(str(rule.catalog_group_label or "")) > 100:
         raise RuntimeError(f"{key}: catalog group label is too long")

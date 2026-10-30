@@ -4,6 +4,9 @@ from typing import Any
 
 from services.unified_service_point_policy import (
     calculate_rule_price_service_point_cost,
+    is_current_service_bonus,
+    is_rule_service_bonus_supported,
+    resolve_rule_staff_count as resolve_service_rule_staff_count,
     uses_rule_price_service_point_cost,
 )
 
@@ -159,6 +162,13 @@ def is_service_bonus_allowed_for_rule(rule, benefit: dict[str, Any] | None, play
     if str(benefit.get("kind") or "") != "service_bonus":
         return True
 
+    # Current seat-aware service rewards are a formal-product capability. Keep the
+    # eligibility check here, at the canonical catalog boundary, instead of layering
+    # a runtime wrapper over Discord/Web callers. Historical aliases have no
+    # seat_count and retain their snapshot behavior for old orders.
+    if is_current_service_bonus(benefit) and not is_rule_service_bonus_supported(rule):
+        return False
+
     expected_tier = str(benefit.get("service_tier") or "").strip().lower()
     if not expected_tier or expected_tier != get_rule_service_tier(rule):
         return False
@@ -241,18 +251,9 @@ def adapt_point_benefit_for_rule(rule, benefit: dict[str, Any] | None) -> dict[s
 
 
 def resolve_rule_staff_count(rule, player_count: Any = 1) -> int:
-    required = getattr(rule, "required_staff_count", 1)
+    """Compatibility name backed by the shared formal-rule resolver."""
 
-    if required == "player_count":
-        try:
-            return max(1, int(player_count or 1))
-        except (TypeError, ValueError):
-            return 1
-
-    try:
-        return max(1, int(required or 1))
-    except (TypeError, ValueError):
-        return 1
+    return resolve_service_rule_staff_count(rule, player_count)
 
 
 def calculate_one_seat_service_bonus_value(

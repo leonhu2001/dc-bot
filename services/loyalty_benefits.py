@@ -237,6 +237,12 @@ _POLICY_V3_NEWLY_ELIGIBLE_RULES = {
     "lol_entertain_ranked",
     "apex_entertain_ranked",
 }
+_PLAYER_COUNT_KEYS = (
+    "player_count",
+    "requested_player_count",
+    "service_player_count",
+    "companion_count",
+)
 
 
 def _canonical_loyalty_rule_key(rule_key: str) -> str:
@@ -257,28 +263,52 @@ def _service_companion_count(rule: Any, player_count: int = 1) -> int:
         return requested if bool(getattr(rule, "player_count_enabled", False)) else 1
 
 
-def _extract_player_count(row: dict[str, Any]) -> int:
+def _positive_int(value: Any) -> int | None:
     try:
-        import json
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
 
-        snapshot = json.loads(str(row.get("price_snapshot_json") or "{}"))
-        if isinstance(snapshot, dict):
-            preview = (
-                snapshot.get("preview")
-                if isinstance(snapshot.get("preview"), dict)
-                else snapshot
-            )
-            quote = (
-                preview.get("quote")
-                if isinstance(preview, dict)
-                and isinstance(preview.get("quote"), dict)
-                else {}
-            )
-            input_data = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else {}
-            return max(1, int(quote.get("player_count") or input_data.get("player_count") or 1))
-    except Exception:
-        pass
-    return 1
+
+def _find_player_count(value: Any) -> int | None:
+    if isinstance(value, dict):
+        for key in _PLAYER_COUNT_KEYS:
+            parsed = _positive_int(value.get(key)) if key in value else None
+            if parsed is not None:
+                return parsed
+        for key in ("quote", "input", "preview", "selection", "order", "data"):
+            parsed = _find_player_count(value.get(key)) if key in value else None
+            if parsed is not None:
+                return parsed
+        for nested in value.values():
+            parsed = _find_player_count(nested)
+            if parsed is not None:
+                return parsed
+    elif isinstance(value, (list, tuple)):
+        for nested in value:
+            parsed = _find_player_count(nested)
+            if parsed is not None:
+                return parsed
+    return None
+
+
+def _extract_player_count(row: dict[str, Any]) -> int:
+    import json
+
+    for column in ("price_snapshot_json", "quote_snapshot_json"):
+        raw = row.get(column)
+        if not raw:
+            continue
+        try:
+            snapshot = json.loads(str(raw))
+        except Exception:
+            continue
+        parsed = _find_player_count(snapshot)
+        if parsed is not None:
+            return parsed
+    parsed = _find_player_count(row)
+    return parsed if parsed is not None else 1
 
 
 def _loyalty_display_label(rule_key: str, fallback: object = "") -> str:
@@ -596,35 +626,54 @@ def get_applicable_coupon(
     return result
 
 
+def _selected_unit_total(rule: Any, player_count: int) -> int:
+    requested = max(1, int(player_count or 1))
+    if bool(getattr(rule, "player_count_enabled", False)):
+        minimum = max(1, int(getattr(rule, "min_player_count", 1) or 1))
+        maximum_raw = getattr(rule, "max_player_count", None)
+        maximum = int(maximum_raw) if maximum_raw is not None else minimum
+        maximum = max(minimum, maximum)
+        if requested < minimum or requested > maximum:
+            requested = minimum
+
+    table = dict(getattr(rule, "player_count_prices", None) or {})
+    if table:
+        normalized = {int(count): int(price) for count, price in table.items()}
+        if requested in normalized:
+            return max(0, normalized[requested])
+
+    amount = max(0, int(getattr(rule, "price", 0) or 0))
+    if bool(getattr(rule, "price_multiply_player_count", False)):
+        amount *= requested
+    return amount
+
+
 def calculate_coupon_service_value(
     *,
     rule_key: str,
     player_count: int,
     coupon: dict[str, Any] | None,
 ) -> int:
-    """Cash value of one customer benefit service-unit credit at list price.
-
-    One benefit hour/game always means one companion's service unit. Multi-
-    companion orders therefore redeem the same credit proportionally instead
-    of multiplying the coupon by the number of companions.
-    """
+    """Cash value of one companion's loyalty service-unit at the selected tier."""
     if not coupon:
         return 0
     rule = _rule_for_key(rule_key)
     if rule is None:
         return 0
     kind = str(coupon.get("benefit_kind") or "")
-    units = float(coupon.get("benefit_units") or 0)
+    try:
+        units = float(coupon.get("benefit_units") or 0)
+    except (TypeError, ValueError):
+        units = 0.0
     if units <= 0 or kind not in {"extra_hours", "extra_games"}:
         return 0
 
     requested_players = max(1, int(player_count or 1))
     companion_count = _service_companion_count(rule, requested_players)
-    order_unit_price = max(0, int(getattr(rule, "price", 0) or 0))
-    if bool(getattr(rule, "price_multiply_player_count", False)):
-        order_unit_price *= requested_players
-
-    per_companion_unit = order_unit_price / max(1, companion_count)
+    selected_total = _selected_unit_total(rule, requested_players)
+    if selected_total <= 0:
+        return 0
+    per_companion_unit = selected_total / max(1, companion_count)
     return max(0, int(round(per_companion_unit * units)))
 
 
@@ -1017,7 +1066,6 @@ def _repair_companion_loyalty_v2(conn) -> None:
         "applied_at": now,
         "note": f"repaired_scopes={len(aggregates)}",
     })
-
 
 
 def _repair_entertainment_loyalty_policy_v3(conn) -> None:
