@@ -1,0 +1,118 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/pages/game_delta_market.css?v=20261030-1">
+{% endblock %}
+
+{% block content %}
+<section class="delta-market-shell">
+    <header class="delta-market-hero">
+        <div class="delta-market-copy">
+            <a class="delta-market-back" href="/games/delta-force">← 三角洲行動</a>
+            <div class="delta-market-kicker">DELTA FORCE · TAIWAN MARKET</div>
+            <h1>台服子彈行情</h1>
+            <p>
+                集中查看台服子彈價格、歷史趨勢與值得關注的品項。
+                行情資料接入後，這裡會自動更新，不需要手動刷新 Discord 指令。
+            </p>
+        </div>
+
+        <aside class="delta-market-status-card">
+            <span class="delta-market-status-dot"></span>
+            <div>
+                <small>MARKET STATUS</small>
+                {% if market_ready %}
+                <strong>行情服務正常</strong>
+                <p>資料會依來源更新時間自動同步。</p>
+                {% else %}
+                <strong>行情資料接入中</strong>
+                <p>網站介面已建立，正式價格源尚未啟用。</p>
+                {% endif %}
+            </div>
+        </aside>
+    </header>
+
+    <section class="delta-market-recommendation">
+        <div>
+            <div class="delta-market-kicker">TODAY'S PICK</div>
+            <h2>目前最推薦</h2>
+            {% if market_ready %}
+            <p>系統會依近期跌幅、均價偏離與歷史低點自動挑選。</p>
+            {% else %}
+            <p>等待第一批正式行情資料後啟用推薦評分，避免用假價格誤導。</p>
+            {% endif %}
+        </div>
+        <div class="delta-market-recommendation-empty">
+            <span>推薦品項</span>
+            <strong>—</strong>
+            <small>等待行情資料</small>
+        </div>
+    </section>
+
+    <section class="delta-market-section">
+        <div class="delta-market-section-head">
+            <div>
+                <div class="delta-market-kicker">AMMO MARKET</div>
+                <h2>子彈列表</h2>
+            </div>
+            <label class="delta-market-search">
+                <span>搜尋</span>
+                <input type="search" placeholder="輸入子彈名稱" data-delta-market-search>
+            </label>
+        </div>
+
+        <div class="delta-market-filter-row" aria-label="子彈篩選">
+            <button type="button" class="is-active" data-delta-market-filter="all">全部</button>
+            <button type="button" data-delta-market-filter="high">高階彈藥</button>
+        </div>
+
+        <div class="delta-market-grid" data-delta-market-grid>
+            {% for item in items %}
+            <a
+                class="delta-market-item-card"
+                href="/games/delta-force/market/items/{{ item.slug }}"
+                data-market-name="{{ item.name|lower }} {{ item.caliber|lower }}"
+                data-market-tier="high"
+            >
+                <div class="delta-market-item-top">
+                    <div>
+                        <small>{{ item.caliber }}</small>
+                        <h3>{{ item.name }}</h3>
+                    </div>
+                    <span class="delta-market-tier">{{ item.tier }}</span>
+                </div>
+
+                <div class="delta-market-price-row">
+                    <div>
+                        <span>目前價格</span>
+                        <strong>—</strong>
+                    </div>
+                    <div>
+                        <span>24H</span>
+                        <strong>—</strong>
+                    </div>
+                </div>
+
+                <div class="delta-market-item-foot">
+                    <span>查看詳細行情</span>
+                    <span>→</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="delta-market-how-it-works">
+        <div class="delta-market-kicker">NEXT STEP</div>
+        <h2>接上價格源後會自動多出這些能力</h2>
+        <div class="delta-market-feature-grid">
+            <article><strong>歷史走勢</strong><span>12H、24H、72H、7D、30D</span></article>
+            <article><strong>推薦評分</strong><span>依均價、跌幅與低點判斷</span></article>
+            <article><strong>我的關注</strong><span>Discord 登入後跨裝置同步</span></article>
+            <article><strong>價格提醒</strong><span>PWA Web Push 直接送到手機</span></article>
+        </div>
+    </section>
+</section>
+
+<script src="/static/js/pages/game_delta_market.js?v=20261030-1" defer></script>
+{% endblock %}
