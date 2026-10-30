@@ -24,6 +24,7 @@ class MarketItemSummary:
     low_24h: int | None = None
     high_24h: int | None = None
     avg_7d: float | None = None
+    vs_7d_avg_pct: float | None = None
     low_7d: int | None = None
     high_7d: int | None = None
     history_points_7d: int = 0
@@ -47,6 +48,12 @@ def _stale_seconds() -> int:
         return max(900, int(os.getenv("MARKET_STALE_SECONDS", "2700")))
     except (TypeError, ValueError):
         return 2700
+
+
+def _vs_7d_avg_pct(current_price: int | None, avg_7d: float | None) -> float | None:
+    if current_price is None or avg_7d is None or avg_7d <= 0:
+        return None
+    return round(((current_price - avg_7d) / avg_7d) * 100.0, 2)
 
 
 def _movers(items: tuple[MarketItemSummary, ...]) -> tuple[
@@ -80,9 +87,9 @@ def _recommended_item(items: tuple[MarketItemSummary, ...]) -> MarketItemSummary
     """
     candidates: list[tuple[float, MarketItemSummary]] = []
     for item in items:
-        if item.current_price is None or item.avg_7d is None or item.avg_7d <= 0:
+        if item.vs_7d_avg_pct is None:
             continue
-        discount_pct = ((item.avg_7d - item.current_price) / item.avg_7d) * 100.0
+        discount_pct = -item.vs_7d_avg_pct
         if discount_pct < _RECOMMENDATION_DISCOUNT_PCT:
             continue
         candidates.append((discount_pct, item))
@@ -179,6 +186,7 @@ def get_public_market_snapshot(
             low_24h=item.low_24h,
             high_24h=item.high_24h,
             avg_7d=item.avg_7d,
+            vs_7d_avg_pct=_vs_7d_avg_pct(item.current_price, item.avg_7d),
             low_7d=item.low_7d,
             high_7d=item.high_7d,
             history_points_7d=item.history_points_7d,
@@ -246,6 +254,21 @@ def filter_market_snapshot(
                 item.change_24h_pct is None,
                 item.change_24h_pct if item.change_24h_pct is not None else float("inf"),
             )
+        )
+    elif sort_key == "value_asc":
+        items.sort(
+            key=lambda item: (
+                item.vs_7d_avg_pct is None,
+                item.vs_7d_avg_pct if item.vs_7d_avg_pct is not None else float("inf"),
+            )
+        )
+    elif sort_key == "value_desc":
+        items.sort(
+            key=lambda item: (
+                item.vs_7d_avg_pct is not None,
+                item.vs_7d_avg_pct if item.vs_7d_avg_pct is not None else float("-inf"),
+            ),
+            reverse=True,
         )
     else:
         items.sort(key=lambda item: (item.tier is None, -(item.tier or 0), item.name.casefold()))

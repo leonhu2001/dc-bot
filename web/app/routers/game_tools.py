@@ -29,7 +29,15 @@ router = APIRouter(tags=["game-tools"])
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-_MARKET_SORTS = {"name", "price_desc", "price_asc", "change_desc", "change_asc"}
+_MARKET_SORTS = {
+    "name",
+    "price_desc",
+    "price_asc",
+    "change_desc",
+    "change_asc",
+    "value_asc",
+    "value_desc",
+}
 _MAX_ALERTS_PER_GAME = 50
 
 
@@ -69,6 +77,7 @@ def _item_payload(item) -> dict:
         "low_24h": item.low_24h,
         "high_24h": item.high_24h,
         "avg_7d": item.avg_7d,
+        "vs_7d_avg_pct": item.vs_7d_avg_pct,
         "low_7d": item.low_7d,
         "high_7d": item.high_7d,
         "history_points_7d": item.history_points_7d,
@@ -517,7 +526,6 @@ async def game_notifications(request: Request, game_slug: str):
         }
         for alert in alerts
     )
-
     seo = build_seo(
         path=path,
         title=f"{game.notifications_title}｜魔丸娛樂",

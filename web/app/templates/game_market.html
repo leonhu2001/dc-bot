@@ -2,7 +2,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
-<link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261031-2">
+<link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261031-3">
 <script src="/static/js/pages/game_market_live.js?v=20261031-2" defer></script>
 {% endblock %}
 
@@ -163,6 +163,8 @@
                 <span class="sr-only">行情排序</span>
                 <select name="sort">
                     <option value="name" {% if market_sort == 'name' %}selected{% endif %}>預設排序</option>
+                    <option value="value_asc" {% if market_sort == 'value_asc' %}selected{% endif %}>7D：低於均價優先</option>
+                    <option value="value_desc" {% if market_sort == 'value_desc' %}selected{% endif %}>7D：高於均價優先</option>
                     <option value="price_desc" {% if market_sort == 'price_desc' %}selected{% endif %}>價格：高到低</option>
                     <option value="price_asc" {% if market_sort == 'price_asc' %}selected{% endif %}>價格：低到高</option>
                     <option value="change_desc" {% if market_sort == 'change_desc' %}selected{% endif %}>24H：漲幅優先</option>
@@ -180,7 +182,7 @@
         <div class="game-market-result-meta" data-market-result-meta>顯示 {{ market_result_count }} 個品項</div>
         <div class="game-market-list">
             <div class="game-market-row game-market-row-head" aria-hidden="true">
-                <div>品項</div><div>現價</div><div>24H</div><div>7D 均價</div>
+                <div>品項</div><div>現價</div><div>24H</div><div>7D 對比</div>
             </div>
             {% for item in snapshot.items %}
             <a
@@ -194,12 +196,29 @@
                     <strong>{{ item.name }}</strong>
                     <small>{% if item.tier %}{{ item.tier }}級 · {% endif %}{% if item.category %}{{ item.category }} · {% endif %}{{ item.item_key }}</small>
                 </div>
-                <div>{% if item.current_price is not none %}${{ "{:,}".format(item.current_price) }}{% else %}—{% endif %}</div>
+                <div class="game-market-price-cell">
+                    <strong>{% if item.current_price is not none %}${{ "{:,}".format(item.current_price) }}{% else %}—{% endif %}</strong>
+                    {% if item.vs_7d_avg_pct is not none %}
+                    <span class="game-market-mobile-value {% if item.vs_7d_avg_pct < 0 %}is-value-low{% elif item.vs_7d_avg_pct > 0 %}is-value-high{% else %}is-value-flat{% endif %}">
+                        {% if item.vs_7d_avg_pct < 0 %}低 {{ "%.1f"|format(0 - item.vs_7d_avg_pct) }}%
+                        {% elif item.vs_7d_avg_pct > 0 %}高 {{ "%.1f"|format(item.vs_7d_avg_pct) }}%
+                        {% else %}均價附近{% endif %}
+                    </span>
+                    {% endif %}
+                    <span class="game-market-mobile-arrow" aria-hidden="true">→</span>
+                </div>
                 <div class="{% if item.change_24h_pct is not none and item.change_24h_pct > 0 %}is-positive{% elif item.change_24h_pct is not none and item.change_24h_pct < 0 %}is-negative{% endif %}">
                     {% if item.change_24h_pct is not none %}{% if item.change_24h_pct > 0 %}+{% endif %}{{ "%.1f"|format(item.change_24h_pct) }}%{% else %}—{% endif %}
                 </div>
-                <div>
-                    {% if item.avg_7d is not none %}${{ "{:,.0f}".format(item.avg_7d) }}{% else %}—{% endif %}
+                <div class="game-market-value-cell">
+                    {% if item.avg_7d is not none %}<small>均價 ${{ "{:,.0f}".format(item.avg_7d) }}</small>{% else %}<small>7D 累積中</small>{% endif %}
+                    {% if item.vs_7d_avg_pct is not none %}
+                    <span class="game-market-value-badge {% if item.vs_7d_avg_pct < 0 %}is-value-low{% elif item.vs_7d_avg_pct > 0 %}is-value-high{% else %}is-value-flat{% endif %}">
+                        {% if item.vs_7d_avg_pct < 0 %}低於均價 {{ "%.1f"|format(0 - item.vs_7d_avg_pct) }}%
+                        {% elif item.vs_7d_avg_pct > 0 %}高於均價 {{ "%.1f"|format(item.vs_7d_avg_pct) }}%
+                        {% else %}接近均價{% endif %}
+                    </span>
+                    {% endif %}
                     <span class="game-market-row-arrow" aria-hidden="true">→</span>
                 </div>
             </a>

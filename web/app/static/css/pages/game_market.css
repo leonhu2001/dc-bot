@@ -125,6 +125,61 @@
     color: #fff;
 }
 
+.game-market-price-cell,
+.game-market-value-cell {
+    min-width: 0;
+}
+
+.game-market-price-cell > strong {
+    font-size: 15px;
+}
+
+.game-market-value-cell {
+    display: grid;
+    justify-items: start;
+    gap: 5px;
+}
+
+.game-market-value-cell small {
+    color: rgba(255, 255, 255, 0.38);
+}
+
+.game-market-value-badge,
+.game-market-mobile-value {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.is-value-low {
+    color: #74e2a5;
+    border-color: rgba(102, 217, 154, 0.2);
+    background: rgba(102, 217, 154, 0.075);
+}
+
+.is-value-high {
+    color: #ff9494;
+    border-color: rgba(255, 133, 133, 0.2);
+    background: rgba(255, 133, 133, 0.07);
+}
+
+.is-value-flat {
+    color: rgba(255, 255, 255, 0.58);
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.game-market-mobile-value,
+.game-market-mobile-arrow {
+    display: none;
+}
+
 .game-market-row-arrow {
     display: none;
     color: rgba(255, 255, 255, 0.42);
@@ -314,8 +369,29 @@
     }
 
     .game-market-row-arrow {
-        display: inline;
-        margin-left: 8px;
+        display: none;
+    }
+
+    .game-market-price-cell {
+        position: relative;
+        display: grid;
+        justify-items: end;
+        gap: 6px;
+        padding-right: 24px;
+    }
+
+    .game-market-mobile-value,
+    .game-market-mobile-arrow {
+        display: inline-flex;
+    }
+
+    .game-market-mobile-arrow {
+        position: absolute;
+        top: 50%;
+        right: 0;
+        transform: translateY(-50%);
+        color: rgba(255, 255, 255, 0.38);
+        font-size: 17px;
     }
 
     .game-market-list-head {
