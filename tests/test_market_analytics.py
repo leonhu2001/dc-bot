@@ -54,7 +54,9 @@ def test_market_analytics_reports_mature_24h_and_7d_stats(tmp_path):
     repository.create_all()
     now = datetime.now(timezone.utc).replace(microsecond=0)
 
-    _store(repository, now - timedelta(days=7), m995=100, m61=200)
+    # Keep the first point slightly inside the seven-day window so wall-clock
+    # drift between fixture creation and snapshot calculation cannot exclude it.
+    _store(repository, now - timedelta(days=6, hours=23), m995=100, m61=200)
     _store(repository, now - timedelta(hours=24), m995=120, m61=180)
     _store(repository, now - timedelta(hours=12), m995=130, m61=170)
     _store(repository, now, m995=150, m61=160)
