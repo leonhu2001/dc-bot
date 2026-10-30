@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from services.game_registry import get_game_hub
 from services.market.push_dispatcher import get_web_push_config
+from services.market.push_test import send_test_push
 from services.market.runtime import (
     get_market_personalization_repository,
     get_market_push_repository,
@@ -111,6 +112,53 @@ async def market_push_subscribe(request: Request, game_slug: str):
         raise HTTPException(status_code=400, detail="推播訂閱資料無效。") from exc
 
     return {"ok": True, "subscription_id": stored.id}
+
+
+@router.post("/games/{game_slug}/notifications/push/test")
+async def market_push_test(request: Request, game_slug: str):
+    game = _game_or_404(game_slug)
+    user_id = _user_id_or_401(request)
+    config = get_web_push_config()
+    if not config.enabled:
+        raise HTTPException(status_code=503, detail="手機推播尚未設定完成。")
+
+    push_repository = get_market_push_repository()
+    if push_repository is None:
+        raise HTTPException(status_code=503, detail="推播資料庫尚未啟用。")
+
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="推播測試格式不正確。") from exc
+    endpoint = str(payload.get("endpoint") or "") if isinstance(payload, dict) else ""
+    if not endpoint:
+        raise HTTPException(status_code=400, detail="缺少推播 endpoint。")
+
+    subscription = next(
+        (
+            row
+            for row in push_repository.list_active_subscriptions(user_id)
+            if row.endpoint == endpoint
+        ),
+        None,
+    )
+    if subscription is None:
+        raise HTTPException(status_code=404, detail="這台裝置的推播訂閱不存在或已停用。")
+
+    result = send_test_push(
+        push_repository=push_repository,
+        subscription=subscription,
+        game_slug=game.slug,
+        config=config,
+    )
+    if result.status == "expired":
+        raise HTTPException(status_code=410, detail="這台裝置的推播訂閱已失效，請重新開啟推播。")
+    if result.status == "unconfigured":
+        raise HTTPException(status_code=503, detail="手機推播尚未設定完成。")
+    if not result.ok:
+        raise HTTPException(status_code=502, detail="測試通知暫時無法送達，請稍後再試。")
+
+    return {"ok": True, "status": "sent"}
 
 
 @router.post("/games/{game_slug}/notifications/push/unsubscribe")
