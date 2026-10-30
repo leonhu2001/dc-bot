@@ -2,6 +2,7 @@
 Description=DC Bot Market Worker
 After=network-online.target
 Wants=network-online.target
+PartOf=dc-bot-dashboard.service
 
 [Service]
 Type=simple
@@ -15,6 +16,7 @@ User=dc-bot-web
 Group=dc-bot-web
 
 # The market worker is isolated from the Discord gateway and web process.
+# Once enabled, PartOf makes normal web deploy restarts reload worker code too.
 # With MARKET_PROVIDER unset it exits successfully and remains disabled.
 NoNewPrivileges=true
 PrivateTmp=true
