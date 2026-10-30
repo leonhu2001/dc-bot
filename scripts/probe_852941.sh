@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 APP="${APP_DIR:-/opt/dc-bot}"
 TARGET="${1:-https://app.852941.xyz/}"
-OUTPUT="${2:-$APP/data/market_source_probe_852941.json}"
+OUTPUT="${2:-/tmp/market_source_probe_852941.json}"
 
 cd "$APP"
 
