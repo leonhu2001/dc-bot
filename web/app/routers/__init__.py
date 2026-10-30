@@ -46,6 +46,18 @@ from web.app.routers.member_vip_timer import (
     router as _member_vip_timer_router,
 )
 
+# Dispatch state was imported by main.py but was not mounted there. Mount both
+# the lobby realtime endpoints and the presence-free background-alert endpoints
+# through the shared site router so /dispatch keeps its existing SSE behavior and
+# other Mowan pages can receive desktop alerts without faking lobby presence.
+from web.app.routers.dispatch_state import router as _dispatch_state_router
+from web.app.routers.dispatch_background_alerts import (
+    router as _dispatch_background_alerts_router,
+)
+
+_site.router.include_router(_dispatch_state_router)
+_site.router.include_router(_dispatch_background_alerts_router)
+
 # vip_timer.py imports create_vip_timer_session by name. Rebind it after the
 # snapshot guard so website-created timers lock the VIP tier at order creation.
 _vip_timer_module.create_vip_timer_session = _timer_service.create_vip_timer_session

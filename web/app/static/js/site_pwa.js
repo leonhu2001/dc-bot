@@ -62,3 +62,121 @@
         button.classList.remove('is-visible');
     });
 })();
+
+// Keep dispatch desktop alerts alive while an eligible worker browses other
+// Mowan pages. The dispatch lobby keeps its richer SSE + sound runtime; this
+// lightweight companion intentionally skips /dispatch to prevent duplicate
+// notifications and never requests Notification permission by itself.
+(() => {
+    const DESKTOP_NOTIFICATION_KEY = 'mw_dispatch_desktop_notification_enabled';
+    const BACKGROUND_EVENTS_URL = '/dispatch/alerts/events';
+    const BACKGROUND_CONFIG_URL = '/dispatch/alerts/config';
+
+    if (window.location.pathname === '/dispatch') return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (localStorage.getItem(DESKTOP_NOTIFICATION_KEY) !== '1') return;
+
+    let eventSource = null;
+    let knownAlertKeys = null;
+    let consecutiveErrors = 0;
+
+    function normalizeKeys(keys) {
+        return Array.from(new Set((keys || []).map(String))).sort();
+    }
+
+    function closeStream() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+    }
+
+    function showNotification(newKeys) {
+        const keys = normalizeKeys(newKeys);
+        if (!keys.length) return;
+
+        const preview = keys.slice(0, 3).join('、');
+        const extra = Math.max(0, keys.length - 3);
+        const body = `新單：${preview}${extra ? `，另有 ${extra} 筆` : ''}`;
+
+        try {
+            const notification = new Notification('魔丸娛樂｜有新單', {
+                body,
+                tag: 'mowan-dispatch-new-order-background',
+                renotify: true,
+                icon: '/static/img/site-app-icon-512.png?v=20261025-4',
+            });
+            notification.onclick = () => {
+                notification.close();
+                window.focus();
+                window.location.href = '/dispatch';
+            };
+        } catch (error) {
+            console.warn('[dispatch-background-alert] notification failed', error);
+        }
+    }
+
+    function applyPayload(payload) {
+        const nextKeys = normalizeKeys(payload?.alert_keys);
+        if (knownAlertKeys === null || payload?.initial) {
+            knownAlertKeys = new Set(nextKeys);
+            return;
+        }
+
+        const newKeys = nextKeys.filter((key) => !knownAlertKeys.has(key));
+        knownAlertKeys = new Set(nextKeys);
+        showNotification(newKeys);
+    }
+
+    function connect() {
+        closeStream();
+        eventSource = new EventSource(BACKGROUND_EVENTS_URL);
+
+        eventSource.onopen = () => {
+            consecutiveErrors = 0;
+        };
+
+        eventSource.onmessage = (event) => {
+            let payload;
+            try {
+                payload = JSON.parse(event.data);
+            } catch (_error) {
+                return;
+            }
+            if (!payload?.ok || payload?.heartbeat) return;
+            applyPayload(payload);
+        };
+
+        eventSource.onerror = () => {
+            consecutiveErrors += 1;
+            if (consecutiveErrors >= 3) {
+                closeStream();
+            }
+        };
+    }
+
+    async function start() {
+        try {
+            const response = await fetch(BACKGROUND_CONFIG_URL, {
+                cache: 'no-store',
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
+            if (!response.ok) return;
+            const payload = await response.json();
+            if (!payload?.ok || !payload?.allowed) return;
+            connect();
+        } catch (_error) {
+            // Site navigation must remain unaffected when the optional stream is unavailable.
+        }
+    }
+
+    window.addEventListener('storage', (event) => {
+        if (event.key !== DESKTOP_NOTIFICATION_KEY) return;
+        if (event.newValue !== '1') closeStream();
+    });
+
+    window.addEventListener('pagehide', closeStream);
+    start();
+})();
