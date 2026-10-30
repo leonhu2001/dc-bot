@@ -3,9 +3,11 @@
     if (!root) return;
 
     const button = root.querySelector('[data-market-push-button]');
+    const testButton = root.querySelector('[data-market-push-test]');
     const status = root.querySelector('[data-market-push-status]');
     const configUrl = root.dataset.configUrl || '';
     const subscribeUrl = root.dataset.subscribeUrl || '';
+    const testUrl = root.dataset.testUrl || '';
     const unsubscribeUrl = root.dataset.unsubscribeUrl || '';
     const canEnable = root.dataset.canEnable === '1';
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -19,13 +21,22 @@
         status.dataset.kind = kind;
     };
 
+    const setTestButton = ({ subscribed = false, busy = false } = {}) => {
+        if (!testButton) return;
+        testButton.hidden = !subscribed;
+        testButton.disabled = !subscribed || busy;
+        testButton.textContent = busy ? '傳送中…' : '傳送測試通知';
+    };
+
     const setButton = ({ enabled = true, subscribed = false, busy = false } = {}) => {
-        if (!button) return;
-        button.disabled = !enabled || busy;
-        button.dataset.subscribed = subscribed ? '1' : '0';
-        button.textContent = busy
-            ? '處理中…'
-            : (subscribed ? '關閉價格推播' : '開啟價格推播');
+        if (button) {
+            button.disabled = !enabled || busy;
+            button.dataset.subscribed = subscribed ? '1' : '0';
+            button.textContent = busy
+                ? '處理中…'
+                : (subscribed ? '關閉價格推播' : '開啟價格推播');
+        }
+        setTestButton({ subscribed, busy });
     };
 
     const urlBase64ToUint8Array = (base64String) => {
@@ -91,7 +102,7 @@
         } catch (error) {
             if (currentSubscription) {
                 setButton({ enabled: true, subscribed: true });
-                setStatus('目前無法讀取伺服器推播設定，但仍可關閉這台裝置的既有訂閱。', 'error');
+                setStatus('目前無法讀取伺服器推播設定，但仍可測試或關閉這台裝置的既有訂閱。', 'error');
             } else {
                 setButton({ enabled: false });
                 setStatus(error?.message || '無法讀取推播設定。', 'error');
@@ -101,7 +112,7 @@
 
         if (currentSubscription) {
             setButton({ enabled: true, subscribed: true });
-            setStatus('這台裝置已開啟價格推播。', 'enabled');
+            setStatus('這台裝置已開啟價格推播，可用測試通知確認實際送達。', 'enabled');
             return;
         }
 
@@ -174,9 +185,55 @@
             }
 
             currentSubscription = subscription;
-            setStatus('價格推播已開啟；提醒達標時會通知這台裝置。', 'enabled');
+            setStatus('價格推播已開啟；你現在可以傳送測試通知確認這台裝置。', 'enabled');
         } catch (error) {
             setStatus(error?.message || '開啟價格推播失敗。', 'error');
+        } finally {
+            setButton({
+                enabled: Boolean(currentSubscription) || canEnable,
+                subscribed: Boolean(currentSubscription),
+                busy: false,
+            });
+        }
+    };
+
+    const testPush = async () => {
+        if (!testUrl) return;
+
+        let subscription = currentSubscription;
+        if (!subscription) {
+            try {
+                subscription = await getExistingSubscription();
+            } catch (_error) {
+                subscription = null;
+            }
+        }
+        if (!subscription) {
+            currentSubscription = null;
+            setButton({ enabled: canEnable, subscribed: false });
+            setStatus('這台裝置目前沒有可測試的推播訂閱。', 'idle');
+            return;
+        }
+
+        currentSubscription = subscription;
+        setButton({ enabled: true, subscribed: true, busy: true });
+        setStatus('正在傳送測試通知到這台裝置…', 'idle');
+        try {
+            const response = await postJson(testUrl, {
+                endpoint: subscription.endpoint,
+            });
+            if (!response.ok) {
+                const message = await readError(response, '測試通知暫時無法送達。');
+                if (response.status === 404 || response.status === 410) {
+                    await subscription.unsubscribe().catch(() => false);
+                    currentSubscription = null;
+                }
+                throw new Error(message);
+            }
+
+            setStatus('測試通知已送出；若系統通知權限正常，這台裝置應會立即看到通知。', 'enabled');
+        } catch (error) {
+            setStatus(error?.message || '測試通知暫時無法送達。', 'error');
         } finally {
             setButton({
                 enabled: Boolean(currentSubscription) || canEnable,
@@ -224,6 +281,8 @@
             await enablePush();
         }
     });
+
+    testButton?.addEventListener('click', testPush);
 
     refreshState();
 })();
