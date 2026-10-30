@@ -56,6 +56,28 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _database_error_status(
+    *,
+    provider: str,
+    stale_seconds: int,
+    push_enabled: bool,
+) -> MarketHealthStatus:
+    return MarketHealthStatus(
+        ok=False,
+        status="database_error",
+        configured=bool(provider),
+        database=False,
+        provider=provider,
+        source_name="",
+        latest_source_updated_at=None,
+        age_seconds=None,
+        item_count=0,
+        stale_seconds=stale_seconds,
+        web_push_enabled=push_enabled,
+        message="market database query failed",
+    )
+
+
 def check_market_health(
     game_key: str = "delta_force",
     *,
@@ -64,7 +86,15 @@ def check_market_health(
     provider = configured_provider_name()
     stale_seconds = _stale_seconds()
     push_enabled = get_web_push_config().enabled
-    repository = get_market_repository()
+
+    try:
+        repository = get_market_repository()
+    except Exception:
+        return _database_error_status(
+            provider=provider,
+            stale_seconds=stale_seconds,
+            push_enabled=push_enabled,
+        )
 
     if not provider or repository is None:
         missing = []
@@ -90,19 +120,10 @@ def check_market_health(
     try:
         latest = repository.list_latest(game_key, limit=500)
     except Exception:
-        return MarketHealthStatus(
-            ok=False,
-            status="database_error",
-            configured=True,
-            database=False,
+        return _database_error_status(
             provider=provider,
-            source_name="",
-            latest_source_updated_at=None,
-            age_seconds=None,
-            item_count=0,
             stale_seconds=stale_seconds,
-            web_push_enabled=push_enabled,
-            message="market database query failed",
+            push_enabled=push_enabled,
         )
 
     if not latest:
