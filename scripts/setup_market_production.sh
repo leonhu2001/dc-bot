@@ -9,9 +9,18 @@ WEB_SERVICE="${WEB_SERVICE:-dc-bot-dashboard.service}"
 BACKUP_DIR="$APP/_archive/market_setup_$(date +%Y%m%d_%H%M%S)"
 DB_ROLE="${MARKET_DB_ROLE:-mowan_market}"
 DB_NAME="${MARKET_DB_NAME:-mowan_market}"
+MARKET_UNIT_EXISTED=0
+MARKET_WAS_ACTIVE=0
+MARKET_WAS_ENABLED=0
+SETUP_COMPLETE=0
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: market production setup must run as root."
+    exit 2
+fi
+
+if ! [[ "$DB_ROLE" =~ ^[a-z_][a-z0-9_]*$ ]] || ! [[ "$DB_NAME" =~ ^[a-z_][a-z0-9_]*$ ]]; then
+    echo "ERROR: MARKET_DB_ROLE and MARKET_DB_NAME must be lowercase PostgreSQL identifiers."
     exit 2
 fi
 
@@ -34,6 +43,55 @@ mkdir -p "$BACKUP_DIR"
 cp -L "$ENV_FILE" "$BACKUP_DIR/web.env"
 echo "Backup: $BACKUP_DIR/web.env"
 
+if [ -f "$MARKET_UNIT_PATH" ]; then
+    cp -L "$MARKET_UNIT_PATH" "$BACKUP_DIR/$MARKET_SERVICE"
+    MARKET_UNIT_EXISTED=1
+fi
+if systemctl is-active --quiet "$MARKET_SERVICE" 2>/dev/null; then
+    MARKET_WAS_ACTIVE=1
+fi
+if systemctl is-enabled --quiet "$MARKET_SERVICE" 2>/dev/null; then
+    MARKET_WAS_ENABLED=1
+fi
+
+rollback() {
+    local rc=$?
+    trap - ERR
+    set +e
+
+    if [ "$SETUP_COMPLETE" -eq 1 ]; then
+        exit "$rc"
+    fi
+
+    echo
+    echo "MARKET SETUP FAILED - restoring previous runtime configuration"
+    install -m 0640 "$BACKUP_DIR/web.env" "$ENV_FILE" || cp -L "$BACKUP_DIR/web.env" "$ENV_FILE" || true
+
+    if [ "$MARKET_UNIT_EXISTED" -eq 1 ] && [ -f "$BACKUP_DIR/$MARKET_SERVICE" ]; then
+        install -m 0644 "$BACKUP_DIR/$MARKET_SERVICE" "$MARKET_UNIT_PATH" || true
+    else
+        rm -f "$MARKET_UNIT_PATH" || true
+    fi
+    systemctl daemon-reload || true
+
+    if [ "$MARKET_WAS_ENABLED" -eq 1 ]; then
+        systemctl enable "$MARKET_SERVICE" >/dev/null 2>&1 || true
+    else
+        systemctl disable "$MARKET_SERVICE" >/dev/null 2>&1 || true
+    fi
+    if [ "$MARKET_WAS_ACTIVE" -eq 1 ]; then
+        systemctl restart "$MARKET_SERVICE" || true
+    else
+        systemctl stop "$MARKET_SERVICE" || true
+    fi
+    systemctl restart "$WEB_SERVICE" || true
+
+    echo "Previous .env/systemd state restored. PostgreSQL objects, if newly created, were left isolated and unused."
+    echo "Backup retained at: $BACKUP_DIR"
+    exit "$rc"
+}
+trap rollback ERR
+
 CURRENT_MARKET_DATABASE_URL="$(
     "$APP/venv/bin/python" - "$ENV_FILE" <<'PY'
 import sys
@@ -43,11 +101,16 @@ print(str(value).strip())
 PY
 )"
 
+if [ -n "$CURRENT_MARKET_DATABASE_URL" ] && [[ "$CURRENT_MARKET_DATABASE_URL" != postgresql* ]]; then
+    echo "ERROR: existing MARKET_DATABASE_URL is not PostgreSQL; refusing to reuse it in production."
+    false
+fi
+
 if [ -z "$CURRENT_MARKET_DATABASE_URL" ]; then
     if ! command -v psql >/dev/null 2>&1 || ! id postgres >/dev/null 2>&1; then
         if ! command -v apt-get >/dev/null 2>&1; then
             echo "ERROR: PostgreSQL is not installed and apt-get is unavailable."
-            exit 2
+            false
         fi
         echo "Installing PostgreSQL..."
         export DEBIAN_FRONTEND=noninteractive
@@ -78,7 +141,7 @@ PY
     CURRENT_MARKET_DATABASE_URL="postgresql+psycopg2://$DB_ROLE:$DB_PASSWORD@127.0.0.1:5432/$DB_NAME"
     echo "PASS: dedicated PostgreSQL market database provisioned"
 else
-    echo "KEEP: existing MARKET_DATABASE_URL is already configured"
+    echo "KEEP: existing PostgreSQL MARKET_DATABASE_URL is already configured"
 fi
 
 "$APP/venv/bin/python" - "$ENV_FILE" "$CURRENT_MARKET_DATABASE_URL" <<'PY'
@@ -200,7 +263,7 @@ for service in "$WEB_SERVICE" "$MARKET_SERVICE"; do
         echo "ERROR: $service did not become active."
         systemctl status "$service" --no-pager || true
         journalctl -u "$service" -n 100 --no-pager || true
-        exit 1
+        false
     fi
 done
 
@@ -213,7 +276,7 @@ for _ in $(seq 1 15); do
 done
 if [ -z "$HEALTH" ]; then
     echo "ERROR: web health check failed after market activation."
-    exit 1
+    false
 fi
 
 MARKET_STATE="$(systemctl is-active "$MARKET_SERVICE")"
@@ -222,3 +285,6 @@ echo "$HEALTH"
 echo "Market worker: $MARKET_STATE / $MARKET_ENABLED"
 echo "PASS: production market pipeline enabled"
 echo "Backup retained at: $BACKUP_DIR"
+
+SETUP_COMPLETE=1
+trap - ERR
