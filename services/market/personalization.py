@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Integer, String, UniqueConstraint, delete, select
+from sqlalchemy import Boolean, DateTime, Integer, String, UniqueConstraint, delete, select, update
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from services.market.storage import MarketRepository
@@ -63,6 +63,36 @@ class MarketAlertState(MarketPersonalizationBase):
     last_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MarketNotificationOutbox(MarketPersonalizationBase):
+    __tablename__ = "market_notification_outbox"
+    __table_args__ = (
+        UniqueConstraint(
+            "alert_id",
+            "triggered_at",
+            name="uq_market_notification_alert_trigger",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    discord_user_id: Mapped[str] = mapped_column(String(64), index=True)
+    game_key: Mapped[str] = mapped_column(String(64), index=True)
+    alert_id: Mapped[int] = mapped_column(Integer, index=True)
+    item_key: Mapped[str] = mapped_column(String(128), index=True)
+    condition_type: Mapped[str] = mapped_column(String(16))
+    target_price: Mapped[int] = mapped_column(Integer)
+    current_price: Mapped[int] = mapped_column(Integer)
+    triggered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
 
 @dataclass(frozen=True)
@@ -135,6 +165,8 @@ class MarketPersonalizationRepository:
     User identity is the Discord user id from the existing OAuth session. The
     records intentionally use game_key + item_key rather than a MarketItem DB
     id so provider changes do not destroy a user's watch/alert configuration.
+    Alert state and notification outbox are committed together so a process
+    crash cannot mark a threshold as triggered without leaving a durable event.
     """
 
     def __init__(self, market_repository: MarketRepository):
@@ -315,6 +347,15 @@ class MarketPersonalizationRepository:
                 return False
             row.enabled = bool(enabled)
             row.updated_at = datetime.now(timezone.utc)
+            if not enabled:
+                db.execute(
+                    update(MarketNotificationOutbox)
+                    .where(
+                        MarketNotificationOutbox.alert_id == row.id,
+                        MarketNotificationOutbox.status == "pending",
+                    )
+                    .values(status="cancelled", last_error="alert disabled before delivery")
+                )
             db.commit()
         return True
 
@@ -329,6 +370,14 @@ class MarketPersonalizationRepository:
             )
             if row is None:
                 return False
+            db.execute(
+                update(MarketNotificationOutbox)
+                .where(
+                    MarketNotificationOutbox.alert_id == row.id,
+                    MarketNotificationOutbox.status == "pending",
+                )
+                .values(status="cancelled", last_error="alert deleted before delivery")
+            )
             db.execute(delete(MarketAlertState).where(MarketAlertState.alert_id == row.id))
             db.delete(row)
             db.commit()
@@ -341,7 +390,7 @@ class MarketPersonalizationRepository:
         *,
         evaluated_at: datetime | None = None,
     ) -> tuple[MarketAlertTrigger, ...]:
-        """Evaluate fresh prices and emit only false->true threshold crossings."""
+        """Evaluate fresh prices and persist false->true crossings + outbox."""
         game = _clean_key(game_key, "game key")
         at = _utc(evaluated_at or datetime.now(timezone.utc)) or datetime.now(timezone.utc)
         triggers: list[MarketAlertTrigger] = []
@@ -375,16 +424,30 @@ class MarketPersonalizationRepository:
 
                 if condition_met and not previously_met:
                     state.last_triggered_at = at
-                    triggers.append(
-                        MarketAlertTrigger(
-                            alert_id=alert.id,
+                    trigger = MarketAlertTrigger(
+                        alert_id=alert.id,
+                        discord_user_id=alert.discord_user_id,
+                        game_key=alert.game_key,
+                        item_key=alert.item_key,
+                        condition_type=alert.condition_type,
+                        target_price=alert.target_price,
+                        current_price=price,
+                        triggered_at=at,
+                    )
+                    triggers.append(trigger)
+                    db.add(
+                        MarketNotificationOutbox(
                             discord_user_id=alert.discord_user_id,
                             game_key=alert.game_key,
+                            alert_id=alert.id,
                             item_key=alert.item_key,
                             condition_type=alert.condition_type,
                             target_price=alert.target_price,
                             current_price=price,
                             triggered_at=at,
+                            status="pending",
+                            attempts=0,
+                            available_at=at,
                         )
                     )
 

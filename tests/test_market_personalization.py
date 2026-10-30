@@ -1,6 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
-from services.market.personalization import MarketPersonalizationRepository
+from sqlalchemy import select
+
+from services.market.personalization import (
+    MarketNotificationOutbox,
+    MarketPersonalizationRepository,
+)
 from services.market.providers.base import MarketSourceItem, MarketSourceSnapshot
 from services.market.storage import MarketRepository
 from services.market.worker import _evaluate_fresh_alerts
@@ -34,6 +39,21 @@ def _store_price(market: MarketRepository, at: datetime, price: int) -> None:
     )
 
 
+def _outbox_rows(personalization: MarketPersonalizationRepository):
+    with personalization.SessionLocal() as db:
+        return tuple(
+            db.scalars(
+                select(MarketNotificationOutbox).order_by(MarketNotificationOutbox.id.asc())
+            ).all()
+        )
+
+
+def _utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def test_watchlist_is_idempotent_and_user_scoped(tmp_path):
     _, personalization = _repositories(tmp_path)
 
@@ -61,6 +81,7 @@ def test_price_alert_triggers_only_on_false_to_true_crossing(tmp_path):
     at = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
 
     assert personalization.evaluate_alerts("delta_force", {"m995": 120}, evaluated_at=at) == ()
+    assert _outbox_rows(personalization) == ()
 
     first = personalization.evaluate_alerts(
         "delta_force", {"m995": 90}, evaluated_at=at + timedelta(minutes=5)
@@ -68,10 +89,16 @@ def test_price_alert_triggers_only_on_false_to_true_crossing(tmp_path):
     assert len(first) == 1
     assert first[0].alert_id == alert.id
     assert first[0].current_price == 90
+    first_outbox = _outbox_rows(personalization)
+    assert len(first_outbox) == 1
+    assert first_outbox[0].alert_id == alert.id
+    assert first_outbox[0].status == "pending"
+    assert first_outbox[0].current_price == 90
 
     assert personalization.evaluate_alerts(
         "delta_force", {"m995": 80}, evaluated_at=at + timedelta(minutes=10)
     ) == ()
+    assert len(_outbox_rows(personalization)) == 1
 
     assert personalization.evaluate_alerts(
         "delta_force", {"m995": 110}, evaluated_at=at + timedelta(minutes=15)
@@ -81,6 +108,10 @@ def test_price_alert_triggers_only_on_false_to_true_crossing(tmp_path):
         "delta_force", {"m995": 95}, evaluated_at=at + timedelta(minutes=20)
     )
     assert len(second) == 1
+    outbox = _outbox_rows(personalization)
+    assert len(outbox) == 2
+    # SQLite drops timezone metadata for DateTime columns; compare the same UTC instant.
+    assert _utc(outbox[1].triggered_at) == at + timedelta(minutes=20)
 
     stored = personalization.list_alerts("user-1", "delta_force")[0]
     assert stored.condition_met is True
@@ -88,7 +119,7 @@ def test_price_alert_triggers_only_on_false_to_true_crossing(tmp_path):
     assert stored.last_triggered_at == at + timedelta(minutes=20)
 
 
-def test_alert_mutations_are_owner_scoped(tmp_path):
+def test_alert_mutations_are_owner_scoped_and_cancel_pending_delivery(tmp_path):
     _, personalization = _repositories(tmp_path)
     alert = personalization.create_alert(
         "owner",
@@ -97,6 +128,9 @@ def test_alert_mutations_are_owner_scoped(tmp_path):
         condition_type="above",
         target_price=5000,
     )
+    at = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+    personalization.evaluate_alerts("delta_force", {"m995": 5100}, evaluated_at=at)
+    assert _outbox_rows(personalization)[0].status == "pending"
 
     assert personalization.set_alert_enabled("other-user", alert.id, enabled=False) is False
     assert personalization.delete_alert("other-user", alert.id) is False
@@ -106,8 +140,11 @@ def test_alert_mutations_are_owner_scoped(tmp_path):
 
     assert personalization.set_alert_enabled("owner", alert.id, enabled=False) is True
     assert personalization.list_alerts("owner", "delta_force")[0].enabled is False
+    assert _outbox_rows(personalization)[0].status == "cancelled"
+
     assert personalization.delete_alert("owner", alert.id) is True
     assert personalization.list_alerts("owner", "delta_force") == ()
+    assert _outbox_rows(personalization)[0].status == "cancelled"
 
 
 def test_worker_alert_evaluation_skips_stale_market(tmp_path, monkeypatch):
@@ -132,3 +169,4 @@ def test_worker_alert_evaluation_skips_stale_market(tmp_path, monkeypatch):
     alert = personalization.list_alerts("user-1", "delta_force")[0]
     assert alert.last_evaluated_at is None
     assert alert.last_triggered_at is None
+    assert _outbox_rows(personalization) == ()

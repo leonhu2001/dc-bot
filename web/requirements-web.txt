@@ -9,3 +9,4 @@ alembic==1.16.5
 psycopg2-binary==2.9.10
 python-multipart==0.0.31
 httpx==0.28.1
+pywebpush==2.5.0
