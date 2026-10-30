@@ -6,6 +6,7 @@
     const ageNode = document.querySelector('[data-market-age]');
     const liveNode = document.querySelector('[data-market-live-state]');
     const filterHost = document.querySelector('[data-market-category-filters]');
+    const tierHost = document.querySelector('[data-market-tier-filters]');
     const resultMeta = document.querySelector('[data-market-result-meta]');
     const rows = Array.from(document.querySelectorAll('[data-market-row]'));
 
@@ -106,6 +107,53 @@
         });
     }
 
+    async function installTierFilters() {
+        if (!tierHost) return;
+
+        const pageParams = new URLSearchParams(window.location.search);
+        const activeTier = String(pageParams.get('tier') || '').trim();
+        const discoveryParams = new URLSearchParams(pageParams);
+        discoveryParams.delete('tier');
+        const query = discoveryParams.toString();
+        const apiUrl = `${window.location.pathname}/api/items${query ? `?${query}` : ''}`;
+
+        try {
+            const response = await fetch(apiUrl, {
+                cache: 'no-store',
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
+            if (!response.ok) return;
+            const payload = await response.json();
+            const items = Array.isArray(payload?.items) ? payload.items : [];
+            const tiers = Array.from(new Set(
+                items
+                    .map((item) => Number.parseInt(String(item?.tier ?? ''), 10))
+                    .filter((tier) => Number.isInteger(tier) && tier >= 1 && tier <= 10)
+            )).sort((left, right) => left - right);
+            if (!tiers.length) return;
+
+            const makeLink = (label, tier) => {
+                const params = new URLSearchParams(pageParams);
+                if (tier === '') params.delete('tier');
+                else params.set('tier', String(tier));
+                const encoded = params.toString();
+                const link = document.createElement('a');
+                link.href = `${window.location.pathname}${encoded ? `?${encoded}` : ''}`;
+                link.textContent = label;
+                const selected = String(tier) === activeTier;
+                link.classList.toggle('is-active', selected);
+                if (selected) link.setAttribute('aria-current', 'page');
+                return link;
+            };
+
+            tierHost.replaceChildren(makeLink('全部', ''));
+            tiers.forEach((tier) => tierHost.appendChild(makeLink(`${tier}級`, tier)));
+        } catch (_error) {
+            // Keep the server-rendered fallback filters when discovery is unavailable.
+        }
+    }
+
     async function checkForNewSnapshot() {
         if (document.hidden || !lastUpdatedAt) return;
         const apiUrl = `${window.location.pathname}/api/items${window.location.search}`;
@@ -137,6 +185,7 @@
     }
 
     installCategoryFilters();
+    installTierFilters();
     applyCategoryFilter('');
     updateFreshness();
     window.setInterval(updateFreshness, 30_000);
