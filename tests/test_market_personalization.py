@@ -48,6 +48,12 @@ def _outbox_rows(personalization: MarketPersonalizationRepository):
         )
 
 
+def _utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def test_watchlist_is_idempotent_and_user_scoped(tmp_path):
     _, personalization = _repositories(tmp_path)
 
@@ -104,7 +110,8 @@ def test_price_alert_triggers_only_on_false_to_true_crossing(tmp_path):
     assert len(second) == 1
     outbox = _outbox_rows(personalization)
     assert len(outbox) == 2
-    assert outbox[1].triggered_at == at + timedelta(minutes=20)
+    # SQLite drops timezone metadata for DateTime columns; compare the same UTC instant.
+    assert _utc(outbox[1].triggered_at) == at + timedelta(minutes=20)
 
     stored = personalization.list_alerts("user-1", "delta_force")[0]
     assert stored.condition_met is True
