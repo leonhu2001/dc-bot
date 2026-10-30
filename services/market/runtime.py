@@ -4,6 +4,7 @@ import os
 from functools import lru_cache
 
 from services.market.personalization import MarketPersonalizationRepository
+from services.market.push import MarketPushRepository
 from services.market.storage import MarketRepository
 
 
@@ -34,7 +35,22 @@ def get_market_personalization_repository() -> MarketPersonalizationRepository |
     return repository
 
 
+@lru_cache(maxsize=1)
+def get_market_push_repository() -> MarketPushRepository | None:
+    """Return browser subscription/delivery storage in the isolated Market DB."""
+    market_repository = get_market_repository()
+    if market_repository is None:
+        return None
+    personalization = get_market_personalization_repository()
+    if personalization is None:
+        return None
+    repository = MarketPushRepository(market_repository)
+    repository.create_all()
+    return repository
+
+
 def reset_market_repository_cache() -> None:
     """Test/deploy helper after MARKET_DATABASE_URL changes."""
+    get_market_push_repository.cache_clear()
     get_market_personalization_repository.cache_clear()
     get_market_repository.cache_clear()
