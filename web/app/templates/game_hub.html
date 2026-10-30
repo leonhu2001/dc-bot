@@ -1,0 +1,27 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-1">
+{% endblock %}
+
+{% block content %}
+<section class="game-tool-shell">
+    <header class="game-tool-hero">
+        <div>
+            <div class="game-tool-kicker">{{ game.eyebrow }}</div>
+            <h1>{{ game.name }}</h1>
+            <p>這款遊戲的魔丸服務、消息、行情與通知會集中在這個入口。</p>
+        </div>
+    </header>
+
+    <section class="game-market-actions">
+        {% for feature in game_features %}
+        <a href="{{ feature.href }}">
+            <span>{{ feature.status }}</span>
+            <strong>{{ feature.title }}</strong>
+            <small>{{ feature.description }} →</small>
+        </a>
+        {% endfor %}
+    </section>
+</section>
+{% endblock %}
