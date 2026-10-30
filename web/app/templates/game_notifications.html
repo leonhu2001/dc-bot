@@ -3,7 +3,7 @@
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
 <link rel="stylesheet" href="/static/css/pages/game_notifications.css?v=20261030-2">
-<script src="/static/js/pages/game_notifications.js?v=20261030-1" defer></script>
+<script src="/static/js/pages/game_notifications.js?v=20261031-1" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -40,6 +40,7 @@
         data-can-enable="{% if alert_items %}1{% else %}0{% endif %}"
         data-config-url="/games/{{ game.slug }}/notifications/push/config"
         data-subscribe-url="/games/{{ game.slug }}/notifications/push/subscribe"
+        data-test-url="/games/{{ game.slug }}/notifications/push/test"
         data-unsubscribe-url="/games/{{ game.slug }}/notifications/push/unsubscribe"
     >
         <div class="game-notification-push-copy">
@@ -49,6 +50,7 @@
         </div>
         <div class="game-notification-push-controls">
             <button type="button" data-market-push-button disabled>檢查推播支援…</button>
+            <button type="button" data-market-push-test hidden disabled>傳送測試通知</button>
             <small data-market-push-status aria-live="polite">正在確認這台裝置的推播狀態。</small>
         </div>
     </section>
