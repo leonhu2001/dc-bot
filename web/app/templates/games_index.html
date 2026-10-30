@@ -1,0 +1,35 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
+<link rel="stylesheet" href="/static/css/pages/games_index.css?v=20261030-1">
+{% endblock %}
+
+{% block content %}
+<section class="game-tool-shell">
+    <header class="game-tool-hero games-directory-hero">
+        <div>
+            <div class="game-tool-kicker">MOWAN GAME HUBS</div>
+            <h1>遊戲專區</h1>
+            <p>每款遊戲各自整理服務、行情、消息與通知。功能只在該遊戲需要時開放，不把不同遊戲的資訊混在一起。</p>
+        </div>
+    </header>
+
+    <section class="games-directory-grid" aria-label="遊戲專區列表">
+        {% for game in games %}
+        <a class="games-directory-card" href="/games/{{ game.slug }}">
+            <span class="game-market-label">{{ game.eyebrow }}</span>
+            <h2>{{ game.name }}</h2>
+            <p>
+                {% if game.has_market %}行情{% endif %}
+                {% if game.has_market and game.has_news %} · {% endif %}
+                {% if game.has_news %}消息{% endif %}
+                {% if game.has_notifications %} · 通知{% endif %}
+                · 魔丸服務
+            </p>
+            <strong>進入 {{ game.short_name }} →</strong>
+        </a>
+        {% endfor %}
+    </section>
+</section>
+{% endblock %}

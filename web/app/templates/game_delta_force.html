@@ -1,7 +1,7 @@
 {% extends "site_layout.html" %}
 
 {% block head %}
-<link rel="stylesheet" href="/static/css/pages/game_delta_force.css?v=20261013">
+<link rel="stylesheet" href="/static/css/pages/game_delta_force.css?v=20261030-2">
 {% endblock %}
 
 {% block content %}
@@ -11,39 +11,74 @@
             <div class="delta-kicker">DELTA FORCE · MOWAN</div>
             <h1>三角洲行動</h1>
             <p>
-                從輕鬆娛樂陪、端遊／手遊技術陪，到趣味單與代解服務，
-                直接在魔丸娛樂官網查看方案、即時驗價，再由 Discord 完成後續接單與付款流程。
+                三角洲服務、台服交易所行情、遊戲消息與通知集中在同一個入口。
+                先看市場與消息，再決定今晚要自己下場，還是直接找魔丸陪你打。
             </p>
             <div class="delta-actions">
                 <a
                     class="button button-primary"
+                    href="/games/delta-force/market"
+                    data-funnel-event="cta_click"
+                    data-funnel-label="delta_hero_market"
+                >
+                    三角洲交易所行情 →
+                </a>
+                <a
+                    class="button button-secondary"
                     href="/order"
                     data-funnel-event="cta_click"
                     data-funnel-label="delta_hero_order"
                 >
-                    查看三角洲方案 →
-                </a>
-                <a
-                    class="button button-secondary"
-                    href="/staff"
-                    data-funnel-event="cta_click"
-                    data-funnel-label="delta_hero_staff"
-                >
-                    先看陪玩陣容
+                    查看三角洲方案
                 </a>
             </div>
         </div>
 
         <aside class="delta-card">
-            <strong>三角洲服務怎麼選？</strong>
+            <strong>三角洲情報中心</strong>
             <ul>
-                <li>想聊天、輕鬆玩：娛樂陪</li>
-                <li>想打機密／絕密：技術陪</li>
-                <li>想玩特別玩法：趣味單</li>
-                <li>想處理賽季或任務：代解／代肝</li>
+                <li>交易所行情：價格、歷史走勢與推薦品項</li>
+                <li>遊戲消息：版本、活動與重要更新</li>
+                <li>通知中心：價格與遊戲提醒集中管理</li>
+                <li>遊戲服務：陪玩、技術陪、趣味單與代解</li>
             </ul>
         </aside>
     </div>
+
+    <section class="delta-section" id="intel">
+        <div class="delta-section-head">
+            <div>
+                <div class="delta-kicker">GAME INTELLIGENCE</div>
+                <h2>三角洲情報與工具</h2>
+            </div>
+        </div>
+
+        <div class="delta-grid">
+            <article class="delta-service">
+                <small>MARKET</small>
+                <h3>三角洲交易所行情</h3>
+                <p>查看台服價格、歷史走勢、市場異動與目前推薦品項。</p>
+                <div class="delta-price">網站版建置中</div>
+                <a href="/games/delta-force/market" class="button button-secondary">查看行情</a>
+            </article>
+
+            <article class="delta-service">
+                <small>NEWS</small>
+                <h3>三角洲消息</h3>
+                <p>之後集中整理版本更新、活動與需要注意的官方消息。</p>
+                <div class="delta-price">資料源準備中</div>
+                <a href="/games/delta-force/news" class="button button-secondary">進入消息中心</a>
+            </article>
+
+            <article class="delta-service">
+                <small>NOTIFICATIONS</small>
+                <h3>三角洲通知</h3>
+                <p>登入後管理價格提醒、遊戲消息與未來的手機 Web Push。</p>
+                <div class="delta-price">Discord 帳號同步</div>
+                <a href="/games/delta-force/notifications" class="button button-secondary">通知設定</a>
+            </article>
+        </div>
+    </section>
 
     <section class="delta-section">
         <div class="delta-section-head">

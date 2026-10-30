@@ -42,6 +42,7 @@ from web.app.routers.admin_operations_report import router as admin_operations_r
 from web.app.routers.admin_payout_exports import router as admin_payout_exports_router
 from web.app.routers.auth import router as auth_router
 from web.app.routers.site import router as site_router
+from web.app.routers.game_tools import router as game_tools_router
 from web.app.routers.web_support import router as web_support_router
 from web.app.routers.dispatch import router as dispatch_router
 from web.app.routers.payouts import router as payouts_router
@@ -261,6 +262,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app.include_router(auth_router)
 app.include_router(site_router)
+app.include_router(game_tools_router)
 app.include_router(web_support_router)
 app.include_router(topups_router)
 app.include_router(payment_reviews_router)

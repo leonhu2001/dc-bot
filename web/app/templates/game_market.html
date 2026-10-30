@@ -1,0 +1,114 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-1">
+{% endblock %}
+
+{% block content %}
+<section class="game-tool-shell">
+    <a class="game-tool-back" href="/games/{{ game.slug }}">← 回到 {{ game.name }}</a>
+
+    <header class="game-tool-hero">
+        <div>
+            <div class="game-tool-kicker">{{ game.eyebrow }} · MARKET</div>
+            <h1>{{ game.market_title }}</h1>
+            <p>{{ game.market_description }}</p>
+        </div>
+        <nav class="game-tool-tabs" aria-label="{{ game.name }}工具">
+            {% for feature in game_features %}
+            <a
+                href="{{ feature.href }}"
+                class="{% if feature.key == 'market' %}is-active{% endif %}"
+            >{{ feature.title }}</a>
+            {% endfor %}
+        </nav>
+    </header>
+
+    {% if snapshot.status != 'ready' %}
+    <section class="game-market-status" aria-live="polite">
+        <div class="game-market-status-mark">↻</div>
+        <div>
+            <span>MARKET DATA</span>
+            <h2>行情資料源準備中</h2>
+            <p>{{ snapshot.message }}</p>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="game-market-grid">
+        <article class="game-market-panel game-market-featured">
+            <div class="game-market-panel-head">
+                <div>
+                    <span class="game-market-label">RECOMMENDATION</span>
+                    <h2>目前推薦品項</h2>
+                </div>
+                <span class="game-market-badge">等待資料</span>
+            </div>
+
+            {% if snapshot.recommended_item %}
+            <div class="game-market-recommendation">
+                <strong>{{ snapshot.recommended_item.name }}</strong>
+                {% if snapshot.recommended_item.current_price is not none %}
+                <span>${{ "{:,}".format(snapshot.recommended_item.current_price) }}</span>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="game-market-empty">
+                接上正式行情資料後，這裡會顯示目前最值得關注的品項與推薦理由。
+            </div>
+            {% endif %}
+        </article>
+
+        <article class="game-market-panel">
+            <span class="game-market-label">MARKET MOVERS</span>
+            <h2>市場異動</h2>
+            <div class="game-market-empty">價格資料啟用後顯示近期漲幅、跌幅與異常波動。</div>
+        </article>
+    </section>
+
+    <section class="game-market-panel game-market-list-panel">
+        <div class="game-market-panel-head">
+            <div>
+                <span class="game-market-label">EXCHANGE</span>
+                <h2>交易所行情</h2>
+            </div>
+            <div class="game-market-filters" aria-label="行情篩選">
+                <button type="button" class="is-active" disabled>全部</button>
+                <button type="button" disabled>5級</button>
+                <button type="button" disabled>6級</button>
+            </div>
+        </div>
+
+        {% if snapshot.items %}
+        <div class="game-market-list">
+            {% for item in snapshot.items %}
+            <article class="game-market-row">
+                <div><strong>{{ item.name }}</strong><small>{{ item.item_key }}</small></div>
+                <div>{% if item.current_price is not none %}${{ "{:,}".format(item.current_price) }}{% else %}—{% endif %}</div>
+                <div>{% if item.change_24h_pct is not none %}{{ "%.1f"|format(item.change_24h_pct) }}%{% else %}—{% endif %}</div>
+                <div>{{ item.recommendation_label or '—' }}</div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="game-market-empty game-market-empty-large">
+            <strong>尚未啟用正式價格</strong>
+            <span>下一步會接上台服資料來源、歷史價格與推薦演算法。</span>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="game-market-actions">
+        <a href="/games/{{ game.slug }}/news">
+            <span>GAME NEWS</span>
+            <strong>{{ game.news_title }}</strong>
+            <small>更新、活動與重要消息集中查看 →</small>
+        </a>
+        <a href="/games/{{ game.slug }}/notifications">
+            <span>NOTIFICATIONS</span>
+            <strong>{{ game.notifications_title }}</strong>
+            <small>之後在這裡管理價格與遊戲通知 →</small>
+        </a>
+    </section>
+</section>
+{% endblock %}
