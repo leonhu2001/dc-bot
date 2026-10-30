@@ -16,7 +16,8 @@
 .game-market-search input:focus-visible,
 .game-market-search select:focus-visible,
 .game-market-search button:focus-visible,
-.game-market-clear:focus-visible {
+.game-market-clear:focus-visible,
+.game-market-opportunity-note a:focus-visible {
     outline: 2px solid rgba(176, 151, 255, 0.72);
     outline-offset: 3px;
 }
@@ -100,6 +101,28 @@
     color: rgba(255, 255, 255, 0.48);
     font-size: 12px;
     white-space: nowrap;
+}
+
+.game-market-opportunity-note {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 12px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.055);
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 13px;
+}
+
+.game-market-opportunity-note a {
+    color: rgba(190, 174, 255, 0.9);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.game-market-opportunity-note a:hover {
+    color: #fff;
 }
 
 .game-market-row-arrow {
@@ -355,6 +378,11 @@
         justify-content: space-between;
         width: 100%;
         box-sizing: border-box;
+    }
+
+    .game-market-opportunity-note {
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .game-market-search {
