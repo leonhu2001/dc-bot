@@ -16,6 +16,7 @@ SOURCE_NAME = "Garena 三角洲行動官方"
 SOURCE_URL = "https://deltaforce.garena.com/zh_tw/news/all"
 _ORIGIN = "https://deltaforce.garena.com"
 _TTL = 600
+_FAILURE_TTL = 60
 _DATE = re.compile(r"(?P<y>20\d{2})[/-](?P<m>\d{1,2})[/-](?P<d>\d{1,2})")
 _PATH = re.compile(r"^/zh_tw/news/(?P<category>[a-z-]+)/(?P<id>[A-Za-z0-9_-]+)$")
 _LABEL = {"system": "版本資訊", "announcement": "公告", "event": "活動"}
@@ -150,10 +151,17 @@ async def get_delta_force_news(*, force: bool = False) -> GameNewsFeed:
             fresh = await _fetch()
         except Exception:
             if _cache is not None and _cache.articles:
-                return replace(_cache, status="stale", message="Garena 官方消息暫時無法更新，以下保留最近一次成功同步內容。")
-            return GameNewsFeed(
-                game_key="delta_force", status="unavailable", source_name=SOURCE_NAME, source_url=SOURCE_URL,
-                message="Garena 官方消息目前暫時無法讀取，稍後重新整理即可再次嘗試。",
-            )
+                failed = replace(
+                    _cache,
+                    status="stale",
+                    message="Garena 官方消息暫時無法更新，以下保留最近一次成功同步內容。",
+                )
+            else:
+                failed = GameNewsFeed(
+                    game_key="delta_force", status="unavailable", source_name=SOURCE_NAME, source_url=SOURCE_URL,
+                    message="Garena 官方消息目前暫時無法讀取，稍後重新整理即可再次嘗試。",
+                )
+            _cache, _deadline = failed, time.monotonic() + _FAILURE_TTL
+            return failed
         _cache, _deadline = fresh, time.monotonic() + _TTL
         return fresh
