@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from services.game_registry import get_game_hub
 from services.market.push_dispatcher import get_web_push_config
@@ -11,6 +11,7 @@ from services.market.runtime import (
     get_market_personalization_repository,
     get_market_push_repository,
 )
+from web.app.services.market_health import check_market_health
 
 
 router = APIRouter(tags=["market-push"])
@@ -42,6 +43,15 @@ async def site_service_worker():
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Service-Worker-Allowed"] = "/"
     return response
+
+
+@router.get("/health/market", include_in_schema=False)
+async def market_health():
+    status = check_market_health()
+    return JSONResponse(
+        status_code=200 if status.ok else 503,
+        content=status.as_dict(),
+    )
 
 
 @router.get("/games/{game_slug}/notifications/push/config")
