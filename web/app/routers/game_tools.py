@@ -7,7 +7,12 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from services.game_registry import GameHub, get_game_feature_cards, get_game_hub
+from services.game_registry import (
+    GameHub,
+    get_game_feature_cards,
+    get_game_hub,
+    list_game_hubs,
+)
 from services.market.public_snapshot import get_public_market_snapshot
 from web.app.services.seo import build_seo
 
@@ -33,6 +38,27 @@ def _base_context(request: Request, game: GameHub, **extra) -> dict:
     }
     context.update(extra)
     return context
+
+
+@router.get("/games")
+async def games_directory(request: Request):
+    seo = build_seo(
+        path="/games",
+        title="遊戲專區｜魔丸娛樂",
+        description="依遊戲查看魔丸服務、行情工具、遊戲消息與通知。",
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="games_index.html",
+        context={
+            "request": request,
+            "user": request.session.get("user"),
+            "games": list_game_hubs(),
+            "title": seo["title"],
+            "seo": seo,
+            "page_name": "games",
+        },
+    )
 
 
 @router.get("/games/{game_slug}/market")
