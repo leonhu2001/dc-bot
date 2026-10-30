@@ -1,0 +1,76 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
+<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261030-1">
+<script src="/static/js/pages/game_market_item.js?v=20261030-1" defer></script>
+{% endblock %}
+
+{% block content %}
+<section class="game-tool-shell market-item-shell">
+    <a class="game-tool-back" href="/games/{{ game.slug }}/market">← 回到 {{ game.market_title }}</a>
+
+    <header class="market-item-hero">
+        <div>
+            <div class="game-tool-kicker">{{ game.eyebrow }} · EXCHANGE ITEM</div>
+            <h1>{{ item.name }}</h1>
+            <p>
+                {% if item.tier %}{{ item.tier }}級 · {% endif %}
+                {{ item.category or '交易所品項' }} · {{ item.source_item_id }}
+            </p>
+        </div>
+        <div class="market-item-price">
+            <span>目前價格</span>
+            <strong>{% if current_price is not none %}${{ "{:,}".format(current_price) }}{% else %}—{% endif %}</strong>
+            {% if latest_at %}<small>資料時間 {{ latest_at.strftime('%Y-%m-%d %H:%M') }} UTC</small>{% endif %}
+        </div>
+    </header>
+
+    <section class="market-item-stats" aria-label="品項行情摘要">
+        <article>
+            <span>目前</span>
+            <strong>{% if current_price is not none %}${{ "{:,}".format(current_price) }}{% else %}—{% endif %}</strong>
+        </article>
+        <article>
+            <span>歷史區間低點</span>
+            <strong>{% if low_price is not none %}${{ "{:,}".format(low_price) }}{% else %}—{% endif %}</strong>
+        </article>
+        <article>
+            <span>歷史區間高點</span>
+            <strong>{% if high_price is not none %}${{ "{:,}".format(high_price) }}{% else %}—{% endif %}</strong>
+        </article>
+        <article>
+            <span>資料點</span>
+            <strong>{{ point_count }}</strong>
+        </article>
+    </section>
+
+    <section
+        class="market-item-chart-panel"
+        data-market-chart
+        data-history-url="/games/{{ game.slug }}/market/api/items/{{ item.source_item_id|urlencode }}/history?limit=500"
+    >
+        <div class="market-item-chart-head">
+            <div>
+                <span class="game-market-label">PRICE HISTORY</span>
+                <h2>價格走勢</h2>
+            </div>
+            <div class="market-item-chart-range" aria-label="走勢時間範圍">
+                <button type="button" data-market-range="24">24H</button>
+                <button type="button" data-market-range="168" class="is-active">7D</button>
+                <button type="button" data-market-range="720">30D</button>
+            </div>
+        </div>
+
+        <div class="market-item-chart-stage" data-market-chart-stage>
+            <div class="market-item-chart-empty" data-market-chart-empty>正在讀取歷史價格…</div>
+        </div>
+        <div class="market-item-chart-foot" data-market-chart-foot></div>
+    </section>
+
+    <section class="market-item-note">
+        <strong>資料說明</strong>
+        <p>行情只顯示已寫入正式 Market DB 的來源資料。來源過期或中斷時會保留最後價格，但網站會標示 stale，未來價格提醒也不會在 stale 狀態觸發。</p>
+    </section>
+</section>
+{% endblock %}

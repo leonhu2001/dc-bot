@@ -14,6 +14,7 @@ from services.game_registry import (
     list_game_hubs,
 )
 from services.market.public_snapshot import get_public_market_snapshot
+from services.market.runtime import get_market_repository
 from web.app.services.seo import build_seo
 
 
@@ -30,6 +31,13 @@ def _game_or_404(game_slug: str) -> GameHub:
     return game
 
 
+def _market_game_or_404(game_slug: str) -> GameHub:
+    game = _game_or_404(game_slug)
+    if not game.has_market:
+        raise HTTPException(status_code=404, detail="這個遊戲目前沒有交易所行情。")
+    return game
+
+
 def _base_context(request: Request, game: GameHub, **extra) -> dict:
     context = {
         "user": request.session.get("user"),
@@ -38,6 +46,33 @@ def _base_context(request: Request, game: GameHub, **extra) -> dict:
     }
     context.update(extra)
     return context
+
+
+def _snapshot_payload(snapshot) -> dict:
+    return {
+        "status": snapshot.status,
+        "updated_at": snapshot.updated_at.isoformat() if snapshot.updated_at else None,
+        "message": snapshot.message,
+        "items": [
+            {
+                "item_key": item.item_key,
+                "name": item.name,
+                "current_price": item.current_price,
+                "change_24h_pct": item.change_24h_pct,
+                "recommendation_label": item.recommendation_label,
+                "category": item.category,
+                "tier": item.tier,
+            }
+            for item in snapshot.items
+        ],
+    }
+
+
+def _safe_market_repository():
+    try:
+        return get_market_repository()
+    except Exception:
+        return None
 
 
 @router.get("/games")
@@ -63,10 +98,7 @@ async def games_directory(request: Request):
 
 @router.get("/games/{game_slug}/market")
 async def game_market(request: Request, game_slug: str):
-    game = _game_or_404(game_slug)
-    if not game.has_market:
-        raise HTTPException(status_code=404, detail="這個遊戲目前沒有交易所行情。")
-
+    game = _market_game_or_404(game_slug)
     snapshot = get_public_market_snapshot(game.key)
     path = f"/games/{game.slug}/market"
     seo = build_seo(
@@ -90,6 +122,114 @@ async def game_market(request: Request, game_slug: str):
             snapshot=snapshot,
         ),
     )
+
+
+@router.get("/games/{game_slug}/market/api/items")
+async def game_market_items_api(game_slug: str):
+    game = _market_game_or_404(game_slug)
+    snapshot = get_public_market_snapshot(game.key)
+    return {
+        "ok": True,
+        "game": game.key,
+        **_snapshot_payload(snapshot),
+    }
+
+
+@router.get("/games/{game_slug}/market/items/{source_item_id}")
+async def game_market_item_detail(
+    request: Request,
+    game_slug: str,
+    source_item_id: str,
+):
+    game = _market_game_or_404(game_slug)
+    repository = _safe_market_repository()
+    if repository is None:
+        raise HTTPException(status_code=503, detail="行情資料目前尚未啟用。")
+
+    try:
+        item = repository.get_item(game.key, source_item_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="找不到這個行情品項。")
+        points = repository.history(item.id, limit=2000)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="行情資料暫時無法讀取。") from exc
+
+    prices = [point.price for point in points]
+    current_price = prices[-1] if prices else None
+    latest_at = points[-1].source_updated_at if points else None
+    path = f"/games/{game.slug}/market/items/{quote(item.source_item_id, safe='')}"
+    seo = build_seo(
+        path=path,
+        title=f"{item.name} 價格走勢｜{game.market_title}｜魔丸娛樂",
+        description=f"查看{game.name} {item.name} 的交易所價格與歷史走勢。",
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="game_market_item.html",
+        context=_base_context(
+            request,
+            game,
+            title=seo["title"],
+            seo=seo,
+            page_name=f"game_{game.key}_market_item",
+            item=item,
+            current_price=current_price,
+            latest_at=latest_at,
+            low_price=min(prices) if prices else None,
+            high_price=max(prices) if prices else None,
+            point_count=len(points),
+        ),
+    )
+
+
+@router.get("/games/{game_slug}/market/api/items/{source_item_id}/history")
+async def game_market_item_history_api(
+    game_slug: str,
+    source_item_id: str,
+    limit: int = 500,
+):
+    game = _market_game_or_404(game_slug)
+    repository = _safe_market_repository()
+    if repository is None:
+        return {
+            "ok": True,
+            "game": game.key,
+            "status": "source_pending",
+            "item": None,
+            "points": [],
+        }
+
+    try:
+        item = repository.get_item(game.key, source_item_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="找不到這個行情品項。")
+        points = repository.history(item.id, limit=limit)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="行情資料暫時無法讀取。") from exc
+
+    return {
+        "ok": True,
+        "game": game.key,
+        "status": "ready" if points else "no_data",
+        "item": {
+            "item_key": item.source_item_id,
+            "name": item.name,
+            "category": item.category,
+            "tier": item.tier,
+        },
+        "points": [
+            {
+                "at": point.source_updated_at.isoformat(),
+                "price": point.price,
+            }
+            for point in points
+        ],
+    }
 
 
 @router.get("/games/{game_slug}/news")
