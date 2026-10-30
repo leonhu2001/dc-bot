@@ -124,17 +124,9 @@ def build_market_analytics(
         return ()
 
     now_utc = _utc(now or datetime.now(timezone.utc))
-    since = now_utc - timedelta(days=7, hours=6)
-    histories = repository.history_for_items(
-        tuple(item.item_id for item in items),
-        since=since,
-    )
+    analytics: list[MarketItemAnalytics] = []
+    for item in items:
+        points = repository.history(item.item_id, limit=2000)
+        analytics.append(_stats_for_item(item, points, now=now_utc))
 
-    return tuple(
-        _stats_for_item(
-            item,
-            histories.get(item.item_id, ()),
-            now=now_utc,
-        )
-        for item in items
-    )
+    return tuple(analytics)
