@@ -21,7 +21,7 @@ def _last_updated():
 
 def _dashboard():
     return {
-        "categories": [".300BLK", "5.56x45mm"],
+        "categories": [".300BLK", ".357 Magnum", ".45 ACP", "5.56x45mm"],
         "data": {
             ".300BLK": [
                 {
@@ -36,6 +36,20 @@ def _dashboard():
                     "current_price": 2352,
                     "tier": 4,
                 },
+            ],
+            ".357 Magnum": [
+                {
+                    "bullet_name": ".357 Magnum FMJ",
+                    "current_price": 2075,
+                    "tier": 4,
+                }
+            ],
+            ".45 ACP": [
+                {
+                    "bullet_name": ".45 ACP AP",
+                    "current_price": 2415,
+                    "tier": 4,
+                }
             ],
             "5.56x45mm": [
                 {
@@ -66,6 +80,8 @@ def test_852941_payload_builds_normalized_taiwan_snapshot():
     assert [(item.source_item_id, item.name, item.price, item.category, item.tier) for item in snapshot.items] == [
         (".300BLK_3", ".300BLK 3級", 692, ".300BLK", 3),
         (".300BLK_4", ".300BLK 4級", 2352, ".300BLK", 4),
+        (".357 Magnum FMJ", ".357 Magnum FMJ", 2075, ".357 Magnum", 4),
+        (".45 ACP AP", ".45 ACP AP", 2415, ".45 ACP", 4),
         ("5.56x45mm_6", "5.56x45mm 6級", 5642, "5.56x45mm", 6),
     ]
 
@@ -86,7 +102,7 @@ def test_852941_payload_skips_invalid_rows_but_keeps_valid_market():
         dashboard_payload=dashboard,
     )
 
-    assert len(snapshot.items) == 3
+    assert len(snapshot.items) == 5
 
 
 def test_852941_payload_rejects_unhealthy_or_unsupported_source():
