@@ -1,7 +1,7 @@
 {% extends "site_layout.html" %}
 
 {% block head %}
-<link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-1">
+<link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
 {% endblock %}
 
 {% block content %}
@@ -26,10 +26,16 @@
 
     {% if snapshot.status != 'ready' %}
     <section class="game-market-status" aria-live="polite">
-        <div class="game-market-status-mark">↻</div>
+        <div class="game-market-status-mark">{% if snapshot.status == 'stale' %}!{% elif snapshot.status == 'source_error' %}×{% else %}↻{% endif %}</div>
         <div>
             <span>MARKET DATA</span>
-            <h2>行情資料源準備中</h2>
+            <h2>
+                {% if snapshot.status == 'stale' %}行情更新暫停
+                {% elif snapshot.status == 'source_error' %}行情服務暫時離線
+                {% elif snapshot.status == 'no_data' %}等待第一批正式行情
+                {% else %}行情資料源準備中
+                {% endif %}
+            </h2>
             <p>{{ snapshot.message }}</p>
         </div>
     </section>
@@ -42,7 +48,7 @@
                     <span class="game-market-label">RECOMMENDATION</span>
                     <h2>目前推薦品項</h2>
                 </div>
-                <span class="game-market-badge">等待資料</span>
+                <span class="game-market-badge">{% if snapshot.items %}等待回測{% else %}等待資料{% endif %}</span>
             </div>
 
             {% if snapshot.recommended_item %}
@@ -54,7 +60,11 @@
             </div>
             {% else %}
             <div class="game-market-empty">
+                {% if snapshot.items %}
+                正式價格已可讀取；推薦模型會等歷史資料累積並完成回測後才啟用，不用假分數湊版面。
+                {% else %}
                 接上正式行情資料後，這裡會顯示目前最值得關注的品項與推薦理由。
+                {% endif %}
             </div>
             {% endif %}
         </article>
@@ -62,7 +72,7 @@
         <article class="game-market-panel">
             <span class="game-market-label">MARKET MOVERS</span>
             <h2>市場異動</h2>
-            <div class="game-market-empty">價格資料啟用後顯示近期漲幅、跌幅與異常波動。</div>
+            <div class="game-market-empty">歷史資料累積後顯示近期漲幅、跌幅與異常波動。</div>
         </article>
     </section>
 
@@ -71,6 +81,9 @@
             <div>
                 <span class="game-market-label">EXCHANGE</span>
                 <h2>交易所行情</h2>
+                {% if snapshot.updated_at %}
+                <small>最後資料時間：{{ snapshot.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</small>
+                {% endif %}
             </div>
             <div class="game-market-filters" aria-label="行情篩選">
                 <button type="button" class="is-active" disabled>全部</button>
@@ -83,7 +96,10 @@
         <div class="game-market-list">
             {% for item in snapshot.items %}
             <article class="game-market-row">
-                <div><strong>{{ item.name }}</strong><small>{{ item.item_key }}</small></div>
+                <div>
+                    <strong>{{ item.name }}</strong>
+                    <small>{% if item.tier %}{{ item.tier }}級 · {% endif %}{{ item.item_key }}</small>
+                </div>
                 <div>{% if item.current_price is not none %}${{ "{:,}".format(item.current_price) }}{% else %}—{% endif %}</div>
                 <div>{% if item.change_24h_pct is not none %}{{ "%.1f"|format(item.change_24h_pct) }}%{% else %}—{% endif %}</div>
                 <div>{{ item.recommendation_label or '—' }}</div>
@@ -93,7 +109,7 @@
         {% else %}
         <div class="game-market-empty game-market-empty-large">
             <strong>尚未啟用正式價格</strong>
-            <span>下一步會接上台服資料來源、歷史價格與推薦演算法。</span>
+            <span>只接受可驗證的台服行情；資料源未確認前不顯示模擬價格。</span>
         </div>
         {% endif %}
     </section>
