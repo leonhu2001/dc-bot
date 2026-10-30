@@ -7,13 +7,15 @@ from services.market.storage import MarketRepository
 
 
 class FakeProvider:
+    def __init__(self) -> None:
+        self.source_time = datetime.now(timezone.utc).replace(microsecond=0)
+
     async def fetch(self, game_key: str) -> MarketSourceSnapshot:
-        now = datetime.now(timezone.utc).replace(microsecond=0)
         return MarketSourceSnapshot(
             source_name="fake-provider",
             game_key=game_key,
-            fetched_at=now,
-            source_updated_at=now,
+            fetched_at=self.source_time,
+            source_updated_at=self.source_time,
             items=(
                 MarketSourceItem(
                     source_item_id="m995",
