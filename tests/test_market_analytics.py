@@ -45,6 +45,7 @@ def test_market_analytics_withholds_partial_windows(tmp_path):
 
     assert by_key["m995"].change_24h_pct is None
     assert by_key["m995"].avg_7d is None
+    assert by_key["m995"].vs_7d_avg_pct is None
     assert snapshot.gainers == ()
     assert snapshot.losers == ()
     assert snapshot.recommended_item is None
@@ -69,15 +70,23 @@ def test_market_analytics_reports_mature_24h_and_7d_stats(tmp_path):
     assert by_key["m995"].low_24h == 120
     assert by_key["m995"].high_24h == 150
     assert by_key["m995"].avg_7d == 125.0
+    assert by_key["m995"].vs_7d_avg_pct == 20.0
     assert by_key["m995"].low_7d == 100
     assert by_key["m995"].high_7d == 150
 
     assert by_key["m61"].change_24h_pct == -11.11
+    assert by_key["m61"].vs_7d_avg_pct == -9.86
     assert snapshot.gainers[0].item_key == "m995"
     assert snapshot.losers[0].item_key == "m61"
     assert snapshot.recommended_item is not None
     assert snapshot.recommended_item.item_key == "m61"
     assert snapshot.recommended_item.recommendation_label == "低於 7D 均價 9.9%"
+
+    value_low_first = filter_market_snapshot(snapshot, sort="value_asc")
+    assert [item.item_key for item in value_low_first.items] == ["m61", "m995"]
+
+    value_high_first = filter_market_snapshot(snapshot, sort="value_desc")
+    assert [item.item_key for item in value_high_first.items] == ["m995", "m61"]
 
 
 def test_market_price_opportunity_requires_meaningful_discount(tmp_path):
