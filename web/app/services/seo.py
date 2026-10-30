@@ -9,6 +9,7 @@ DEFAULT_OG_IMAGE = f"{PUBLIC_BASE_URL}/static/img/og-share.jpg?v=20260904-2"
 
 PUBLIC_SITEMAP_PATHS = (
     "/",
+    "/games",
     "/games/delta-force",
     "/games/delta-force/market",
     "/games/delta-force/news",
@@ -130,6 +131,8 @@ def build_sitemap_xml() -> str:
     for path in PUBLIC_SITEMAP_PATHS:
         if path == "/":
             priority = "1.0"
+        elif path == "/games":
+            priority = "0.9"
         elif path == "/games/delta-force":
             priority = "0.9"
         elif path.startswith("/games/delta-force/"):
