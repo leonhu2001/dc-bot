@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
 
 import discord
 
@@ -63,6 +62,19 @@ async def market_restock_delivery_loop(bot: discord.Client) -> None:
                 min_confidence=_RESTOCK_MIN_CONFIDENCE,
                 limit=100,
             )
+            latest_items = (
+                await asyncio.to_thread(
+                    services.market.list_latest,
+                    MARKET_GAME_KEY,
+                    limit=500,
+                )
+                if due
+                else ()
+            )
+            latest_by_key = {
+                str(item.source_item_id): item
+                for item in latest_items
+            }
 
             for event in due:
                 try:
@@ -97,11 +109,13 @@ async def market_restock_delivery_loop(bot: discord.Client) -> None:
                             )
                             continue
 
-                    item = await asyncio.to_thread(
-                        services.market.get_item,
-                        event.game_key,
-                        event.item_key,
-                    )
+                    item = latest_by_key.get(event.item_key)
+                    if item is None:
+                        item = await asyncio.to_thread(
+                            services.market.get_item,
+                            event.game_key,
+                            event.item_key,
+                        )
                     item_name = str(getattr(item, "name", "") or event.item_key)
                     current_price = getattr(item, "current_price", None)
                     predicted_ts = int(event.predicted_at.timestamp())
