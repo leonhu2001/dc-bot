@@ -17,6 +17,8 @@ _BROAD_MEDIAN_PCT = -2.0
 _BROAD_FALLING_RATIO = 0.35
 _ISOLATED_DROP_PCT = -10.0
 _ISOLATED_RESIDUAL_PCT = -8.0
+_ISOLATED_RISE_PCT = 10.0
+_ISOLATED_POSITIVE_RESIDUAL_PCT = 8.0
 _MIN_COMPARABLE_ITEMS = 20
 _MIN_BROAD_CATEGORIES = 3
 _MIN_PREDICTION_EVENTS = 3
@@ -38,6 +40,9 @@ class MarketEventSignal:
     predicted_window: str | None = None
     predicted_confidence: int | None = None
     predicted_window_events: int = 0
+    restock_item_keys: tuple[str, ...] = ()
+    abnormal_down_item_keys: tuple[str, ...] = ()
+    abnormal_up_item_keys: tuple[str, ...] = ()
     message: str = ""
 
 
@@ -49,9 +54,13 @@ class _Transition:
     falling_categories: int
     median_change_pct: float
     minimum_change_pct: float
+    maximum_change_pct: float
     maximum_negative_residual_pct: float
+    maximum_positive_residual_pct: float
     broad_drop: bool
     isolated_dump: bool
+    isolated_spike: bool
+    item_changes: tuple[tuple[str, float], ...]
 
 
 def _utc(value: datetime) -> datetime:
@@ -71,30 +80,40 @@ def _transition(
     previous: dict[str, tuple[int, str]],
     current: dict[str, tuple[int, str]],
 ) -> _Transition | None:
-    changes: list[tuple[float, str]] = []
+    changes: list[tuple[str, float, str]] = []
     for item_key in previous.keys() & current.keys():
         previous_price, _previous_category = previous[item_key]
         current_price, current_category = current[item_key]
         if previous_price <= 0 or current_price <= 0:
             continue
-        changes.append((_pct_change(previous_price, current_price), current_category))
+        changes.append(
+            (item_key, _pct_change(previous_price, current_price), current_category)
+        )
 
     if len(changes) < 2:
         return None
 
-    values = [value for value, _category in changes]
+    values = [value for _item_key, value, _category in changes]
     market_median = float(median(values))
-    falling = [(value, category) for value, category in changes if value <= _DROP_ITEM_PCT]
+    falling = [
+        (value, category)
+        for _item_key, value, category in changes
+        if value <= _DROP_ITEM_PCT
+    ]
     falling_ratio = len(falling) / len(changes)
     categories = {category for _value, category in falling if category}
-    known_categories = {category for _value, category in changes if category}
+    known_categories = {
+        category for _item_key, _value, category in changes if category
+    }
     category_breadth_ok = (
         len(known_categories) < _MIN_BROAD_CATEGORIES
         or len(categories) >= _MIN_BROAD_CATEGORIES
     )
 
     minimum_change = min(values)
+    maximum_change = max(values)
     negative_residual = minimum_change - market_median
+    positive_residual = maximum_change - market_median
     broad_drop = (
         len(changes) >= _MIN_COMPARABLE_ITEMS
         and falling_ratio >= _BROAD_FALLING_RATIO
@@ -108,6 +127,12 @@ def _transition(
         and minimum_change <= _ISOLATED_DROP_PCT
         and negative_residual <= _ISOLATED_RESIDUAL_PCT
     )
+    isolated_spike = (
+        not broad_drop
+        and len(changes) >= _MIN_COMPARABLE_ITEMS
+        and maximum_change >= _ISOLATED_RISE_PCT
+        and positive_residual >= _ISOLATED_POSITIVE_RESIDUAL_PCT
+    )
 
     return _Transition(
         at=_utc(at),
@@ -116,9 +141,21 @@ def _transition(
         falling_categories=len(categories),
         median_change_pct=round(market_median, 2),
         minimum_change_pct=round(minimum_change, 2),
+        maximum_change_pct=round(maximum_change, 2),
         maximum_negative_residual_pct=round(negative_residual, 2),
+        maximum_positive_residual_pct=round(positive_residual, 2),
         broad_drop=broad_drop,
         isolated_dump=isolated_dump,
+        isolated_spike=isolated_spike,
+        item_changes=tuple(
+            sorted(
+                (
+                    (item_key, round(value, 2))
+                    for item_key, value, _category in changes
+                ),
+                key=lambda entry: entry[0],
+            )
+        ),
     )
 
 
@@ -146,9 +183,40 @@ def _event_confidence(event: _Transition) -> int:
     breadth = event.falling_items / max(1, event.compared_items)
     breadth_score = min(1.0, max(0.0, breadth / 0.75))
     median_score = min(1.0, abs(min(0.0, event.median_change_pct)) / 8.0)
-    category_score = min(1.0, event.falling_categories / 6.0) if event.falling_categories else 0.5
+    category_score = (
+        min(1.0, event.falling_categories / 6.0)
+        if event.falling_categories
+        else 0.5
+    )
     score = (breadth_score * 0.5) + (median_score * 0.35) + (category_score * 0.15)
     return max(50, min(95, round(score * 100)))
+
+
+def _item_signal_keys(
+    event: _Transition,
+    *,
+    broad_market: bool,
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    restock: list[str] = []
+    abnormal_down: list[str] = []
+    abnormal_up: list[str] = []
+
+    for item_key, change_pct in event.item_changes:
+        residual = change_pct - event.median_change_pct
+        if broad_market and change_pct <= _DROP_ITEM_PCT:
+            restock.append(item_key)
+        if (
+            change_pct <= _ISOLATED_DROP_PCT
+            and residual <= _ISOLATED_RESIDUAL_PCT
+        ):
+            abnormal_down.append(item_key)
+        if (
+            change_pct >= _ISOLATED_RISE_PCT
+            and residual >= _ISOLATED_POSITIVE_RESIDUAL_PCT
+        ):
+            abnormal_up.append(item_key)
+
+    return tuple(restock), tuple(abnormal_down), tuple(abnormal_up)
 
 
 def _prediction(
@@ -206,11 +274,22 @@ def analyze_market_events(
     """
     clean_game_key = str(game_key or "").strip()
     if not clean_game_key:
-        return MarketEventSignal(state="learning", label="📊 預測學習中", message="等待行情資料。")
+        return MarketEventSignal(
+            state="learning",
+            label="📊 預測學習中",
+            message="等待行情資料。",
+        )
 
-    clean_source_name = str(source_name or "").strip() or repository.latest_source_name(clean_game_key)
+    clean_source_name = (
+        str(source_name or "").strip()
+        or repository.latest_source_name(clean_game_key)
+    )
     if not clean_source_name:
-        return MarketEventSignal(state="learning", label="📊 預測學習中", message="等待行情資料。")
+        return MarketEventSignal(
+            state="learning",
+            label="📊 預測學習中",
+            message="等待行情資料。",
+        )
 
     limit = max(2, min(int(max_snapshots), 1000))
     with repository.SessionLocal() as db:
@@ -251,12 +330,19 @@ def analyze_market_events(
     snapshots: dict[datetime, dict[str, tuple[int, str]]] = {}
     for item_key, category, source_updated_at, price in rows:
         at = _utc(source_updated_at)
-        snapshots.setdefault(at, {})[str(item_key)] = (int(price), str(category or ""))
+        snapshots.setdefault(at, {})[str(item_key)] = (
+            int(price),
+            str(category or ""),
+        )
 
     times = sorted(snapshots)
     transitions: list[_Transition] = []
     for previous_at, current_at in zip(times, times[1:]):
-        event = _transition(current_at, snapshots[previous_at], snapshots[current_at])
+        event = _transition(
+            current_at,
+            snapshots[previous_at],
+            snapshots[current_at],
+        )
         if event is not None:
             transitions.append(event)
 
@@ -270,8 +356,18 @@ def analyze_market_events(
     broad_events = _cluster_broad_events(transitions)
     current_at = transitions[-1].at
     active_cutoff = current_at - timedelta(minutes=_ACTIVE_EVENT_MINUTES)
-    recent_broad = [event for event in transitions if event.broad_drop and event.at >= active_cutoff]
-    recent_isolated = [event for event in transitions if event.isolated_dump and event.at >= active_cutoff]
+    recent_broad = [
+        event for event in transitions
+        if event.broad_drop and event.at >= active_cutoff
+    ]
+    recent_isolated = [
+        event for event in transitions
+        if event.isolated_dump and event.at >= active_cutoff
+    ]
+    recent_spike = [
+        event for event in transitions
+        if event.isolated_spike and event.at >= active_cutoff
+    ]
 
     current = transitions[-1]
     if recent_broad:
@@ -292,6 +388,15 @@ def analyze_market_events(
             f"市場中位 {current.median_change_pct:.1f}%"
             f" · 單品最大偏離 {current.maximum_negative_residual_pct:.1f}%"
         )
+    elif recent_spike:
+        current = recent_spike[-1]
+        state = "isolated_spike"
+        label = "🔴 單品異常拉升"
+        confidence = None
+        message = (
+            f"市場中位 {current.median_change_pct:.1f}%"
+            f" · 單品最大偏離 +{current.maximum_positive_residual_pct:.1f}%"
+        )
     else:
         state = "normal"
         label = "🟢 目前波動正常"
@@ -302,15 +407,23 @@ def analyze_market_events(
             else "尚無明顯市場異常。"
         )
 
+    restock_item_keys, abnormal_down_item_keys, abnormal_up_item_keys = (
+        _item_signal_keys(current, broad_market=current.broad_drop)
+    )
+
     prediction_now = now or datetime.now(timezone.utc)
     predicted_window, predicted_confidence, bucket_events = _prediction(
         broad_events,
         now=prediction_now,
     )
     if predicted_window is None:
-        learning_message = f"同步大跌樣本 {len(broad_events)}/{_MIN_PREDICTION_EVENTS}"
+        learning_message = (
+            f"同步大跌樣本 {len(broad_events)}/{_MIN_PREDICTION_EVENTS}"
+        )
         if len(broad_events) >= _MIN_PREDICTION_EVENTS:
-            learning_message = f"已有 {len(broad_events)} 次樣本，但時段尚未集中"
+            learning_message = (
+                f"已有 {len(broad_events)} 次樣本，但時段尚未集中"
+            )
         message = f"{message} · {learning_message}"
 
     return MarketEventSignal(
@@ -325,5 +438,8 @@ def analyze_market_events(
         predicted_window=predicted_window,
         predicted_confidence=predicted_confidence,
         predicted_window_events=bucket_events,
+        restock_item_keys=restock_item_keys,
+        abnormal_down_item_keys=abnormal_down_item_keys,
+        abnormal_up_item_keys=abnormal_up_item_keys,
         message=message,
     )

@@ -165,6 +165,15 @@
                 </div>
             </div>
             <div class="game-market-readiness">
+                {% if snapshot.market_event.restock_item_keys %}
+                <span>疑似補貨 <strong>{{ snapshot.market_event.restock_item_keys|length }} 種</strong></span>
+                {% endif %}
+                {% if snapshot.market_event.abnormal_down_item_keys %}
+                <span>異常跌價 <strong>{{ snapshot.market_event.abnormal_down_item_keys|length }} 種</strong></span>
+                {% endif %}
+                {% if snapshot.market_event.abnormal_up_item_keys %}
+                <span>異常拉升 <strong>{{ snapshot.market_event.abnormal_up_item_keys|length }} 種</strong></span>
+                {% endif %}
                 {% if snapshot.market_event.predicted_window %}
                 <span>高機率低價時段 <strong>{{ snapshot.market_event.predicted_window }}</strong></span>
                 <span>可信度 <strong>{{ snapshot.market_event.predicted_confidence }}%</strong></span>
@@ -219,6 +228,17 @@
                 <div>
                     <strong>{{ item.name }}</strong>
                     <small>{% if item.tier %}{{ item.tier }}級 · {% endif %}{% if item.category %}{{ item.category }} · {% endif %}{{ item.item_key }}</small>
+                    {% if snapshot.market_event %}
+                        {% if item.item_key in snapshot.market_event.restock_item_keys %}
+                        <span class="game-market-value-badge is-value-low">📦 疑似補貨</span>
+                        {% endif %}
+                        {% if item.item_key in snapshot.market_event.abnormal_down_item_keys %}
+                        <span class="game-market-value-badge is-value-high">🟠 異常跌價</span>
+                        {% endif %}
+                        {% if item.item_key in snapshot.market_event.abnormal_up_item_keys %}
+                        <span class="game-market-value-badge is-value-high">🔴 異常拉升</span>
+                        {% endif %}
+                    {% endif %}
                 </div>
                 <div class="game-market-price-cell">
                     <strong>{% if item.current_price is not none %}${{ "{:,}".format(item.current_price) }}{% else %}—{% endif %}</strong>

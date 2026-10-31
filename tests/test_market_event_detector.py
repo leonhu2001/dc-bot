@@ -55,6 +55,10 @@ def test_synchronized_market_drop_is_classified_as_broad_supply_event(tmp_path):
     assert signal.median_change_pct == -10.0
     assert signal.confidence is not None
     assert signal.confidence >= 50
+    assert len(signal.restock_item_keys) == ITEM_COUNT
+    assert "ammo-00" in signal.restock_item_keys
+    assert signal.abnormal_down_item_keys == ()
+    assert signal.abnormal_up_item_keys == ()
 
 
 def test_single_item_crash_with_stable_market_is_classified_as_isolated_dump(tmp_path):
@@ -72,6 +76,42 @@ def test_single_item_crash_with_stable_market_is_classified_as_isolated_dump(tmp
     assert signal.median_change_pct == 0.0
     assert signal.falling_items == 1
     assert signal.confidence is None
+    assert signal.restock_item_keys == ()
+    assert signal.abnormal_down_item_keys == ("ammo-00",)
+    assert signal.abnormal_up_item_keys == ()
+
+
+def test_single_item_spike_with_stable_market_is_classified_as_abnormal_rise(tmp_path):
+    repository = _repository(tmp_path)
+    start = datetime(2026, 10, 31, 9, 0, tzinfo=timezone.utc)
+    _store(repository, start, _prices(100))
+    changed = _prices(100)
+    changed[5] = 125
+    _store(repository, start + timedelta(minutes=15), changed)
+
+    signal = analyze_market_events(repository, "delta_force")
+
+    assert signal.state == "isolated_spike"
+    assert signal.label == "🔴 單品異常拉升"
+    assert signal.median_change_pct == 0.0
+    assert signal.restock_item_keys == ()
+    assert signal.abnormal_down_item_keys == ()
+    assert signal.abnormal_up_item_keys == ("ammo-05",)
+
+
+def test_broad_drop_can_still_flag_an_item_that_falls_far_more_than_market(tmp_path):
+    repository = _repository(tmp_path)
+    start = datetime(2026, 10, 31, 9, 0, tzinfo=timezone.utc)
+    _store(repository, start, _prices(100))
+    changed = _prices(90)
+    changed[2] = 70
+    _store(repository, start + timedelta(minutes=15), changed)
+
+    signal = analyze_market_events(repository, "delta_force")
+
+    assert signal.state == "broad_drop"
+    assert "ammo-02" in signal.restock_item_keys
+    assert signal.abnormal_down_item_keys == ("ammo-02",)
 
 
 def test_small_market_move_remains_normal(tmp_path):
@@ -86,6 +126,9 @@ def test_small_market_move_remains_normal(tmp_path):
     assert signal.label == "🟢 目前波動正常"
     assert signal.falling_items == 0
     assert signal.predicted_window is None
+    assert signal.restock_item_keys == ()
+    assert signal.abnormal_down_item_keys == ()
+    assert signal.abnormal_up_item_keys == ()
 
 
 def test_repeated_evening_broad_drops_predict_next_taipei_low_price_window(tmp_path):
