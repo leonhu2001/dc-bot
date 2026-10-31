@@ -125,7 +125,9 @@ if not latest:
 print(f"PASS: Discord Market DB preflight items={len(latest)}")
 PY
 
-STARTED_AT="$(date --iso-8601=seconds)"
+# journalctl accepts its native local-time timestamp format more consistently than
+# ISO 8601 offsets across distro/systemd versions.
+STARTED_AT="$(date '+%Y-%m-%d %H:%M:%S')"
 systemctl restart "$BOT_SERVICE"
 
 ready=0
