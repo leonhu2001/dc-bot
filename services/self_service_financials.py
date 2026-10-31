@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
+from services.aw_collision_financials import calculate_aw_collision_financials, is_aw_collision_rule
+
 import discord
 
 from services.point_benefit_catalog import (
@@ -517,6 +519,9 @@ def _format_point_hours(hours) -> str:
 
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
+    if is_aw_collision_rule(rule):
+        return calculate_aw_collision_financials(price_result, data)
+
     manual_price = get_self_service_staff_price(data)
     specify_before = max(0, int(getattr(price_result, "specify_fee", 0) or 0))
     staff_adjust = int(getattr(price_result, "staff_adjustment_amount", 0) or 0)

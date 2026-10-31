@@ -33,6 +33,7 @@ from services.self_service_financials import (
     _parse_discount_percent_text,
     add_self_service_quote_preview,
     get_self_service_staff_price,
+    is_aw_collision_rule,
     is_order_point_benefit_allowed_for_rule,
     is_self_service_staff_price_required,
 )
@@ -575,14 +576,20 @@ class SelfServiceOrderView(discord.ui.View):
             current_rule = _get_rule_from_self_service_data(data) if selected_item else None
         except Exception:
             current_rule = None
+        is_aw_collision = bool(current_rule and is_aw_collision_rule(current_rule))
 
         for child in self.children:
             custom_id = getattr(child, "custom_id", None)
             if custom_id == "self_service_order_specified_staff_button":
                 child.disabled = not bool(current_rule and getattr(current_rule, "allow_specify", False))
             elif custom_id == "self_service_order_staff_price_button":
-                child.disabled = not bool(current_rule and is_self_service_staff_price_required(current_rule))
-            elif custom_id == "self_service_order_point_benefit_button" and data.get("website_finance_settled"):
+                child.disabled = not bool(
+                    current_rule
+                    and (is_self_service_staff_price_required(current_rule) or is_aw_collision)
+                )
+            elif custom_id == "self_service_order_point_benefit_button":
+                child.disabled = bool(is_aw_collision or data.get("website_finance_settled"))
+            elif custom_id == "self_service_order_staff_discount_coupon_button" and is_aw_collision:
                 child.disabled = True
             elif custom_id == "self_service_order_go_payment_button":
                 child.label = "客服確認送出" if data.get("reorder_source_order_id") else "送出等待接單"
@@ -735,7 +742,7 @@ class SelfServiceOrderView(discord.ui.View):
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
-        if not is_self_service_staff_price_required(rule):
+        if not is_self_service_staff_price_required(rule) and not is_aw_collision_rule(rule):
             await interaction.response.send_message("這個項目會自動試算價格，不需要客服手動填價格。", ephemeral=True)
             return
 
@@ -764,6 +771,18 @@ class SelfServiceOrderView(discord.ui.View):
 
         if not data.get("item"):
             await interaction.response.send_message("請先選擇訂單項目，再設定折扣。", ephemeral=True)
+            return
+
+        try:
+            rule = _get_rule_from_self_service_data(data)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        if is_aw_collision_rule(rule):
+            await interaction.response.send_message(
+                "AW代撞不套用客服折扣、會員或點數福利。",
+                ephemeral=True,
+            )
             return
 
         panel_message_id = interaction.message.id if interaction.message is not None else None
