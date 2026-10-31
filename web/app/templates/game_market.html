@@ -3,27 +3,19 @@
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
 <link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261031-3">
-<script src="/static/js/pages/game_market_live.js?v=20261101-1" defer></script>
+<link rel="stylesheet" href="/static/css/pages/game_market_focus.css?v=20261101-1">
+<script src="/static/js/pages/game_market_live.js?v=20261101-2" defer></script>
 {% endblock %}
 
 {% block content %}
 <section class="game-tool-shell">
-    <a class="game-tool-back" href="/games/{{ game.slug }}">← 回到 {{ game.name }}</a>
+    <a class="game-tool-back" href="/games">← 回到遊戲專區</a>
 
-    <header class="game-tool-hero">
+    <header class="game-tool-hero game-market-focus-hero">
         <div>
-            <div class="game-tool-kicker">{{ game.eyebrow }} · MARKET</div>
+            <div class="game-tool-kicker">DELTA FORCE · BULLET TRACKER</div>
             <h1>{{ game.market_title }}</h1>
-            <p>{{ game.market_description }}</p>
         </div>
-        <nav class="game-tool-tabs" aria-label="{{ game.name }}工具">
-            {% for feature in game_features %}
-            <a
-                href="{{ feature.href }}"
-                class="{% if feature.key == 'market' %}is-active{% endif %}"
-            >{{ feature.title }}</a>
-            {% endfor %}
-        </nav>
     </header>
 
     {% if snapshot.status != 'ready' %}
@@ -55,7 +47,7 @@
         <div class="game-market-livebar-main">
             <span class="game-market-live-dot" aria-hidden="true"></span>
             <div>
-                <strong>台服公開行情 · {{ snapshot.items|length }} 個品項</strong>
+                <strong>4、5 級子彈 · {{ snapshot.items|length }} 個品項</strong>
                 {% if snapshot.updated_at %}
                 <small>
                     <time data-market-updated-at datetime="{{ snapshot.updated_at.isoformat() }}">{{ snapshot.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</time>
@@ -66,9 +58,9 @@
             </div>
         </div>
         <div class="game-market-readiness">
-            <span>24H 統計 <strong>{{ readiness.day }}/{{ snapshot.items|length }}</strong></span>
-            <span>7D 統計 <strong>{{ readiness.week }}/{{ snapshot.items|length }}</strong></span>
-            <span>最長歷史 <strong>{{ "%.1f"|format(readiness.max_hours / 24) }} 天</strong></span>
+            <span>24H <strong>{{ readiness.day }}/{{ snapshot.items|length }}</strong></span>
+            <span>7D <strong>{{ readiness.week }}/{{ snapshot.items|length }}</strong></span>
+            <span>歷史 <strong>{{ "%.1f"|format(readiness.max_hours / 24) }} 天</strong></span>
         </div>
         <span class="game-market-live-state" data-market-live-state>自動更新中</span>
     </section>
@@ -102,13 +94,9 @@
             </div>
             {% else %}
             <div class="game-market-empty">
-                {% if snapshot.items and readiness.week > 0 %}
-                目前沒有品項低於 7D 均價 3% 以上。
-                {% elif snapshot.items %}
-                7D 資料累積中。
-                {% else %}
-                等待行情資料。
-                {% endif %}
+                {% if snapshot.items and readiness.week > 0 %}目前沒有品項低於 7D 均價 3% 以上。
+                {% elif snapshot.items %}7D 資料累積中。
+                {% else %}等待行情資料。{% endif %}
             </div>
             {% endif %}
         </article>
@@ -137,7 +125,11 @@
         </article>
     </section>
 
-    <section class="game-market-panel game-market-list-panel" data-market-user="{% if user %}1{% else %}0{% endif %}">
+    <section
+        class="game-market-panel game-market-list-panel"
+        data-market-user="{% if user %}1{% else %}0{% endif %}"
+        data-market-csrf="{{ request.session.get('csrf_token', '') }}"
+    >
         <div class="game-market-panel-head game-market-list-head">
             <div>
                 <span class="game-market-label">EXCHANGE</span>
@@ -148,8 +140,8 @@
             </div>
             <div class="game-market-filters" data-market-tier-filters aria-label="行情等級篩選">
                 <a href="{{ market_filter_links.all }}" class="{% if not market_tier %}is-active{% endif %}">全部</a>
+                <a href="/games/{{ game.slug }}/market?tier=4" class="{% if market_tier == 4 %}is-active{% endif %}">4級</a>
                 <a href="{{ market_filter_links['5'] }}" class="{% if market_tier == 5 %}is-active{% endif %}">5級</a>
-                <a href="{{ market_filter_links['6'] }}" class="{% if market_tier == 6 %}is-active{% endif %}">6級</a>
             </div>
         </div>
 
@@ -168,18 +160,9 @@
                 {% if snapshot.market_event.restock_item_keys %}
                 <span>疑似補貨 <strong>{{ snapshot.market_event.restock_item_keys|length }} 種</strong></span>
                 {% endif %}
-                {% if snapshot.market_event.abnormal_down_item_keys %}
-                <span>異常跌價 <strong>{{ snapshot.market_event.abnormal_down_item_keys|length }} 種</strong></span>
-                {% endif %}
-                {% if snapshot.market_event.abnormal_up_item_keys %}
-                <span>異常拉升 <strong>{{ snapshot.market_event.abnormal_up_item_keys|length }} 種</strong></span>
-                {% endif %}
                 {% if snapshot.market_event.predicted_window %}
                 <span>高機率低價時段 <strong>{{ snapshot.market_event.predicted_window }}</strong></span>
                 <span>可信度 <strong>{{ snapshot.market_event.predicted_confidence }}%</strong></span>
-                {% else %}
-                <span>低價時段 <strong>學習中</strong></span>
-                <span>同步大跌樣本 <strong>{{ snapshot.market_event.historical_event_count }}/3</strong></span>
                 {% endif %}
                 {% if snapshot.next_restock_item %}
                 <span>下一個單品 <strong>{{ snapshot.next_restock_item.name }}</strong></span>
@@ -225,10 +208,13 @@
             </div>
             {% for item in snapshot.items %}
             {% set is_watched = item.item_key in market_watched_keys %}
-            <a
-                class="game-market-row"
-                href="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}"
+            <div
+                class="game-market-row game-market-row-link"
+                role="link"
+                tabindex="0"
                 data-market-row
+                data-market-href="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}"
+                data-market-watch-url="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}/watch"
                 data-market-item-key="{{ item.item_key }}"
                 data-market-category="{{ item.category }}"
                 data-market-tier="{{ item.tier or '' }}"
@@ -237,11 +223,19 @@
                 data-market-restock-confidence="{{ item.restock_confidence if item.restock_confidence is not none else '' }}"
             >
                 <div>
-                    <strong>{{ item.name }}</strong>
+                    <div class="game-market-row-title-line">
+                        <a class="game-market-item-link" href="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}"><strong>{{ item.name }}</strong></a>
+                        {% if user %}
+                        <button
+                            type="button"
+                            class="game-market-watch-inline{% if is_watched %} is-watched{% endif %}"
+                            data-market-watch-toggle
+                            aria-pressed="{% if is_watched %}true{% else %}false{% endif %}"
+                            title="{% if is_watched %}取消收藏{% else %}收藏這顆子彈{% endif %}"
+                        >{% if is_watched %}★ 收藏{% else %}☆ 收藏{% endif %}</button>
+                        {% endif %}
+                    </div>
                     <small>{% if item.tier %}{{ item.tier }}級 · {% endif %}{% if item.category %}{{ item.category }} · {% endif %}{{ item.item_key }}</small>
-                    {% if is_watched %}
-                    <span class="game-market-value-badge is-value-low">★ 收藏</span>
-                    {% endif %}
                     {% if item.restock_prediction_label %}
                     <span
                         class="game-market-value-badge {% if item.restock_confidence is not none and item.restock_confidence >= 65 %}is-value-low{% else %}is-value-flat{% endif %}"
@@ -249,15 +243,9 @@
                     >⏱ {{ item.restock_prediction_label }} · {{ item.restock_confidence }}%</span>
                     {% endif %}
                     {% if snapshot.market_event %}
-                        {% if item.item_key in snapshot.market_event.restock_item_keys %}
-                        <span class="game-market-value-badge is-value-low">📦 疑似補貨</span>
-                        {% endif %}
-                        {% if item.item_key in snapshot.market_event.abnormal_down_item_keys %}
-                        <span class="game-market-value-badge is-value-high">🟠 異常跌價</span>
-                        {% endif %}
-                        {% if item.item_key in snapshot.market_event.abnormal_up_item_keys %}
-                        <span class="game-market-value-badge is-value-high">🔴 異常拉升</span>
-                        {% endif %}
+                        {% if item.item_key in snapshot.market_event.restock_item_keys %}<span class="game-market-value-badge is-value-low">📦 疑似補貨</span>{% endif %}
+                        {% if item.item_key in snapshot.market_event.abnormal_down_item_keys %}<span class="game-market-value-badge is-value-high">🟠 異常跌價</span>{% endif %}
+                        {% if item.item_key in snapshot.market_event.abnormal_up_item_keys %}<span class="game-market-value-badge is-value-high">🔴 異常拉升</span>{% endif %}
                     {% endif %}
                 </div>
                 <div class="game-market-price-cell">
@@ -268,7 +256,6 @@
                         {% elif item.vs_7d_avg_pct > 0 %}高 {{ "%.1f"|format(item.vs_7d_avg_pct) }}%
                         {% else %}均價附近{% endif %}
                     </span>
-                    {% endif %}
                     <span class="game-market-mobile-arrow" aria-hidden="true">→</span>
                 </div>
                 <div class="{% if item.change_24h_pct is not none and item.change_24h_pct > 0 %}is-positive{% elif item.change_24h_pct is not none and item.change_24h_pct < 0 %}is-negative{% endif %}">
@@ -285,7 +272,7 @@
                     {% endif %}
                     <span class="game-market-row-arrow" aria-hidden="true">→</span>
                 </div>
-            </a>
+            </div>
             {% endfor %}
         </div>
         {% else %}
@@ -298,19 +285,6 @@
             {% endif %}
         </div>
         {% endif %}
-    </section>
-
-    <section class="game-market-actions">
-        <a href="/games/{{ game.slug }}/news">
-            <span>GAME NEWS</span>
-            <strong>{{ game.news_title }}</strong>
-            <small>更新與活動 →</small>
-        </a>
-        <a href="/games/{{ game.slug }}/notifications">
-            <span>NOTIFICATIONS</span>
-            <strong>{{ game.notifications_title }}</strong>
-            <small>價格提醒與推播 →</small>
-        </a>
     </section>
 </section>
 {% endblock %}
