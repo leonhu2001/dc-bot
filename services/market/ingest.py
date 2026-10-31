@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from services.market.providers.base import MarketPriceProvider, normalize_source_snapshot
+from services.market.scope import market_item_enabled
 from services.market.storage import MarketRepository
 
 
@@ -28,6 +29,12 @@ async def ingest_market_snapshot(
     duplicating validation or persistence rules.
     """
     snapshot = normalize_source_snapshot(await provider.fetch(game_key))
+    tracked_items = tuple(
+        item
+        for item in snapshot.items
+        if market_item_enabled(snapshot.game_key, item.tier)
+    )
+    snapshot = replace(snapshot, items=tracked_items)
     inserted = repository.store_snapshot(snapshot)
 
     return MarketIngestResult(
