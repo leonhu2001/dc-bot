@@ -65,7 +65,7 @@
                 {% endif %}
             </div>
         </div>
-        <div class="game-market-readiness" title="只用我們自己的歷史資料計算，不採用第三方推薦分數">
+        <div class="game-market-readiness">
             <span>24H 統計 <strong>{{ readiness.day }}/{{ snapshot.items|length }}</strong></span>
             <span>7D 統計 <strong>{{ readiness.week }}/{{ snapshot.items|length }}</strong></span>
             <span>最長歷史 <strong>{{ "%.1f"|format(readiness.max_hours / 24) }} 天</strong></span>
@@ -103,11 +103,11 @@
             {% else %}
             <div class="game-market-empty">
                 {% if snapshot.items and readiness.week > 0 %}
-                已有 {{ readiness.week }} 個品項具備成熟 7D 統計；目前沒有任何品項低於自己的 7D 均價 3% 以上。
+                目前沒有品項低於 7D 均價 3% 以上。
                 {% elif snapshot.items %}
-                至少累積約 6 天可信歷史後，才會用我們自己的 7D 均價找出明顯偏低的價格；資料不足時不硬湊推薦。
+                7D 資料累積中。
                 {% else %}
-                接上正式行情資料後，這裡會依我們自己的歷史價格顯示值得關注的低價品項。
+                等待行情資料。
                 {% endif %}
             </div>
             {% endif %}
@@ -132,7 +132,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <div class="game-market-empty">至少累積約 24 小時可信歷史後，才會顯示漲幅與跌幅排行。</div>
+            <div class="game-market-empty">24H 資料累積中。</div>
             {% endif %}
         </article>
     </section>
@@ -231,7 +231,6 @@
             <span>換個關鍵字或清除等級篩選後再查看。</span>
             {% else %}
             <strong>尚未啟用正式價格</strong>
-            <span>只接受可驗證的台服行情；資料源未確認前不顯示模擬價格。</span>
             {% endif %}
         </div>
         {% endif %}
@@ -241,12 +240,12 @@
         <a href="/games/{{ game.slug }}/news">
             <span>GAME NEWS</span>
             <strong>{{ game.news_title }}</strong>
-            <small>更新、活動與重要消息集中查看 →</small>
+            <small>更新與活動 →</small>
         </a>
         <a href="/games/{{ game.slug }}/notifications">
             <span>NOTIFICATIONS</span>
             <strong>{{ game.notifications_title }}</strong>
-            <small>管理價格提醒與瀏覽器推播 →</small>
+            <small>價格提醒與推播 →</small>
         </a>
     </section>
 </section>
