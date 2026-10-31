@@ -58,8 +58,9 @@ def main() -> int:
         return 2
 
     pg_dump = shutil.which("pg_dump")
-    if not pg_dump:
-        print("ERROR: pg_dump is not installed", file=sys.stderr)
+    pg_restore = shutil.which("pg_restore")
+    if not pg_dump or not pg_restore:
+        print("ERROR: pg_dump and pg_restore are required", file=sys.stderr)
         return 2
 
     backup_dir = Path(os.getenv("MARKET_BACKUP_DIR", str(DEFAULT_BACKUP_DIR)))
@@ -83,7 +84,7 @@ def main() -> int:
     if url.password:
         env["PGPASSWORD"] = str(url.password)
 
-    command = [
+    dump_command = [
         pg_dump,
         "--format=custom",
         "--no-owner",
@@ -94,7 +95,7 @@ def main() -> int:
 
     try:
         subprocess.run(
-            command,
+            dump_command,
             env=env,
             check=True,
             stdout=subprocess.DEVNULL,
@@ -104,12 +105,18 @@ def main() -> int:
         )
         if not temp_path.exists() or temp_path.stat().st_size <= 0:
             raise RuntimeError("pg_dump produced an empty backup")
+        subprocess.run(
+            [pg_restore, "--list", str(temp_path)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=60,
+        )
         temp_path.replace(final_path)
-    except subprocess.CalledProcessError as exc:
+    except subprocess.CalledProcessError:
         temp_path.unlink(missing_ok=True)
-        message = (exc.stderr or "pg_dump failed").strip().splitlines()[-1:]
-        detail = message[0][:240] if message else "pg_dump failed"
-        print(f"ERROR: market backup failed: {detail}", file=sys.stderr)
+        print("ERROR: market backup command failed", file=sys.stderr)
         return 1
     except Exception as exc:
         temp_path.unlink(missing_ok=True)
@@ -122,7 +129,7 @@ def main() -> int:
         now=now,
     )
     print(
-        "PASS: market backup created",
+        "PASS: market backup created and verified",
         f"file={final_path.name}",
         f"bytes={final_path.stat().st_size}",
         f"retention_days={retention_days}",
