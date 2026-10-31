@@ -277,6 +277,12 @@ async def market_discord_delivery_loop(bot: discord.Client) -> None:
 
 
 def ensure_market_discord_delivery_started(bot: discord.Client) -> None:
+    from services.market.restock_runtime import ensure_market_restock_runtime_started
+    from views.market_v2 import install_market_v2_overrides
+
+    install_market_v2_overrides(bot)
+    ensure_market_restock_runtime_started(bot)
+
     if getattr(bot, "_market_discord_delivery_started", False):
         return
     bot._market_discord_delivery_started = True
