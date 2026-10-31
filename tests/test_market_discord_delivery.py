@@ -2,7 +2,11 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import update
 
-from services.market.discord_delivery import MarketDiscordRepository
+from services.market.discord_delivery import (
+    MarketDiscordDelivery,
+    MarketDiscordRepository,
+)
+from services.market.discord_runtime import _alert_is_active
 from services.market.personalization import (
     MarketNotificationOutbox,
     MarketPersonalizationRepository,
@@ -93,6 +97,40 @@ def test_cancelled_shared_outbox_is_not_sent_to_discord(tmp_path):
     assert discord_repo.list_pending_events() == ()
 
 
+def test_discord_rechecks_alert_is_active_before_delivery(tmp_path):
+    _, personalization, _ = _repositories(tmp_path)
+    alert = personalization.create_alert(
+        "123",
+        "delta_force",
+        "m995",
+        condition_type="below",
+        target_price=100,
+    )
+
+    assert _alert_is_active(
+        personalization,
+        discord_user_id="123",
+        game_key="delta_force",
+        alert_id=alert.id,
+    ) is True
+
+    assert personalization.set_alert_enabled("123", alert.id, enabled=False) is True
+    assert _alert_is_active(
+        personalization,
+        discord_user_id="123",
+        game_key="delta_force",
+        alert_id=alert.id,
+    ) is False
+
+    assert personalization.delete_alert("123", alert.id) is True
+    assert _alert_is_active(
+        personalization,
+        discord_user_id="123",
+        game_key="delta_force",
+        alert_id=alert.id,
+    ) is False
+
+
 def test_discord_retry_is_bounded_and_does_not_repeat_sent_event(tmp_path):
     _, personalization, discord_repo = _repositories(tmp_path)
     personalization.create_alert(
@@ -114,10 +152,8 @@ def test_discord_retry_is_bounded_and_does_not_repeat_sent_event(tmp_path):
 
     # Make the retry due, then exhaust it. Failed is terminal for Discord only.
     with discord_repo.SessionLocal() as db:
-        row = db.get(__import__(
-            "services.market.discord_delivery",
-            fromlist=["MarketDiscordDelivery"],
-        ).MarketDiscordDelivery, event.outbox_id)
+        row = db.get(MarketDiscordDelivery, event.outbox_id)
+        assert row is not None
         row.available_at = datetime.now(timezone.utc) - timedelta(seconds=1)
         db.commit()
 
