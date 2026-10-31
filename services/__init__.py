@@ -115,3 +115,11 @@ from .self_service_companion_count_runtime import (
 )
 
 _install_self_service_companion_count_runtime()
+
+# Keep public VIP monthly announcements on the same current entitlement source as
+# checkout. This also repairs the already-posted 2026-11 announcement in place.
+from .vip_monthly_announcement_policy import (
+    install_vip_monthly_announcement_policy as _install_vip_monthly_announcement_policy,
+)
+
+_install_vip_monthly_announcement_policy()
