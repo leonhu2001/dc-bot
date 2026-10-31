@@ -10,6 +10,7 @@
     const resultMeta = document.querySelector('[data-market-result-meta]');
     const listHost = document.querySelector('.game-market-list');
     const sortSelect = document.querySelector('.game-market-search select[name="sort"]');
+    const marketEventBar = document.querySelector('.game-market-livebar[aria-label="市場事件預測"]');
     const rows = Array.from(document.querySelectorAll('[data-market-row]'));
 
     const formatter = new Intl.DateTimeFormat('zh-TW', {
@@ -37,6 +38,12 @@
     rows.forEach((row, index) => {
         row.dataset.marketOriginalIndex = String(index);
     });
+
+    function removeStandaloneAnomalyBar() {
+        if (!marketEventBar) return;
+        const label = String(marketEventBar.querySelector('strong')?.textContent || '').trim();
+        if (label.includes('單品異常')) marketEventBar.remove();
+    }
 
     function parseUpdatedAt() {
         if (!lastUpdatedAt) return null;
@@ -322,7 +329,7 @@
             const tiers = Array.from(new Set(
                 items
                     .map((item) => Number.parseInt(String(item?.tier ?? ''), 10))
-                    .filter((tier) => Number.isInteger(tier) && tier >= 1 && tier <= 10)
+                    .filter((tier) => Number.isInteger(tier) && tier >= 4 && tier <= 10)
             )).sort((left, right) => left - right);
             if (!tiers.length) return;
 
@@ -382,6 +389,7 @@
         if (smartOption) smartOption.textContent = '智慧排序';
     }
 
+    removeStandaloneAnomalyBar();
     installCategoryFilters();
     installQuickFilters();
     applySmartSort();
