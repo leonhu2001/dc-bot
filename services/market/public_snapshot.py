@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 
 from services.market.analytics import build_market_analytics
+from services.market.event_detector import MarketEventSignal, analyze_market_events
 from services.market.runtime import get_market_repository
 from services.market.storage import MarketRepository
 
@@ -40,6 +41,7 @@ class MarketSnapshot:
     items: tuple[MarketItemSummary, ...] = field(default_factory=tuple)
     gainers: tuple[MarketItemSummary, ...] = field(default_factory=tuple)
     losers: tuple[MarketItemSummary, ...] = field(default_factory=tuple)
+    market_event: MarketEventSignal | None = None
     message: str = ""
 
 
@@ -163,6 +165,16 @@ def get_public_market_snapshot(
             message="行情統計暫時無法使用。",
         )
 
+    try:
+        market_event = analyze_market_events(
+            market_repository,
+            clean_game_key,
+            source_name=latest[0].source_name if latest else None,
+            now=now,
+        )
+    except Exception:
+        market_event = None
+
     items = tuple(
         MarketItemSummary(
             item_key=item.item_key,
@@ -192,6 +204,7 @@ def get_public_market_snapshot(
         items=items,
         gainers=gainers,
         losers=losers,
+        market_event=market_event,
         message="行情更新延遲，提醒暫停。" if stale else "",
     )
 
