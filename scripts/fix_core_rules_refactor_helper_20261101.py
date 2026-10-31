@@ -22,5 +22,11 @@ if text.count(old_price) != 1:
     raise RuntimeError(f"AW PriceResult patch target count={text.count(old_price)}")
 text = text.replace(old_price, new_price, 1)
 
+old_audit = '''text = replace_once(text, '            role_id = ROLE_IDS.get(role_key)\\n', '            role_id = all_role_ids.get(role_key)\\n', "audit map")'''
+new_audit = '''text = replace_once(text, '        role_id = ROLE_IDS.get(role_key)\\n', '        role_id = all_role_ids.get(role_key)\\n', "audit map")'''
+if text.count(old_audit) != 1:
+    raise RuntimeError(f"audit helper patch target count={text.count(old_audit)}")
+text = text.replace(old_audit, new_audit, 1)
+
 path.write_text(text, encoding="utf-8")
 print("HELPER_PATCHED")
