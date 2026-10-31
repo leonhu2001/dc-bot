@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+
+{% block page_title %}市場監控{% endblock %}
+
+{% block content %}
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>三角洲市場監控</h2>
+            <p class="muted-text">只監控可交易的 4、5 級子彈；預測、回測與 Discord 補貨私訊集中在這裡。</p>
+        </div>
+        <div>
+            <span class="status-chip {% if market.ok %}is-paid{% else %}is-unpaid{% endif %}">
+                {% if market.ok %}正常{% else %}{{ market.status }}{% endif %}
+            </span>
+            <a class="button secondary" href="/admin/market">重新檢查</a>
+        </div>
+    </div>
+
+    <div class="payout-stat-grid">
+        <div class="payout-stat-card">
+            <span>行情品項</span>
+            <strong>{{ market.item_count }}</strong>
+            <p class="muted-text">4、5 級子彈</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>行情延遲</span>
+            <strong>{% if market.age_seconds is not none %}{{ (market.age_seconds / 60)|round(1) }} 分鐘{% else %}—{% endif %}</strong>
+            <p class="muted-text">逾 {{ (market.stale_seconds / 60)|round(0)|int }} 分鐘視為 stale</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>成熟補貨預測</span>
+            <strong>{{ market.prediction_count }}</strong>
+            <p class="muted-text">目前可用的單品預測</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>待驗證預測</span>
+            <strong>{{ market.scheduled_forecasts }}</strong>
+            <p class="muted-text">等待下一次實際補貨事件</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>已回測預測</span>
+            <strong>{{ market.resolved_forecasts }}</strong>
+            <p class="muted-text">已有實際事件可比較</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>平均預測誤差</span>
+            <strong>{% if market.forecast_mae_minutes is not none %}±{{ market.forecast_mae_minutes }} 分鐘{% else %}樣本不足{% endif %}</strong>
+            <p class="muted-text">Mean absolute error</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>補貨 DM 已送達</span>
+            <strong>{{ market.restock_dm.sent }}</strong>
+            <p class="muted-text">Discord 私訊 delivery ledger</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>DM 重試 / 失敗</span>
+            <strong>{{ market.restock_dm.retry }} / {{ market.restock_dm.failed }}</strong>
+            <p class="muted-text">非 0 時優先檢查 Discord delivery</p>
+        </div>
+    </div>
+
+    {% if market.message %}
+    <p class="muted-text">{{ market.message }}</p>
+    {% endif %}
+</div>
+{% endblock %}
