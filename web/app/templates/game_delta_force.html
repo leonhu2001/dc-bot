@@ -10,10 +10,6 @@
         <div>
             <div class="delta-kicker">DELTA FORCE · MOWAN</div>
             <h1>三角洲行動</h1>
-            <p>
-                三角洲服務、台服交易所行情、遊戲消息與通知集中在同一個入口。
-                先看市場與消息，再決定今晚要自己下場，還是直接找魔丸陪你打。
-            </p>
             <div class="delta-actions">
                 <a
                     class="button button-primary"
@@ -21,7 +17,7 @@
                     data-funnel-event="cta_click"
                     data-funnel-label="delta_hero_market"
                 >
-                    三角洲交易所行情 →
+                    查看子彈行情 →
                 </a>
                 <a
                     class="button button-secondary"
@@ -35,47 +31,30 @@
         </div>
 
         <aside class="delta-card">
-            <strong>三角洲情報中心</strong>
+            <strong>子彈價格追蹤</strong>
             <ul>
-                <li>交易所行情：價格、歷史走勢與推薦品項</li>
-                <li>遊戲消息：版本、活動與重要更新</li>
-                <li>通知中心：價格與遊戲提醒集中管理</li>
-                <li>遊戲服務：陪玩、技術陪、趣味單與代解</li>
+                <li>只追蹤可交易的 4、5 級子彈</li>
+                <li>24H / 7D 價格與歷史走勢</li>
+                <li>收藏、異常價格與補貨預測</li>
+                <li>收藏子彈的 Discord 補貨預警</li>
             </ul>
         </aside>
     </div>
 
-    <section class="delta-section" id="intel">
+    <section class="delta-section" id="market">
         <div class="delta-section-head">
             <div>
-                <div class="delta-kicker">GAME INTELLIGENCE</div>
-                <h2>三角洲情報與工具</h2>
+                <div class="delta-kicker">BULLET MARKET</div>
+                <h2>三角洲子彈行情</h2>
             </div>
         </div>
 
         <div class="delta-grid">
             <article class="delta-service">
                 <small>MARKET</small>
-                <h3>三角洲交易所行情</h3>
-                <p>查看台服價格、歷史走勢、市場異動與目前推薦品項。</p>
-                <div class="delta-price">網站版建置中</div>
+                <h3>台服子彈價格</h3>
+                <p>追蹤 4、5 級子彈現價、24H / 7D 走勢、收藏與補貨預測。</p>
                 <a href="/games/delta-force/market" class="button button-secondary">查看行情</a>
-            </article>
-
-            <article class="delta-service">
-                <small>NEWS</small>
-                <h3>三角洲消息</h3>
-                <p>之後集中整理版本更新、活動與需要注意的官方消息。</p>
-                <div class="delta-price">資料源準備中</div>
-                <a href="/games/delta-force/news" class="button button-secondary">進入消息中心</a>
-            </article>
-
-            <article class="delta-service">
-                <small>NOTIFICATIONS</small>
-                <h3>三角洲通知</h3>
-                <p>登入後管理價格提醒、遊戲消息與未來的手機 Web Push。</p>
-                <div class="delta-price">Discord 帳號同步</div>
-                <a href="/games/delta-force/notifications" class="button button-secondary">通知設定</a>
             </article>
         </div>
     </section>
@@ -107,37 +86,6 @@
                 </article>
             {% endfor %}
         </div>
-    </section>
-
-    <section class="delta-section">
-        <div class="delta-section-head">
-            <div>
-                <div class="delta-kicker">FAQ</div>
-                <h2>常見問題</h2>
-            </div>
-        </div>
-
-        <div class="delta-faq">
-            {% for item in faq_items %}
-                <details>
-                    <summary>{{ item.question }}</summary>
-                    <p>{{ item.answer }}</p>
-                </details>
-            {% endfor %}
-        </div>
-    </section>
-
-    <section class="delta-cta">
-        <h2>想直接開始？</h2>
-        <p>選方案後會先由伺服器驗價，正式訂單建立後再進 Discord 接單與付款流程。</p>
-        <a
-            href="/order"
-            class="button button-primary"
-            data-funnel-event="cta_click"
-            data-funnel-label="delta_bottom_order"
-        >
-            立即下單 →
-        </a>
     </section>
 </section>
 {% endblock %}
