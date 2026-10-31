@@ -14,6 +14,7 @@
     const marketEventBar = document.querySelector('.game-market-livebar[aria-label="市場事件預測"]');
     const rows = Array.from(document.querySelectorAll('[data-market-row]'));
     const userLoggedIn = listPanel?.dataset.marketUser === '1';
+    const csrfToken = String(listPanel?.dataset.marketCsrf || '');
 
     const formatter = new Intl.DateTimeFormat('zh-TW', {
         timeZone: 'Asia/Taipei',
@@ -49,20 +50,13 @@
         const updatedAt = parseUpdatedAt();
         if (!updatedAt) return;
 
-        if (updatedNode) {
-            updatedNode.textContent = formatter.format(updatedAt) + '（台灣時間）';
-        }
-
+        if (updatedNode) updatedNode.textContent = formatter.format(updatedAt) + '（台灣時間）';
         if (!ageNode) return;
+
         const ageMinutes = Math.max(0, Math.floor((Date.now() - updatedAt.getTime()) / 60000));
-        if (ageMinutes < 1) {
-            ageNode.textContent = '剛剛更新';
-        } else if (ageMinutes < 60) {
-            ageNode.textContent = `${ageMinutes} 分鐘前更新`;
-        } else {
-            const hours = Math.floor(ageMinutes / 60);
-            ageNode.textContent = `${hours} 小時前更新`;
-        }
+        if (ageMinutes < 1) ageNode.textContent = '剛剛更新';
+        else if (ageMinutes < 60) ageNode.textContent = `${ageMinutes} 分鐘前更新`;
+        else ageNode.textContent = `${Math.floor(ageMinutes / 60)} 小時前更新`;
     }
 
     function signalState(row) {
@@ -83,6 +77,10 @@
         return row.dataset.marketWatched === '1';
     }
 
+    function predictionState(row) {
+        return Boolean(String(row.dataset.marketRestockAt || '').trim());
+    }
+
     function visibleRows() {
         return rows.filter((row) => !row.hidden);
     }
@@ -90,6 +88,7 @@
     function rowMatchesQuickFilter(row) {
         const signals = signalState(row);
         if (activeQuickFilter === 'favorites') return favoriteState(row);
+        if (activeQuickFilter === 'prediction') return predictionState(row);
         if (activeQuickFilter === 'abnormal') return signals.abnormalDown || signals.abnormalUp;
         if (activeQuickFilter === 'restock') return signals.restock;
         return true;
@@ -101,6 +100,7 @@
         const suffixes = [];
         if (activeCategory) suffixes.push(activeCategory);
         if (activeQuickFilter === 'favorites') suffixes.push('只看收藏');
+        if (activeQuickFilter === 'prediction') suffixes.push('有補貨預測');
         if (activeQuickFilter === 'abnormal') suffixes.push('只看異常');
         if (activeQuickFilter === 'restock') suffixes.push('只看疑似補貨');
         resultMeta.textContent = suffixes.length
@@ -139,6 +139,34 @@
         applyFilters();
     }
 
+    function applySmartPinning() {
+        if (!rowContainer) return;
+        const sortKey = String(pageParams.get('sort') || 'name');
+        if (sortKey !== 'name') return;
+
+        const priority = (row) => {
+            const signals = signalState(row);
+            const watched = favoriteState(row);
+            let group = 3;
+            if (watched && signals.hasSignal) group = 0;
+            else if (watched) group = 1;
+            else if (signals.hasSignal) group = 2;
+
+            let signal = 3;
+            if (signals.abnormalDown) signal = 0;
+            else if (signals.restock) signal = 1;
+            else if (signals.abnormalUp) signal = 2;
+            return [group, signal];
+        };
+
+        const ordered = [...rows].sort((left, right) => {
+            const [leftGroup, leftSignal] = priority(left);
+            const [rightGroup, rightSignal] = priority(right);
+            return leftGroup - rightGroup || leftSignal - rightSignal;
+        });
+        ordered.forEach((row) => rowContainer.appendChild(row));
+    }
+
     function applyClientSort() {
         if (!rowContainer || pageParams.get('sort') !== 'restock_asc') return;
 
@@ -159,6 +187,71 @@
         ordered.forEach((row) => rowContainer.appendChild(row));
     }
 
+    function installRowNavigation() {
+        rows.forEach((row) => {
+            const href = String(row.dataset.marketHref || '');
+            if (!href) return;
+            row.addEventListener('click', (event) => {
+                if (event.target.closest('a, button, input, select, textarea, form')) return;
+                window.location.href = href;
+            });
+            row.addEventListener('keydown', (event) => {
+                if (event.target !== row || event.key !== 'Enter') return;
+                event.preventDefault();
+                window.location.href = href;
+            });
+        });
+    }
+
+    function updateWatchButton(row, watched) {
+        const button = row.querySelector('[data-market-watch-toggle]');
+        if (!button) return;
+        button.classList.toggle('is-watched', watched);
+        button.setAttribute('aria-pressed', watched ? 'true' : 'false');
+        button.title = watched ? '取消收藏' : '收藏這顆子彈';
+        button.textContent = watched ? '★ 收藏' : '☆ 收藏';
+    }
+
+    function installWatchToggles() {
+        if (!userLoggedIn || !csrfToken) return;
+        rows.forEach((row) => {
+            const button = row.querySelector('[data-market-watch-toggle]');
+            const watchUrl = String(row.dataset.marketWatchUrl || '');
+            if (!button || !watchUrl) return;
+
+            button.addEventListener('click', async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (button.disabled) return;
+
+                const nextWatched = !favoriteState(row);
+                button.disabled = true;
+                try {
+                    const body = new URLSearchParams();
+                    body.set('csrf_token', csrfToken);
+                    body.set('watched', nextWatched ? '1' : '0');
+                    body.set('return_to', window.location.pathname + window.location.search);
+                    const response = await fetch(watchUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        cache: 'no-store',
+                        body,
+                    });
+                    if (!response.ok) throw new Error(`watch update failed: ${response.status}`);
+
+                    row.dataset.marketWatched = nextWatched ? '1' : '0';
+                    updateWatchButton(row, nextWatched);
+                    applySmartPinning();
+                    applyFilters();
+                } catch (_error) {
+                    button.title = '收藏更新失敗，請重新整理後再試';
+                } finally {
+                    button.disabled = false;
+                }
+            });
+        });
+    }
+
     function installCategoryFilters() {
         if (!filterHost || rows.length === 0) return;
         const categories = Array.from(new Set(
@@ -168,7 +261,6 @@
         )).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
 
         if (categories.length === 0) return;
-
         filterHost.hidden = false;
         filterHost.replaceChildren();
 
@@ -184,9 +276,7 @@
         };
 
         filterHost.appendChild(makeButton('全部口徑', ''));
-        categories.forEach((category) => {
-            filterHost.appendChild(makeButton(category, category));
-        });
+        categories.forEach((category) => filterHost.appendChild(makeButton(category, category)));
     }
 
     function installQuickFilters() {
@@ -202,6 +292,7 @@
         quickFilterHost.replaceChildren();
         const options = [['全部行情', 'all']];
         if (userLoggedIn) options.push(['★ 只看收藏', 'favorites']);
+        options.push(['⏱ 有補貨預測', 'prediction']);
         options.push(['⚠️ 只看異常', 'abnormal']);
         options.push(['📦 只看疑似補貨', 'restock']);
 
@@ -242,7 +333,7 @@
             const tiers = Array.from(new Set(
                 items
                     .map((item) => Number.parseInt(String(item?.tier ?? ''), 10))
-                    .filter((tier) => Number.isInteger(tier) && tier >= 4 && tier <= 10)
+                    .filter((tier) => Number.isInteger(tier) && tier >= 4 && tier <= 5)
             )).sort((left, right) => left - right);
             if (!tiers.length) return;
 
@@ -263,7 +354,7 @@
             tierHost.replaceChildren(makeLink('全部', ''));
             tiers.forEach((tier) => tierHost.appendChild(makeLink(`${tier}級`, tier)));
         } catch (_error) {
-            // Keep the server-rendered fallback filters when discovery is unavailable.
+            // Keep the server-rendered 4/5 fallback filters when discovery is unavailable.
         }
     }
 
@@ -304,7 +395,10 @@
     }
 
     removeStandaloneAnomalyBar();
+    applySmartPinning();
     applyClientSort();
+    installRowNavigation();
+    installWatchToggles();
     installCategoryFilters();
     installQuickFilters();
     applyFilters();
