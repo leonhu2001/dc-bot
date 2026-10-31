@@ -87,5 +87,36 @@
             {% endfor %}
         </div>
     </section>
+
+    <section class="delta-section">
+        <div class="delta-section-head">
+            <div>
+                <div class="delta-kicker">FAQ</div>
+                <h2>常見問題</h2>
+            </div>
+        </div>
+
+        <div class="delta-faq">
+            {% for item in faq_items %}
+                <details>
+                    <summary>{{ item.question }}</summary>
+                    <p>{{ item.answer }}</p>
+                </details>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="delta-cta">
+        <h2>想直接開始？</h2>
+        <p>選方案後會先由伺服器驗價，正式訂單建立後再進 Discord 接單與付款流程。</p>
+        <a
+            href="/order"
+            class="button button-primary"
+            data-funnel-event="cta_click"
+            data-funnel-label="delta_bottom_order"
+        >
+            立即下單 →
+        </a>
+    </section>
 </section>
 {% endblock %}
