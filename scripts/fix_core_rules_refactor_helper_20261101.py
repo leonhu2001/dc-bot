@@ -28,5 +28,15 @@ if text.count(old_audit) != 1:
     raise RuntimeError(f"audit helper patch target count={text.count(old_audit)}")
 text = text.replace(old_audit, new_audit, 1)
 
+old_aw_plans = '''    'AW_RULE_KEYS = tuple(AW_COLLISION_PRICING_BY_RULE)\\nAW_COLLISION_PLANS: dict[str, dict[str, Any]] = {key: dict(plan) for key, plan in AW_COLLISION_PRICING_BY_RULE.items()}\\n',
+    "AW plans",
+)'''
+new_aw_plans = '''    'AW_RULE_KEYS = tuple(AW_COLLISION_PRICING_BY_RULE)\\nCREDENTIAL_NOTE_PLACEHOLDER = (\\n    "例如 Steam、Garena、Google 登入、其他登入注意事項；請補充安全箱格數"\\n)\\nAW_COLLISION_PLANS: dict[str, dict[str, Any]] = {key: dict(plan) for key, plan in AW_COLLISION_PRICING_BY_RULE.items()}\\n',
+    "AW plans",
+)'''
+if text.count(old_aw_plans) != 1:
+    raise RuntimeError(f"AW plan replacement patch target count={text.count(old_aw_plans)}")
+text = text.replace(old_aw_plans, new_aw_plans, 1)
+
 path.write_text(text, encoding="utf-8")
 print("HELPER_PATCHED")
