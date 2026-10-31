@@ -35,10 +35,8 @@ _GAME_HUBS: dict[str, GameHub] = {
         name="三角洲行動",
         short_name="三角洲",
         eyebrow="DELTA FORCE · MOWAN",
-        market_title="三角洲交易所行情",
-        market_description="台服價格、24H / 7D 走勢與價格提醒。",
-        news_title="三角洲消息",
-        notifications_title="三角洲通知",
+        market_title="三角洲子彈行情",
+        market_description="台服 4、5 級子彈價格、24H / 7D 走勢、收藏與價格提醒。",
     ),
 }
 
@@ -59,32 +57,8 @@ def get_game_feature_cards(game: GameHub) -> list[dict[str, str | bool]]:
             {
                 "key": "market",
                 "title": str(game.market_title),
-                "description": "台服價格、歷史走勢與提醒。",
+                "description": "追蹤台服 4、5 級子彈價格、歷史走勢與補貨預測。",
                 "href": f"/games/{game.slug}/market",
-                "status": "已上線",
-                "enabled": True,
-            }
-        )
-
-    if game.has_news:
-        cards.append(
-            {
-                "key": "news",
-                "title": str(game.news_title),
-                "description": "集中整理更新、活動與值得注意的遊戲消息。",
-                "href": f"/games/{game.slug}/news",
-                "status": "準備中",
-                "enabled": True,
-            }
-        )
-
-    if game.has_notifications:
-        cards.append(
-            {
-                "key": "notifications",
-                "title": str(game.notifications_title),
-                "description": "價格提醒與 Web Push。",
-                "href": f"/games/{game.slug}/notifications",
                 "status": "已上線",
                 "enabled": True,
             }
