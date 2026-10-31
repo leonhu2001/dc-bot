@@ -9,6 +9,7 @@
     const tierHost = document.querySelector('[data-market-tier-filters]');
     const resultMeta = document.querySelector('[data-market-result-meta]');
     const listPanel = document.querySelector('.game-market-list-panel');
+    const rowContainer = document.querySelector('.game-market-list');
     const sortSelect = document.querySelector('.game-market-search select[name="sort"]');
     const marketEventBar = document.querySelector('.game-market-livebar[aria-label="市場事件預測"]');
     const rows = Array.from(document.querySelectorAll('[data-market-row]'));
@@ -136,6 +137,26 @@
     function applyCategoryFilter(category) {
         activeCategory = category || '';
         applyFilters();
+    }
+
+    function applyClientSort() {
+        if (!rowContainer || pageParams.get('sort') !== 'restock_asc') return;
+
+        const ordered = [...rows].sort((left, right) => {
+            const leftAt = Date.parse(left.dataset.marketRestockAt || '');
+            const rightAt = Date.parse(right.dataset.marketRestockAt || '');
+            const leftMissing = Number.isNaN(leftAt);
+            const rightMissing = Number.isNaN(rightAt);
+
+            if (leftMissing !== rightMissing) return leftMissing ? 1 : -1;
+            if (!leftMissing && leftAt !== rightAt) return leftAt - rightAt;
+
+            const leftConfidence = Number.parseInt(left.dataset.marketRestockConfidence || '0', 10) || 0;
+            const rightConfidence = Number.parseInt(right.dataset.marketRestockConfidence || '0', 10) || 0;
+            return rightConfidence - leftConfidence;
+        });
+
+        ordered.forEach((row) => rowContainer.appendChild(row));
     }
 
     function installCategoryFilters() {
@@ -279,9 +300,11 @@
     if (sortSelect) {
         const smartOption = sortSelect.querySelector('option[value="name"]');
         if (smartOption) smartOption.textContent = '智慧排序';
+        if (pageParams.get('sort') === 'restock_asc') sortSelect.value = 'restock_asc';
     }
 
     removeStandaloneAnomalyBar();
+    applyClientSort();
     installCategoryFilters();
     installQuickFilters();
     applyFilters();

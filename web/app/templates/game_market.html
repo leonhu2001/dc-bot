@@ -3,7 +3,7 @@
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
 <link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261031-3">
-<script src="/static/js/pages/game_market_live.js?v=20261031-4" defer></script>
+<script src="/static/js/pages/game_market_live.js?v=20261101-1" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -181,6 +181,11 @@
                 <span>低價時段 <strong>學習中</strong></span>
                 <span>同步大跌樣本 <strong>{{ snapshot.market_event.historical_event_count }}/3</strong></span>
                 {% endif %}
+                {% if snapshot.next_restock_item %}
+                <span>下一個單品 <strong>{{ snapshot.next_restock_item.name }}</strong></span>
+                <span>預估 <strong>{{ snapshot.next_restock_item.restock_prediction_label }}</strong></span>
+                <span>單品可信度 <strong>{{ snapshot.next_restock_item.restock_confidence }}%</strong></span>
+                {% endif %}
             </div>
             <span class="game-market-live-state">價格歷史推估</span>
         </section>
@@ -196,6 +201,7 @@
                 <span class="sr-only">行情排序</span>
                 <select name="sort">
                     <option value="name" {% if market_sort == 'name' %}selected{% endif %}>智慧排序</option>
+                    <option value="restock_asc">預估補貨：最近優先</option>
                     <option value="value_asc" {% if market_sort == 'value_asc' %}selected{% endif %}>7D：低於均價優先</option>
                     <option value="value_desc" {% if market_sort == 'value_desc' %}selected{% endif %}>7D：高於均價優先</option>
                     <option value="price_desc" {% if market_sort == 'price_desc' %}selected{% endif %}>價格：高到低</option>
@@ -227,12 +233,20 @@
                 data-market-category="{{ item.category }}"
                 data-market-tier="{{ item.tier or '' }}"
                 data-market-watched="{% if is_watched %}1{% else %}0{% endif %}"
+                data-market-restock-at="{{ item.restock_predicted_at.isoformat() if item.restock_predicted_at else '' }}"
+                data-market-restock-confidence="{{ item.restock_confidence if item.restock_confidence is not none else '' }}"
             >
                 <div>
                     <strong>{{ item.name }}</strong>
                     <small>{% if item.tier %}{{ item.tier }}級 · {% endif %}{% if item.category %}{{ item.category }} · {% endif %}{{ item.item_key }}</small>
                     {% if is_watched %}
                     <span class="game-market-value-badge is-value-low">★ 收藏</span>
+                    {% endif %}
+                    {% if item.restock_prediction_label %}
+                    <span
+                        class="game-market-value-badge {% if item.restock_confidence is not none and item.restock_confidence >= 65 %}is-value-low{% else %}is-value-flat{% endif %}"
+                        title="歷史補貨型下跌樣本 {{ item.restock_event_count }} 次；時間抖動約 ±{{ item.restock_jitter_minutes or 0 }} 分鐘"
+                    >⏱ {{ item.restock_prediction_label }} · {{ item.restock_confidence }}%</span>
                     {% endif %}
                     {% if snapshot.market_event %}
                         {% if item.item_key in snapshot.market_event.restock_item_keys %}
