@@ -951,3 +951,16 @@ def test_smart_dispatch_backfill_failure_is_not_silent():
     assert "logger.exception(" in body
     assert "except Exception:\n            pass" not in body
 
+
+
+
+def test_dedicated_receiver_dispatch_suppresses_non_receiver_role_escalation():
+    from views.smart_dispatch import _is_dedicated_receiver_dispatch
+
+    assert _is_dedicated_receiver_dispatch(["1565369029005287595"]) is True
+    assert _is_dedicated_receiver_dispatch(["1565369317929918554"]) is True
+    assert _is_dedicated_receiver_dispatch(["1500234130871550004"]) is False
+    assert _is_dedicated_receiver_dispatch([
+        "1565369029005287595",
+        "1500234130871550004",
+    ]) is False

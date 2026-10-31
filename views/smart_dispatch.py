@@ -21,7 +21,11 @@ SECOND_WAVE_AFTER_OPEN_SECONDS = SECOND_WAVE_SECONDS - PUBLIC_ACCEPTANCE_OPEN_SE
 FULL_EXPANSION_AFTER_OPEN_SECONDS = FULL_EXPANSION_SECONDS - PUBLIC_ACCEPTANCE_OPEN_SECONDS
 
 from core.vip_levels import VIP_LEVELS
-from services.order_rules import role_ids_match_requirements
+from services.order_rules import (
+    AW_COLLISION_RECEIVER_ROLE_ID,
+    HALFCOIN_RECEIVER_ROLE_ID,
+    role_ids_match_requirements,
+)
 from services.smart_dispatch import (
     choose_initial_candidate_ids,
     get_completed_favorite_worker_ids,
@@ -416,6 +420,21 @@ async def send_specified_staff_dispatch_dms(
     return sent, failed
 
 
+_DEDICATED_RECEIVER_ROLE_IDS = frozenset({
+    AW_COLLISION_RECEIVER_ROLE_ID,
+    HALFCOIN_RECEIVER_ROLE_ID,
+})
+
+
+def _is_dedicated_receiver_dispatch(role_ids: Iterable[str | int]) -> bool:
+    normalized = {
+        str(role_id).strip()
+        for role_id in role_ids
+        if str(role_id).strip()
+    }
+    return len(normalized) == 1 and bool(normalized & _DEDICATED_RECEIVER_ROLE_IDS)
+
+
 def _customer_service_role_mention(
     bot: discord.Client,
     guild: discord.Guild,
@@ -680,7 +699,14 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                             )
                         )
 
-                    support_mention = _customer_service_role_mention(bot, guild)
+                    dedicated_receiver_dispatch = _is_dedicated_receiver_dispatch(
+                        plan.get("allowed_role_ids") or []
+                    )
+                    support_mention = (
+                        None
+                        if dedicated_receiver_dispatch
+                        else _customer_service_role_mention(bot, guild)
+                    )
                     if support_mention:
                         lines.append(
                             "🚨 **客服介入提醒**｜"
