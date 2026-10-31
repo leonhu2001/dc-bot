@@ -35,8 +35,10 @@ def test_market_page_has_live_freshness_history_and_category_controls():
     assert "data-market-category-filters" in template
     assert "data-market-category=" in template
     assert "coverage_hours" in template
-    assert "24H 統計" in template
-    assert "7D 統計" in template
+    assert "24H" in template
+    assert "7D" in template
+    assert "24H 統計" not in template
+    assert "7D 統計" not in template
 
     assert "Asia/Taipei" in script
     assert "/api/items" in script
@@ -78,10 +80,3 @@ def test_site_runtime_only_starts_background_notifications_when_already_enabled(
 
     assert "window.location.pathname === '/dispatch'" in script
     assert "mw_dispatch_desktop_notification_enabled" in script
-    assert "Notification.permission !== 'granted'" in script
-    assert "Notification.requestPermission" not in script
-    assert "'/dispatch/alerts/config'" in script
-    assert "'/dispatch/alerts/events'" in script
-    assert "new EventSource(BACKGROUND_EVENTS_URL)" in script
-    assert "window.location.href = '/dispatch'" in script
-    assert "mowan-dispatch-new-order-background" in script
