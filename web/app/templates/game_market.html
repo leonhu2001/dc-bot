@@ -153,6 +153,30 @@
             </div>
         </div>
 
+        {% if snapshot.market_event %}
+        <section class="game-market-livebar" aria-label="市場事件預測">
+            <div class="game-market-livebar-main">
+                <div>
+                    <strong>
+                        {{ snapshot.market_event.label }}
+                        {% if snapshot.market_event.confidence is not none %} · {{ snapshot.market_event.confidence }}%{% endif %}
+                    </strong>
+                    <small>{{ snapshot.market_event.message }}</small>
+                </div>
+            </div>
+            <div class="game-market-readiness">
+                {% if snapshot.market_event.predicted_window %}
+                <span>高機率低價時段 <strong>{{ snapshot.market_event.predicted_window }}</strong></span>
+                <span>可信度 <strong>{{ snapshot.market_event.predicted_confidence }}%</strong></span>
+                {% else %}
+                <span>低價時段 <strong>學習中</strong></span>
+                <span>同步大跌樣本 <strong>{{ snapshot.market_event.historical_event_count }}/3</strong></span>
+                {% endif %}
+            </div>
+            <span class="game-market-live-state">價格歷史推估</span>
+        </section>
+        {% endif %}
+
         <form class="game-market-search" method="get" action="/games/{{ game.slug }}/market">
             <label>
                 <span class="sr-only">搜尋行情品項</span>
