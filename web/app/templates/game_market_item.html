@@ -3,7 +3,9 @@
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
 <link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261031-2">
+<link rel="stylesheet" href="/static/css/pages/game_market_item_focus.css?v=20261101-1">
 <script src="/static/js/pages/game_market_item.js?v=20261031-2" defer></script>
+<script src="/static/js/pages/game_market_item_focus.js?v=20261101-1" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -35,12 +37,12 @@
         <article>
             <span>目前</span>
             <strong>{% if current_price is not none %}${{ "{:,}".format(current_price) }}{% else %}—{% endif %}</strong>
-            <small>最新台服成交掛價快照</small>
+            <small>最新台服價格</small>
         </article>
         <article>
             <span>24H 漲跌</span>
             <strong data-market-change-24h>累積中</strong>
-            <small data-market-change-24h-note>至少需要約 20 小時可信歷史</small>
+            <small data-market-change-24h-note>至少需要約 20 小時歷史</small>
         </article>
         <article>
             <span>24H 區間</span>
@@ -50,7 +52,7 @@
         <article>
             <span>7D 均價</span>
             <strong data-market-average-7d>累積中</strong>
-            <small>至少需要約 6 天實際覆蓋</small>
+            <small>至少需要約 6 天覆蓋</small>
         </article>
         <article>
             <span>7D 區間</span>
@@ -60,8 +62,28 @@
         <article>
             <span>歷史覆蓋</span>
             <strong data-market-coverage>{{ point_count }} 筆</strong>
-            <small data-market-coverage-note>讀取正式 Market DB 中…</small>
+            <small data-market-coverage-note>讀取中…</small>
         </article>
+    </section>
+
+    <section
+        class="market-item-restock-card"
+        data-market-restock-card
+        data-market-overview-url="/games/{{ game.slug }}/market?q={{ item.source_item_id|urlencode }}"
+        data-market-item-key="{{ item.source_item_id }}"
+        hidden
+        aria-label="補貨預測"
+    >
+        <div>
+            <span class="game-market-label">RESTOCK RADAR</span>
+            <h2>補貨預測</h2>
+        </div>
+        <div class="market-item-restock-grid">
+            <article><span>下次預估</span><strong data-restock-time>—</strong></article>
+            <article><span>可信度</span><strong data-restock-confidence>—</strong></article>
+            <article><span>歷史樣本</span><strong data-restock-samples>—</strong></article>
+            <article><span>時間抖動</span><strong data-restock-jitter>—</strong></article>
+        </div>
     </section>
 
     <section
@@ -78,7 +100,6 @@
             <div>
                 <span class="game-market-label">SAME CALIBER</span>
                 <h2>同口徑比較</h2>
-                <small>直接比較目前台服價格；不把不同彈種硬算成推薦分數。</small>
             </div>
             <span data-market-compare-count>載入中…</span>
         </div>
@@ -87,22 +108,20 @@
         </div>
     </section>
 
-    <section class="market-item-personal" id="price-alerts" aria-label="關注與價格提醒">
+    <section class="market-item-personal" id="price-alerts" aria-label="收藏與價格提醒">
         <article class="market-item-personal-card">
             <span class="game-market-label">WATCHLIST</span>
-            <h2>關注這個品項</h2>
+            <h2>收藏這顆子彈</h2>
             {% if user %}
-            <p>加入關注後，可在「{{ game.notifications_title }}」集中查看。</p>
             <form method="post" action="/games/{{ game.slug }}/market/items/{{ item.source_item_id|urlencode }}/watch">
                 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                 <input type="hidden" name="watched" value="{% if watched %}0{% else %}1{% endif %}">
                 <button class="market-item-watch-button{% if watched %} is-watched{% endif %}" type="submit">
-                    {% if watched %}★ 已關注 · 點擊取消{% else %}☆ 加入關注{% endif %}
+                    {% if watched %}★ 已收藏 · 點擊取消{% else %}☆ 加入收藏{% endif %}
                 </button>
             </form>
             {% else %}
-            <p>使用 Discord 登入後即可建立自己的關注清單與價格提醒。</p>
-            <a class="market-item-login" href="/auth/discord/login?next={{ request.url.path|urlencode }}">Discord 登入後關注</a>
+            <a class="market-item-login" href="/auth/discord/login?next={{ request.url.path|urlencode }}">Discord 登入後收藏</a>
             {% endif %}
         </article>
 
@@ -110,7 +129,6 @@
             <span class="game-market-label">PRICE ALERT</span>
             <h2>設定價格提醒</h2>
             {% if user %}
-            <p>價格跨過目標值時才記錄一次觸發；離開條件後再次跨入才會重新觸發。</p>
             <form class="market-item-alert-form" method="post" action="/games/{{ game.slug }}/market/items/{{ item.source_item_id|urlencode }}/alerts">
                 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                 <label>
@@ -138,11 +156,9 @@
             {% if item_alerts %}
             <div class="market-item-alert-existing">
                 <span>這個品項已有 {{ item_alerts|length }} 個提醒</span>
-                <a href="/games/{{ game.slug }}/notifications">管理提醒 →</a>
             </div>
             {% endif %}
             {% else %}
-            <p>登入後可設定「低於」或「高於」指定價格的提醒。</p>
             <a class="market-item-login" href="/auth/discord/login?next={{ request.url.path|urlencode }}">Discord 登入後設定</a>
             {% endif %}
         </article>
@@ -157,7 +173,7 @@
             <div>
                 <span class="game-market-label">PRICE HISTORY</span>
                 <h2>價格走勢</h2>
-                <small data-market-chart-status>只使用魔丸自己累積的台服正式歷史</small>
+                <small data-market-chart-status>讀取價格歷史中…</small>
             </div>
             <div class="market-item-chart-range" aria-label="走勢時間範圍">
                 <button type="button" data-market-range="24">24H</button>
@@ -170,11 +186,6 @@
             <div class="market-item-chart-empty" data-market-chart-empty>正在讀取歷史價格…</div>
         </div>
         <div class="market-item-chart-foot" data-market-chart-foot></div>
-    </section>
-
-    <section class="market-item-note">
-        <strong>資料說明</strong>
-        <p>行情只使用已寫入正式 Market DB 的台服公開來源資料。24H 指標至少需要約 20 小時實際覆蓋，7D 指標至少需要約 6 天才顯示；資料不足時寧可標示「累積中」，不拿第三方推薦或統計分數補洞。來源過期或中斷時會保留最後價格，但價格提醒不會在 stale 狀態觸發。Web Push 已正式啟用，已訂閱的裝置可接收價格穿越門檻通知。</p>
     </section>
 </section>
 {% endblock %}
