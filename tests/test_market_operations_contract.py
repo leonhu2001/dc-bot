@@ -11,6 +11,7 @@ def test_market_backup_keeps_credentials_out_of_pg_dump_arguments():
     assert '"--format=custom"' in text
     assert '"--no-owner"' in text
     assert '"--no-privileges"' in text
+    assert '[pg_restore, "--list", str(temp_path)]' in text
     assert "MARKET_BACKUP_RETENTION_DAYS" in text
     assert "market_*.dump" in text
     assert "raw_url" not in "\n".join(
@@ -48,6 +49,8 @@ def test_market_operations_setup_installs_and_runs_both_checks():
     powershell = (ROOT / "scripts" / "setup_market_operations.ps1").read_text(encoding="utf-8")
 
     assert "pg_dump" in shell
+    assert "pg_restore" in shell
+    assert 'BACKUP_DIR="$APP/_archive/market_db"' in shell
     assert "systemctl enable --now" in shell
     assert 'systemctl start "$BACKUP_SERVICE"' in shell
     assert 'systemctl start "$HEALTH_SERVICE"' in shell
