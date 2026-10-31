@@ -1,0 +1,33 @@
+[Unit]
+Description=DC Bot Market PostgreSQL backup
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/dc-bot
+EnvironmentFile=/opt/dc-bot/web/.env
+Environment=APP_DIR=/opt/dc-bot
+ExecStart=/opt/dc-bot/venv/bin/python /opt/dc-bot/scripts/market_backup.py
+User=dc-bot-web
+Group=dc-bot-web
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ReadWritePaths=/opt/dc-bot/_archive/market_db
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0077

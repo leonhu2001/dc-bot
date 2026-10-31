@@ -1,0 +1,31 @@
+[Unit]
+Description=DC Bot Market production health probe
+After=dc-bot-dashboard.service dc-bot-market.service
+Wants=dc-bot-dashboard.service dc-bot-market.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/dc-bot
+Environment=MARKET_HEALTH_REQUIRE_WEB_PUSH=1
+ExecStart=/opt/dc-bot/venv/bin/python /opt/dc-bot/scripts/market_health_probe.py
+User=dc-bot-web
+Group=dc-bot-web
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0027
