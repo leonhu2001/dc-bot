@@ -32,6 +32,7 @@ class MarketRestockForecast(MarketRestockBase):
     item_key: Mapped[str] = mapped_column(String(128), index=True)
     predicted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    based_on_event_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     confidence: Mapped[int] = mapped_column(Integer)
     event_count: Mapped[int] = mapped_column(Integer)
     interval_minutes: Mapped[int] = mapped_column(Integer)
@@ -123,7 +124,7 @@ class MarketRestockRepository:
                         MarketRestockForecast.game_key == game,
                         MarketRestockForecast.item_key == prediction.item_key,
                         MarketRestockForecast.status == "scheduled",
-                        MarketRestockForecast.generated_at < last_event_at,
+                        MarketRestockForecast.based_on_event_at < last_event_at,
                         MarketRestockForecast.predicted_at >= last_event_at - timedelta(hours=3),
                         MarketRestockForecast.predicted_at <= last_event_at + timedelta(hours=3),
                     )
@@ -155,6 +156,7 @@ class MarketRestockRepository:
                 if nearby is not None:
                     nearby.predicted_at = predicted_at
                     nearby.generated_at = at
+                    nearby.based_on_event_at = last_event_at
                     nearby.confidence = int(prediction.confidence)
                     nearby.event_count = int(prediction.event_count)
                     nearby.interval_minutes = int(prediction.median_interval_minutes)
@@ -177,6 +179,7 @@ class MarketRestockRepository:
                         item_key=prediction.item_key,
                         predicted_at=predicted_at,
                         generated_at=at,
+                        based_on_event_at=last_event_at,
                         confidence=int(prediction.confidence),
                         event_count=int(prediction.event_count),
                         interval_minutes=int(prediction.median_interval_minutes),
