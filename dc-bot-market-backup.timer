@@ -1,0 +1,11 @@
+[Unit]
+Description=Run DC Bot Market PostgreSQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 Asia/Taipei
+Persistent=true
+RandomizedDelaySec=10m
+Unit=dc-bot-market-backup.service
+
+[Install]
+WantedBy=timers.target
