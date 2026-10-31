@@ -5,7 +5,8 @@
     const updatedNode = document.querySelector('[data-market-updated-at]');
     const ageNode = document.querySelector('[data-market-age]');
     const liveNode = document.querySelector('[data-market-live-state]');
-    const filterHost = document.querySelector('[data-market-category-filters]');
+    const categoryHost = document.querySelector('[data-market-category-filters]');
+    const focusHost = document.querySelector('[data-market-focus-filters]');
     const tierHost = document.querySelector('[data-market-tier-filters]');
     const resultMeta = document.querySelector('[data-market-result-meta]');
     const rows = Array.from(document.querySelectorAll('[data-market-row]'));
@@ -20,7 +21,14 @@
         hour12: false,
     });
 
+    const focusLabels = {
+        watched: '收藏',
+        abnormal: '價格異常',
+        restock: '疑似補貨',
+    };
+
     let activeCategory = '';
+    let activeFocus = '';
     let refreshTimer = null;
     let lastUpdatedAt = updatedNode?.getAttribute('datetime') || '';
 
@@ -50,35 +58,72 @@
         }
     }
 
+    function rowMatchesFocus(row) {
+        if (!activeFocus) return true;
+        if (activeFocus === 'watched') {
+            return row.dataset.marketWatched === '1';
+        }
+        if (activeFocus === 'restock') {
+            return row.dataset.marketRestock === '1';
+        }
+        if (activeFocus === 'abnormal') {
+            return row.dataset.marketAbnormalDown === '1'
+                || row.dataset.marketAbnormalUp === '1';
+        }
+        return true;
+    }
+
     function visibleRows() {
         return rows.filter((row) => !row.hidden);
     }
 
-    function applyCategoryFilter(category) {
-        activeCategory = category || '';
+    function updateResultMeta() {
+        if (!resultMeta) return;
+        const suffixes = [];
+        if (activeFocus && focusLabels[activeFocus]) suffixes.push(focusLabels[activeFocus]);
+        if (activeCategory) suffixes.push(activeCategory);
+        const suffix = suffixes.length ? ` · ${suffixes.join(' · ')}` : '';
+        resultMeta.textContent = `顯示 ${visibleRows().length} 個品項${suffix}`;
+    }
+
+    function applyFilters() {
         rows.forEach((row) => {
             const rowCategory = (row.dataset.marketCategory || '').trim();
-            row.hidden = Boolean(activeCategory && rowCategory !== activeCategory);
+            const categoryMatches = !activeCategory || rowCategory === activeCategory;
+            row.hidden = !(categoryMatches && rowMatchesFocus(row));
         });
 
-        if (filterHost) {
-            filterHost.querySelectorAll('button[data-market-category]').forEach((button) => {
+        if (categoryHost) {
+            categoryHost.querySelectorAll('button[data-market-category]').forEach((button) => {
                 const selected = (button.dataset.marketCategory || '') === activeCategory;
                 button.classList.toggle('is-active', selected);
                 button.setAttribute('aria-pressed', selected ? 'true' : 'false');
             });
         }
 
-        if (resultMeta) {
-            const count = visibleRows().length;
-            resultMeta.textContent = activeCategory
-                ? `顯示 ${count} 個品項 · ${activeCategory}`
-                : `顯示 ${count} 個品項`;
+        if (focusHost) {
+            focusHost.querySelectorAll('button[data-market-focus]').forEach((button) => {
+                const selected = (button.dataset.marketFocus || '') === activeFocus;
+                button.classList.toggle('is-active', selected);
+                button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            });
         }
+
+        updateResultMeta();
+    }
+
+    function applyCategoryFilter(category) {
+        activeCategory = category || '';
+        applyFilters();
+    }
+
+    function applyFocusFilter(focus) {
+        activeFocus = focus || '';
+        applyFilters();
     }
 
     function installCategoryFilters() {
-        if (!filterHost || rows.length === 0) return;
+        if (!categoryHost || rows.length === 0) return;
         const categories = Array.from(new Set(
             rows
                 .map((row) => (row.dataset.marketCategory || '').trim())
@@ -87,8 +132,8 @@
 
         if (categories.length === 0) return;
 
-        filterHost.hidden = false;
-        filterHost.replaceChildren();
+        categoryHost.hidden = false;
+        categoryHost.replaceChildren();
 
         const makeButton = (label, value) => {
             const button = document.createElement('button');
@@ -101,9 +146,18 @@
             return button;
         };
 
-        filterHost.appendChild(makeButton('全部口徑', ''));
+        categoryHost.appendChild(makeButton('全部口徑', ''));
         categories.forEach((category) => {
-            filterHost.appendChild(makeButton(category, category));
+            categoryHost.appendChild(makeButton(category, category));
+        });
+    }
+
+    function installFocusFilters() {
+        if (!focusHost) return;
+        focusHost.querySelectorAll('button[data-market-focus]').forEach((button) => {
+            button.addEventListener('click', () => {
+                applyFocusFilter(button.dataset.marketFocus || '');
+            });
         });
     }
 
@@ -185,8 +239,9 @@
     }
 
     installCategoryFilters();
+    installFocusFilters();
     installTierFilters();
-    applyCategoryFilter('');
+    applyFilters();
     updateFreshness();
     window.setInterval(updateFreshness, 30_000);
     scheduleRefresh();
