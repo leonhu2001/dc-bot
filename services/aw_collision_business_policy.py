@@ -4,14 +4,13 @@ from dataclasses import replace
 
 import discord
 
-from services.aw_collision_catalog import AW_RULE_KEYS, is_aw_collision_rule
+from services.aw_collision_catalog import is_aw_collision_rule
 
 
 _INSTALLED = False
 _ORIGINAL_FINANCIAL_CALCULATOR = None
 _ORIGINAL_DISCOUNT_RESOLVER = None
 _ORIGINAL_VIEW_INIT = None
-_ORIGINAL_ROLE_AWARE_PAYOUT = None
 
 
 _AW_DISCOUNT_AND_BENEFIT_KEYS = {
@@ -47,24 +46,6 @@ _AW_DISCOUNT_AND_BENEFIT_KEYS = {
     "benefit_discount_amount",
     "benefit_service_note",
 }
-
-
-def _install_rule_policy() -> None:
-    from services.order_rules import ORDER_RULES
-
-    for key in AW_RULE_KEYS:
-        rule = ORDER_RULES.get(str(key))
-        if rule is None:
-            continue
-        ORDER_RULES[str(key)] = replace(
-            rule,
-            allow_specify=False,
-            max_specified_count=None,
-            specify_fee_default=0,
-            vip_discount_allowed=False,
-            point_benefits_allowed=False,
-            loyalty_benefits_enabled=False,
-        )
 
 
 def _clean_aw_finance_input(data: dict) -> dict:
@@ -224,71 +205,14 @@ def _install_checkout_controls() -> None:
     ui.SelfServiceOrderView.__init__ = aw_business_view_init
 
 
-def _install_payout_policy() -> None:
-    global _ORIGINAL_ROLE_AWARE_PAYOUT
-
-    from services import one_companion_one_guard_payout as role_payout
-    from shared.payout import calculate_order_payout
-
-    if _ORIGINAL_ROLE_AWARE_PAYOUT is None:
-        _ORIGINAL_ROLE_AWARE_PAYOUT = role_payout.calculate_one_companion_one_guard_order_payout
-    original = _ORIGINAL_ROLE_AWARE_PAYOUT
-
-    def calculate_role_aware_payout(
-        *,
-        rule_key: str | None,
-        total_amount: int,
-        worker_roles,
-        named_bonus_worker_ids=None,
-        customer_service_total_amount: int | None = None,
-    ):
-        if not is_aw_collision_rule(rule_key):
-            return original(
-                rule_key=rule_key,
-                total_amount=total_amount,
-                worker_roles=worker_roles,
-                named_bonus_worker_ids=named_bonus_worker_ids,
-                customer_service_total_amount=customer_service_total_amount,
-            )
-
-        worker_ids: list[str] = []
-        seen: set[str] = set()
-        for worker_id, _role_type in list(worker_roles or ()): 
-            worker_id_text = str(worker_id or "").strip()
-            if worker_id_text and worker_id_text not in seen:
-                seen.add(worker_id_text)
-                worker_ids.append(worker_id_text)
-
-        # AW is a pure pass-through service: the whole payout basis belongs to
-        # the active worker roster. No named bonus and no customer-service share
-        # is added on top, so the store cannot accidentally pay over 100%.
-        return calculate_order_payout(
-            total_amount=max(0, int(total_amount or 0)),
-            worker_discord_ids=worker_ids,
-            named_bonus_worker_ids=[],
-            worker_base_rate=1.0,
-            customer_service_rate=0.0,
-            named_bonus_rate=0.0,
-            customer_service_total_amount=(
-                max(0, int(total_amount or 0))
-                if customer_service_total_amount is None
-                else max(0, int(customer_service_total_amount or 0))
-            ),
-        )
-
-    role_payout.calculate_one_companion_one_guard_order_payout = calculate_role_aware_payout
-
-
 def install_aw_collision_business_policy() -> None:
-    """Apply AW-only checkout, finance, and payroll rules."""
+    """Install only AW checkout/financial UI behavior. Qualification and payout are canonical rules."""
     global _INSTALLED
     if _INSTALLED:
         return
 
-    _install_rule_policy()
     _install_financial_policy()
     _install_checkout_controls()
-    _install_payout_policy()
     _INSTALLED = True
 
 

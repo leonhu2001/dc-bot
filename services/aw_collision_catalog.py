@@ -5,8 +5,7 @@ from typing import Any
 import discord
 
 from services.order_rules import (
-    ALL_RECEIVER_ROLES,
-    DELTA_ANY_GAME_ROLE,
+    AW_COLLISION_RECEIVER_ROLES,
     ORDER_RULES,
     OrderRule,
     PriceResult,
@@ -139,12 +138,17 @@ def _install_rules_and_catalog() -> None:
                 pricing_type="unit",
                 price=nominal_price,
                 unit_label="發",
-                allowed_roles=ALL_RECEIVER_ROLES,
+                allowed_roles=AW_COLLISION_RECEIVER_ROLES,
                 required_staff_count=1,
                 min_quantity=minimum,
                 max_quantity=maximum,
                 allow_specify=False,
-                required_game_roles=DELTA_ANY_GAME_ROLE,
+                max_specified_count=None,
+                specify_fee_default=0,
+                vip_discount_allowed=False,
+                point_benefits_allowed=False,
+                loyalty_benefits_enabled=False,
+                required_game_roles=(),
                 note=(
                     "AW代撞依方案發數動態計價；101～500發為4.5T/發。"
                     "系統帳務只存整數T，半T總額向上進位。"

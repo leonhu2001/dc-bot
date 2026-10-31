@@ -16,6 +16,17 @@ ONE_COMPANION_ONE_GUARD_PAYOUT_BASES: dict[str, tuple[int, int]] = {
     "basic_mobile_one_companion_one_guard_topsecret": (420, 320),
 }
 
+FULL_WORKER_PAYOUT_RULE_KEYS = frozenset({
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
+})
+FULL_WORKER_PAYOUT_RULE_PREFIXES = ("farm_aw_collision_",)
+
+
+def is_full_worker_payout_rule(rule_key: str | None) -> bool:
+    key = str(rule_key or "").strip()
+    return key in FULL_WORKER_PAYOUT_RULE_KEYS or key.startswith(FULL_WORKER_PAYOUT_RULE_PREFIXES)
+
 
 def payout_bases_for_rule(rule_key: str | None) -> tuple[int, int] | None:
     return ONE_COMPANION_ONE_GUARD_PAYOUT_BASES.get(str(rule_key or "").strip())
@@ -146,6 +157,24 @@ def calculate_one_companion_one_guard_order_payout(
     scaling the 400/320 etc. slot weights to the order's actual payout basis.
     """
     workers = _unique_worker_roles(worker_roles)
+
+    if is_full_worker_payout_rule(rule_key):
+        worker_ids = [worker_id for worker_id, _role_type in workers]
+        customer_service_amount = (
+            max(0, int(total_amount or 0))
+            if customer_service_total_amount is None
+            else max(0, int(customer_service_total_amount or 0))
+        )
+        return calculate_order_payout(
+            total_amount=max(0, int(total_amount or 0)),
+            worker_discord_ids=worker_ids,
+            named_bonus_worker_ids=[],
+            worker_base_rate=1.0,
+            customer_service_rate=0.0,
+            named_bonus_rate=0.0,
+            customer_service_total_amount=customer_service_amount,
+        )
+
     shares = allocate_integer_gross_shares(rule_key, workers, total_amount)
     if shares is None:
         return None
@@ -210,9 +239,12 @@ def calculate_one_companion_one_guard_order_payout(
 
 __all__ = [
     "ONE_COMPANION_ONE_GUARD_PAYOUT_BASES",
+    "FULL_WORKER_PAYOUT_RULE_KEYS",
+    "FULL_WORKER_PAYOUT_RULE_PREFIXES",
     "allocate_decimal_gross_shares",
     "allocate_integer_gross_shares",
     "calculate_one_companion_one_guard_order_payout",
+    "is_full_worker_payout_rule",
     "payout_bases_for_rule",
     "worker_basis_weights",
 ]

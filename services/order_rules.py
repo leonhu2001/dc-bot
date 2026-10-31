@@ -13,6 +13,8 @@ RoleKey = Literal[
     "male_protector",
     "male_companion",
     "female_companion",
+    "aw_collision_receiver",
+    "halfcoin_receiver",
 ]
 
 PricingType = Literal["fixed", "hourly", "game", "unit", "manual"]
@@ -26,6 +28,8 @@ ROLE_LABELS: dict[RoleKey, str] = {
     "male_protector": "魔丸♜男護",
     "male_companion": "魔丸♞男陪",
     "female_companion": "魔丸♟女陪",
+    "aw_collision_receiver": "AW代撞接單",
+    "halfcoin_receiver": "哈夫幣代洗接單",
 }
 
 ROLE_IDS: dict[RoleKey, str] = {
@@ -34,6 +38,8 @@ ROLE_IDS: dict[RoleKey, str] = {
     "male_protector": "1500751039060643990",
     "male_companion": "1500751059239440575",
     "female_companion": "1482080315798192210",
+    "aw_collision_receiver": "1565369029005287595",
+    "halfcoin_receiver": "1565369317929918554",
 }
 
 GAME_ROLE_IDS_BY_KEY: dict[str, str] = {
@@ -68,6 +74,8 @@ COMPANION_ROLES: tuple[RoleKey, ...] = (
 )
 
 ALL_RECEIVER_ROLES: tuple[RoleKey, ...] = PROTECTOR_ROLES + COMPANION_ROLES
+AW_COLLISION_RECEIVER_ROLES: tuple[RoleKey, ...] = ("aw_collision_receiver",)
+HALFCOIN_RECEIVER_ROLES: tuple[RoleKey, ...] = ("halfcoin_receiver",)
 
 DELTA_DESKTOP_GAME_ROLE = ("delta_desktop",)
 DELTA_MOBILE_GAME_ROLE = ("delta_mobile",)
@@ -600,7 +608,7 @@ _add(OrderRule(
     "general", "basic_sweet_single", "甜蜜單｜單陪", "hourly", 520, "H",
     allowed_roles=COMPANION_ROLES,
     allowed_game_roles=(),
-    required_game_roles=(),
+    required_game_roles=(SWEET_COMPANION_ROLE_KEY,),
     required_staff_count=1,
     allow_specify=True,
     max_specified_count=1,
@@ -617,7 +625,7 @@ _add(OrderRule(
     "general", "basic_sweet_double", "甜蜜單｜雙陪", "hourly", 1314, "H",
     allowed_roles=COMPANION_ROLES,
     allowed_game_roles=(),
-    required_game_roles=(),
+    required_game_roles=(SWEET_COMPANION_ROLE_KEY,),
     required_staff_count=2,
     allow_specify=True,
     max_specified_count=2,
@@ -651,7 +659,7 @@ def _add_sweet_rule(
         "H",
         allowed_roles=allowed_roles,
         allowed_game_roles=(),
-        required_game_roles=required_game_roles,
+        required_game_roles=(*required_game_roles, SWEET_COMPANION_ROLE_KEY),
         required_staff_count=required_staff_count,
         allow_specify=True,
         max_specified_count=required_staff_count,
@@ -990,7 +998,7 @@ for key, label, price in [
     ("farm_halfcoin_120m", "哈夫幣代洗｜120M", 1250),
     ("farm_halfcoin_360m", "哈夫幣代洗｜360M", 3400),
 ]:
-    _add(OrderRule("farm", key, label, "fixed", price, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_ANY_GAME_ROLE, required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
+    _add(OrderRule("farm", key, label, "fixed", price, allowed_roles=HALFCOIN_RECEIVER_ROLES, required_game_roles=(), required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
 
 
 
@@ -1548,6 +1556,16 @@ SOURCE_AUTHORITY_RULE_KEYS = frozenset(
     if bool(rule.player_count_enabled) and key != "custom_custom_order"
 )
 
+# Owner-approved structural qualifications. Manager overrides may change ordinary
+# commercial fields but cannot broaden who may claim these system products.
+SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS = frozenset({
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
+    "farm_aw_collision_1_100",
+    "farm_aw_collision_101_500",
+    "farm_aw_collision_501_plus",
+})
+
 
 class EffectiveOrderRules(dict):
     """Read-through mapping for code rules + manager-created rules + overrides.
@@ -1645,6 +1663,19 @@ class EffectiveOrderRules(dict):
                     price_multiply_player_count=base.price_multiply_player_count,
                     player_count_prices=dict(base.player_count_prices),
                     max_specified_count=base.max_specified_count,
+                )
+            if key in SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS:
+                rule = replace(
+                    rule,
+                    allowed_roles=base.allowed_roles,
+                    allowed_game_roles=base.allowed_game_roles,
+                    required_game_roles=base.required_game_roles,
+                    allow_specify=base.allow_specify,
+                    max_specified_count=base.max_specified_count,
+                    specify_fee_default=base.specify_fee_default,
+                    vip_discount_allowed=base.vip_discount_allowed,
+                    point_benefits_allowed=base.point_benefits_allowed,
+                    loyalty_benefits_enabled=base.loyalty_benefits_enabled,
                 )
             if SWEET_COMPANION_ROLE_KEY in tuple(base.required_game_roles):
                 rule = replace(rule, required_game_roles=base.required_game_roles)
@@ -1750,6 +1781,8 @@ def invalidate_rule_override_cache() -> None:
 
 __all__ = [
     "ALL_RECEIVER_ROLES",
+    "AW_COLLISION_RECEIVER_ROLES",
+    "HALFCOIN_RECEIVER_ROLES",
     "ALL_ROLE_IDS",
     "ALL_ROLE_LABELS",
     "CATEGORY_LABELS",
@@ -1760,6 +1793,7 @@ __all__ = [
     "ROLE_IDS",
     "ROLE_LABELS",
     "SOURCE_AUTHORITY_RULE_KEYS",
+    "SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS",
     "RoleKey",
     "OrderRule",
     "calculate_price",
