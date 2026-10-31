@@ -3,8 +3,10 @@ from types import SimpleNamespace
 
 from views.market import (
     MARKET_PANEL_CHANNEL_ID,
+    MarketDmSettingsView,
     MarketNotificationCenterView,
     MarketOverviewView,
+    _build_dm_settings_embed,
     _message_component_custom_ids,
     build_market_alerts_embed,
     build_market_overview_embed,
@@ -56,6 +58,12 @@ def test_market_panel_internal_markers_are_hidden_from_users():
     assert getattr(notifications.footer, "text", None) is None
     assert notifications.description is None
 
+    fields = {field.name: field.value for field in notifications.fields}
+    assert fields == {
+        "提醒條件": "📉 低於指定價格\n📈 高於指定價格",
+        "通知方式": "💬 Discord 私訊",
+    }
+
     message = SimpleNamespace(
         components=[
             SimpleNamespace(
@@ -70,6 +78,24 @@ def test_market_panel_internal_markers_are_hidden_from_users():
     assert "embed.set_footer(text=MARKET_ALERTS_MARKER)" not in source
     assert "marker == LEGACY_MARKET_OVERVIEW_MARKER" in source
     assert "marker == LEGACY_MARKET_ALERTS_MARKER" in source
+
+
+def test_discord_dm_settings_show_private_status_before_toggling():
+    enabled_embed = _build_dm_settings_embed(True)
+    disabled_embed = _build_dm_settings_embed(False)
+    enabled_view = MarketDmSettingsView(True)
+    disabled_view = MarketDmSettingsView(False)
+
+    assert enabled_embed.description == "目前狀態：✅ 已開啟"
+    assert disabled_embed.description == "目前狀態：🔕 已關閉"
+    assert enabled_view.timeout == 180
+    assert disabled_view.timeout == 180
+    assert enabled_view.children[0].label == "關閉通知"
+    assert disabled_view.children[0].label == "開啟通知"
+
+    source = (ROOT / "views" / "market.py").read_text(encoding="utf-8")
+    assert "view=MarketDmSettingsView(enabled)" in source
+    assert "target = not self.enabled" in source
 
 
 def test_setup_cog_installs_market_discord_runtime():
