@@ -256,6 +256,7 @@
                         {% elif item.vs_7d_avg_pct > 0 %}高 {{ "%.1f"|format(item.vs_7d_avg_pct) }}%
                         {% else %}均價附近{% endif %}
                     </span>
+                    {% endif %}
                     <span class="game-market-mobile-arrow" aria-hidden="true">→</span>
                 </div>
                 <div class="{% if item.change_24h_pct is not none and item.change_24h_pct > 0 %}is-positive{% elif item.change_24h_pct is not none and item.change_24h_pct < 0 %}is-negative{% endif %}">
