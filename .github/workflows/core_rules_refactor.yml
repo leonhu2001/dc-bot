@@ -28,6 +28,8 @@ jobs:
             requirements.txt
             web/requirements-web.txt
             requirements-dev.txt
+      - name: Patch one-shot helper
+        run: python scripts/fix_core_rules_refactor_helper_20261101.py
       - name: Apply direct core refactor
         run: python scripts/core_rules_refactor_20261101.py
       - name: Install dependencies
