@@ -30,4 +30,4 @@ def test_market_snapshot_never_fabricates_prices_before_source_is_ready():
     assert snapshot.status == "source_pending"
     assert snapshot.recommended_item is None
     assert snapshot.items == ()
-    assert "不會顯示模擬價格" in snapshot.message
+    assert snapshot.message == "行情準備中。"

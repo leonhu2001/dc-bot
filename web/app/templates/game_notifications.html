@@ -14,7 +14,7 @@
         <div>
             <div class="game-tool-kicker">{{ game.eyebrow }} · NOTIFICATIONS</div>
             <h1>{{ game.notifications_title }}</h1>
-            <p>管理你的關注清單、價格提醒與這台裝置的網站推播。只有 fresh 正式行情會觸發價格條件。</p>
+            <p>管理關注、價格提醒與推播。</p>
         </div>
         <nav class="game-tool-tabs" aria-label="{{ game.name }}工具">
             {% for feature in game_features %}
@@ -29,7 +29,7 @@
         <div>
             <span>PERSONALIZATION</span>
             <h2>個人化行情資料庫尚未就緒</h2>
-            <p>關注與提醒目前暫停寫入；既有網站與訂單功能不受影響。</p>
+            <p>關注與提醒目前暫停使用。</p>
         </div>
     </section>
     {% endif %}
@@ -46,12 +46,11 @@
         <div class="game-notification-push-copy">
             <span class="game-market-label">WEB PUSH</span>
             <h2>價格達標時通知這台裝置</h2>
-            <p>只有你主動按下開啟後，瀏覽器才會詢問通知權限。沒有價格提醒時不會新增推播訂閱；既有訂閱仍可在這裡關閉。</p>
         </div>
         <div class="game-notification-push-controls">
             <button type="button" data-market-push-button disabled>檢查推播支援…</button>
             <button type="button" data-market-push-test hidden disabled>傳送測試通知</button>
-            <small data-market-push-status aria-live="polite">正在確認這台裝置的推播狀態。</small>
+            <small data-market-push-status aria-live="polite">正在確認推播狀態。</small>
         </div>
     </section>
 
@@ -88,7 +87,6 @@
             {% else %}
             <div class="game-market-empty game-notification-empty">
                 <strong>還沒有關注品項</strong>
-                <span>到交易所行情打開任一品項，按「加入關注」即可放進這裡。</span>
                 <a href="/games/{{ game.slug }}/market">前往 {{ game.market_title }} →</a>
             </div>
             {% endif %}
@@ -140,18 +138,10 @@
             {% else %}
             <div class="game-market-empty game-notification-empty">
                 <strong>還沒有價格提醒</strong>
-                <span>在品項頁設定「低於或等於」或「高於或等於」目標價格；建立後才可為新裝置開啟推播。</span>
+                <span>到品項頁建立提醒。</span>
             </div>
             {% endif %}
         </article>
-    </section>
-
-    <section class="market-item-note game-notification-note">
-        <strong>提醒狀態</strong>
-        <p>
-            目前行情狀態：{{ market_status }}。只有 fresh/ready 行情才會進行價格條件判斷；stale、來源中斷或無資料時不觸發。
-            推播採裝置個別訂閱與送達紀錄；若推播服務暫時失敗會重試，已失效的瀏覽器 endpoint 會自動停用。
-        </p>
     </section>
 </section>
 {% endblock %}
