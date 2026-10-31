@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
+from services.market.scope import minimum_market_tier
 from services.market.storage import MarketItem, MarketPrice, MarketRepository, MarketSourceRun
 
 
@@ -311,7 +312,7 @@ def analyze_market_events(
                 message="至少需要 2 批行情才能開始判斷。",
             )
 
-        rows = db.execute(
+        rows_query = (
             select(
                 MarketItem.source_item_id,
                 MarketItem.category,
@@ -324,7 +325,17 @@ def analyze_market_events(
                 MarketItem.source_name == clean_source_name,
                 MarketPrice.source_updated_at.in_(run_times),
             )
-            .order_by(MarketPrice.source_updated_at.asc(), MarketItem.id.asc())
+        )
+        minimum_tier = minimum_market_tier(clean_game_key)
+        if minimum_tier is not None:
+            rows_query = rows_query.where(
+                MarketItem.tier.is_(None) | (MarketItem.tier >= minimum_tier)
+            )
+        rows = db.execute(
+            rows_query.order_by(
+                MarketPrice.source_updated_at.asc(),
+                MarketItem.id.asc(),
+            )
         ).all()
 
     snapshots: dict[datetime, dict[str, tuple[int, str]]] = {}
