@@ -1,0 +1,54 @@
+.market-item-restock-card {
+    margin-top: 18px;
+    padding: 22px;
+    border: 1px solid rgba(102, 217, 154, 0.16);
+    border-radius: 20px;
+    background: rgba(102, 217, 154, 0.045);
+}
+
+.market-item-restock-card[hidden] {
+    display: none !important;
+}
+
+.market-item-restock-card h2 {
+    margin: 5px 0 0;
+    font-size: 22px;
+}
+
+.market-item-restock-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.market-item-restock-grid article {
+    display: grid;
+    gap: 5px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.market-item-restock-grid span {
+    color: rgba(255, 255, 255, 0.48);
+    font-size: 12px;
+}
+
+.market-item-restock-grid strong {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 16px;
+}
+
+@media (max-width: 760px) {
+    .market-item-restock-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 460px) {
+    .market-item-restock-grid {
+        grid-template-columns: 1fr;
+    }
+}
