@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
@@ -13,6 +14,7 @@ from services.game_registry import (
     get_game_hub,
     list_game_hubs,
 )
+from services.market.list_presentation import pin_market_items
 from services.market.public_snapshot import (
     filter_market_snapshot,
     get_public_market_snapshot,
@@ -165,6 +167,30 @@ def _market_filter_href(
     return f"{base}?{encoded}" if encoded else base
 
 
+def _market_watch_keys(request: Request, game_key: str) -> frozenset[str]:
+    user_id = _session_user_id(request)
+    if not user_id:
+        return frozenset()
+    personalization = _safe_personalization_repository()
+    if personalization is None:
+        return frozenset()
+    try:
+        return frozenset(
+            row.item_key
+            for row in personalization.list_watchlist(user_id, game_key)
+        )
+    except Exception:
+        return frozenset()
+
+
+def _safe_market_return_path(value: str, game: GameHub, fallback: str) -> str:
+    clean = str(value or "").strip()
+    allowed_prefix = f"/games/{game.slug}/market"
+    if clean == allowed_prefix or clean.startswith(allowed_prefix + "?"):
+        return clean
+    return fallback
+
+
 def _parse_target_price(value) -> int:
     text = str(value or "").replace(",", "").replace("$", "").strip()
     try:
@@ -201,11 +227,20 @@ async def games_directory(request: Request):
 async def game_market(request: Request, game_slug: str):
     game = _market_game_or_404(game_slug)
     query, tier, sort = _market_query_state(request)
+    watched_item_keys = _market_watch_keys(request, game.key)
     snapshot = filter_market_snapshot(
         get_public_market_snapshot(game.key),
         query=query,
         tier=tier,
         sort=sort,
+    )
+    snapshot = replace(
+        snapshot,
+        items=pin_market_items(
+            snapshot.items,
+            market_event=snapshot.market_event,
+            watched_item_keys=watched_item_keys,
+        ),
     )
     path = f"/games/{game.slug}/market"
     seo = build_seo(
@@ -238,6 +273,7 @@ async def game_market(request: Request, game_slug: str):
             market_sort=sort,
             market_filter_links=filter_links,
             market_result_count=len(snapshot.items),
+            market_watched_keys=watched_item_keys,
         ),
     )
 
@@ -352,7 +388,8 @@ async def game_market_item_watch(
     form = await request.form()
     watched = str(form.get("watched") or "").strip() == "1"
     personalization.set_watched(user_id, game.key, item.source_item_id, watched=watched)
-    return RedirectResponse(url=path, status_code=303)
+    return_to = _safe_market_return_path(form.get("return_to"), game, path)
+    return RedirectResponse(url=return_to, status_code=303)
 
 
 @router.post("/games/{game_slug}/market/items/{source_item_id}/alerts")
