@@ -83,10 +83,8 @@ def _prediction_from_events(
 
     predicted = ordered[-1] + timedelta(minutes=interval_median)
     clean_now = _utc(now)
-    advances = 0
-    while predicted <= clean_now and advances < 24:
-        predicted += timedelta(minutes=interval_median)
-        advances += 1
+    # Never invent another cycle after a prediction has already been missed.
+    # A new forecast requires a newly observed broad restock-type event.
     if predicted <= clean_now:
         return None
 
