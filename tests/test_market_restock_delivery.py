@@ -34,23 +34,27 @@ def _prediction(now: datetime, *, item_key: str = "m995") -> ItemRestockPredicti
 
 
 def test_stable_item_events_produce_future_prediction():
-    now = datetime(2026, 11, 1, 1, 0, tzinfo=timezone.utc)
+    expected = datetime(2026, 11, 1, 1, 0, tzinfo=timezone.utc)
     events = [
-        now - timedelta(hours=18),
-        now - timedelta(hours=12),
-        now - timedelta(hours=6),
+        expected - timedelta(hours=18),
+        expected - timedelta(hours=12),
+        expected - timedelta(hours=6),
     ]
 
-    prediction = _prediction_from_events("m995", events, now=now)
+    prediction = _prediction_from_events(
+        "m995",
+        events,
+        now=expected - timedelta(minutes=1),
+    )
 
     assert prediction is not None
-    assert prediction.predicted_at == now
-    # At exactly the predicted instant the model rolls to the next cycle.
-    prediction = _prediction_from_events("m995", events, now=now - timedelta(minutes=1))
-    assert prediction is not None
-    assert prediction.predicted_at == now
+    assert prediction.predicted_at == expected
     assert prediction.confidence >= 65
     assert prediction.event_count == 3
+
+    rolled = _prediction_from_events("m995", events, now=expected)
+    assert rolled is not None
+    assert rolled.predicted_at == expected + timedelta(hours=6)
 
 
 def test_restock_delivery_requires_watchlist_and_dm_opt_in(tmp_path):
