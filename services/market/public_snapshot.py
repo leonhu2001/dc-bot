@@ -8,6 +8,7 @@ from services.market.analytics import build_market_analytics
 from services.market.event_detector import MarketEventSignal
 from services.market.event_signal_cache import get_cached_market_event_signal
 from services.market.runtime import get_market_repository
+from services.market.scope import market_item_enabled
 from services.market.storage import MarketRepository
 
 
@@ -131,7 +132,7 @@ def get_public_market_snapshot(
         )
 
     try:
-        latest = market_repository.list_latest(clean_game_key)
+        raw_latest = market_repository.list_latest(clean_game_key)
     except Exception:
         return MarketSnapshot(
             game_key=clean_game_key,
@@ -139,11 +140,23 @@ def get_public_market_snapshot(
             message="行情暫時無法使用。",
         )
 
-    if not latest:
+    if not raw_latest:
         return MarketSnapshot(
             game_key=clean_game_key,
             status="no_data",
             message="等待第一批行情。",
+        )
+
+    latest = tuple(
+        item
+        for item in raw_latest
+        if market_item_enabled(clean_game_key, item.tier)
+    )
+    if not latest:
+        return MarketSnapshot(
+            game_key=clean_game_key,
+            status="no_data",
+            message="等待可用行情。",
         )
 
     updated_at = max(item.source_updated_at for item in latest)
@@ -195,6 +208,7 @@ def get_public_market_snapshot(
             coverage_hours=item.coverage_hours,
         )
         for item in analytics
+        if market_item_enabled(clean_game_key, item.tier)
     )
     gainers, losers = _movers(items)
 
@@ -220,7 +234,12 @@ def filter_market_snapshot(
 ) -> MarketSnapshot:
     """Filter/sort the public list without changing global mover analytics."""
     clean_query = str(query or "").strip().casefold()
-    clean_tier = tier if tier in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10} else None
+    requested_tier = tier if tier in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10} else None
+    blocked_tier = requested_tier is not None and not market_item_enabled(
+        snapshot.game_key,
+        requested_tier,
+    )
+    clean_tier = requested_tier if not blocked_tier else -1
 
     items = list(snapshot.items)
     if clean_query:
