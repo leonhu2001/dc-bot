@@ -62,12 +62,10 @@ def _previous_month_utc_bounds(now: datetime | None = None) -> tuple[datetime, d
 
 
 def previous_month_performance(db, worker_discord_id: str, *, now: datetime | None = None) -> int:
-    """Return wages earned from orders closed in the previous Taipei month.
+    """Return completed-order worker wages plus paid chicken-leg tips.
 
-    Performance follows the same definition as the payout-summary page: sum the
-    worker's ``final_payout`` on closed orders by the order's closing month. It
-    deliberately does not depend on payout status or ``paid_at`` so a late payroll
-    run cannot move September performance into October.
+    Both parts are attributed by the order closing time. Payout status and
+    payroll-transfer adjustments do not affect performance.
     """
     start_at, end_at = _previous_month_utc_bounds(now)
     order_date = func.coalesce(
@@ -75,7 +73,7 @@ def previous_month_performance(db, worker_discord_id: str, *, now: datetime | No
         WebOrder.updated_at,
         WebOrder.created_at,
     )
-    total = db.scalar(
+    wage_total = db.scalar(
         select(func.coalesce(func.sum(WorkerPayout.final_payout), 0))
         .join(WebOrder, WebOrder.id == WorkerPayout.order_id)
         .where(
@@ -86,7 +84,27 @@ def previous_month_performance(db, worker_discord_id: str, *, now: datetime | No
             order_date < end_at,
         )
     )
-    return max(0, int(total or 0))
+    tip_total = db.scalar(
+        text(
+            """
+            SELECT COALESCE(SUM(t.amount), 0)
+            FROM worker_tips t
+            JOIN web_orders w ON w.id = t.order_id
+            WHERE CAST(t.worker_discord_id AS TEXT) = :worker_id
+              AND w.status = 'closed'
+              AND t.payment_status = 'paid'
+              AND COALESCE(t.amount, 0) > 0
+              AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) >= :start_at
+              AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) < :end_at
+            """
+        ),
+        {
+            "worker_id": str(worker_discord_id),
+            "start_at": start_at,
+            "end_at": end_at,
+        },
+    )
+    return max(0, int(wage_total or 0) + int(tip_total or 0))
 
 
 def previous_month_paid_salary(db, worker_discord_id: str, *, now: datetime | None = None) -> int:
@@ -169,14 +187,7 @@ def _calculate_worker_rate(
 
 
 def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None = None) -> dict:
-    """Apply report-reviewed worker bonuses and then refresh CS margin share.
-
-    New-policy orders use 80% base + named 3% + streamed 2% + previous-month
-    earned worker wages >= 5000 bonus 2%, capped at the normal 87%. A worker who
-    had an effective Web DB store binding when the order closed receives another
-    3%, capped at 90%. Existing legacy orders retain their historical 80% + named
-    5% rule and never receive the new store-binding bonus.
-    """
+    """Apply report-reviewed worker bonuses and then refresh CS margin share."""
     with SessionLocal() as db:
         order = db.get(WebOrder, int(order_id))
         if order is None:
@@ -221,7 +232,6 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
             named_amount = int(round(gross * (LEGACY_WORKER_NAMED_BONUS_RATE if legacy and named else WORKER_NAMED_BONUS_RATE if named else 0.0)))
             final_amount = int(round(gross * rate))
 
-            # Never silently rewrite a payout that has already been paid or manually overridden.
             manual_override = "手動指定分潤" in str(payout.note or "")
             locked = payout.payout_status == PayoutStatus.PAID.value or manual_override
             if not locked:

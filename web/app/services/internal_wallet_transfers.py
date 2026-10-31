@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
+from core.vip_levels import BASE_MEMBER_LEVELS, has_active_vip_progress_reset
 from services.wallet_atomic_credit import credit_principal_in_connection
 from services.wallet_service import ensure_wallet_tables
 from web.app.services import internal_transfers as payroll
@@ -125,6 +127,153 @@ def _credit_wallet(
     return int(result["transaction_id"])
 
 
+def _vip_level_index_for_total(total_spent: int) -> int:
+    index = 0
+    for i, level in enumerate(BASE_MEMBER_LEVELS):
+        if int(total_spent) >= int(level["threshold"]):
+            index = i
+        else:
+            break
+    return index
+
+
+def _effective_vip_level_index(data: dict) -> int:
+    total_spent = int(data.get("total_spent", 0) or 0)
+    cumulative_index = _vip_level_index_for_total(total_spent)
+    try:
+        stored_index = int(data.get("vip_level_index"))
+    except (TypeError, ValueError):
+        return cumulative_index
+    stored_index = max(0, min(stored_index, len(BASE_MEMBER_LEVELS) - 1))
+    if stored_index < cumulative_index and has_active_vip_progress_reset(data):
+        try:
+            base_total = int(data.get("vip_progress_base_total_spent") or 0)
+        except (TypeError, ValueError):
+            base_total = 0
+        earned_after_reset = max(0, total_spent - base_total)
+        virtual_total = int(BASE_MEMBER_LEVELS[stored_index]["threshold"]) + earned_after_reset
+        progressed_index = _vip_level_index_for_total(virtual_total)
+        return max(stored_index, min(progressed_index, len(BASE_MEMBER_LEVELS) - 1))
+    return stored_index
+
+
+def _add_wallet_transfer_vip_progress(
+    conn: sqlite3.Connection,
+    *,
+    customer_id: str,
+    amount: int,
+    updated_at: str,
+) -> None:
+    """Count salary-to-own-wallet principal as VIP spend in the same transaction."""
+    customer_id_int = int(str(customer_id))
+    amount = int(amount)
+    if amount <= 0:
+        return
+
+    row = conn.execute(
+        """
+        SELECT customer_id, total_spent, points, completed_orders, last_order_at,
+               level, platinum_channel_id, data_json
+        FROM walletdb.customers
+        WHERE customer_id = ?
+        LIMIT 1
+        """,
+        (customer_id_int,),
+    ).fetchone()
+
+    if row is None:
+        data: dict = {
+            "total_spent": 0,
+            "order_count": 0,
+            "last_order_at": None,
+            "points": 0,
+            "point_adjustment": 0,
+            "point_adjustment_logs": [],
+            "platinum_channel_id": None,
+            "manual_purchase_keys": [],
+            "notes": [],
+            "vip_level_index": 0,
+            "vip_progress_base_total_spent": None,
+            "vip_progress_reset_active": False,
+            "vip_downgrade_logs": [],
+        }
+        completed_orders = 0
+        last_order_at = None
+        platinum_channel_id = None
+    else:
+        try:
+            data = json.loads(row["data_json"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        data.setdefault("total_spent", int(row["total_spent"] or 0))
+        data.setdefault("order_count", int(row["completed_orders"] or 0))
+        data.setdefault("points", int(row["points"] or 0))
+        data.setdefault("last_order_at", row["last_order_at"])
+        completed_orders = int(row["completed_orders"] or data.get("order_count", 0) or 0)
+        last_order_at = row["last_order_at"]
+        platinum_channel_id = row["platinum_channel_id"]
+
+    old_total = int(data.get("total_spent", 0) or 0)
+    data["total_spent"] = old_total + amount
+
+    try:
+        stored_index = int(data.get("vip_level_index"))
+    except (TypeError, ValueError):
+        stored_index = None
+    reset_active = has_active_vip_progress_reset(data)
+    if stored_index is None:
+        data["vip_level_index"] = _vip_level_index_for_total(int(data["total_spent"]))
+        data["vip_progress_base_total_spent"] = None
+        data["vip_progress_reset_active"] = False
+    else:
+        effective_index = _effective_vip_level_index(data)
+        if effective_index > stored_index:
+            data["vip_level_index"] = effective_index
+            if reset_active:
+                data["vip_progress_base_total_spent"] = int(data["total_spent"])
+                data["vip_progress_reset_active"] = True
+            else:
+                data["vip_progress_base_total_spent"] = None
+                data["vip_progress_reset_active"] = False
+
+    effective_index = _effective_vip_level_index(data)
+    level_name = str(BASE_MEMBER_LEVELS[effective_index]["name"])
+    point_adjustment = int(data.get("point_adjustment", 0) or 0)
+    points = max(0, int(data["total_spent"]) // 100 + point_adjustment)
+    data["points"] = points
+
+    conn.execute(
+        """
+        INSERT INTO walletdb.customers (
+            customer_id, total_spent, points, completed_orders, last_order_at,
+            level, platinum_channel_id, data_json, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(customer_id) DO UPDATE SET
+            total_spent = excluded.total_spent,
+            points = excluded.points,
+            completed_orders = excluded.completed_orders,
+            last_order_at = excluded.last_order_at,
+            level = excluded.level,
+            platinum_channel_id = excluded.platinum_channel_id,
+            data_json = excluded.data_json,
+            updated_at = excluded.updated_at
+        """,
+        (
+            customer_id_int,
+            int(data["total_spent"]),
+            points,
+            completed_orders,
+            last_order_at,
+            level_name,
+            platinum_channel_id,
+            json.dumps(data, ensure_ascii=False),
+            updated_at,
+        ),
+    )
+
+
 def create_internal_wallet_transfer(
     *,
     actor_discord_id: str,
@@ -237,6 +386,12 @@ def create_internal_wallet_transfer(
                 operator_display_name=actor_name,
                 source_display_name=from_name,
                 reason=clean_reason,
+            )
+            _add_wallet_transfer_vip_progress(
+                conn,
+                customer_id=from_id,
+                amount=amount,
+                updated_at=now,
             )
             conn.execute(
                 """
@@ -363,6 +518,12 @@ def review_internal_wallet_transfer(
             operator_display_name=reviewer_name,
             source_display_name=from_name,
             reason=str(row["reason"] or ""),
+        )
+        _add_wallet_transfer_vip_progress(
+            conn,
+            customer_id=wallet_id,
+            amount=amount,
+            updated_at=now,
         )
         conn.execute(
             """

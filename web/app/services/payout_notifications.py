@@ -28,6 +28,17 @@ def _count(snapshot: Mapping[str, Any] | None, bucket: str) -> int:
         return 0
 
 
+def _snapshot_unpaid_total(snapshot: Mapping[str, Any] | None) -> int | None:
+    """Return the authoritative amount shown as pending before payout."""
+    totals = dict((snapshot or {}).get("totals") or {})
+    if "unpaid_total" not in totals:
+        return None
+    try:
+        return int(totals.get("unpaid_total") or 0)
+    except (TypeError, ValueError):
+        return None
+
+
 def should_send_payout_paid_notification(*, before, after) -> bool:
     after_data = dict(after or {})
     if str(after_data.get("target_status") or "").strip() != "paid":
@@ -184,7 +195,13 @@ def send_payout_paid_notification(*, db_file, person_id, before, after) -> dict:
     tip_count = int(details["tip_count"])
     cs_total = int(details["cs_total"])
     cs_count = int(details["cs_count"])
-    total = worker_total + tip_total + cs_total
+
+    # The payout-summary audit snapshot is taken before rows are marked paid and
+    # already includes internal-transfer adjustments. Use it as the single
+    # source of truth for "本次發放" instead of re-summing all historical paid
+    # rows after the update.
+    snapshot_total = _snapshot_unpaid_total(before)
+    total = snapshot_total if snapshot_total is not None else worker_total + tip_total + cs_total
     if total <= 0:
         return {"sent": False, "reason": "empty_salary_details"}
 
@@ -195,6 +212,8 @@ def send_payout_paid_notification(*, db_file, person_id, before, after) -> dict:
         category_lines.append(_category_line("🍗 雞腿", tip_total, tip_count))
     if cs_total:
         category_lines.append(_category_line("客服分潤", cs_total, cs_count))
+    if snapshot_total is not None and snapshot_total != worker_total + tip_total + cs_total:
+        category_lines.append("• **內部轉帳調整**　已反映於本次發放總額")
 
     period = _period_label(month)
     send_direct_message(
@@ -208,7 +227,7 @@ def send_payout_paid_notification(*, db_file, person_id, before, after) -> dict:
             "fields": [
                 {"name": "本次發放", "value": f"**{total:,}T**", "inline": True},
                 {"name": "發放期間", "value": period, "inline": True},
-                {"name": "薪資分類", "value": "\n".join(category_lines), "inline": False},
+                {"name": "薪資分類", "value": "\n".join(category_lines) or "請至員工中心查看", "inline": False},
             ],
             "footer": {"text": "魔丸娛樂｜員工薪資通知"},
         }],
