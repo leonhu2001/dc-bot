@@ -3,7 +3,7 @@
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
 <link rel="stylesheet" href="/static/css/pages/game_market.css?v=20261031-3">
-<script src="/static/js/pages/game_market_live.js?v=20261031-2" defer></script>
+<script src="/static/js/pages/game_market_live.js?v=20261031-3" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -195,7 +195,7 @@
             <label>
                 <span class="sr-only">行情排序</span>
                 <select name="sort">
-                    <option value="name" {% if market_sort == 'name' %}selected{% endif %}>預設排序</option>
+                    <option value="name" {% if market_sort == 'name' %}selected{% endif %}>智慧排序</option>
                     <option value="value_asc" {% if market_sort == 'value_asc' %}selected{% endif %}>7D：低於均價優先</option>
                     <option value="value_desc" {% if market_sort == 'value_desc' %}selected{% endif %}>7D：高於均價優先</option>
                     <option value="price_desc" {% if market_sort == 'price_desc' %}selected{% endif %}>價格：高到低</option>
@@ -211,6 +211,12 @@
         </form>
 
         {% if snapshot.items %}
+        <div class="game-market-category-filters" data-market-focus-filters aria-label="行情狀態篩選">
+            <button type="button" data-market-focus="" class="is-active" aria-pressed="true">全部狀態</button>
+            {% if user %}<button type="button" data-market-focus="watched" aria-pressed="false">★ 收藏</button>{% endif %}
+            <button type="button" data-market-focus="abnormal" aria-pressed="false">⚡ 價格異常</button>
+            <button type="button" data-market-focus="restock" aria-pressed="false">📦 疑似補貨</button>
+        </div>
         <div class="game-market-category-filters" data-market-category-filters hidden aria-label="口徑快速篩選"></div>
         <div class="game-market-result-meta" data-market-result-meta>顯示 {{ market_result_count }} 個品項</div>
         <div class="game-market-list">
@@ -218,27 +224,28 @@
                 <div>品項</div><div>現價</div><div>24H</div><div>7D 對比</div>
             </div>
             {% for item in snapshot.items %}
+            {% set is_watched = item.item_key in market_watched_keys %}
+            {% set is_restock = snapshot.market_event and item.item_key in snapshot.market_event.restock_item_keys %}
+            {% set is_abnormal_down = snapshot.market_event and item.item_key in snapshot.market_event.abnormal_down_item_keys %}
+            {% set is_abnormal_up = snapshot.market_event and item.item_key in snapshot.market_event.abnormal_up_item_keys %}
             <a
                 class="game-market-row"
                 href="/games/{{ game.slug }}/market/items/{{ item.item_key|urlencode }}"
                 data-market-row
                 data-market-category="{{ item.category }}"
                 data-market-tier="{{ item.tier or '' }}"
+                data-market-watched="{% if is_watched %}1{% else %}0{% endif %}"
+                data-market-restock="{% if is_restock %}1{% else %}0{% endif %}"
+                data-market-abnormal-down="{% if is_abnormal_down %}1{% else %}0{% endif %}"
+                data-market-abnormal-up="{% if is_abnormal_up %}1{% else %}0{% endif %}"
             >
                 <div>
                     <strong>{{ item.name }}</strong>
                     <small>{% if item.tier %}{{ item.tier }}級 · {% endif %}{% if item.category %}{{ item.category }} · {% endif %}{{ item.item_key }}</small>
-                    {% if snapshot.market_event %}
-                        {% if item.item_key in snapshot.market_event.restock_item_keys %}
-                        <span class="game-market-value-badge is-value-low">📦 疑似補貨</span>
-                        {% endif %}
-                        {% if item.item_key in snapshot.market_event.abnormal_down_item_keys %}
-                        <span class="game-market-value-badge is-value-high">🟠 異常跌價</span>
-                        {% endif %}
-                        {% if item.item_key in snapshot.market_event.abnormal_up_item_keys %}
-                        <span class="game-market-value-badge is-value-high">🔴 異常拉升</span>
-                        {% endif %}
-                    {% endif %}
+                    {% if is_watched %}<span class="game-market-value-badge is-value-low">★ 收藏</span>{% endif %}
+                    {% if is_restock %}<span class="game-market-value-badge is-value-low">📦 疑似補貨</span>{% endif %}
+                    {% if is_abnormal_down %}<span class="game-market-value-badge is-value-high">🟠 異常跌價</span>{% endif %}
+                    {% if is_abnormal_up %}<span class="game-market-value-badge is-value-high">🔴 異常拉升</span>{% endif %}
                 </div>
                 <div class="game-market-price-cell">
                     <strong>{% if item.current_price is not none %}${{ "{:,}".format(item.current_price) }}{% else %}—{% endif %}</strong>
