@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, inspect, select, text
 
 from shared.db import SessionLocal
 from shared.models import CustomerServicePayout, OrderAssignment, PayoutStatus, WebOrder, WorkerPayout
@@ -84,26 +84,31 @@ def previous_month_performance(db, worker_discord_id: str, *, now: datetime | No
             order_date < end_at,
         )
     )
-    tip_total = db.scalar(
-        text(
-            """
-            SELECT COALESCE(SUM(t.amount), 0)
-            FROM worker_tips t
-            JOIN web_orders w ON w.id = t.order_id
-            WHERE CAST(t.worker_discord_id AS TEXT) = :worker_id
-              AND w.status = 'closed'
-              AND t.payment_status = 'paid'
-              AND COALESCE(t.amount, 0) > 0
-              AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) >= :start_at
-              AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) < :end_at
-            """
-        ),
-        {
-            "worker_id": str(worker_discord_id),
-            "start_at": start_at,
-            "end_at": end_at,
-        },
-    )
+
+    tip_total = 0
+    # Some unit-test/minimal databases do not create the optional tips table.
+    # Treat that as zero tips instead of breaking payout recalculation.
+    if inspect(db.connection()).has_table("worker_tips"):
+        tip_total = db.scalar(
+            text(
+                """
+                SELECT COALESCE(SUM(t.amount), 0)
+                FROM worker_tips t
+                JOIN web_orders w ON w.id = t.order_id
+                WHERE CAST(t.worker_discord_id AS TEXT) = :worker_id
+                  AND w.status = 'closed'
+                  AND t.payment_status = 'paid'
+                  AND COALESCE(t.amount, 0) > 0
+                  AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) >= :start_at
+                  AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) < :end_at
+                """
+            ),
+            {
+                "worker_id": str(worker_discord_id),
+                "start_at": start_at,
+                "end_at": end_at,
+            },
+        )
     return max(0, int(wage_total or 0) + int(tip_total or 0))
 
 

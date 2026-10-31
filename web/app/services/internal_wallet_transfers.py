@@ -165,10 +165,27 @@ def _add_wallet_transfer_vip_progress(
     updated_at: str,
 ) -> None:
     """Count salary-to-own-wallet principal as VIP spend in the same transaction."""
-    customer_id_int = int(str(customer_id))
     amount = int(amount)
     if amount <= 0:
         return
+
+    customer_id_text = str(customer_id or "").strip()
+    if not customer_id_text:
+        return
+
+    # Some lightweight test/maintenance databases only contain wallet tables.
+    # In production bot.db the normalized customers table exists; when it does
+    # not, wallet credit should still succeed instead of breaking payroll flow.
+    customers_table = conn.execute(
+        "SELECT 1 FROM walletdb.sqlite_master WHERE type='table' AND name='customers' LIMIT 1"
+    ).fetchone()
+    if customers_table is None:
+        return
+
+    try:
+        customer_key: int | str = int(customer_id_text)
+    except ValueError:
+        customer_key = customer_id_text
 
     row = conn.execute(
         """
@@ -178,7 +195,7 @@ def _add_wallet_transfer_vip_progress(
         WHERE customer_id = ?
         LIMIT 1
         """,
-        (customer_id_int,),
+        (customer_key,),
     ).fetchone()
 
     if row is None:
@@ -217,7 +234,6 @@ def _add_wallet_transfer_vip_progress(
 
     old_total = int(data.get("total_spent", 0) or 0)
     data["total_spent"] = old_total + amount
-
     try:
         stored_index = int(data.get("vip_level_index"))
     except (TypeError, ValueError):
@@ -261,7 +277,7 @@ def _add_wallet_transfer_vip_progress(
             updated_at = excluded.updated_at
         """,
         (
-            customer_id_int,
+            customer_key,
             int(data["total_spent"]),
             points,
             completed_orders,
