@@ -15,6 +15,7 @@ from services.quick_order_v2_select_display import install_quick_order_v2_select
 from services.custom_order_quick_entry import install_custom_order_quick_entry
 from services.discord_vip_channel_access import install_discord_vip_channel_access
 from services.order_ticket_name_restore_runtime import install_order_ticket_name_restore
+from views.market import install_market_discord
 from views.member_portal import (
     MEMBER_PORTAL_CHANNEL_ID,
     MEMBER_PORTAL_MARKER,
@@ -47,6 +48,7 @@ class SetupCommands(commands.Cog):
         install_custom_order_quick_entry(bot)
         install_discord_vip_channel_access()
         install_order_ticket_name_restore(bot)
+        install_market_discord(bot)
 
         if not getattr(
             bot,
