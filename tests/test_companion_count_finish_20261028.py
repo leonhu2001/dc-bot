@@ -109,6 +109,8 @@ def test_sweet_role_is_additional_and_gate() -> None:
     female_role_id = order_rules.ROLE_IDS["female_companion"]
     game_ids = [role_id for role_id in required if role_id != SWEET_COMPANION_ROLE_ID]
 
+    assert order_rules.get_required_role_keys(rule) == ("sweet_companion",)
+    assert order_rules.get_required_game_role_keys(rule) == ("valorant_game",)
     assert SWEET_COMPANION_ROLE_ID in required
     assert game_ids
 

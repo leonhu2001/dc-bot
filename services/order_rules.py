@@ -28,8 +28,6 @@ ROLE_LABELS: dict[RoleKey, str] = {
     "male_protector": "魔丸♜男護",
     "male_companion": "魔丸♞男陪",
     "female_companion": "魔丸♟女陪",
-    "aw_collision_receiver": "AW代撞接單",
-    "halfcoin_receiver": "哈夫幣代洗接單",
 }
 
 ROLE_IDS: dict[RoleKey, str] = {
@@ -38,8 +36,20 @@ ROLE_IDS: dict[RoleKey, str] = {
     "male_protector": "1500751039060643990",
     "male_companion": "1500751059239440575",
     "female_companion": "1482080315798192210",
-    "aw_collision_receiver": "1565369029005287595",
-    "halfcoin_receiver": "1565369317929918554",
+}
+
+AW_COLLISION_RECEIVER_ROLE_KEY = "aw_collision_receiver"
+AW_COLLISION_RECEIVER_ROLE_ID = "1565369029005287595"
+HALFCOIN_RECEIVER_ROLE_KEY = "halfcoin_receiver"
+HALFCOIN_RECEIVER_ROLE_ID = "1565369317929918554"
+
+SPECIAL_RECEIVER_ROLE_IDS_BY_KEY: dict[str, str] = {
+    AW_COLLISION_RECEIVER_ROLE_KEY: AW_COLLISION_RECEIVER_ROLE_ID,
+    HALFCOIN_RECEIVER_ROLE_KEY: HALFCOIN_RECEIVER_ROLE_ID,
+}
+SPECIAL_RECEIVER_ROLE_LABELS_BY_KEY: dict[str, str] = {
+    AW_COLLISION_RECEIVER_ROLE_KEY: "AW代撞接單",
+    HALFCOIN_RECEIVER_ROLE_KEY: "哈夫幣代洗接單",
 }
 
 GAME_ROLE_IDS_BY_KEY: dict[str, str] = {
@@ -51,16 +61,28 @@ GAME_ROLE_LABELS_BY_KEY: dict[str, str] = {
     for key, role in GAME_ROLE_BY_KEY.items()
 }
 
-# 甜蜜陪是甜蜜單的額外必要資格，不是遊戲階級；直接登記在共用
-# role lookup，讓規則快照、智慧派單與最後接單驗證都讀同一份來源。
 SWEET_COMPANION_ROLE_KEY = "sweet_companion"
 SWEET_COMPANION_ROLE_ID = "1564966706407940248"
 SWEET_COMPANION_ROLE_LABEL = "甜蜜陪"
-GAME_ROLE_IDS_BY_KEY[SWEET_COMPANION_ROLE_KEY] = SWEET_COMPANION_ROLE_ID
-GAME_ROLE_LABELS_BY_KEY[SWEET_COMPANION_ROLE_KEY] = SWEET_COMPANION_ROLE_LABEL
+EXTRA_REQUIRED_ROLE_IDS_BY_KEY: dict[str, str] = {
+    SWEET_COMPANION_ROLE_KEY: SWEET_COMPANION_ROLE_ID,
+}
+EXTRA_REQUIRED_ROLE_LABELS_BY_KEY: dict[str, str] = {
+    SWEET_COMPANION_ROLE_KEY: SWEET_COMPANION_ROLE_LABEL,
+}
 
-ALL_ROLE_IDS: dict[str, str] = {**ROLE_IDS, **GAME_ROLE_IDS_BY_KEY}
-ALL_ROLE_LABELS: dict[str, str] = {**ROLE_LABELS, **GAME_ROLE_LABELS_BY_KEY}
+ALL_ROLE_IDS: dict[str, str] = {
+    **ROLE_IDS,
+    **SPECIAL_RECEIVER_ROLE_IDS_BY_KEY,
+    **GAME_ROLE_IDS_BY_KEY,
+    **EXTRA_REQUIRED_ROLE_IDS_BY_KEY,
+}
+ALL_ROLE_LABELS: dict[str, str] = {
+    **ROLE_LABELS,
+    **SPECIAL_RECEIVER_ROLE_LABELS_BY_KEY,
+    **GAME_ROLE_LABELS_BY_KEY,
+    **EXTRA_REQUIRED_ROLE_LABELS_BY_KEY,
+}
 
 PROTECTOR_ROLES: tuple[RoleKey, ...] = (
     "top_protector",
@@ -76,6 +98,8 @@ COMPANION_ROLES: tuple[RoleKey, ...] = (
 ALL_RECEIVER_ROLES: tuple[RoleKey, ...] = PROTECTOR_ROLES + COMPANION_ROLES
 AW_COLLISION_RECEIVER_ROLES: tuple[RoleKey, ...] = ("aw_collision_receiver",)
 HALFCOIN_RECEIVER_ROLES: tuple[RoleKey, ...] = ("halfcoin_receiver",)
+SPECIAL_RECEIVER_ROLES: tuple[RoleKey, ...] = AW_COLLISION_RECEIVER_ROLES + HALFCOIN_RECEIVER_ROLES
+ALL_CLAIM_ROLES: tuple[RoleKey, ...] = ALL_RECEIVER_ROLES + SPECIAL_RECEIVER_ROLES
 
 DELTA_DESKTOP_GAME_ROLE = ("delta_desktop",)
 DELTA_MOBILE_GAME_ROLE = ("delta_mobile",)
@@ -85,13 +109,19 @@ VALORANT_GAME_ROLE = ("valorant_game",)
 LOL_GAME_ROLE = ("lol_game",)
 APEX_GAME_ROLE = ("apex_game",)
 
+AW_COLLISION_PRICING_BY_RULE: dict[str, dict[str, Any]] = {
+    "farm_aw_collision_1_100": {"label": "1～100發｜5T/發", "short_label": "1～100發", "min": 1, "max": 100, "rate_x2": 10, "rate_text": "5"},
+    "farm_aw_collision_101_500": {"label": "101～500發｜4.5T/發", "short_label": "101～500發", "min": 101, "max": 500, "rate_x2": 9, "rate_text": "4.5"},
+    "farm_aw_collision_501_plus": {"label": "501發以上｜4T/發", "short_label": "501發以上", "min": 501, "max": 999999, "rate_x2": 8, "rate_text": "4"},
+}
+
 
 CATEGORY_LABELS: dict[str, str] = {
     # 新下單分類。舊 basic / fun / general 保留供歷史訂單與舊存單回查。
     "delta_desktop_basic": "三角洲 基礎單<端遊>",
     "delta_mobile_basic": "三角洲 基礎單<手遊>",
     "delta_desktop_fun": "三角洲 趣味單<端遊>",
-    "farm": "三角洲 代肝代解",
+    "farm": "台服代肝代解",
     "basic": "三角洲 基礎單",
     "fun": "三角洲 趣味單",
     "general": "通用單",
@@ -158,6 +188,8 @@ class OrderRule:
     allowed_game_roles: tuple[str, ...] = ()
     # 必須同時持有其中至少一個遊戲身分組；與 allowed_* 是 AND 關係。
     required_game_roles: tuple[str, ...] = ()
+    # 非遊戲身分的額外資格；每一個都必須持有（ALL / AND）。
+    required_roles: tuple[str, ...] = ()
     specify_fee_by_game_role: dict[str, int] = field(default_factory=dict)
 
 
@@ -205,6 +237,7 @@ RULE_OVERRIDE_FIELDS = {
     "note",
     "allowed_game_roles",
     "required_game_roles",
+    "required_roles",
     "specify_fee_by_game_role",
 }
 
@@ -212,6 +245,7 @@ _TUPLE_OVERRIDE_FIELDS = {
     "allowed_roles",
     "allowed_game_roles",
     "required_game_roles",
+    "required_roles",
 }
 _DICT_OVERRIDE_FIELDS = {
     "specify_fee_by_role",
@@ -378,9 +412,29 @@ def calculate_price(
     specified_roles: list[str] | tuple[str, ...] | None = None,
     staff_adjustments: list[str] | tuple[str, ...] | None = None,
 ) -> PriceResult:
+    aw_plan = AW_COLLISION_PRICING_BY_RULE.get(str(getattr(rule, "key", "") or ""))
+    if aw_plan is not None and quantity is None:
+        quantity = int(getattr(rule, "min_quantity", 1) or 1)
     qty = _normalize_quantity(rule, quantity)
     players = _normalize_player_count(rule, player_count)
     required_staff = get_required_staff_count(rule, players)
+
+    if aw_plan is not None:
+        if specified_roles:
+            raise ValueError("AW代撞不開放指定")
+        if staff_adjustments:
+            raise ValueError("AW代撞不支援額外加減價選項")
+        base_amount = (qty * int(aw_plan["rate_x2"]) + 1) // 2
+        return PriceResult(
+            base_amount=base_amount,
+            specify_fee=0,
+            staff_adjustment_amount=0,
+            total_amount=base_amount,
+            service_quantity=qty,
+            required_staff_count=1,
+            free_specify_fee=False,
+            details=(f"AW代撞｜{aw_plan['short_label']}｜{aw_plan['rate_text']}T/發",),
+        )
 
     if rule.pricing_type == "manual":
         base_amount = 0
@@ -608,7 +662,7 @@ _add(OrderRule(
     "general", "basic_sweet_single", "甜蜜單｜單陪", "hourly", 520, "H",
     allowed_roles=COMPANION_ROLES,
     allowed_game_roles=(),
-    required_game_roles=(SWEET_COMPANION_ROLE_KEY,),
+    required_game_roles=(),
     required_staff_count=1,
     allow_specify=True,
     max_specified_count=1,
@@ -625,7 +679,7 @@ _add(OrderRule(
     "general", "basic_sweet_double", "甜蜜單｜雙陪", "hourly", 1314, "H",
     allowed_roles=COMPANION_ROLES,
     allowed_game_roles=(),
-    required_game_roles=(SWEET_COMPANION_ROLE_KEY,),
+    required_game_roles=(),
     required_staff_count=2,
     allow_specify=True,
     max_specified_count=2,
@@ -659,7 +713,7 @@ def _add_sweet_rule(
         "H",
         allowed_roles=allowed_roles,
         allowed_game_roles=(),
-        required_game_roles=(*required_game_roles, SWEET_COMPANION_ROLE_KEY),
+        required_game_roles=required_game_roles,
         required_staff_count=required_staff_count,
         allow_specify=True,
         max_specified_count=required_staff_count,
@@ -688,7 +742,8 @@ def _add_selectable_sweet_rule(
         "H",
         allowed_roles=allowed_roles,
         allowed_game_roles=(),
-        required_game_roles=(*required_game_roles, SWEET_COMPANION_ROLE_KEY),
+        required_game_roles=required_game_roles,
+        required_roles=(SWEET_COMPANION_ROLE_KEY,),
         required_staff_count="player_count",
         player_count_enabled=True,
         min_player_count=1,
@@ -999,6 +1054,17 @@ for key, label, price in [
     ("farm_halfcoin_360m", "哈夫幣代洗｜360M", 3400),
 ]:
     _add(OrderRule("farm", key, label, "fixed", price, allowed_roles=HALFCOIN_RECEIVER_ROLES, required_game_roles=(), required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
+
+for key, plan in AW_COLLISION_PRICING_BY_RULE.items():
+    _add(OrderRule(
+        category="farm", key=key, label=f"AW代撞｜{plan['short_label']}",
+        pricing_type="unit", price=max(1, int(plan["rate_x2"]) // 2), unit_label="發",
+        allowed_roles=AW_COLLISION_RECEIVER_ROLES, required_staff_count=1,
+        min_quantity=int(plan["min"]), max_quantity=int(plan["max"]), allow_specify=False,
+        max_specified_count=None, specify_fee_default=0, vip_discount_allowed=False,
+        point_benefits_allowed=False, loyalty_benefits_enabled=False, required_game_roles=(),
+        note="AW代撞依方案發數動態計價；101～500發為4.5T/發。系統帳務只存整數T，半T總額向上進位。",
+    ))
 
 
 
@@ -1375,47 +1441,39 @@ def get_required_game_role_keys(rule: OrderRule) -> tuple[str, ...]:
     return _unique_role_keys_by_id(tuple(rule.required_game_roles))
 
 
+def get_required_role_keys(rule: OrderRule) -> tuple[str, ...]:
+    return _unique_role_keys_by_id(tuple(rule.required_roles))
+
+
+def get_required_role_ids(rule: OrderRule) -> list[str]:
+    return [str(ALL_ROLE_IDS[key]) for key in get_required_role_keys(rule) if key in ALL_ROLE_IDS]
+
+
+def get_required_qualification_role_ids(rule: OrderRule) -> list[str]:
+    keys = _unique_role_keys_by_id(tuple(get_required_game_role_keys(rule)) + tuple(get_required_role_keys(rule)))
+    return [str(ALL_ROLE_IDS[key]) for key in keys if key in ALL_ROLE_IDS]
+
+
 def get_required_game_role_ids(rule: OrderRule) -> list[str]:
-    return [
-        str(ALL_ROLE_IDS[key])
-        for key in get_required_game_role_keys(rule)
-        if key in ALL_ROLE_IDS
-    ]
+    # Legacy persistence/caller API. The stored column is still named game roles,
+    # so return all required qualification IDs while the canonical keys stay split.
+    return get_required_qualification_role_ids(rule)
 
 
-def role_ids_match_requirements(
-    member_role_ids,
-    allowed_role_ids,
-    required_game_role_ids=(),
-) -> bool:
-    member_roles = {
-        str(role_id).strip()
-        for role_id in (member_role_ids or [])
-        if str(role_id).strip()
-    }
-    allowed = {
-        str(role_id).strip()
-        for role_id in (allowed_role_ids or [])
-        if str(role_id).strip()
-    }
-    required_games = {
-        str(role_id).strip()
-        for role_id in (required_game_role_ids or [])
-        if str(role_id).strip()
-    }
-
+def role_ids_match_requirements(member_role_ids, allowed_role_ids, required_game_role_ids=(), required_role_ids=()) -> bool:
+    member_roles = {str(x).strip() for x in (member_role_ids or []) if str(x).strip()}
+    allowed = {str(x).strip() for x in (allowed_role_ids or []) if str(x).strip()}
+    required_games = {str(x).strip() for x in (required_game_role_ids or []) if str(x).strip()}
+    required_all = {str(x).strip() for x in (required_role_ids or []) if str(x).strip()}
+    extra_ids = set(EXTRA_REQUIRED_ROLE_IDS_BY_KEY.values())
+    required_all.update(required_games & extra_ids)
+    required_games.difference_update(extra_ids)
     if allowed and not (member_roles & allowed):
         return False
-
-    # 甜蜜陪是額外 AND 資格；其餘遊戲身分仍維持「至少一個」語意。
-    if SWEET_COMPANION_ROLE_ID in required_games:
-        if SWEET_COMPANION_ROLE_ID not in member_roles:
-            return False
-        required_games.remove(SWEET_COMPANION_ROLE_ID)
-
     if required_games and not (member_roles & required_games):
         return False
-
+    if required_all and not required_all.issubset(member_roles):
+        return False
     return True
 
 
@@ -1433,13 +1491,11 @@ def role_labels(roles: tuple[str, ...], game_roles: tuple[str, ...] = ()) -> str
 
 def rule_role_labels(rule: OrderRule) -> str:
     qualification = role_labels(rule.allowed_roles, rule.allowed_game_roles)
-    required_games = " / ".join(
-        str(ALL_ROLE_LABELS.get(key, key))
-        for key in get_required_game_role_keys(rule)
-    )
-    if qualification and required_games:
-        return f"{qualification} + {required_games}"
-    return qualification or required_games
+    required_keys = _unique_role_keys_by_id(tuple(get_required_game_role_keys(rule)) + tuple(get_required_role_keys(rule)))
+    required = " / ".join(str(ALL_ROLE_LABELS.get(key, key)) for key in required_keys)
+    if qualification and required:
+        return f"{qualification} + {required}"
+    return qualification or required
 
 
 def validate_rule_definition(key: str, rule: OrderRule) -> None:
@@ -1521,15 +1577,12 @@ def validate_rule_definition(key: str, rule: OrderRule) -> None:
     if unknown_roles:
         raise RuntimeError(f"{key}: unknown allowed roles {unknown_roles}")
 
-    unknown_required_games = [
-        role_key
-        for role_key in rule.required_game_roles
-        if role_key not in ALL_ROLE_IDS
-    ]
+    unknown_required_games = [role_key for role_key in rule.required_game_roles if role_key not in GAME_ROLE_IDS_BY_KEY]
     if unknown_required_games:
-        raise RuntimeError(
-            f"{key}: unknown required game roles {unknown_required_games}"
-        )
+        raise RuntimeError(f"{key}: unknown required game roles {unknown_required_games}")
+    unknown_required_roles = [role_key for role_key in rule.required_roles if role_key not in EXTRA_REQUIRED_ROLE_IDS_BY_KEY]
+    if unknown_required_roles:
+        raise RuntimeError(f"{key}: unknown required roles {unknown_required_roles}")
 
     if (
         rule.min_protector_count > 0
@@ -1656,6 +1709,7 @@ class EffectiveOrderRules(dict):
                     allowed_roles=base.allowed_roles,
                     allowed_game_roles=base.allowed_game_roles,
                     required_game_roles=base.required_game_roles,
+                    required_roles=base.required_roles,
                     required_staff_count=base.required_staff_count,
                     player_count_enabled=base.player_count_enabled,
                     min_player_count=base.min_player_count,
@@ -1670,6 +1724,7 @@ class EffectiveOrderRules(dict):
                     allowed_roles=base.allowed_roles,
                     allowed_game_roles=base.allowed_game_roles,
                     required_game_roles=base.required_game_roles,
+                    required_roles=base.required_roles,
                     allow_specify=base.allow_specify,
                     max_specified_count=base.max_specified_count,
                     specify_fee_default=base.specify_fee_default,
@@ -1677,8 +1732,8 @@ class EffectiveOrderRules(dict):
                     point_benefits_allowed=base.point_benefits_allowed,
                     loyalty_benefits_enabled=base.loyalty_benefits_enabled,
                 )
-            if SWEET_COMPANION_ROLE_KEY in tuple(base.required_game_roles):
-                rule = replace(rule, required_game_roles=base.required_game_roles)
+            if SWEET_COMPANION_ROLE_KEY in tuple(base.required_roles):
+                rule = replace(rule, required_roles=base.required_roles)
 
             validate_rule_definition(key, rule)
             return rule
@@ -1781,8 +1836,13 @@ def invalidate_rule_override_cache() -> None:
 
 __all__ = [
     "ALL_RECEIVER_ROLES",
+    "ALL_CLAIM_ROLES",
+    "SPECIAL_RECEIVER_ROLES",
     "AW_COLLISION_RECEIVER_ROLES",
+    "AW_COLLISION_RECEIVER_ROLE_ID",
+    "AW_COLLISION_PRICING_BY_RULE",
     "HALFCOIN_RECEIVER_ROLES",
+    "HALFCOIN_RECEIVER_ROLE_ID",
     "ALL_ROLE_IDS",
     "ALL_ROLE_LABELS",
     "CATEGORY_LABELS",
@@ -1805,6 +1865,9 @@ __all__ = [
     "get_allowed_role_labels",
     "get_required_game_role_ids",
     "get_required_game_role_keys",
+    "get_required_role_ids",
+    "get_required_role_keys",
+    "get_required_qualification_role_ids",
     "role_ids_match_requirements",
     "get_required_staff_count",
     "get_rule",
@@ -1820,7 +1883,7 @@ __all__ = [
     "validate_rules",
 ]
 
-ORDER_RULE_SNAPSHOT_VERSION = 1
+ORDER_RULE_SNAPSHOT_VERSION = 2
 
 
 def _order_rule_snapshot_safe(value):
@@ -1868,6 +1931,8 @@ def build_order_rule_snapshot(
             "allowed_role_keys": list(getattr(rule, "allowed_roles", []) or []),
             "allowed_game_role_keys": list(getattr(rule, "allowed_game_roles", []) or []),
             "required_game_role_keys": list(getattr(rule, "required_game_roles", []) or []),
+            "required_role_keys": list(getattr(rule, "required_roles", []) or []),
+            "required_role_ids": get_required_role_ids(rule),
             "allowed_role_ids": [str(item) for item in (allowed_role_ids or [])],
             "required_game_role_ids": [
                 str(item)

@@ -56,12 +56,13 @@ def test_aw_price_tiers_and_half_t_rounding():
         assert aw_collision_original_amount(rule_key, quantity) == expected
 
 
-def test_aw_rules_require_one_delta_worker_and_no_specify():
+def test_aw_rules_require_only_dedicated_receiver_and_no_specify():
     for key in AW_RULE_KEYS:
         rule = ORDER_RULES[key]
         assert rule.category == "farm"
         assert rule.required_staff_count == 1
-        assert rule.required_game_roles == ("delta_desktop", "delta_mobile")
+        assert rule.allowed_roles == ("aw_collision_receiver",)
+        assert rule.required_game_roles == ()
         assert rule.allow_specify is False
 
 

@@ -185,7 +185,7 @@ def main() -> None:
     rules = load_rules(order_rules)
     categories = load_categories(order_rules, rules)
     role_labels = getattr(order_rules, "ROLE_LABELS", {})
-    all_receiver_roles = set(getattr(order_rules, "ALL_RECEIVER_ROLES", set()) or set())
+    all_receiver_roles = set(getattr(order_rules, "ALL_CLAIM_ROLES", getattr(order_rules, "ALL_RECEIVER_ROLES", set())) or set())
 
     helper_names = [
         "calculate_price",
@@ -226,7 +226,7 @@ def main() -> None:
 
     title("ROLE_MAP")
     for role_key in sorted(all_receiver_roles):
-        role_id = ROLE_IDS.get(role_key)
+        role_id = all_role_ids.get(role_key)
         print(f"{role_key}: {role_id} / {role_labels.get(role_key)}")
 
         if not role_id:
@@ -301,8 +301,8 @@ def main() -> None:
             errors.append(f"{key}: no allowed service or game roles")
 
         for role_key in allowed_roles:
-            if role_key not in ROLE_IDS:
-                errors.append(f"{key}: allowed role missing ROLE_IDS mapping: {role_key}")
+            if role_key not in all_role_ids:
+                errors.append(f"{key}: allowed role missing ALL_ROLE_IDS mapping: {role_key}")
 
             if all_receiver_roles and role_key not in all_receiver_roles:
                 errors.append(f"{key}: allowed role is not receiver role: {role_key}")

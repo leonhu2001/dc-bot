@@ -4,54 +4,17 @@ from typing import Any
 
 import discord
 
-from services.order_rules import (
-    AW_COLLISION_RECEIVER_ROLES,
-    ORDER_RULES,
-    OrderRule,
-    PriceResult,
-    validate_rule_definition,
-)
+from services.order_rules import AW_COLLISION_PRICING_BY_RULE
 
 
 AW_GROUP_LABEL = "AW代撞"
-AW_RULE_KEYS = (
-    "farm_aw_collision_1_100",
-    "farm_aw_collision_101_500",
-    "farm_aw_collision_501_plus",
-)
+AW_RULE_KEYS = tuple(AW_COLLISION_PRICING_BY_RULE)
 CREDENTIAL_NOTE_PLACEHOLDER = (
     "例如 Steam、Garena、Google 登入、其他登入注意事項；請補充安全箱格數"
 )
-
-AW_COLLISION_PLANS: dict[str, dict[str, Any]] = {
-    "farm_aw_collision_1_100": {
-        "label": "1～100發｜5T/發",
-        "short_label": "1～100發",
-        "min": 1,
-        "max": 100,
-        "rate_x2": 10,
-        "rate_text": "5",
-    },
-    "farm_aw_collision_101_500": {
-        "label": "101～500發｜4.5T/發",
-        "short_label": "101～500發",
-        "min": 101,
-        "max": 500,
-        "rate_x2": 9,
-        "rate_text": "4.5",
-    },
-    "farm_aw_collision_501_plus": {
-        "label": "501發以上｜4T/發",
-        "short_label": "501發以上",
-        "min": 501,
-        "max": 999999,
-        "rate_x2": 8,
-        "rate_text": "4",
-    },
-}
+AW_COLLISION_PLANS: dict[str, dict[str, Any]] = {key: dict(plan) for key, plan in AW_COLLISION_PRICING_BY_RULE.items()}
 
 _INSTALLED = False
-_ORIGINAL_CALCULATE_PRICE = None
 _ORIGINAL_QUANTITY_SELECT = None
 _ORIGINAL_WAITING_ORDER_CREATOR = None
 _ORIGINAL_PANEL_BUILDER = None
@@ -96,146 +59,6 @@ def aw_collision_original_amount(rule_key: str | None, quantity: int) -> int:
     # 系統金額以整數 T 記錄。4.5T/發若總額出現 0.5T，向上進位 1T，
     # 避免因整數帳務格式而少收半 T。
     return (value * int(plan["rate_x2"]) + 1) // 2
-
-
-def _install_rules_and_catalog() -> None:
-    from services import orders
-    from services import order_rules
-
-    order_rules.CATEGORY_LABELS["farm"] = "台服代肝代解"
-    orders.ORDER_CATEGORY_LABELS["farm"] = "台服代肝代解"
-
-    rule_specs = (
-        (
-            "farm_aw_collision_1_100",
-            "AW代撞｜1～100發",
-            5,
-            1,
-            100,
-        ),
-        (
-            "farm_aw_collision_101_500",
-            "AW代撞｜101～500發",
-            5,
-            101,
-            500,
-        ),
-        (
-            "farm_aw_collision_501_plus",
-            "AW代撞｜501發以上",
-            4,
-            501,
-            999999,
-        ),
-    )
-
-    for key, label, nominal_price, minimum, maximum in rule_specs:
-        if key not in ORDER_RULES:
-            rule = OrderRule(
-                category="farm",
-                key=key,
-                label=label,
-                pricing_type="unit",
-                price=nominal_price,
-                unit_label="發",
-                allowed_roles=AW_COLLISION_RECEIVER_ROLES,
-                required_staff_count=1,
-                min_quantity=minimum,
-                max_quantity=maximum,
-                allow_specify=False,
-                max_specified_count=None,
-                specify_fee_default=0,
-                vip_discount_allowed=False,
-                point_benefits_allowed=False,
-                loyalty_benefits_enabled=False,
-                required_game_roles=(),
-                note=(
-                    "AW代撞依方案發數動態計價；101～500發為4.5T/發。"
-                    "系統帳務只存整數T，半T總額向上進位。"
-                ),
-            )
-            validate_rule_definition(key, rule)
-            ORDER_RULES[key] = rule
-
-        rule = ORDER_RULES[key]
-        if rule.label not in orders.ORDER_ITEMS_BY_CATEGORY.setdefault("farm", []):
-            orders.ORDER_ITEMS_BY_CATEGORY["farm"].append(rule.label)
-        orders.ORDER_RULE_KEY_BY_LABEL[rule.label] = key
-        orders.ORDER_ITEM_TO_CATEGORY[rule.label] = "farm"
-        orders.QUANTITY_SELECT_ITEMS.add(rule.label)
-
-    groups = orders.SELF_SERVICE_ORDER_CATALOG.setdefault("farm", [])
-    existing = next(
-        (group for group in groups if str(group.get("label") or "") == AW_GROUP_LABEL),
-        None,
-    )
-    details = [
-        {
-            "label": str(AW_COLLISION_PLANS[key]["label"]),
-            "value": key.removeprefix("farm_aw_collision_"),
-            "rule_key": key,
-            "quantity_unit": "發",
-            "min_quantity": int(AW_COLLISION_PLANS[key]["min"]),
-            "max_quantity": int(AW_COLLISION_PLANS[key]["max"]),
-            "quantity_input_mode": "modal",
-        }
-        for key in AW_RULE_KEYS
-    ]
-    if existing is None:
-        groups.append({"label": AW_GROUP_LABEL, "details": details})
-    else:
-        existing["details"] = details
-
-
-def _install_price_patch() -> None:
-    global _ORIGINAL_CALCULATE_PRICE
-
-    from services import order_rules
-
-    if _ORIGINAL_CALCULATE_PRICE is None:
-        _ORIGINAL_CALCULATE_PRICE = order_rules.calculate_price
-    original = _ORIGINAL_CALCULATE_PRICE
-
-    def calculate_price_with_aw(
-        rule,
-        *,
-        quantity=None,
-        player_count=None,
-        specified_roles=None,
-        staff_adjustments=None,
-    ):
-        rule_key = str(getattr(rule, "key", "") or "")
-        if not is_aw_collision_rule(rule_key):
-            return original(
-                rule,
-                quantity=quantity,
-                player_count=player_count,
-                specified_roles=specified_roles,
-                staff_adjustments=staff_adjustments,
-            )
-
-        qty = int(quantity if quantity is not None else getattr(rule, "min_quantity", 1) or 1)
-        plan = validate_aw_quantity_for_rule(rule_key, qty)
-        if specified_roles:
-            raise ValueError("AW代撞不開放指定")
-        if staff_adjustments:
-            raise ValueError("AW代撞不支援額外加減價選項")
-
-        base_amount = aw_collision_original_amount(rule_key, qty)
-        return PriceResult(
-            base_amount=base_amount,
-            specify_fee=0,
-            staff_adjustment_amount=0,
-            total_amount=base_amount,
-            service_quantity=qty,
-            required_staff_count=1,
-            free_specify_fee=False,
-            details=(
-                f"AW代撞｜{plan['short_label']}｜{plan['rate_text']}T/發",
-            ),
-        )
-
-    order_rules.calculate_price = calculate_price_with_aw
 
 
 def _extend_product_dependent_state() -> None:
@@ -531,8 +354,6 @@ def install_aw_collision_catalog() -> None:
     if _INSTALLED:
         return
 
-    _install_rules_and_catalog()
-    _install_price_patch()
     _extend_product_dependent_state()
     _install_quantity_select_patch()
     _install_dispatch_guard()

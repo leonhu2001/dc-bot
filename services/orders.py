@@ -155,6 +155,14 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
                 {"label": "360M", "value": "360m", "rule_key": "farm_halfcoin_360m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
+        {
+            "label": "AW代撞",
+            "details": [
+                {"label": "1～100發｜5T/發", "value": "1_100", "rule_key": "farm_aw_collision_1_100", "quantity_unit": "發", "min_quantity": 1, "max_quantity": 100, "quantity_input_mode": "modal"},
+                {"label": "101～500發｜4.5T/發", "value": "101_500", "rule_key": "farm_aw_collision_101_500", "quantity_unit": "發", "min_quantity": 101, "max_quantity": 500, "quantity_input_mode": "modal"},
+                {"label": "501發以上｜4T/發", "value": "501_plus", "rule_key": "farm_aw_collision_501_plus", "quantity_unit": "發", "min_quantity": 501, "max_quantity": 999999, "quantity_input_mode": "modal"},
+            ],
+        },
     ],
     "steam": [
         {"label": "娛樂陪", "details": [
