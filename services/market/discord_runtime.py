@@ -85,6 +85,17 @@ def market_notifications_url() -> str:
     return f"{MARKET_SITE_BASE_URL}/games/{MARKET_GAME_SLUG}/notifications"
 
 
+def _alert_is_active(
+    personalization: MarketPersonalizationRepository,
+    *,
+    discord_user_id: str,
+    game_key: str,
+    alert_id: int,
+) -> bool:
+    alerts = personalization.list_alerts(discord_user_id, game_key)
+    return any(alert.id == int(alert_id) and alert.enabled for alert in alerts)
+
+
 async def market_discord_delivery_loop(bot: discord.Client) -> None:
     await bot.wait_until_ready()
 
@@ -125,6 +136,21 @@ async def market_discord_delivery_loop(bot: discord.Client) -> None:
                         services.discord.mark_skipped,
                         event.outbox_id,
                         "trigger predates discord dm opt-in",
+                    )
+                    continue
+
+                alert_active = await asyncio.to_thread(
+                    _alert_is_active,
+                    services.personalization,
+                    discord_user_id=event.discord_user_id,
+                    game_key=event.game_key,
+                    alert_id=event.alert_id,
+                )
+                if not alert_active:
+                    await asyncio.to_thread(
+                        services.discord.mark_skipped,
+                        event.outbox_id,
+                        "alert paused or deleted before discord delivery",
                     )
                     continue
 
