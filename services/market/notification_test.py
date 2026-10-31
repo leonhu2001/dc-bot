@@ -44,12 +44,16 @@ def enqueue_market_test_notification(
     market_repository: MarketRepository,
     personalization_repository: MarketPersonalizationRepository,
     discord_user_id: str,
+    game_key: str,
     alert_id: int,
     triggered_at: datetime | None = None,
 ) -> MarketTestNotification:
     user_id = str(discord_user_id or "").strip()
+    game = str(game_key or "").strip()
     if not user_id:
         raise ValueError("discord user id is required")
+    if not game:
+        raise ValueError("game key is required")
 
     at = triggered_at or datetime.now(timezone.utc)
     if at.tzinfo is None:
@@ -62,6 +66,7 @@ def enqueue_market_test_notification(
             select(MarketAlert).where(
                 MarketAlert.id == int(alert_id),
                 MarketAlert.discord_user_id == user_id,
+                MarketAlert.game_key == game,
             )
         )
         if alert is None:
@@ -93,12 +98,11 @@ def enqueue_market_test_notification(
             if at - previous < timedelta(seconds=TEST_NOTIFICATION_COOLDOWN_SECONDS):
                 raise ValueError("test notification cooldown")
 
-        game_key = str(alert.game_key)
         item_key = str(alert.item_key)
         condition_type = str(alert.condition_type)
         target_price = int(alert.target_price)
 
-    latest_items = market_repository.list_latest(game_key, limit=500)
+    latest_items = market_repository.list_latest(game, limit=500)
     item = next(
         (row for row in latest_items if str(row.source_item_id) == item_key),
         None,
@@ -110,7 +114,7 @@ def enqueue_market_test_notification(
     with personalization_repository.SessionLocal() as db:
         row = MarketNotificationOutbox(
             discord_user_id=user_id,
-            game_key=game_key,
+            game_key=game,
             alert_id=int(alert_id),
             item_key=item_key,
             condition_type=test_condition,
@@ -124,14 +128,13 @@ def enqueue_market_test_notification(
         db.add(row)
         db.commit()
         db.refresh(row)
-
         outbox_id = int(row.id)
 
     return MarketTestNotification(
         outbox_id=outbox_id,
         alert_id=int(alert_id),
         discord_user_id=user_id,
-        game_key=game_key,
+        game_key=game,
         item_key=item_key,
         condition_type=test_condition,
         target_price=target_price,
