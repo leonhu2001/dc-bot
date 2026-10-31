@@ -22,7 +22,7 @@ class FakeProvider:
                     name="5.56x45 M995",
                     price=4700,
                     category="ammo",
-                    tier=6,
+                    tier=5,
                 ),
             ),
         )
