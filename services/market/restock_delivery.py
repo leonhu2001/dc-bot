@@ -123,7 +123,7 @@ class MarketRestockRepository:
                     select(MarketRestockForecast).where(
                         MarketRestockForecast.game_key == game,
                         MarketRestockForecast.item_key == prediction.item_key,
-                        MarketRestockForecast.status == "scheduled",
+                        MarketRestockForecast.status.in_(("scheduled", "superseded", "expired")),
                         MarketRestockForecast.based_on_event_at < last_event_at,
                         MarketRestockForecast.predicted_at >= last_event_at - timedelta(hours=3),
                         MarketRestockForecast.predicted_at <= last_event_at + timedelta(hours=3),
