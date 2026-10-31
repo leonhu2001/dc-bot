@@ -147,7 +147,17 @@ fi
 
 echo "Waiting for Discord panel synchronization..."
 panel_ready=0
-for _ in $(seq 1 30); do
+# The production bot performs substantial on_ready restoration work and may hit
+# Discord's normal HTTP rate limits while refreshing existing panels. Market setup
+# must wait for the actual sync marker instead of assuming startup finishes in 30s.
+for _ in $(seq 1 180); do
+    if [ "$(systemctl is-active "$BOT_SERVICE" 2>/dev/null || true)" != "active" ]; then
+        systemctl status "$BOT_SERVICE" --no-pager || true
+        journalctl -u "$BOT_SERVICE" --since "$STARTED_AT" -n 160 --no-pager || true
+        echo "ERROR: $BOT_SERVICE stopped while waiting for Discord Market panels."
+        false
+    fi
+
     if journalctl -u "$BOT_SERVICE" --since "$STARTED_AT" --no-pager 2>/dev/null \
         | grep -Fq "[market-discord] panels synced channel=$TARGET_CHANNEL"; then
         panel_ready=1
@@ -157,7 +167,7 @@ for _ in $(seq 1 30); do
 done
 
 if [ "$panel_ready" -ne 1 ]; then
-    journalctl -u "$BOT_SERVICE" --since "$STARTED_AT" -n 160 --no-pager || true
+    journalctl -u "$BOT_SERVICE" --since "$STARTED_AT" -n 200 --no-pager || true
     echo "ERROR: Discord Market panels were not confirmed in target channel $TARGET_CHANNEL."
     false
 fi
