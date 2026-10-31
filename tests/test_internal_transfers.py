@@ -235,7 +235,6 @@ def test_customer_service_created_transfer_is_immediately_approved(transfer_db):
 
 
 def test_recipient_does_not_need_same_order_or_any_order(transfer_db):
-    # employee-b 沒有任何 order assignment / payout，仍可以作為收款人。
     result = internal_transfers.create_internal_transfer(
         actor_discord_id="cs-1",
         actor_display_name="客服一號",
@@ -340,10 +339,23 @@ def test_adjustment_payout_status_can_be_settled_independently(transfer_db):
     )
     assert result["status"] == "approved"
 
+    conn = sqlite3.connect(transfer_db)
+    try:
+        effective_month = conn.execute(
+            """
+            SELECT substr(effective_at, 1, 7)
+            FROM employee_payroll_adjustments
+            WHERE transfer_id = ? AND direction = 'incoming'
+            """,
+            (result["id"],),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
     internal_transfers.mark_employee_adjustments(
         employee_discord_id="employee-b",
         target_status="paid",
-        month="2026-10",
+        month=effective_month,
     )
 
     conn = sqlite3.connect(transfer_db)
