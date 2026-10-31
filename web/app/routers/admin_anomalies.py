@@ -14,6 +14,7 @@ from shared.models import AdminAuditLog
 from web.app.services.anomaly_detection import build_anomaly_snapshot
 from web.app.services.anomaly_repair import apply_anomaly_repair
 from web.app.services.system_health import build_system_health_snapshot
+from web.app.services.market_health import check_market_health
 from web.app.services.accounting_reconciliation_policy import (
     build_accounting_policy_view,
     normalize_anomaly_snapshot,
@@ -59,6 +60,31 @@ def _recent_audit_logs(limit: int = 25) -> list[dict]:
         }
         for row in rows
     ]
+
+
+def _manager_or_none(request: Request) -> dict | None:
+    user = get_current_user(request)
+    if not isinstance(user, dict) or not user.get("is_manager"):
+        return None
+    return user
+
+
+@router.get("/admin/market")
+async def admin_market_health(request: Request):
+    user = _manager_or_none(request)
+    if user is None:
+        return RedirectResponse(url="/no-access", status_code=303)
+
+    market = await run_in_threadpool(check_market_health)
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_market.html",
+        context={
+            "title": "市場監控",
+            "user": user,
+            "market": market.as_dict(),
+        },
+    )
 
 
 @router.get("/admin/anomalies")
