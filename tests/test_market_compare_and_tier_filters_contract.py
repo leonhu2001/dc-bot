@@ -13,7 +13,7 @@ def test_market_overview_discovers_available_tiers_without_losing_query_state():
     script = _read("web/app/static/js/pages/game_market_live.js")
 
     assert "data-market-tier-filters" in template
-    assert "game_market_live.js?v=20261031-2" in template
+    assert "game_market_live.js?v=20261031-4" in template
     assert "async function installTierFilters()" in script
     assert "discoveryParams.delete('tier')" in script
     assert "params.set('tier', String(tier))" in script

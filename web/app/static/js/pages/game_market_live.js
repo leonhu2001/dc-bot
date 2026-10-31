@@ -8,9 +8,10 @@
     const filterHost = document.querySelector('[data-market-category-filters]');
     const tierHost = document.querySelector('[data-market-tier-filters]');
     const resultMeta = document.querySelector('[data-market-result-meta]');
-    const listHost = document.querySelector('.game-market-list');
+    const listPanel = document.querySelector('.game-market-list-panel');
     const sortSelect = document.querySelector('.game-market-search select[name="sort"]');
     const rows = Array.from(document.querySelectorAll('[data-market-row]'));
+    const userLoggedIn = listPanel?.dataset.marketUser === '1';
 
     const formatter = new Intl.DateTimeFormat('zh-TW', {
         timeZone: 'Asia/Taipei',
@@ -23,20 +24,12 @@
     });
 
     const pageParams = new URLSearchParams(window.location.search);
-    const requestedSort = String(pageParams.get('sort') || 'name').trim().toLowerCase();
-    const smartSortEnabled = requestedSort === '' || requestedSort === 'name';
-    const favorites = new Set();
 
     let activeCategory = '';
     let activeQuickFilter = 'all';
-    let favoritesReady = false;
     let quickFilterHost = null;
     let refreshTimer = null;
     let lastUpdatedAt = updatedNode?.getAttribute('datetime') || '';
-
-    rows.forEach((row, index) => {
-        row.dataset.marketOriginalIndex = String(index);
-    });
 
     function parseUpdatedAt() {
         if (!lastUpdatedAt) return null;
@@ -64,16 +57,6 @@
         }
     }
 
-    function itemKeyForRow(row) {
-        try {
-            const url = new URL(row.getAttribute('href') || '', window.location.origin);
-            const parts = url.pathname.split('/').filter(Boolean);
-            return decodeURIComponent(parts[parts.length - 1] || '');
-        } catch (_error) {
-            return '';
-        }
-    }
-
     function signalState(row) {
         const labels = Array.from(row.querySelectorAll('.game-market-value-badge'))
             .map((node) => String(node.textContent || '').trim());
@@ -89,7 +72,7 @@
     }
 
     function favoriteState(row) {
-        return row.dataset.marketFavorite === '1';
+        return row.dataset.marketWatched === '1';
     }
 
     function visibleRows() {
@@ -190,7 +173,7 @@
 
         quickFilterHost.replaceChildren();
         const options = [['全部行情', 'all']];
-        if (favoritesReady) options.push(['★ 只看收藏', 'favorites']);
+        if (userLoggedIn) options.push(['★ 只看收藏', 'favorites']);
         options.push(['⚠️ 只看異常', 'abnormal']);
         options.push(['📦 只看疑似補貨', 'restock']);
 
@@ -208,97 +191,6 @@
             });
             quickFilterHost.appendChild(button);
         });
-    }
-
-    function markFavorites() {
-        rows.forEach((row) => {
-            const itemKey = itemKeyForRow(row);
-            const favorite = itemKey && favorites.has(itemKey);
-            row.dataset.marketFavorite = favorite ? '1' : '0';
-
-            const firstCell = row.firstElementChild;
-            if (!firstCell) return;
-            let badge = firstCell.querySelector('[data-market-favorite-badge]');
-            if (favorite && !badge) {
-                badge = document.createElement('span');
-                badge.dataset.marketFavoriteBadge = '';
-                badge.className = 'game-market-value-badge is-value-low';
-                badge.textContent = '★ 收藏';
-                firstCell.appendChild(badge);
-            } else if (!favorite && badge) {
-                badge.remove();
-            }
-        });
-    }
-
-    function smartSortRank(row) {
-        const favorite = favoriteState(row);
-        const signals = signalState(row);
-        const group = favorite && signals.hasSignal
-            ? 0
-            : favorite
-                ? 1
-                : signals.hasSignal
-                    ? 2
-                    : 3;
-        const signalRank = signals.abnormalDown
-            ? 0
-            : signals.restock
-                ? 1
-                : signals.abnormalUp
-                    ? 2
-                    : 3;
-        const originalIndex = Number.parseInt(row.dataset.marketOriginalIndex || '0', 10) || 0;
-        return [group, signalRank, originalIndex];
-    }
-
-    function applySmartSort() {
-        if (!smartSortEnabled || !listHost || rows.length === 0) return;
-        const sorted = [...rows].sort((left, right) => {
-            const leftRank = smartSortRank(left);
-            const rightRank = smartSortRank(right);
-            for (let index = 0; index < leftRank.length; index += 1) {
-                if (leftRank[index] !== rightRank[index]) return leftRank[index] - rightRank[index];
-            }
-            return 0;
-        });
-        sorted.forEach((row) => listHost.appendChild(row));
-    }
-
-    async function loadFavorites() {
-        const notificationsPath = window.location.pathname.replace(/\/market\/?$/, '/notifications');
-        if (notificationsPath === window.location.pathname) return;
-
-        try {
-            const response = await fetch(notificationsPath, {
-                cache: 'no-store',
-                credentials: 'same-origin',
-                headers: { Accept: 'text/html' },
-            });
-            if (!response.ok) return;
-            if (response.redirected && new URL(response.url).origin !== window.location.origin) return;
-
-            const html = await response.text();
-            const documentCopy = new DOMParser().parseFromString(html, 'text/html');
-            documentCopy.querySelectorAll('.game-notification-watch[href*="/market/items/"]').forEach((link) => {
-                try {
-                    const url = new URL(link.getAttribute('href') || '', window.location.origin);
-                    const parts = url.pathname.split('/').filter(Boolean);
-                    const itemKey = decodeURIComponent(parts[parts.length - 1] || '');
-                    if (itemKey) favorites.add(itemKey);
-                } catch (_error) {
-                    // Ignore malformed watchlist links and keep the market usable.
-                }
-            });
-
-            favoritesReady = true;
-            markFavorites();
-            applySmartSort();
-            installQuickFilters();
-            applyFilters();
-        } catch (_error) {
-            // Logged-out visitors and unavailable personalization simply skip favorites.
-        }
     }
 
     async function installTierFilters() {
@@ -384,9 +276,7 @@
 
     installCategoryFilters();
     installQuickFilters();
-    applySmartSort();
     applyFilters();
-    loadFavorites();
     installTierFilters();
     updateFreshness();
     window.setInterval(updateFreshness, 30_000);
