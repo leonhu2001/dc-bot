@@ -146,9 +146,32 @@ def build_market_overview_embed(snapshot) -> discord.Embed:
 
 
 def build_market_alerts_embed() -> discord.Embed:
-    return discord.Embed(
+    embed = discord.Embed(
         title="🔔 價格通知中心",
         color=discord.Color.blurple(),
+    )
+    embed.add_field(
+        name="提醒條件",
+        value="📉 低於指定價格\n📈 高於指定價格",
+        inline=True,
+    )
+    embed.add_field(
+        name="通知方式",
+        value="💬 Discord 私訊",
+        inline=True,
+    )
+    return embed
+
+
+def _build_dm_settings_embed(enabled: bool, *, error: str | None = None) -> discord.Embed:
+    status = "✅ 已開啟" if enabled else "🔕 已關閉"
+    description = f"目前狀態：{status}"
+    if error:
+        description = f"{description}\n{error}"
+    return discord.Embed(
+        title="🔔 Discord 通知",
+        description=description,
+        color=discord.Color.green() if enabled else discord.Color.dark_grey(),
     )
 
 
@@ -259,6 +282,55 @@ class MarketOverviewView(discord.ui.View):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
+class MarketDmToggleButton(discord.ui.Button):
+    def __init__(self, enabled: bool):
+        self.enabled = bool(enabled)
+        super().__init__(
+            label="關閉通知" if self.enabled else "開啟通知",
+            emoji="🔕" if self.enabled else "🔔",
+            style=discord.ButtonStyle.danger if self.enabled else discord.ButtonStyle.success,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        services = get_discord_market_services()
+        if services is None:
+            await interaction.response.edit_message(
+                content="行情服務暫時不可用。",
+                embed=None,
+                view=None,
+            )
+            return
+
+        user_id = str(interaction.user.id)
+        target = not self.enabled
+        if target:
+            try:
+                await interaction.user.send("✅ 三角洲價格通知已開啟。")
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                await interaction.response.edit_message(
+                    content=None,
+                    embed=_build_dm_settings_embed(
+                        False,
+                        error="無法私訊你，請先開放此伺服器成員私訊。",
+                    ),
+                    view=MarketDmSettingsView(False),
+                )
+                return
+
+        await asyncio.to_thread(services.discord.set_dm_enabled, user_id, target)
+        await interaction.response.edit_message(
+            content=None,
+            embed=_build_dm_settings_embed(target),
+            view=MarketDmSettingsView(target),
+        )
+
+
+class MarketDmSettingsView(discord.ui.View):
+    def __init__(self, enabled: bool):
+        super().__init__(timeout=180)
+        self.add_item(MarketDmToggleButton(enabled))
+
+
 class MarketNotificationCenterView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -299,23 +371,13 @@ class MarketNotificationCenterView(discord.ui.View):
         services = await _services_or_reply(interaction)
         if services is None:
             return
-        user_id = str(interaction.user.id)
-        enabled = await asyncio.to_thread(services.discord.dm_enabled, user_id)
-        target = not enabled
-
-        if target:
-            try:
-                await interaction.user.send("✅ 三角洲價格通知已開啟。")
-            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-                await interaction.response.send_message(
-                    "無法私訊你，請先開放此伺服器成員私訊。",
-                    ephemeral=True,
-                )
-                return
-
-        await asyncio.to_thread(services.discord.set_dm_enabled, user_id, target)
+        enabled = await asyncio.to_thread(
+            services.discord.dm_enabled,
+            str(interaction.user.id),
+        )
         await interaction.response.send_message(
-            f"Discord 私訊通知：{'已開啟' if target else '已關閉'}",
+            embed=_build_dm_settings_embed(enabled),
+            view=MarketDmSettingsView(enabled),
             ephemeral=True,
         )
 
