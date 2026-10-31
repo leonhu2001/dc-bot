@@ -128,3 +128,36 @@ def test_forecast_is_resolved_with_actual_event_for_backtest(tmp_path):
     resolved = next(row for row in rows if row.status == "resolved")
     assert resolved.actual_at is not None
     assert resolved.error_minutes == 12
+
+
+def test_expired_forecast_can_still_be_resolved_by_late_actual_event(tmp_path):
+    repository, _personalization, _discord, restock = _services(tmp_path)
+    now = datetime(2026, 11, 1, 1, 0, tzinfo=timezone.utc)
+    first = _prediction(now)
+    restock.sync_predictions("delta_force", (first,), now=now)
+
+    restock.sync_predictions(
+        "delta_force",
+        (),
+        now=first.predicted_at + timedelta(hours=2, minutes=5),
+    )
+    actual = first.predicted_at + timedelta(hours=2, minutes=20)
+    next_prediction = ItemRestockPrediction(
+        item_key="m995",
+        predicted_at=actual + timedelta(hours=6),
+        confidence=80,
+        event_count=6,
+        median_interval_minutes=360,
+        jitter_minutes=12,
+        last_event_at=actual,
+    )
+    restock.sync_predictions(
+        "delta_force",
+        (next_prediction,),
+        now=actual + timedelta(minutes=5),
+    )
+
+    with repository.SessionLocal() as db:
+        rows = db.query(MarketRestockForecast).order_by(MarketRestockForecast.id.asc()).all()
+    resolved = next(row for row in rows if row.status == "resolved")
+    assert resolved.error_minutes == 140
