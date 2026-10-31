@@ -5,7 +5,8 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 
 from services.market.analytics import build_market_analytics
-from services.market.event_detector import MarketEventSignal, analyze_market_events
+from services.market.event_detector import MarketEventSignal
+from services.market.event_signal_cache import get_cached_market_event_signal
 from services.market.runtime import get_market_repository
 from services.market.storage import MarketRepository
 
@@ -166,10 +167,11 @@ def get_public_market_snapshot(
         )
 
     try:
-        market_event = analyze_market_events(
+        market_event = get_cached_market_event_signal(
             market_repository,
             clean_game_key,
-            source_name=latest[0].source_name if latest else None,
+            source_name=latest[0].source_name,
+            latest_source_at=updated_at,
             now=now,
         )
     except Exception:
