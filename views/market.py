@@ -16,8 +16,8 @@ from services.market.public_snapshot import MarketItemSummary, get_public_market
 
 
 MARKET_PANEL_CHANNEL_ID = 1566004926209990776
-MARKET_OVERVIEW_MARKER = "MOWAN_MARKET_OVERVIEW_V1"
-MARKET_ALERTS_MARKER = "MOWAN_MARKET_ALERTS_V1"
+LEGACY_MARKET_OVERVIEW_MARKER = "MOWAN_MARKET_OVERVIEW_V1"
+LEGACY_MARKET_ALERTS_MARKER = "MOWAN_MARKET_ALERTS_V1"
 MARKET_STALE_SECONDS = 2700
 
 
@@ -36,6 +36,16 @@ def _pct(value: float | None) -> str:
 
 def _item_map(items) -> dict[str, object]:
     return {str(item.source_item_id): item for item in items}
+
+
+def _message_component_custom_ids(message) -> set[str]:
+    custom_ids: set[str] = set()
+    for row in getattr(message, "components", ()) or ():
+        for child in getattr(row, "children", ()) or ():
+            custom_id = getattr(child, "custom_id", None)
+            if custom_id:
+                custom_ids.add(str(custom_id))
+    return custom_ids
 
 
 async def _services_or_reply(interaction: discord.Interaction):
@@ -66,13 +76,11 @@ async def _snapshot():
 
 def build_market_overview_embed(snapshot) -> discord.Embed:
     if snapshot is None:
-        embed = discord.Embed(
+        return discord.Embed(
             title="📈 三角洲台服交易所",
             description="🔴 行情暫不可用",
             color=discord.Color.red(),
         )
-        embed.set_footer(text=MARKET_OVERVIEW_MARKER)
-        return embed
 
     status_text = {
         "ready": "🟢 行情正常",
@@ -134,18 +142,14 @@ def build_market_overview_embed(snapshot) -> discord.Embed:
             inline=False,
         )
 
-    embed.set_footer(text=MARKET_OVERVIEW_MARKER)
     return embed
 
 
 def build_market_alerts_embed() -> discord.Embed:
-    embed = discord.Embed(
+    return discord.Embed(
         title="🔔 價格通知中心",
-        description="價格達標時以 Discord 私訊通知。",
         color=discord.Color.blurple(),
     )
-    embed.set_footer(text=MARKET_ALERTS_MARKER)
-    return embed
 
 
 def _item_result_embed(item: MarketItemSummary) -> discord.Embed:
@@ -743,10 +747,19 @@ async def sync_market_panels(bot: discord.Client, snapshot=None) -> bool:
         async for message in channel.history(limit=100, oldest_first=False):
             if message.author.id != bot.user.id or not message.embeds:
                 continue
+            custom_ids = _message_component_custom_ids(message)
             marker = str(getattr(message.embeds[0].footer, "text", "") or "")
-            if marker == MARKET_OVERVIEW_MARKER and overview_message is None:
+            is_overview = (
+                "mowan_market_query_v1" in custom_ids
+                or marker == LEGACY_MARKET_OVERVIEW_MARKER
+            )
+            is_alerts = (
+                "mowan_market_alert_add_v1" in custom_ids
+                or marker == LEGACY_MARKET_ALERTS_MARKER
+            )
+            if is_overview and overview_message is None:
                 overview_message = message
-            elif marker == MARKET_ALERTS_MARKER and alerts_message is None:
+            elif is_alerts and alerts_message is None:
                 alerts_message = message
             if overview_message is not None and alerts_message is not None:
                 break
