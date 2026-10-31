@@ -30,6 +30,7 @@
         <div class="mw-r5-nav-section">管理設定</div>
         <a class="{% if _p.startswith('/admin/benefits') %}active{% endif %}" href="/admin/benefits">優惠與福利</a>
         <a class="{% if _p.startswith('/admin/order-rules') %}active{% endif %}" href="/admin/order-rules">商品與規則</a>
+        <a class="{% if _p.startswith('/admin/market') %}active{% endif %}" href="/admin/market">市場監控</a>
         <a class="{% if _p.startswith('/admin/anomalies') or _p.startswith('/admin/system') or _p.startswith('/admin/audit') %}active{% endif %}" href="/admin/anomalies">系統維運</a>
         {% endif %}
 
