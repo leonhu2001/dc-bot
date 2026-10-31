@@ -252,14 +252,17 @@ def get_public_market_snapshot(
     except Exception:
         market_event = None
 
-    try:
-        restock_predictions = get_cached_item_restock_predictions(
-            market_repository,
-            clean_game_key,
-            now=now,
-        )
-    except Exception:
+    if stale:
         restock_predictions = ()
+    else:
+        try:
+            restock_predictions = get_cached_item_restock_predictions(
+                market_repository,
+                clean_game_key,
+                now=now,
+            )
+        except Exception:
+            restock_predictions = ()
     restock_by_item = {
         prediction.item_key: prediction
         for prediction in restock_predictions
@@ -300,7 +303,7 @@ def get_public_market_snapshot(
         gainers=gainers,
         losers=losers,
         market_event=market_event,
-        next_restock_item=None if stale else _next_restock_item(items),
+        next_restock_item=_next_restock_item(items),
         message="行情更新延遲，提醒暫停。" if stale else "",
     )
 
@@ -379,4 +382,9 @@ def filter_market_snapshot(
     else:
         items.sort(key=lambda item: (item.tier is None, -(item.tier or 0), item.name.casefold()))
 
-    return replace(snapshot, items=tuple(items))
+    filtered_items = tuple(items)
+    return replace(
+        snapshot,
+        items=filtered_items,
+        next_restock_item=_next_restock_item(filtered_items),
+    )
