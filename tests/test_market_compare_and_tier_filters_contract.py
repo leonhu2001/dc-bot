@@ -8,16 +8,20 @@ def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_market_overview_discovers_available_tiers_without_losing_query_state():
+def test_market_overview_discovers_only_tradable_tiers_without_losing_query_state():
     template = _read("web/app/templates/game_market.html")
     script = _read("web/app/static/js/pages/game_market_live.js")
 
     assert "data-market-tier-filters" in template
-    assert "game_market_live.js?v=20261101-1" in template
+    assert "game_market_live.js?v=20261101-2" in template
+    assert ">4級</a>" in template
+    assert ">5級</a>" in template
+    assert ">6級</a>" not in template
     assert "async function installTierFilters()" in script
     assert "discoveryParams.delete('tier')" in script
     assert "params.set('tier', String(tier))" in script
     assert "new URLSearchParams(window.location.search)" in script
+    assert "tier >= 4 && tier <= 5" in script
     assert "tiers.forEach" in script
 
 

@@ -105,24 +105,26 @@ def test_setup_cog_installs_market_discord_runtime():
     assert "install_market_discord(bot)" in text
 
 
-def test_market_and_notifications_are_marked_live_with_short_copy():
+def test_website_focuses_on_market_while_discord_keeps_notifications():
     registry = (ROOT / "services" / "game_registry.py").read_text(encoding="utf-8")
     market = (ROOT / "web" / "app" / "templates" / "game_market.html").read_text(
         encoding="utf-8"
     )
-    notifications = (
-        ROOT / "web" / "app" / "templates" / "game_notifications.html"
-    ).read_text(encoding="utf-8")
+    delta = (ROOT / "web" / "app" / "templates" / "game_delta_force.html").read_text(
+        encoding="utf-8"
+    )
 
-    assert registry.count('"status": "已上線"') >= 2
-    assert "後續將加入" not in registry
-    assert "下一階段" not in registry
+    assert registry.count('"status": "已上線"') == 1
+    assert '"key": "market"' in registry
+    assert '"key": "news"' not in registry
+    assert '"key": "notifications"' not in registry
 
-    assert "只使用我們自己的歷史資料" not in market
-    assert "不採用第三方推薦分數" not in market
-    assert "不會用未驗證價格填版面" not in market
+    assert "三角洲消息" not in market
+    assert "三角洲通知" not in market
+    assert "三角洲消息" not in delta
+    assert "通知中心" not in delta
 
-    assert "推播採每台瀏覽器獨立訂閱" not in notifications
-    assert "暫時性失敗會保留待送事件" not in notifications
-    assert "失效 endpoint" not in notifications
-    assert "管理關注、價格提醒與推播。" in notifications
+    # Discord remains the proactive notification surface.
+    source = (ROOT / "views" / "market.py").read_text(encoding="utf-8")
+    assert "MarketNotificationCenterView" in source
+    assert "Discord 私訊" in source

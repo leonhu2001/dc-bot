@@ -35,8 +35,10 @@ def test_market_page_has_live_freshness_history_and_category_controls():
     assert "data-market-category-filters" in template
     assert "data-market-category=" in template
     assert "coverage_hours" in template
-    assert "24H 統計" in template
-    assert "7D 統計" in template
+    assert "24H" in template
+    assert "7D" in template
+    assert "24H 統計" not in template
+    assert "7D 統計" not in template
 
     assert "Asia/Taipei" in script
     assert "/api/items" in script

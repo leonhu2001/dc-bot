@@ -18,14 +18,14 @@ def _store(repository: MarketRepository, at: datetime, *, m995: int, m61: int) -
                     name="5.56x45 M995",
                     price=m995,
                     category="ammo",
-                    tier=6,
+                    tier=4,
                 ),
                 MarketSourceItem(
                     source_item_id="m61",
                     name="7.62x51 M61",
                     price=m61,
                     category="ammo",
-                    tier=6,
+                    tier=5,
                 ),
             ),
         )
@@ -117,7 +117,7 @@ def test_market_snapshot_search_tier_and_sort(tmp_path):
     assert [item.item_key for item in searched.items] == ["m995"]
 
     tiered = filter_market_snapshot(snapshot, tier=5)
-    assert tiered.items == ()
+    assert [item.item_key for item in tiered.items] == ["m61"]
 
     sorted_snapshot = filter_market_snapshot(snapshot, sort="price_desc")
     assert [item.item_key for item in sorted_snapshot.items] == ["m61", "m995"]

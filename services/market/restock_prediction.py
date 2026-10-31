@@ -9,7 +9,7 @@ from time import monotonic
 from sqlalchemy import select
 
 from services.market.event_detector import _cluster_broad_events, _transition
-from services.market.scope import minimum_market_tier
+from services.market.scope import maximum_market_tier, minimum_market_tier
 from services.market.storage import MarketItem, MarketPrice, MarketRepository, MarketSourceRun
 
 
@@ -146,9 +146,14 @@ def predict_item_restocks(
             )
         )
         minimum_tier = minimum_market_tier(clean_game)
+        maximum_tier = maximum_market_tier(clean_game)
         if minimum_tier is not None:
             rows_query = rows_query.where(
                 MarketItem.tier.is_(None) | (MarketItem.tier >= minimum_tier)
+            )
+        if maximum_tier is not None:
+            rows_query = rows_query.where(
+                MarketItem.tier.is_(None) | (MarketItem.tier <= maximum_tier)
             )
         rows = db.execute(
             rows_query.order_by(
