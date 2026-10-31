@@ -8,6 +8,7 @@ from urllib.parse import quote
 from pywebpush import WebPushException, webpush
 
 from services.game_registry import list_game_hubs
+from services.market.notification_test import split_notification_condition
 from services.market.push import MarketPushRepository, StoredOutboxEvent
 from services.market.storage import MarketRepository
 
@@ -50,24 +51,40 @@ def _payload(event: StoredOutboxEvent, market_repository: MarketRepository) -> s
     game_slug = _game_slug(event.game_key)
     item = market_repository.get_item(event.game_key, event.item_key)
     item_name = item.name if item is not None else event.item_key
-    relation = "低於或等於" if event.condition_type == "below" else "高於或等於"
+    base_condition, is_test = split_notification_condition(event.condition_type)
+    relation = "低於或等於" if base_condition == "below" else "高於或等於"
+    symbol = "≤" if base_condition == "below" else "≥"
     url = (
         f"/games/{game_slug}/market/items/{quote(event.item_key, safe='')}"
         if game_slug
         else "/games"
     )
-    payload = {
-        "title": f"{item_name} 價格提醒",
-        "body": (
+
+    if is_test:
+        title = "🧪 價格通知測試"
+        body = (
+            f"{item_name} · 現價 ${event.current_price:,} · "
+            f"目標 {symbol} ${event.target_price:,}"
+        )
+        tag = f"market-alert-test-{event.id}"
+    else:
+        title = f"{item_name} 價格提醒"
+        body = (
             f"目前 ${event.current_price:,}，已{relation}你的目標 "
             f"${event.target_price:,}。"
-        ),
+        )
+        tag = f"market-alert-{event.alert_id}"
+
+    payload = {
+        "title": title,
+        "body": body,
         "url": url,
-        "tag": f"market-alert-{event.alert_id}",
+        "tag": tag,
         "data": {
             "game_key": event.game_key,
             "item_key": event.item_key,
             "alert_id": event.alert_id,
+            "test": is_test,
         },
     }
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
