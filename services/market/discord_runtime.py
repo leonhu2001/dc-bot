@@ -11,6 +11,7 @@ import discord
 from dotenv import dotenv_values
 
 from services.market.discord_delivery import MarketDiscordRepository
+from services.market.notification_test import split_notification_condition
 from services.market.personalization import MarketPersonalizationRepository
 from services.market.storage import MarketRepository
 
@@ -191,24 +192,31 @@ async def market_discord_delivery_loop(bot: discord.Client) -> None:
                     event.item_key,
                 )
                 item_name = str(getattr(item, "name", "") or event.item_key)
-                symbol = "≤" if event.condition_type == "below" else "≥"
+                base_condition, is_test = split_notification_condition(
+                    event.condition_type
+                )
+                symbol = "≤" if base_condition == "below" else "≥"
                 color = (
-                    discord.Color.green()
-                    if event.condition_type == "below"
-                    else discord.Color.orange()
+                    discord.Color.blurple()
+                    if is_test
+                    else (
+                        discord.Color.green()
+                        if base_condition == "below"
+                        else discord.Color.orange()
+                    )
                 )
                 embed = discord.Embed(
-                    title="🔔 價格提醒",
+                    title="🧪 價格通知測試" if is_test else "🔔 價格提醒",
                     description=f"**{item_name}** · ${event.current_price:,}",
                     color=color,
                 )
                 embed.add_field(
-                    name="條件",
+                    name="條件" if not is_test else "提醒設定",
                     value=f"{symbol} ${event.target_price:,}",
                     inline=True,
                 )
                 embed.add_field(
-                    name="觸發時間",
+                    name="觸發時間" if not is_test else "測試時間",
                     value=f"<t:{int(event.triggered_at.timestamp())}:R>",
                     inline=True,
                 )

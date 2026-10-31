@@ -92,7 +92,7 @@
             {% endif %}
         </article>
 
-        <article class="game-market-panel">
+        <article class="game-market-panel" id="price-alerts">
             <div class="game-market-panel-head">
                 <div>
                     <span class="game-market-label">PRICE ALERTS</span>
@@ -100,6 +100,10 @@
                 </div>
                 <span class="game-market-badge">{{ alert_items|length }} 個</span>
             </div>
+
+            {% if request.query_params.get('delivery_test') == 'queued' %}
+            <small role="status">🧪 測試通知已送出。</small>
+            {% endif %}
 
             {% if alert_items %}
             <div class="game-notification-list">
@@ -126,6 +130,10 @@
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <input type="hidden" name="enabled" value="{% if alert.enabled %}0{% else %}1{% endif %}">
                             <button type="submit">{% if alert.enabled %}暫停{% else %}啟用{% endif %}</button>
+                        </form>
+                        <form method="post" action="/games/{{ game.slug }}/notifications/alerts/{{ alert.id }}/test-delivery">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <button type="submit" {% if not alert.enabled %}disabled{% endif %}>🧪 測試通知</button>
                         </form>
                         <form method="post" action="/games/{{ game.slug }}/notifications/alerts/{{ alert.id }}/delete">
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">

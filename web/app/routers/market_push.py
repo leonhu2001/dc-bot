@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from services.game_registry import get_game_hub
-from services.market.push_dispatcher import get_web_push_config
+from services.market.notification_test import enqueue_market_test_notification
+from services.market.push_dispatcher import dispatch_pending_pushes, get_web_push_config
 from services.market.push_test import send_test_push
 from services.market.runtime import (
     get_market_personalization_repository,
     get_market_push_repository,
+    get_market_repository,
 )
 from web.app.services.market_health import check_market_health
 
@@ -159,6 +162,59 @@ async def market_push_test(request: Request, game_slug: str):
         raise HTTPException(status_code=502, detail="測試通知暫時無法送達，請稍後再試。")
 
     return {"ok": True, "status": "sent"}
+
+
+@router.post("/games/{game_slug}/notifications/alerts/{alert_id}/test-delivery")
+async def market_alert_delivery_test(
+    request: Request,
+    game_slug: str,
+    alert_id: int,
+):
+    game = _game_or_404(game_slug)
+    user_id = _user_id_or_401(request)
+    market_repository = get_market_repository()
+    personalization = get_market_personalization_repository()
+    push_repository = get_market_push_repository()
+    if market_repository is None or personalization is None:
+        raise HTTPException(status_code=503, detail="價格通知目前尚未啟用。")
+
+    try:
+        enqueue_market_test_notification(
+            market_repository=market_repository,
+            personalization_repository=personalization,
+            discord_user_id=user_id,
+            game_key=game.key,
+            alert_id=alert_id,
+        )
+    except ValueError as exc:
+        reason = str(exc)
+        if reason == "alert not found":
+            raise HTTPException(status_code=404, detail="找不到這個價格提醒。") from exc
+        if reason == "alert is paused":
+            raise HTTPException(status_code=400, detail="請先啟用這個價格提醒。") from exc
+        if reason == "test notification cooldown":
+            raise HTTPException(status_code=429, detail="測試通知剛送出，請稍後再試。") from exc
+        if reason == "market item unavailable":
+            raise HTTPException(status_code=503, detail="目前無法讀取這個品項的行情。") from exc
+        raise HTTPException(status_code=400, detail="無法建立測試通知。") from exc
+
+    # Production push delivery normally follows the Market polling cycle. For
+    # an explicit user test, run the same durable dispatcher immediately so a
+    # browser subscription can be verified without waiting for the next poll.
+    config = get_web_push_config()
+    if push_repository is not None and config.enabled:
+        await asyncio.to_thread(
+            dispatch_pending_pushes,
+            market_repository=market_repository,
+            push_repository=push_repository,
+            config=config,
+            limit=50,
+        )
+
+    return RedirectResponse(
+        url=f"/games/{game.slug}/notifications?delivery_test=queued#price-alerts",
+        status_code=303,
+    )
 
 
 @router.post("/games/{game_slug}/notifications/push/unsubscribe")
