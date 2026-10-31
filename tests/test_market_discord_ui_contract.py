@@ -1,9 +1,13 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 from views.market import (
     MARKET_PANEL_CHANNEL_ID,
     MarketNotificationCenterView,
     MarketOverviewView,
+    _message_component_custom_ids,
+    build_market_alerts_embed,
+    build_market_overview_embed,
 )
 
 
@@ -42,6 +46,30 @@ def test_market_panels_target_requested_channel_and_are_persistent():
         "mowan_market_dm_toggle_v1",
         "mowan_market_alert_pause_all_v1",
     } <= notification_custom_ids
+
+
+def test_market_panel_internal_markers_are_hidden_from_users():
+    overview = build_market_overview_embed(None)
+    notifications = build_market_alerts_embed()
+
+    assert getattr(overview.footer, "text", None) is None
+    assert getattr(notifications.footer, "text", None) is None
+    assert notifications.description is None
+
+    message = SimpleNamespace(
+        components=[
+            SimpleNamespace(
+                children=[SimpleNamespace(custom_id="mowan_market_query_v1")]
+            )
+        ]
+    )
+    assert _message_component_custom_ids(message) == {"mowan_market_query_v1"}
+
+    source = (ROOT / "views" / "market.py").read_text(encoding="utf-8")
+    assert "embed.set_footer(text=MARKET_OVERVIEW_MARKER)" not in source
+    assert "embed.set_footer(text=MARKET_ALERTS_MARKER)" not in source
+    assert "marker == LEGACY_MARKET_OVERVIEW_MARKER" in source
+    assert "marker == LEGACY_MARKET_ALERTS_MARKER" in source
 
 
 def test_setup_cog_installs_market_discord_runtime():
