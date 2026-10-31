@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 APP="${APP_DIR:-/opt/dc-bot}"
-BACKUP_DIR="${MARKET_BACKUP_DIR:-$APP/_archive/market_db}"
+BACKUP_DIR="$APP/_archive/market_db"
 BACKUP_SERVICE="dc-bot-market-backup.service"
 BACKUP_TIMER="dc-bot-market-backup.timer"
 HEALTH_SERVICE="dc-bot-market-health.service"
@@ -31,8 +31,8 @@ for path in "${required[@]}"; do
     fi
 done
 
-if ! command -v pg_dump >/dev/null 2>&1; then
-    echo "ERROR: pg_dump is required for market backups."
+if ! command -v pg_dump >/dev/null 2>&1 || ! command -v pg_restore >/dev/null 2>&1; then
+    echo "ERROR: pg_dump and pg_restore are required for Market backups."
     exit 2
 fi
 
