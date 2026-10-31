@@ -23,14 +23,14 @@ def _snapshot(
                 name="5.56x45 M995",
                 price=m995,
                 category="ammo",
-                tier=6,
+                tier=4,
             ),
             MarketSourceItem(
                 source_item_id="m61",
                 name="7.62x51 M61",
                 price=m61,
                 category="ammo",
-                tier=6,
+                tier=5,
             ),
         ),
     )
