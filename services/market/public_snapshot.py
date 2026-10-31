@@ -78,13 +78,6 @@ def _movers(items: tuple[MarketItemSummary, ...]) -> tuple[
 
 
 def _recommended_item(items: tuple[MarketItemSummary, ...]) -> MarketItemSummary | None:
-    """Pick a transparent seven-day price opportunity from our own history.
-
-    This is deliberately not a predictive score. A candidate must already have
-    a mature seven-day average and be at least a few percent below that average.
-    If no item clears the threshold, the public page should say so instead of
-    manufacturing a recommendation from thin data.
-    """
     candidates: list[tuple[float, MarketItemSummary]] = []
     for item in items:
         if item.vs_7d_avg_pct is None:
@@ -109,18 +102,13 @@ def get_public_market_snapshot(
     *,
     repository: MarketRepository | None = None,
 ) -> MarketSnapshot:
-    """Return trusted persisted market data for website/Discord presentation.
-
-    Market failures are intentionally isolated from the existing site. A bad
-    market connection must degrade this feature to an explicit status instead
-    of turning unrelated order/customer pages into HTTP 500 responses.
-    """
+    """Return persisted market data for website and Discord presentation."""
     clean_game_key = str(game_key or "").strip()
     if not clean_game_key:
         return MarketSnapshot(
             game_key="",
             status="source_pending",
-            message="行情遊戲識別不存在。",
+            message="行情準備中。",
         )
 
     try:
@@ -129,14 +117,14 @@ def get_public_market_snapshot(
         return MarketSnapshot(
             game_key=clean_game_key,
             status="source_error",
-            message="行情資料庫暫時無法連線，其他網站功能不受影響。",
+            message="行情暫時無法使用。",
         )
 
     if market_repository is None:
         return MarketSnapshot(
             game_key=clean_game_key,
             status="source_pending",
-            message="行情資料源正在接入中，啟用前不會顯示模擬價格。",
+            message="行情準備中。",
         )
 
     try:
@@ -145,14 +133,14 @@ def get_public_market_snapshot(
         return MarketSnapshot(
             game_key=clean_game_key,
             status="source_error",
-            message="行情資料暫時讀取失敗，已停止顯示未確認的新價格。",
+            message="行情暫時無法使用。",
         )
 
     if not latest:
         return MarketSnapshot(
             game_key=clean_game_key,
             status="no_data",
-            message="行情資料庫已啟用，但尚未收到可驗證的正式價格。",
+            message="等待第一批行情。",
         )
 
     updated_at = max(item.source_updated_at for item in latest)
@@ -172,7 +160,7 @@ def get_public_market_snapshot(
             game_key=clean_game_key,
             status="source_error",
             updated_at=updated_at,
-            message="行情統計暫時無法讀取，已停止顯示可能不完整的價格分析。",
+            message="行情統計暫時無法使用。",
         )
 
     items = tuple(
@@ -204,11 +192,7 @@ def get_public_market_snapshot(
         items=items,
         gainers=gainers,
         losers=losers,
-        message=(
-            "行情已超過安全更新時間，價格僅供參考；恢復更新前不觸發價格提醒。"
-            if stale
-            else "行情資料已由正式來源更新。"
-        ),
+        message="行情更新延遲，提醒暫停。" if stale else "",
     )
 
 
