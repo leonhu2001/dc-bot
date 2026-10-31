@@ -33,15 +33,24 @@ def _market_database_url() -> str:
         return direct
 
     app_dir = Path(os.getenv("APP_DIR") or Path(__file__).resolve().parents[2])
-    web_env = app_dir / "web" / ".env"
-    if not web_env.exists():
-        return ""
-
-    try:
-        values = dotenv_values(web_env)
-    except Exception:
-        return ""
-    return str(values.get("MARKET_DATABASE_URL") or "").strip()
+    candidates = (
+        Path(
+            os.getenv("MARKET_DISCORD_ENV_FILE")
+            or app_dir / "data" / "market_discord.env"
+        ),
+        app_dir / "web" / ".env",
+    )
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            values = dotenv_values(path)
+        except Exception:
+            continue
+        value = str(values.get("MARKET_DATABASE_URL") or "").strip()
+        if value:
+            return value
+    return ""
 
 
 @lru_cache(maxsize=1)
