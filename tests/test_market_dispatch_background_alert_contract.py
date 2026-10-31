@@ -80,3 +80,10 @@ def test_site_runtime_only_starts_background_notifications_when_already_enabled(
 
     assert "window.location.pathname === '/dispatch'" in script
     assert "mw_dispatch_desktop_notification_enabled" in script
+    assert "Notification.permission !== 'granted'" in script
+    assert "Notification.requestPermission" not in script
+    assert "'/dispatch/alerts/config'" in script
+    assert "'/dispatch/alerts/events'" in script
+    assert "new EventSource(BACKGROUND_EVENTS_URL)" in script
+    assert "window.location.href = '/dispatch'" in script
+    assert "mowan-dispatch-new-order-background" in script
