@@ -75,12 +75,18 @@ class MarketDiscordRepository:
         MarketDiscordBase.metadata.create_all(self.engine)
 
     def dm_enabled(self, discord_user_id: str) -> bool:
+        enabled, _enabled_at = self.dm_state(discord_user_id)
+        return enabled
+
+    def dm_state(self, discord_user_id: str) -> tuple[bool, datetime | None]:
         user_id = str(discord_user_id or "").strip()
         if not user_id:
-            return False
+            return False, None
         with self.SessionLocal() as db:
             row = db.get(MarketDiscordPreference, user_id)
-            return bool(row and row.dm_enabled)
+            if row is None:
+                return False, None
+            return bool(row.dm_enabled), _utc(row.updated_at)
 
     def set_dm_enabled(self, discord_user_id: str, enabled: bool) -> bool:
         user_id = str(discord_user_id or "").strip()
