@@ -48,6 +48,8 @@ def test_discord_market_setup_uses_least_secret_and_rolls_back():
     assert 'panels synced channel=$TARGET_CHANNEL' in shell
     assert "date '+%Y-%m-%d %H:%M:%S'" in shell
     assert "date --iso-8601=seconds" not in shell
+    assert "for _ in $(seq 1 180)" in shell
+    assert 'stopped while waiting for Discord Market panels' in shell
 
     assert "git pull --ff-only origin main" in powershell
     assert "VPS HEAD" in powershell
