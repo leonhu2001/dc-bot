@@ -166,8 +166,6 @@ def _restock_health(repository, game_key: str) -> dict[str, int | float | None]:
                     or 0
                 )
     except Exception:
-        # Older databases may not have the V2 restock tables yet. Market price
-        # health remains useful and deployment startup will create the tables.
         pass
 
     return metrics
@@ -216,7 +214,7 @@ def check_market_health(
         latest = tuple(
             item
             for item in repository.list_latest(game_key, limit=500)
-            if market_item_enabled(game_key, item.tier)
+            if market_item_enabled(game_key, getattr(item, "tier", None))
         )
     except Exception:
         return _database_error_status(
