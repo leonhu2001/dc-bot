@@ -16,6 +16,7 @@ from services.market.provider_registry import build_configured_provider, configu
 from services.market.providers.base import MarketPriceProvider, MarketSourceUnavailable
 from services.market.push import MarketPushRepository
 from services.market.push_dispatcher import dispatch_pending_pushes
+from services.market.scope import market_item_enabled
 from services.market.storage import MarketRepository
 
 
@@ -65,7 +66,11 @@ def _evaluate_fresh_alerts(
     if personalization is None:
         return 0
 
-    latest = repository.list_latest(game_key)
+    latest = tuple(
+        item
+        for item in repository.list_latest(game_key)
+        if market_item_enabled(game_key, item.tier)
+    )
     if not latest:
         return 0
 
