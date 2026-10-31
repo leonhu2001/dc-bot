@@ -52,9 +52,8 @@ def test_stable_item_events_produce_future_prediction():
     assert prediction.confidence >= 65
     assert prediction.event_count == 3
 
-    rolled = _prediction_from_events("m995", events, now=expected)
-    assert rolled is not None
-    assert rolled.predicted_at == expected + timedelta(hours=6)
+    # Once the expected event is missed, do not manufacture another cycle.
+    assert _prediction_from_events("m995", events, now=expected) is None
 
 
 def test_restock_delivery_requires_watchlist_and_dm_opt_in(tmp_path):
