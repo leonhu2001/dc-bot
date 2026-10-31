@@ -9,6 +9,9 @@ TARGET_CHANNEL="1566004926209990776"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="$APP/_archive/market_discord_setup_$STAMP"
 TMP_ENV=""
+BOT_ENV_EXISTED=0
+SETUP_COMPLETE=0
+CREDENTIAL_INSTALLED=0
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: Discord market production setup must run as root."
@@ -44,19 +47,47 @@ if [ -z "$BOT_GROUP" ]; then
 fi
 
 mkdir -p "$BACKUP_DIR" "$APP/data"
-chmod 0750 "$APP/data"
+chmod 0700 "$BACKUP_DIR"
 if [ -f "$BOT_ENV" ]; then
     cp -a "$BOT_ENV" "$BACKUP_DIR/market_discord.env"
+    BOT_ENV_EXISTED=1
 fi
 
-cleanup() {
+cleanup_temp() {
     if [ -n "$TMP_ENV" ] && [ -e "$TMP_ENV" ]; then
         rm -f "$TMP_ENV"
     fi
 }
-trap cleanup EXIT
 
-TMP_ENV="$(mktemp "$APP/data/.market_discord.env.XXXXXX")"
+rollback() {
+    local rc=$?
+    trap - ERR
+    set +e
+    cleanup_temp
+
+    if [ "$SETUP_COMPLETE" -eq 1 ]; then
+        exit "$rc"
+    fi
+
+    if [ "$CREDENTIAL_INSTALLED" -eq 1 ]; then
+        if [ "$BOT_ENV_EXISTED" -eq 1 ] && [ -f "$BACKUP_DIR/market_discord.env" ]; then
+            cp -a "$BACKUP_DIR/market_discord.env" "$BOT_ENV"
+            echo "PASS: previous Discord Market credential restored"
+        else
+            rm -f "$BOT_ENV"
+            echo "PASS: new Discord Market credential removed"
+        fi
+        systemctl restart "$BOT_SERVICE" >/dev/null 2>&1 || true
+    fi
+
+    echo "DISCORD MARKET SETUP FAILED"
+    echo "Backup retained at: $BACKUP_DIR"
+    exit "$rc"
+}
+trap rollback ERR
+trap cleanup_temp EXIT
+
+TMP_ENV="$(mktemp)"
 "$APP/venv/bin/python" - "$WEB_ENV" "$TMP_ENV" <<'PY'
 import sys
 from pathlib import Path
@@ -73,6 +104,7 @@ target.write_text(f"MARKET_DATABASE_URL={value}\n", encoding="utf-8")
 PY
 
 install -o "$BOT_USER" -g "$BOT_GROUP" -m 0600 "$TMP_ENV" "$BOT_ENV"
+CREDENTIAL_INSTALLED=1
 rm -f "$TMP_ENV"
 TMP_ENV=""
 echo "PASS: dedicated Discord Market credential installed"
@@ -108,7 +140,7 @@ if [ "$ready" -ne 1 ]; then
     systemctl status "$BOT_SERVICE" --no-pager || true
     journalctl -u "$BOT_SERVICE" -n 120 --no-pager || true
     echo "ERROR: $BOT_SERVICE did not become active."
-    exit 1
+    false
 fi
 
 echo "Waiting for Discord panel synchronization..."
@@ -125,9 +157,11 @@ done
 if [ "$panel_ready" -ne 1 ]; then
     journalctl -u "$BOT_SERVICE" --since "$STARTED_AT" -n 160 --no-pager || true
     echo "ERROR: Discord Market panels were not confirmed in target channel $TARGET_CHANNEL."
-    exit 1
+    false
 fi
 
 echo "PASS: Discord Market panels synced to channel $TARGET_CHANNEL"
 echo "PASS: Discord Market DM runtime enabled"
 echo "Backup retained at: $BACKUP_DIR"
+SETUP_COMPLETE=1
+trap - ERR
