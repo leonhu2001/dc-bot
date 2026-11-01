@@ -35,9 +35,9 @@ from .delta_mobile_legacy_catalog_tombstone_20261101 import (
 _install_delta_mobile_legacy_catalog_tombstone_20261101()
 
 # 2026-11-01 owner-approved handheld Delta Force catalog. Guard orders are now
-# result-based (trial / guarantee / big-red / Babel), while the handheld technical
-# hourly product is removed from new self-service. Entertainment / sweet / teaching
-# keep their existing time-based rules and prices.
+# result-based (trial / guarantee / big-red / Babel), while handheld hourly guard
+# entry points are hidden from new self-service. Their resolver data stays available
+# for historical orders and interactions opened before deployment.
 from .delta_mobile_result_catalog_20261101 import (
     install_delta_mobile_result_catalog_20261101 as _install_delta_mobile_result_catalog_20261101,
 )
@@ -45,18 +45,9 @@ from .delta_mobile_result_catalog_20261101 import (
 _install_delta_mobile_result_catalog_20261101()
 _order_rules.validate_rules()
 
-# A customer may still have a Discord selector that was opened before deployment.
-# Keep those stale selections resolvable without putting handheld 技術陪 back into
-# the visible group list or allowing a new customer to start that product.
-from .delta_mobile_retired_tech_compat_20261101 import (
-    install_delta_mobile_retired_tech_compat_20261101 as _install_delta_mobile_retired_tech_compat_20261101,
-)
-
-_install_delta_mobile_retired_tech_compat_20261101()
-
 # Register system-owned catalog extensions before the remaining runtime wrappers are
-# installed. The extension injects its rules before services.orders builds label maps,
-# then adds the matching storefront groups for desktop and mobile Delta Force.
+# installed. The extension keeps desktop 一陪一護 public and mobile resolver data
+# historical-only; the handheld group selector filter prevents new mobile orders.
 from .one_companion_one_guard_catalog import (
     install_one_companion_one_guard_catalog as _install_one_companion_one_guard_catalog,
 )
