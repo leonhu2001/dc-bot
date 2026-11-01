@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import MethodType
+
 from services.order_rules import (
     DELTA_MOBILE_GAME_ROLE,
     PROTECTOR_ROLES,
@@ -19,10 +21,10 @@ MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS = frozenset({
     "basic_mobile_one_companion_one_guard_topsecret",
 })
 
-MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS = (
-    MOBILE_TECH_RULE_KEYS
-    | MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS
-)
+MOBILE_RETIRED_GROUP_LABELS = frozenset({
+    "技術陪",
+    "一陪一護",
+})
 
 
 # Handheld Delta Force self-service is intentionally result-based for guard orders.
@@ -211,34 +213,33 @@ def _discord_group(group: dict) -> dict:
     }
 
 
-def _drop_retired_mobile_groups(groups: list[dict]) -> list[dict]:
-    result: list[dict] = []
-    for group in groups:
-        if str(group.get("label") or "") == "一陪一護":
-            continue
-        details = [
-            dict(detail)
-            for detail in group.get("details", [])
-            if str(detail.get("rule_key") or "")
-            not in MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS
-        ]
-        if not details:
-            continue
-        cloned = dict(group)
-        cloned["details"] = details
-        result.append(cloned)
-    return result
+def _install_mobile_group_selector_filter(orders) -> None:
+    """Hide retired handheld groups without deleting their resolver data.
+
+    ORDER_ITEM_GROUPS_BY_CATEGORY is a DynamicOrderItemGroups instance. Giving the
+    instance its own get() keeps this visibility policy intact even when the product
+    status subsystem later swaps the class-level get() implementation in place.
+    """
+    groups = orders.ORDER_ITEM_GROUPS_BY_CATEGORY
+    if getattr(groups, "_delta_mobile_result_filter_installed", False):
+        return
+
+    def filtered_get(self, category, default=None):
+        labels = orders.DynamicOrderItemGroups.get(self, category, default)
+        if str(category or "") == "delta_mobile_basic":
+            labels = [
+                label
+                for label in labels
+                if str(label or "") not in MOBILE_RETIRED_GROUP_LABELS
+            ]
+        return labels
+
+    groups.get = MethodType(filtered_get, groups)
+    groups._delta_mobile_result_filter_installed = True
 
 
 def _install_discord_catalog() -> None:
     from services import order_rules, orders
-
-    # Remove retired handheld hourly guard products from both the current split
-    # category and the legacy aggregate catalog. Historical rule keys remain
-    # resolvable for old order snapshots, but no new self-service path exposes them.
-    for category in ("basic", "delta_mobile_basic"):
-        existing = list(orders.SELF_SERVICE_ORDER_CATALOG.get(category, []))
-        orders.SELF_SERVICE_ORDER_CATALOG[category] = _drop_retired_mobile_groups(existing)
 
     mobile_groups = orders.SELF_SERVICE_ORDER_CATALOG.setdefault(
         "delta_mobile_basic",
@@ -251,17 +252,14 @@ def _install_discord_catalog() -> None:
         for variant in group["variants"]
     }
 
-    # Idempotent re-install: discard an older copy before inserting the approved
-    # groups in front of entertainment / sweet / teaching services.
+    # Keep old 技術陪 / 一陪一護 group data for historical and already-open
+    # interactions. Only remove previous copies of the new result groups.
     mobile_groups[:] = [
         group
         for group in mobile_groups
         if str(group.get("label") or "") not in new_group_labels
-        and str(group.get("label") or "") != "一陪一護"
         and not any(
             str(detail.get("rule_key") or "") in new_rule_keys
-            or str(detail.get("rule_key") or "")
-            in MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS
             for detail in group.get("details", [])
         )
     ]
@@ -279,11 +277,11 @@ def _install_discord_catalog() -> None:
         for group in _MOBILE_RESULT_GROUPS
     ]
 
-    orders.CATALOG_HIDDEN_RULE_KEYS.update(MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS)
+    _install_mobile_group_selector_filter(orders)
+
     orders.ORDER_ITEMS_BY_CATEGORY["delta_mobile_basic"] = [
         rule.label
         for rule in order_rules.get_rules_by_category("delta_mobile_basic")
-        if rule.key not in orders.CATALOG_HIDDEN_RULE_KEYS
     ]
     orders.ORDER_RULE_KEY_BY_LABEL.update({
         rule.label: rule.key
@@ -312,14 +310,82 @@ def mobile_result_web_group_specs() -> list[dict]:
     ]
 
 
+def _filter_public_mobile_groups(groups: list[dict]) -> list[dict]:
+    return [
+        group
+        for group in groups
+        if not (
+            str(group.get("category") or "") == "delta_mobile_basic"
+            and (
+                str(group.get("key") or "") == "tech_play_mobile"
+                or str(group.get("label") or "") == "一陪一護"
+            )
+        )
+    ]
+
+
+def _install_public_web_entry_filter() -> None:
+    """Hide retired groups on real customer routes while keeping internal resolvers."""
+    from web.app.routers import site
+    from web.app.services import order_catalog_cards
+
+    if not getattr(site, "_delta_mobile_result_filter_installed", False):
+        original_grouped = site.get_grouped_order_catalog
+        original_cards = site.get_grouped_order_catalog_cards
+        original_detail = site.get_order_group_detail
+
+        def public_grouped(category="all"):
+            return _filter_public_mobile_groups(list(original_grouped(category)))
+
+        def public_cards(category="all"):
+            return _filter_public_mobile_groups(list(original_cards(category)))
+
+        def public_detail(group_key):
+            if str(group_key or "") == "tech_play_mobile":
+                return None
+            detail = original_detail(group_key)
+            if detail and (
+                str(detail.get("category") or "") == "delta_mobile_basic"
+                and str(detail.get("label") or "") == "一陪一護"
+            ):
+                return None
+            return detail
+
+        site.get_grouped_order_catalog = public_grouped
+        site.get_grouped_order_catalog_cards = public_cards
+        site.get_order_group_detail = public_detail
+        site._delta_mobile_result_filter_installed = True
+
+    if not getattr(order_catalog_cards, "_delta_mobile_result_filter_installed", False):
+        original_cards = order_catalog_cards.get_grouped_order_catalog_cards
+        original_detail = order_catalog_cards.get_order_group_detail
+
+        def service_cards(category="all"):
+            return _filter_public_mobile_groups(list(original_cards(category)))
+
+        def service_detail(group_key):
+            if str(group_key or "") == "tech_play_mobile":
+                return None
+            detail = original_detail(group_key)
+            if detail and (
+                str(detail.get("category") or "") == "delta_mobile_basic"
+                and str(detail.get("label") or "") == "一陪一護"
+            ):
+                return None
+            return detail
+
+        order_catalog_cards.get_grouped_order_catalog_cards = service_cards
+        order_catalog_cards.get_order_group_detail = service_detail
+        order_catalog_cards._delta_mobile_result_filter_installed = True
+
+
 def install_delta_mobile_result_web_catalog_20261101() -> None:
-    """Patch the already-imported Web storefront group list."""
+    """Install new Web cards while hiding retired mobile entry points."""
     from web.app.services import order_groups
 
-    order_groups.HIDDEN_PUBLIC_RULE_KEYS.update(
-        MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS
-    )
-
+    # Do not delete tech_play_mobile from GROUP_SPECS. Keeping it as resolver data
+    # preserves old snapshots and existing regression contracts; customer routes are
+    # filtered below so no new customer can start the retired hourly product.
     new_specs = mobile_result_web_group_specs()
     new_keys = {str(spec["key"]) for spec in new_specs}
     new_labels = {str(spec["label"]) for spec in new_specs}
@@ -327,12 +393,7 @@ def install_delta_mobile_result_web_catalog_20261101() -> None:
     order_groups.GROUP_SPECS[:] = [
         spec
         for spec in order_groups.GROUP_SPECS
-        if str(spec.get("key") or "") != "tech_play_mobile"
-        and str(spec.get("key") or "") not in new_keys
-        and not (
-            str(spec.get("category") or "") == "delta_mobile_basic"
-            and str(spec.get("label") or "") == "一陪一護"
-        )
+        if str(spec.get("key") or "") not in new_keys
         and not (
             str(spec.get("category") or "") == "delta_mobile_basic"
             and str(spec.get("label") or "") in new_labels
@@ -348,6 +409,7 @@ def install_delta_mobile_result_web_catalog_20261101() -> None:
         len(order_groups.GROUP_SPECS),
     )
     order_groups.GROUP_SPECS[anchor:anchor] = new_specs
+    _install_public_web_entry_filter()
 
 
 def install_delta_mobile_result_catalog_20261101() -> None:
@@ -358,7 +420,7 @@ def install_delta_mobile_result_catalog_20261101() -> None:
 
 __all__ = [
     "MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS",
-    "MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS",
+    "MOBILE_RETIRED_GROUP_LABELS",
     "MOBILE_TECH_RULE_KEYS",
     "install_delta_mobile_result_catalog_20261101",
     "install_delta_mobile_result_web_catalog_20261101",
