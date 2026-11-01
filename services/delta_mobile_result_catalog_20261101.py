@@ -14,6 +14,16 @@ MOBILE_TECH_RULE_KEYS = frozenset({
     "basic_mobile_tech_topsecret_double",
 })
 
+MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS = frozenset({
+    "basic_mobile_one_companion_one_guard_secret",
+    "basic_mobile_one_companion_one_guard_topsecret",
+})
+
+MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS = (
+    MOBILE_TECH_RULE_KEYS
+    | MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS
+)
+
 
 # Handheld Delta Force self-service is intentionally result-based for guard orders.
 # Time-based products remain only for entertainment / sweet / teaching services.
@@ -201,13 +211,16 @@ def _discord_group(group: dict) -> dict:
     }
 
 
-def _drop_mobile_tech_groups(groups: list[dict]) -> list[dict]:
+def _drop_retired_mobile_groups(groups: list[dict]) -> list[dict]:
     result: list[dict] = []
     for group in groups:
+        if str(group.get("label") or "") == "一陪一護":
+            continue
         details = [
             dict(detail)
             for detail in group.get("details", [])
-            if str(detail.get("rule_key") or "") not in MOBILE_TECH_RULE_KEYS
+            if str(detail.get("rule_key") or "")
+            not in MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS
         ]
         if not details:
             continue
@@ -220,12 +233,12 @@ def _drop_mobile_tech_groups(groups: list[dict]) -> list[dict]:
 def _install_discord_catalog() -> None:
     from services import order_rules, orders
 
-    # Remove the handheld technical-hourly product from both the current split
+    # Remove retired handheld hourly guard products from both the current split
     # category and the legacy aggregate catalog. Historical rule keys remain
     # resolvable for old order snapshots, but no new self-service path exposes them.
     for category in ("basic", "delta_mobile_basic"):
         existing = list(orders.SELF_SERVICE_ORDER_CATALOG.get(category, []))
-        orders.SELF_SERVICE_ORDER_CATALOG[category] = _drop_mobile_tech_groups(existing)
+        orders.SELF_SERVICE_ORDER_CATALOG[category] = _drop_retired_mobile_groups(existing)
 
     mobile_groups = orders.SELF_SERVICE_ORDER_CATALOG.setdefault(
         "delta_mobile_basic",
@@ -244,8 +257,11 @@ def _install_discord_catalog() -> None:
         group
         for group in mobile_groups
         if str(group.get("label") or "") not in new_group_labels
+        and str(group.get("label") or "") != "一陪一護"
         and not any(
             str(detail.get("rule_key") or "") in new_rule_keys
+            or str(detail.get("rule_key") or "")
+            in MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS
             for detail in group.get("details", [])
         )
     ]
@@ -263,7 +279,7 @@ def _install_discord_catalog() -> None:
         for group in _MOBILE_RESULT_GROUPS
     ]
 
-    orders.CATALOG_HIDDEN_RULE_KEYS.update(MOBILE_TECH_RULE_KEYS)
+    orders.CATALOG_HIDDEN_RULE_KEYS.update(MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS)
     orders.ORDER_ITEMS_BY_CATEGORY["delta_mobile_basic"] = [
         rule.label
         for rule in order_rules.get_rules_by_category("delta_mobile_basic")
@@ -300,7 +316,9 @@ def install_delta_mobile_result_web_catalog_20261101() -> None:
     """Patch the already-imported Web storefront group list."""
     from web.app.services import order_groups
 
-    order_groups.HIDDEN_PUBLIC_RULE_KEYS.update(MOBILE_TECH_RULE_KEYS)
+    order_groups.HIDDEN_PUBLIC_RULE_KEYS.update(
+        MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS
+    )
 
     new_specs = mobile_result_web_group_specs()
     new_keys = {str(spec["key"]) for spec in new_specs}
@@ -311,6 +329,10 @@ def install_delta_mobile_result_web_catalog_20261101() -> None:
         for spec in order_groups.GROUP_SPECS
         if str(spec.get("key") or "") != "tech_play_mobile"
         and str(spec.get("key") or "") not in new_keys
+        and not (
+            str(spec.get("category") or "") == "delta_mobile_basic"
+            and str(spec.get("label") or "") == "一陪一護"
+        )
         and not (
             str(spec.get("category") or "") == "delta_mobile_basic"
             and str(spec.get("label") or "") in new_labels
@@ -335,6 +357,8 @@ def install_delta_mobile_result_catalog_20261101() -> None:
 
 
 __all__ = [
+    "MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS",
+    "MOBILE_RETIRED_SELF_SERVICE_RULE_KEYS",
     "MOBILE_TECH_RULE_KEYS",
     "install_delta_mobile_result_catalog_20261101",
     "install_delta_mobile_result_web_catalog_20261101",
