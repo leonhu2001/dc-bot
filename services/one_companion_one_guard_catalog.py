@@ -11,6 +11,10 @@ from services.order_rules import (
 
 
 GROUP_LABEL = "一陪一護"
+MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS = frozenset({
+    "basic_mobile_one_companion_one_guard_secret",
+    "basic_mobile_one_companion_one_guard_topsecret",
+})
 
 _RULE_SPECS = (
     (
@@ -53,6 +57,8 @@ _RULE_SPECS = (
 
 
 def _install_rules() -> None:
+    # Keep both desktop and mobile rule definitions resolvable for historical
+    # orders/snapshots. Only the mobile self-service entry is retired below.
     for category, key, _legacy_label, price, game_roles, _value, detail_label in _RULE_SPECS:
         if key in ORDER_RULES:
             continue
@@ -106,6 +112,26 @@ def _install_catalog_group(category: str) -> None:
     from services import orders
 
     groups = orders.SELF_SERVICE_ORDER_CATALOG.setdefault(category, [])
+
+    # 2026-11-01 handheld guard orders moved to result-based products. Keep the
+    # old rule keys for historical resolution but do not offer a new hourly
+    # 一陪一護 entry on mobile. Desktop remains unchanged.
+    if category == "delta_mobile_basic":
+        groups[:] = [
+            group
+            for group in groups
+            if str(group.get("label") or "") != GROUP_LABEL
+            and not any(
+                str(item.get("rule_key") or "")
+                in MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS
+                for item in group.get("details", [])
+            )
+        ]
+        orders.CATALOG_HIDDEN_RULE_KEYS.update(
+            MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS
+        )
+        return
+
     details = _catalog_details(category)
     if not details:
         return
@@ -129,13 +155,19 @@ def _install_catalog_group(category: str) -> None:
 
 
 def install_one_companion_one_guard_catalog() -> None:
-    """Install the four Delta Force 1-companion/1-guard variants.
+    """Install Delta Force 1-companion/1-guard rules and desktop entry.
 
-    The receiver must have one of the normal companion/protector service roles AND
-    the matching Delta desktop/mobile role. Each order needs two staff and at least
-    one protector-level receiver, matching the storefront wording and acceptance
-    rules used elsewhere in the bot.
+    Mobile rules remain available only for historical order resolution. New
+    handheld self-service uses result-based guard products instead of hourly
+    one-companion/one-guard service.
     """
     _install_rules()
     _install_catalog_group("delta_desktop_basic")
     _install_catalog_group("delta_mobile_basic")
+
+
+__all__ = [
+    "GROUP_LABEL",
+    "MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS",
+    "install_one_companion_one_guard_catalog",
+]
