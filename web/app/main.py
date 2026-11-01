@@ -21,6 +21,9 @@ from services.ai_support_knowledge import ensure_ai_support_knowledge_tables
 from services.order_rule_store import ensure_order_rule_store
 from services.promotion_benefits import ensure_promotion_benefit_tables
 from services.vip_timer_policy_v5 import install_vip_timer_policy_v5
+from services.delta_mobile_result_catalog_20261101 import (
+    install_delta_mobile_result_web_catalog_20261101,
+)
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_staff import router as admin_staff_router
@@ -310,6 +313,7 @@ async def legacy_discord_login_redirect():
 
 @app.on_event("startup")
 async def startup_event():
+    install_delta_mobile_result_web_catalog_20261101()
     create_all_tables()
     ensure_topup_tables()
     ensure_payment_review_tables()
