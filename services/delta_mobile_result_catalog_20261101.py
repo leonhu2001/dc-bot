@@ -325,58 +325,42 @@ def _filter_public_mobile_groups(groups: list[dict]) -> list[dict]:
 
 
 def _install_public_web_entry_filter() -> None:
-    """Hide retired groups on real customer routes while keeping internal resolvers."""
+    """Hide retired groups on real customer routes while keeping internal resolvers.
+
+    Only the route module's already-imported bindings are wrapped. The underlying
+    order_catalog_cards service stays untouched so its cache identity/TTL contract
+    remains exactly as before.
+    """
     from web.app.routers import site
-    from web.app.services import order_catalog_cards
 
-    if not getattr(site, "_delta_mobile_result_filter_installed", False):
-        original_grouped = site.get_grouped_order_catalog
-        original_cards = site.get_grouped_order_catalog_cards
-        original_detail = site.get_order_group_detail
+    if getattr(site, "_delta_mobile_result_filter_installed", False):
+        return
 
-        def public_grouped(category="all"):
-            return _filter_public_mobile_groups(list(original_grouped(category)))
+    original_grouped = site.get_grouped_order_catalog
+    original_cards = site.get_grouped_order_catalog_cards
+    original_detail = site.get_order_group_detail
 
-        def public_cards(category="all"):
-            return _filter_public_mobile_groups(list(original_cards(category)))
+    def public_grouped(category="all"):
+        return _filter_public_mobile_groups(list(original_grouped(category)))
 
-        def public_detail(group_key):
-            if str(group_key or "") == "tech_play_mobile":
-                return None
-            detail = original_detail(group_key)
-            if detail and (
-                str(detail.get("category") or "") == "delta_mobile_basic"
-                and str(detail.get("label") or "") == "一陪一護"
-            ):
-                return None
-            return detail
+    def public_cards(category="all"):
+        return _filter_public_mobile_groups(list(original_cards(category)))
 
-        site.get_grouped_order_catalog = public_grouped
-        site.get_grouped_order_catalog_cards = public_cards
-        site.get_order_group_detail = public_detail
-        site._delta_mobile_result_filter_installed = True
+    def public_detail(group_key):
+        if str(group_key or "") == "tech_play_mobile":
+            return None
+        detail = original_detail(group_key)
+        if detail and (
+            str(detail.get("category") or "") == "delta_mobile_basic"
+            and str(detail.get("label") or "") == "一陪一護"
+        ):
+            return None
+        return detail
 
-    if not getattr(order_catalog_cards, "_delta_mobile_result_filter_installed", False):
-        original_cards = order_catalog_cards.get_grouped_order_catalog_cards
-        original_detail = order_catalog_cards.get_order_group_detail
-
-        def service_cards(category="all"):
-            return _filter_public_mobile_groups(list(original_cards(category)))
-
-        def service_detail(group_key):
-            if str(group_key or "") == "tech_play_mobile":
-                return None
-            detail = original_detail(group_key)
-            if detail and (
-                str(detail.get("category") or "") == "delta_mobile_basic"
-                and str(detail.get("label") or "") == "一陪一護"
-            ):
-                return None
-            return detail
-
-        order_catalog_cards.get_grouped_order_catalog_cards = service_cards
-        order_catalog_cards.get_order_group_detail = service_detail
-        order_catalog_cards._delta_mobile_result_filter_installed = True
+    site.get_grouped_order_catalog = public_grouped
+    site.get_grouped_order_catalog_cards = public_cards
+    site.get_order_group_detail = public_detail
+    site._delta_mobile_result_filter_installed = True
 
 
 def install_delta_mobile_result_web_catalog_20261101() -> None:
