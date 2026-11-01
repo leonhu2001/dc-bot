@@ -58,7 +58,8 @@ _RULE_SPECS = (
 
 def _install_rules() -> None:
     # Keep both desktop and mobile rule definitions resolvable for historical
-    # orders/snapshots. Only the mobile self-service entry is retired below.
+    # orders/snapshots. Mobile visibility is controlled by the handheld catalog
+    # policy rather than by deleting canonical resolver data.
     for category, key, _legacy_label, price, game_roles, _value, detail_label in _RULE_SPECS:
         if key in ORDER_RULES:
             continue
@@ -77,8 +78,6 @@ def _install_rules() -> None:
             allow_specify=False,
             min_protector_count=1,
             required_game_roles=game_roles,
-            # The game selector already identifies desktop/mobile. Keep the
-            # second-level play style stable and avoid duplicating the platform.
             catalog_group_label=GROUP_LABEL,
         )
         validate_rule_definition(key, rule)
@@ -112,26 +111,6 @@ def _install_catalog_group(category: str) -> None:
     from services import orders
 
     groups = orders.SELF_SERVICE_ORDER_CATALOG.setdefault(category, [])
-
-    # 2026-11-01 handheld guard orders moved to result-based products. Keep the
-    # old rule keys for historical resolution but do not offer a new hourly
-    # 一陪一護 entry on mobile. Desktop remains unchanged.
-    if category == "delta_mobile_basic":
-        groups[:] = [
-            group
-            for group in groups
-            if str(group.get("label") or "") != GROUP_LABEL
-            and not any(
-                str(item.get("rule_key") or "")
-                in MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS
-                for item in group.get("details", [])
-            )
-        ]
-        orders.CATALOG_HIDDEN_RULE_KEYS.update(
-            MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS
-        )
-        return
-
     details = _catalog_details(category)
     if not details:
         return
@@ -155,11 +134,11 @@ def _install_catalog_group(category: str) -> None:
 
 
 def install_one_companion_one_guard_catalog() -> None:
-    """Install Delta Force 1-companion/1-guard rules and desktop entry.
+    """Install Delta Force one-companion/one-guard rules and resolver data.
 
-    Mobile rules remain available only for historical order resolution. New
-    handheld self-service uses result-based guard products instead of hourly
-    one-companion/one-guard service.
+    The mobile group remains in the resolver catalog only for historical/stale
+    interactions. services.delta_mobile_result_catalog_20261101 filters it out of
+    the new mobile group selector. Desktop visibility remains unchanged.
     """
     _install_rules()
     _install_catalog_group("delta_desktop_basic")
