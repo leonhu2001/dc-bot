@@ -36,6 +36,15 @@ from .delta_mobile_result_catalog_20261101 import (
 _install_delta_mobile_result_catalog_20261101()
 _order_rules.validate_rules()
 
+# A customer may still have a Discord selector that was opened before deployment.
+# Keep those stale selections resolvable without putting handheld 技術陪 back into
+# the visible group list or allowing a new customer to start that product.
+from .delta_mobile_retired_tech_compat_20261101 import (
+    install_delta_mobile_retired_tech_compat_20261101 as _install_delta_mobile_retired_tech_compat_20261101,
+)
+
+_install_delta_mobile_retired_tech_compat_20261101()
+
 # Register system-owned catalog extensions before the remaining runtime wrappers are
 # installed. The extension injects its rules before services.orders builds label maps,
 # then adds the matching storefront groups for desktop and mobile Delta Force.
