@@ -25,6 +25,17 @@ _install_black_tide_legacy_tombstone()
 # 載入順序或舊 manager override 把後來核准的版本改回單陪／雙陪。
 _order_rules.validate_rules()
 
+# 2026-11-01 owner-approved handheld Delta Force catalog. Guard orders are now
+# result-based (trial / guarantee / big-red / Babel), while the handheld technical
+# hourly product is removed from new self-service. Entertainment / sweet / teaching
+# keep their existing time-based rules and prices.
+from .delta_mobile_result_catalog_20261101 import (
+    install_delta_mobile_result_catalog_20261101 as _install_delta_mobile_result_catalog_20261101,
+)
+
+_install_delta_mobile_result_catalog_20261101()
+_order_rules.validate_rules()
+
 # Register system-owned catalog extensions before the remaining runtime wrappers are
 # installed. The extension injects its rules before services.orders builds label maps,
 # then adds the matching storefront groups for desktop and mobile Delta Force.
