@@ -38,27 +38,33 @@ def test_delta_mobile_result_rules_and_discord_catalog() -> None:
     assert order_rules.ORDER_RULES["delta_mobile_trial_1688w"].vip_discount_allowed is False
     assert order_rules.ORDER_RULES["delta_mobile_guarantee_1500w"].vip_discount_allowed is True
 
+    # Resolver data is deliberately retained for history/stale interactions.
     mobile_groups = orders.SELF_SERVICE_ORDER_CATALOG["delta_mobile_basic"]
-    labels = [str(group.get("label") or "") for group in mobile_groups]
+    resolver_labels = [str(group.get("label") or "") for group in mobile_groups]
+    assert "技術陪" in resolver_labels
+    assert "一陪一護" in resolver_labels
 
-    assert "技術陪" not in labels
-    assert "一陪一護" not in labels
-    assert labels.index("護航體驗單") < labels.index("娛樂陪")
-    assert labels.index("護航保底單") < labels.index("娛樂陪")
-    assert labels.index("大紅單") < labels.index("娛樂陪")
-    assert labels.index("巴別塔限定") < labels.index("娛樂陪")
+    # New customers only see the result-based products plus unchanged
+    # entertainment/sweet/teaching groups.
+    visible_labels = orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get("delta_mobile_basic", [])
+    assert "技術陪" not in visible_labels
+    assert "一陪一護" not in visible_labels
+    assert visible_labels.index("護航體驗單") < visible_labels.index("娛樂陪")
+    assert visible_labels.index("護航保底單") < visible_labels.index("娛樂陪")
+    assert visible_labels.index("大紅單") < visible_labels.index("娛樂陪")
+    assert visible_labels.index("巴別塔限定") < visible_labels.index("娛樂陪")
 
-    # Retired hourly handheld rules stay resolvable for historical orders, but
-    # cannot surface as new self-service products.
+    # Retired hourly handheld rules remain resolvable for historical orders.
     assert order_rules.ORDER_RULES["basic_mobile_one_companion_one_guard_secret"].price == 700
     assert order_rules.ORDER_RULES["basic_mobile_one_companion_one_guard_topsecret"].price == 740
-    assert "basic_mobile_one_companion_one_guard_secret" in orders.CATALOG_HIDDEN_RULE_KEYS
-    assert "basic_mobile_one_companion_one_guard_topsecret" in orders.CATALOG_HIDDEN_RULE_KEYS
+    assert [
+        item["label"]
+        for item in orders.get_order_item_details_for_group("delta_mobile_basic", "一陪一護")
+    ] == ["機密", "絕密"]
 
-    # Desktop one-companion/one-guard remains available.
-    desktop_groups = orders.SELF_SERVICE_ORDER_CATALOG["delta_desktop_basic"]
-    desktop_labels = [str(group.get("label") or "") for group in desktop_groups]
-    assert "一陪一護" in desktop_labels
+    # Desktop one-companion/one-guard remains visible and unchanged.
+    desktop_visible = orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get("delta_desktop_basic", [])
+    assert "一陪一護" in desktop_visible
 
     trial = _group_by_label(mobile_groups, "護航體驗單")
     assert [item["rule_key"] for item in trial["details"]] == [
@@ -83,6 +89,7 @@ def test_delta_mobile_result_web_catalog() -> None:
     from services.delta_mobile_result_catalog_20261101 import (
         install_delta_mobile_result_web_catalog_20261101,
     )
+    from web.app.routers import site
     from web.app.services import order_groups
 
     # The installer is deliberately idempotent because the Web startup may run
@@ -97,14 +104,18 @@ def test_delta_mobile_result_web_catalog() -> None:
     ]
     labels = [str(spec.get("label") or "") for spec in mobile_specs]
 
-    assert "技術陪" not in labels
-    assert "一陪一護" not in labels
+    # Internal resolver/spec data remains for historical compatibility.
+    assert "技術陪" in labels
     assert labels.count("護航體驗單") == 1
     assert labels.count("護航保底單") == 1
     assert labels.count("大紅單") == 1
     assert labels.count("巴別塔限定") == 1
 
-    catalog = order_groups.get_grouped_order_catalog("delta_mobile_basic")
+    internal_catalog = order_groups.get_grouped_order_catalog("delta_mobile_basic")
+    assert "技術陪" in [str(group.get("label") or "") for group in internal_catalog]
+
+    # The actual public route binding filters retired hourly guard entry points.
+    catalog = site.get_grouped_order_catalog("delta_mobile_basic")
     catalog_labels = [str(group.get("label") or "") for group in catalog]
     assert "技術陪" not in catalog_labels
     assert "一陪一護" not in catalog_labels
