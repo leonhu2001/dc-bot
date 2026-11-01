@@ -25,6 +25,15 @@ _install_black_tide_legacy_tombstone()
 # 載入順序或舊 manager override 把後來核准的版本改回單陪／雙陪。
 _order_rules.validate_rules()
 
+# Retire the old manager-created handheld 技術陪 / 體驗單 / 絕巴技術陪 rows before
+# installing the new result catalog. Rows and version history stay in SQLite for audit
+# and historical orders, but cannot merge back into live Web or Discord self-service.
+from .delta_mobile_legacy_catalog_tombstone_20261101 import (
+    install_delta_mobile_legacy_catalog_tombstone_20261101 as _install_delta_mobile_legacy_catalog_tombstone_20261101,
+)
+
+_install_delta_mobile_legacy_catalog_tombstone_20261101()
+
 # 2026-11-01 owner-approved handheld Delta Force catalog. Guard orders are now
 # result-based (trial / guarantee / big-red / Babel), while the handheld technical
 # hourly product is removed from new self-service. Entertainment / sweet / teaching
