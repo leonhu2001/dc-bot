@@ -143,3 +143,14 @@ from .vip_monthly_announcement_policy import (
 )
 
 _install_vip_monthly_announcement_policy()
+
+# 2026-11-02 owner correction: this desktop fun order is named 一命通關, costs
+# 13888T, and must use the owner-provided challenge copy. The old display name stays
+# resolver-only for historical orders; active manager overrides are reset so Web,
+# Discord checkout, price lists and 商品與規則 all agree.
+from .delta_fun_one_life_clear_20261102 import (
+    install_delta_fun_one_life_clear_20261102 as _install_delta_fun_one_life_clear_20261102,
+)
+
+_install_delta_fun_one_life_clear_20261102()
+_order_rules.validate_rules()
