@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from services import quick_order_v2 as quick
 from services import quick_order_v2_price_lists as price_lists
@@ -94,7 +95,8 @@ def test_delta_mobile_timed_orders_show_specify_fee_and_coupon_policy() -> None:
 
     assert "320T / H" in entertainment
     assert "600T / H" in entertainment
-    assert "累積 **10 小時** → 贈送 **1 小時券**" in entertainment
+    assert "計時" in entertainment
+    assert "累積 10 小時 → 贈送 1 小時券" in entertainment
 
     assert "520T / H" in sweet
     assert "1314T / H" in sweet
@@ -103,6 +105,16 @@ def test_delta_mobile_timed_orders_show_specify_fee_and_coupon_policy() -> None:
     for text in (entertainment, sweet, teaching):
         assert "+100T" in text
         assert "2H 或 2局以上免指定費" in text
+
+
+def test_apex_entertainment_loyalty_row_is_framed_like_other_price_rows() -> None:
+    text = price_lists._apex_price_list(SimpleNamespace(guild=None))
+    loyalty_heading = "🎁 **娛樂陪累積回饋**"
+    assert loyalty_heading in text
+    loyalty_section = text.split(loyalty_heading, 1)[1].split("📌 **指定陪玩**", 1)[0]
+    assert "```text" in loyalty_section
+    assert "計時" in loyalty_section
+    assert "累積 10 小時 → 贈送 1 小時券" in loyalty_section
 
 
 def test_delta_price_list_button_routes_to_selector_without_changing_other_games() -> None:
