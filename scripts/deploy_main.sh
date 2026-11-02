@@ -11,6 +11,9 @@ MARKER_PATH="$APP/data/deployed_version.json"
 TARGET="${1:-}"
 SERVICE_ACTIVE_ATTEMPTS="${DEPLOY_SERVICE_ACTIVE_ATTEMPTS:-20}"
 SERVICE_ACTIVE_INTERVAL="${DEPLOY_SERVICE_ACTIVE_INTERVAL_SECONDS:-1}"
+HEALTH_ATTEMPTS="${DEPLOY_HEALTH_ATTEMPTS:-45}"
+HEALTH_INTERVAL="${DEPLOY_HEALTH_INTERVAL_SECONDS:-1}"
+HEALTH_CURL_TIMEOUT="${DEPLOY_HEALTH_CURL_TIMEOUT_SECONDS:-3}"
 STABILITY_SAMPLES="${DEPLOY_STABILITY_SAMPLES:-5}"
 STABILITY_INTERVAL="${DEPLOY_STABILITY_INTERVAL_SECONDS:-2}"
 
@@ -474,20 +477,21 @@ HEALTH_URL="${WEB_HEALTH_URL:-http://127.0.0.1:8000/health}"
 HEALTH_RESPONSE=""
 HEALTH_OK=0
 
-for attempt in $(seq 1 15); do
-    if HEALTH_RESPONSE="$(curl --fail --silent --max-time 3 "$HEALTH_URL" 2>/dev/null)"; then
+echo "Web health readiness: up to $HEALTH_ATTEMPTS attempts, ${HEALTH_INTERVAL}s interval, ${HEALTH_CURL_TIMEOUT}s curl timeout"
+for attempt in $(seq 1 "$HEALTH_ATTEMPTS"); do
+    if HEALTH_RESPONSE="$(curl --fail --silent --max-time "$HEALTH_CURL_TIMEOUT" "$HEALTH_URL" 2>/dev/null)"; then
         HEALTH_OK=1
         break
     fi
 
-    if [ "$attempt" -lt 15 ]; then
-        sleep 1
+    if [ "$attempt" -lt "$HEALTH_ATTEMPTS" ]; then
+        sleep "$HEALTH_INTERVAL"
     fi
 done
 
 if [ "$HEALTH_OK" -ne 1 ]; then
-    echo "ERROR: Web health endpoint did not become ready after 15 attempts."
-    curl --fail --silent --show-error --max-time 3 "$HEALTH_URL" || true
+    echo "ERROR: Web health endpoint did not become ready after $HEALTH_ATTEMPTS attempts."
+    curl --fail --silent --show-error --max-time "$HEALTH_CURL_TIMEOUT" "$HEALTH_URL" || true
     print_service_diagnostics "$WEB_SERVICE" "Web"
     false
 fi
