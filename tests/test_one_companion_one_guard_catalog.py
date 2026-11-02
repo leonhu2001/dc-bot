@@ -1,3 +1,4 @@
+from services import order_rules
 from services.order_rules import (
     ALL_ROLE_IDS,
     calculate_price,
@@ -16,12 +17,10 @@ MOBILE_SECRET = "basic_mobile_one_companion_one_guard_secret"
 MOBILE_TOPSECRET = "basic_mobile_one_companion_one_guard_topsecret"
 
 
-def test_one_companion_one_guard_prices_and_staffing():
+def test_one_companion_one_guard_prices_and_staffing_are_desktop_only():
     expected = {
         DESKTOP_SECRET: (720, "delta_desktop_basic", "delta_desktop"),
         DESKTOP_TOPSECRET: (770, "delta_desktop_basic", "delta_desktop"),
-        MOBILE_SECRET: (700, "delta_mobile_basic", "delta_mobile"),
-        MOBILE_TOPSECRET: (740, "delta_mobile_basic", "delta_mobile"),
     }
 
     for key, (price, category, game_role) in expected.items():
@@ -39,6 +38,11 @@ def test_one_companion_one_guard_prices_and_staffing():
         quote = calculate_price(rule, quantity=3)
         assert quote.total_amount == price * 3
         assert quote.required_staff_count == 2
+
+    assert MOBILE_SECRET not in order_rules.ORDER_RULES
+    assert MOBILE_TOPSECRET not in order_rules.ORDER_RULES
+    assert MOBILE_SECRET not in order_rules._BASE_ORDER_RULES
+    assert MOBILE_TOPSECRET not in order_rules._BASE_ORDER_RULES
 
 
 def test_one_companion_one_guard_requires_matching_delta_platform_role():
@@ -67,16 +71,14 @@ def test_one_companion_one_guard_allows_two_protectors():
     expected_rule_keys = {
         DESKTOP_SECRET,
         DESKTOP_TOPSECRET,
-        MOBILE_SECRET,
-        MOBILE_TOPSECRET,
     }
 
-    # These products require at least one protector but intentionally do not
-    # enforce the old fun-order exact-one-protector rule, so 護+護 remains valid.
+    # This desktop product requires at least one protector but intentionally does
+    # not enforce the old fun-order exact-one-protector rule, so 護+護 remains valid.
     assert expected_rule_keys.isdisjoint(EXACT_ONE_PROTECTOR_RULE_KEYS)
 
 
-def test_one_companion_one_guard_catalog_has_clear_difficulty_choices():
+def test_one_companion_one_guard_catalog_has_desktop_choices_only():
     desktop = get_order_item_details_for_group("delta_desktop_basic", "一陪一護")
     mobile = get_order_item_details_for_group("delta_mobile_basic", "一陪一護")
 
@@ -84,12 +86,9 @@ def test_one_companion_one_guard_catalog_has_clear_difficulty_choices():
         ("機密", DESKTOP_SECRET),
         ("絕密", DESKTOP_TOPSECRET),
     ]
-    assert [(item["label"], item["rule_key"]) for item in mobile] == [
-        ("機密", MOBILE_SECRET),
-        ("絕密", MOBILE_TOPSECRET),
-    ]
+    assert mobile == []
 
-    for item in desktop + mobile:
+    for item in desktop:
         assert item["quantity_unit"] == "小時"
         assert item["min_quantity"] == 1
         assert item["max_quantity"] == 24
