@@ -3,7 +3,6 @@ from __future__ import annotations
 from services.order_rules import (
     ALL_RECEIVER_ROLES,
     DELTA_DESKTOP_GAME_ROLE,
-    DELTA_MOBILE_GAME_ROLE,
     ORDER_RULES,
     OrderRule,
     validate_rule_definition,
@@ -35,31 +34,38 @@ _RULE_SPECS = (
         "topsecret",
         "絕密",
     ),
-    (
-        "delta_mobile_basic",
-        "basic_mobile_one_companion_one_guard_secret",
-        "一陪一護〈手遊〉｜機密",
-        700,
-        DELTA_MOBILE_GAME_ROLE,
-        "mobile_secret",
-        "機密",
-    ),
-    (
-        "delta_mobile_basic",
-        "basic_mobile_one_companion_one_guard_topsecret",
-        "一陪一護〈手遊〉｜絕密",
-        740,
-        DELTA_MOBILE_GAME_ROLE,
-        "mobile_topsecret",
-        "絕密",
-    ),
 )
 
 
+def _retire_mobile_variant() -> None:
+    """Remove the discontinued handheld variant from active runtime registries."""
+    from services import order_rules, orders
+
+    for key in MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+        if dict.__contains__(order_rules.ORDER_RULES, key):
+            dict.__delitem__(order_rules.ORDER_RULES, key)
+        order_rules._BASE_ORDER_RULES.pop(key, None)
+        order_rules.ORDER_RULES._custom_cache.pop(key, None)
+        order_rules.ORDER_RULES._override_cache.pop(key, None)
+
+    mobile_groups = orders.SELF_SERVICE_ORDER_CATALOG.setdefault("delta_mobile_basic", [])
+    mobile_groups[:] = [
+        group
+        for group in mobile_groups
+        if str(group.get("label") or "") != GROUP_LABEL
+        and not any(
+            str(detail.get("rule_key") or "") in MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS
+            for detail in group.get("details", [])
+        )
+    ]
+
+    for label, rule_key in tuple(orders.ORDER_RULE_KEY_BY_LABEL.items()):
+        if str(rule_key or "") in MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+            orders.ORDER_RULE_KEY_BY_LABEL.pop(label, None)
+            orders.ORDER_ITEM_TO_CATEGORY.pop(label, None)
+
+
 def _install_rules() -> None:
-    # Keep both desktop and mobile rule definitions resolvable for historical
-    # orders/snapshots. Mobile visibility is controlled by the handheld catalog
-    # policy rather than by deleting canonical resolver data.
     for category, key, _legacy_label, price, game_roles, _value, detail_label in _RULE_SPECS:
         if key in ORDER_RULES:
             continue
@@ -134,15 +140,14 @@ def _install_catalog_group(category: str) -> None:
 
 
 def install_one_companion_one_guard_catalog() -> None:
-    """Install Delta Force one-companion/one-guard rules and resolver data.
+    """Install the desktop Delta one-companion/one-guard product only.
 
-    The mobile group remains in the resolver catalog only for historical/stale
-    interactions. services.delta_mobile_result_catalog_20261101 filters it out of
-    the new mobile group selector. Desktop visibility remains unchanged.
+    The handheld variant is retired from active products and rules. Historical
+    order records remain untouched in storage.
     """
+    _retire_mobile_variant()
     _install_rules()
     _install_catalog_group("delta_desktop_basic")
-    _install_catalog_group("delta_mobile_basic")
 
 
 __all__ = [
