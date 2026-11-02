@@ -31,16 +31,23 @@ def test_delta_mobile_price_list_has_only_approved_seven_order_types() -> None:
         for plan in price_lists.DELTA_MOBILE_PRICE_LISTS.values()
     ]
     assert labels == [
-        "護航體驗單",
-        "護航保底單",
+        "體驗單",
+        "保底單",
         "大紅單",
-        "巴別塔限定",
+        "絕巴保底單",
         "娛樂陪",
         "甜蜜單",
         "教學單",
     ]
     assert "技術陪" not in labels
     assert "一陪一護" not in labels
+
+
+def test_delta_mobile_price_list_uses_aligned_blocks_without_vertical_separators() -> None:
+    for plan in price_lists.DELTA_MOBILE_PRICE_LISTS.values():
+        text = str(plan["text"])
+        assert "```text" in text
+        assert "｜" not in text
 
 
 def test_delta_mobile_fixed_result_prices_match_approved_copy() -> None:
@@ -66,9 +73,9 @@ def test_delta_mobile_fixed_result_prices_match_approved_copy() -> None:
 
     for price in ("600T", "3000T", "5000T"):
         assert price in babel
-    assert "2個沙色保險＋800W保底" in babel
-    assert "累積10個沙色保險＋6000W保底" in babel
-    assert "累積20個沙色保險＋100M保底" in babel
+    assert "2 個沙色保險 ＋ 800W 保底" in babel
+    assert "累積 10 個沙色保險 ＋ 6000W 保底" in babel
+    assert "累積 20 個沙色保險 ＋ 100M 保底" in babel
     assert "不出不結單" in babel
 
 
