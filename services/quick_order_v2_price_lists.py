@@ -15,6 +15,87 @@ _PRICE_LIST_LABEL_BY_CHANNEL_ID = {
     int(quick.QUICK_ORDER_V2_CHANNELS["steam"]): "STEAM",
 }
 
+DELTA_PRICE_LIST_CATEGORIES = (
+    ("desktop", "端遊", "🖥️"),
+    ("mobile", "手遊", "📱"),
+    ("farm", "代肝代解", "🛠️"),
+    ("fun", "趣味單", "🎉"),
+)
+
+DELTA_MOBILE_PRICE_LISTS = {
+    "trial": {
+        "label": "護航體驗單",
+        "text": """**護航體驗**
+累積帶出 **777W**｜**400T**
+累積帶出 **1688W**｜**800T**""",
+    },
+    "guarantee": {
+        "label": "護航保底單",
+        "text": """**累積保底**
+**1500W**｜**600T**
+**4200W**｜**2000T**
+**110M**｜**4000T**
+**300M**｜**10000T**""",
+    },
+    "big_red": {
+        "label": "大紅單",
+        "text": """**累積帶出**
+**1 大紅**｜**1000T**
+**5 大紅**｜**4000T**
+**10 大紅**｜**7000T**
+
+📌 **大紅定義**
+價值 **100萬以上** 的紅色物資即計為大紅。""",
+    },
+    "babel": {
+        "label": "巴別塔限定",
+        "text": """**基礎護航｜600T**
+2個沙色保險＋800W保底
+
+**進階護航｜3000T**
+累積10個沙色保險＋6000W保底
+
+**最強方案｜5000T**
+累積20個沙色保險＋100M保底
+
+**三幻神挑戰｜5000T**
+三幻神任一出現即完成
+**不出不結單**""",
+    },
+    "entertainment": {
+        "label": "娛樂陪",
+        "text": """**娛樂陪**
+單陪｜**320T / H**
+雙陪｜**600T / H**
+
+🎁 **娛樂陪累積回饋**
+計時｜累積 **10 小時** → 贈送 **1 小時券**
+
+📌 **指定陪玩**
+指定打手／陪玩｜每人 **+100T**
+⚠️ **2H 或 2局以上免指定費**""",
+    },
+    "sweet": {
+        "label": "甜蜜單",
+        "text": """**甜蜜單**
+單陪｜**520T / H**
+雙陪｜**1314T / H**
+
+📌 **指定陪玩**
+指定打手／陪玩｜每人 **+100T**
+⚠️ **2H 或 2局以上免指定費**""",
+    },
+    "teaching": {
+        "label": "教學單",
+        "text": """**1對1教學**
+每人 **500T / H**
+
+📌 **指定人員**
+指定打手／教學人員｜每人 **+100T**
+⚠️ **2H 或 2局以上免指定費**""",
+    },
+}
+
 
 def _normalise_emoji_name(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", str(value or "").casefold())
@@ -157,6 +238,109 @@ def _price_list_text(interaction: discord.Interaction, channel_id: int) -> str:
     return "價目表內容整理中，稍後更新。"
 
 
+def _delta_category_label(value: str) -> str:
+    for key, label, _ in DELTA_PRICE_LIST_CATEGORIES:
+        if key == value:
+            return label
+    return "三角洲行動"
+
+
+def _delta_root_embed() -> discord.Embed:
+    return discord.Embed(
+        title="📋 三角洲行動｜價目表",
+        description="請先選擇價目表分類。",
+        color=discord.Color.blurple(),
+    )
+
+
+def _delta_category_embed(category: str) -> discord.Embed:
+    label = _delta_category_label(category)
+    description = (
+        "請選擇要查看的單子。"
+        if category == "mobile"
+        else "此分類價目表內容整理中。"
+    )
+    return discord.Embed(
+        title=f"📋 三角洲行動｜{label}價目",
+        description=description,
+        color=discord.Color.blurple(),
+    )
+
+
+def _delta_mobile_embed(plan_key: str) -> discord.Embed:
+    plan = DELTA_MOBILE_PRICE_LISTS[plan_key]
+    return discord.Embed(
+        title=f"📋 三角洲行動｜手遊｜{plan['label']}",
+        description=str(plan["text"]),
+        color=discord.Color.blurple(),
+    )
+
+
+class DeltaPriceListCategorySelect(discord.ui.Select):
+    def __init__(self, selected: str | None = None):
+        super().__init__(
+            placeholder="請選擇價目表分類",
+            min_values=1,
+            max_values=1,
+            row=0,
+            custom_id="quick_order_v2_delta_price_list_category",
+            options=[
+                discord.SelectOption(
+                    label=label,
+                    value=value,
+                    emoji=emoji,
+                    default=value == selected,
+                )
+                for value, label, emoji in DELTA_PRICE_LIST_CATEGORIES
+            ],
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        category = str(self.values[0])
+        await interaction.response.edit_message(
+            embed=_delta_category_embed(category),
+            view=DeltaPriceListView(category=category),
+        )
+
+
+class DeltaMobilePriceListSelect(discord.ui.Select):
+    def __init__(self, selected: str | None = None):
+        super().__init__(
+            placeholder="請選擇手遊單子",
+            min_values=1,
+            max_values=1,
+            row=1,
+            custom_id="quick_order_v2_delta_mobile_price_list",
+            options=[
+                discord.SelectOption(
+                    label=str(plan["label"]),
+                    value=key,
+                    default=key == selected,
+                )
+                for key, plan in DELTA_MOBILE_PRICE_LISTS.items()
+            ],
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        plan_key = str(self.values[0])
+        await interaction.response.edit_message(
+            embed=_delta_mobile_embed(plan_key),
+            view=DeltaPriceListView(category="mobile", mobile_plan=plan_key),
+        )
+
+
+class DeltaPriceListView(discord.ui.View):
+    def __init__(
+        self,
+        category: str | None = None,
+        mobile_plan: str | None = None,
+    ):
+        super().__init__(timeout=180)
+        self.add_item(DeltaPriceListCategorySelect(selected=category))
+        if category == "mobile":
+            self.add_item(DeltaMobilePriceListSelect(selected=mobile_plan))
+
+
 def has_price_list(channel_id: int) -> bool:
     return int(channel_id) in _PRICE_LIST_LABEL_BY_CHANNEL_ID
 
@@ -173,6 +357,14 @@ class QuickPriceListButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        if self.source_channel_id == int(quick.QUICK_ORDER_V2_CHANNELS["delta"]):
+            await interaction.response.send_message(
+                embed=_delta_root_embed(),
+                view=DeltaPriceListView(),
+                ephemeral=True,
+            )
+            return
+
         label = _PRICE_LIST_LABEL_BY_CHANNEL_ID.get(
             self.source_channel_id,
             "遊戲",
@@ -193,6 +385,9 @@ def add_price_list_control(view: discord.ui.View, channel_id: int) -> discord.ui
 
 
 __all__ = [
+    "DELTA_MOBILE_PRICE_LISTS",
+    "DELTA_PRICE_LIST_CATEGORIES",
+    "DeltaPriceListView",
     "QuickPriceListButton",
     "add_price_list_control",
     "has_price_list",
