@@ -21,6 +21,8 @@ _PRICE_LIST_LABEL_BY_CHANNEL_ID = {
 _ROOT_DIR = Path(__file__).resolve().parents[1]
 _PUBLIC_BASE_URL = "https://mowanentertainment.com/static"
 _DELTA_FARM_3X3_ASSET = "price_lists/delta_farm_3x3.jpg"
+_DELTA_FUN_RUSSIAN_ROULETTE_ASSET = "price_lists/delta_fun_russian_roulette.jpg"
+_DELTA_FUN_RICH_ENOUGH_ASSET = "price_lists/delta_fun_hao_dao_ni_le_ma.jpg"
 
 
 def _display_width(value: str) -> int:
@@ -151,6 +153,94 @@ DELTA_FARM_PRICE_LISTS = {
         "label": "3×3安全箱",
         "text": "**3×3安全箱**\n詳細方案、包損與預約優惠請見下圖。",
         "image": _DELTA_FARM_3X3_ASSET,
+    },
+}
+
+DELTA_FUN_PRICE_LISTS = {
+    "russian_roulette": {
+        "label": "俄羅斯輪盤",
+        "text": f"""**俄羅斯輪盤**
+{_aligned_code_block((("價格", "1000T"),))}
+📌 **玩法說明**
+老闆前往本店提供的輪盤網站進行抽選保底。
+抽選完成後，由機器人自動記錄於票口。""",
+        "image": _DELTA_FUN_RUSSIAN_ROULETTE_ASSET,
+    },
+    "love_delta": {
+        "label": "戀與三角洲",
+        "text": f"""**戀與三角洲**
+{_aligned_code_block((("基礎", "1688T    基礎好感度 30"), ("標準", "2688T    基礎好感度 0"), ("困難", "4688T    基礎好感度 -30"), ("地獄", "6688T    基礎好感度 -80")))}
+🎯 **結單條件**
+好感度達 **100** 結單。
+
+💗 **好感度加分**
+{_aligned_code_block((("金色物資／紫卡", "+3"), ("小紅（200W以下）／金卡", "+8"), ("大紅（200W以上）／紅卡", "+15"), ("心／淚", "+30"), ("女陪第一次救起老闆", "+5"), ("女陪與老闆撤離成功", "+5"), ("女陪打三滅隊", "+10"), ("300W以上撤離", "+4"), ("600W以上撤離", "+8"), ("900W以上撤離", "+12")))}
+📌 **互動規則**
+老闆可設定 **3 種不同禁語**；女陪每次講到，好感度 **-2**，撤離成功後可更換。
+禁語不可與自訂句末助詞、暱稱重複。
+
+女陪每局開始前，可從上架物資中猜一樣老闆最想要的東西；猜中該局分數 **×1.2**。可提示物資類別及品質，兩位女陪需統一答案。
+
+✨ **好感度解鎖**
+好感度 **30**：可設定一句句末助詞，漏說一次 **-2**。
+好感度 **60**：解鎖女陪對老闆的特殊稱呼，由老闆自訂。
+
+單局摸出 **4 個同樣小金／紅**，老闆可指定下局女陪使用的幹員及槍械。
+撤離失敗仍會計算安全箱內價值。""",
+    },
+    "watch_your_words": {
+        "label": "謹言慎行",
+        "text": f"""**謹言慎行**
+{_aligned_code_block((("價格", "2500T"), ("基礎保底", "1888W")))}
+📌 **規則**
+開局由老闆決定 **3 個禁詞**。
+
+在原保底內，打手每次講到禁詞，額外保底 **+50W**。
+禁詞被打手猜到後，老闆可更換禁詞，最多更換 **2 次**。
+
+打滿原保底後，結束猜禁詞環節並結算額外保底。
+打手進入額外保底期間，不需再猜禁詞。""",
+    },
+    "eat_yourself": {
+        "label": "想吃自己打",
+        "text": f"""**想吃自己打**
+{_aligned_code_block((("價格", "13888T"),))}
+📌 **挑戰規則**
+需連續撤離 **5 把**，且每把都需達 **1000W**，本方案無保底。
+
+若連撤中斷，全部重新開始。
+若連撤過程中有場次未達 1000W，需補場次，但不會中斷連撤紀錄。
+補場次過程中若撤離失敗，累計場次歸零。
+
+🔴 **大紅可折抵 1 個場次**""",
+    },
+    "rich_enough": {
+        "label": "豪到你了嗎",
+        "text": f"""**豪到你了嗎**
+{_aligned_code_block((("價格", "2000T"), ("基礎保底", "1200W")))}
+⚠️ **開打前檢查**
+打手必須戴帽，並依方案規則準備裝備；語音使用英文。
+
+🔫 **限定槍枝**
+AS VAL、M7、M14
+
+📌 **玩法規則**
+僅能拉閘，禁止飛升。
+全程禁止靜步，必須開麥照趣味口令互動。
+少說指定口令任一句，保底 **+30W**。
+
+完整趣味口令與玩法示意請見下圖。""",
+        "image": _DELTA_FUN_RICH_ENOUGH_ASSET,
+    },
+    "lovebirds": {
+        "label": "比翼雙飛",
+        "text": f"""**比翼雙飛**
+{_aligned_code_block((("價格", "2000T"), ("基礎保底", "1314W")))}
+📌 **規則**
+由老闆指定一個打手給對方的愛稱，並在開局說出指定情話。
+忘記一次，保底 **+50W**。
+
+⚠️ **打手任何決策都必須開麥溝通**""",
     },
 }
 
@@ -300,7 +390,7 @@ def _delta_category_embed(category: str) -> discord.Embed:
     label = _delta_category_label(category)
     description = (
         "請選擇要查看的單子。"
-        if category in {"mobile", "farm"}
+        if category in {"mobile", "farm", "fun"}
         else "此分類價目表內容整理中。"
     )
     return discord.Embed(
@@ -323,6 +413,19 @@ def _delta_farm_embed(plan_key: str) -> discord.Embed:
     plan = DELTA_FARM_PRICE_LISTS[plan_key]
     embed = discord.Embed(
         title=f"📋 三角洲行動・代肝代解・{plan['label']}",
+        description=str(plan["text"]),
+        color=discord.Color.blurple(),
+    )
+    image = str(plan.get("image") or "").strip()
+    if image:
+        embed.set_image(url=_static_asset_url(image))
+    return embed
+
+
+def _delta_fun_embed(plan_key: str) -> discord.Embed:
+    plan = DELTA_FUN_PRICE_LISTS[plan_key]
+    embed = discord.Embed(
+        title=f"📋 三角洲行動・趣味單・{plan['label']}",
         description=str(plan["text"]),
         color=discord.Color.blurple(),
     )
@@ -411,12 +514,39 @@ class DeltaFarmPriceListSelect(discord.ui.Select):
         )
 
 
+class DeltaFunPriceListSelect(discord.ui.Select):
+    def __init__(self, selected: str | None = None):
+        super().__init__(
+            placeholder="請選擇趣味單",
+            min_values=1,
+            max_values=1,
+            row=1,
+            custom_id="quick_order_v2_delta_fun_price_list",
+            options=[
+                discord.SelectOption(
+                    label=str(plan["label"]),
+                    value=key,
+                    default=key == selected,
+                )
+                for key, plan in DELTA_FUN_PRICE_LISTS.items()
+            ],
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        plan_key = str(self.values[0])
+        await interaction.response.edit_message(
+            embed=_delta_fun_embed(plan_key),
+            view=DeltaPriceListView(category="fun", fun_plan=plan_key),
+        )
+
+
 class DeltaPriceListView(discord.ui.View):
     def __init__(
         self,
         category: str | None = None,
         mobile_plan: str | None = None,
         farm_plan: str | None = None,
+        fun_plan: str | None = None,
     ):
         super().__init__(timeout=180)
         self.add_item(DeltaPriceListCategorySelect(selected=category))
@@ -424,6 +554,8 @@ class DeltaPriceListView(discord.ui.View):
             self.add_item(DeltaMobilePriceListSelect(selected=mobile_plan))
         elif category == "farm":
             self.add_item(DeltaFarmPriceListSelect(selected=farm_plan))
+        elif category == "fun":
+            self.add_item(DeltaFunPriceListSelect(selected=fun_plan))
 
 
 def has_price_list(channel_id: int) -> bool:
@@ -471,9 +603,11 @@ def add_price_list_control(view: discord.ui.View, channel_id: int) -> discord.ui
 
 __all__ = [
     "DELTA_FARM_PRICE_LISTS",
+    "DELTA_FUN_PRICE_LISTS",
     "DELTA_MOBILE_PRICE_LISTS",
     "DELTA_PRICE_LIST_CATEGORIES",
     "DeltaFarmPriceListSelect",
+    "DeltaFunPriceListSelect",
     "DeltaPriceListView",
     "QuickPriceListButton",
     "add_price_list_control",
