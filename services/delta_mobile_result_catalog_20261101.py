@@ -21,6 +21,7 @@ MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS = frozenset({
     "basic_mobile_one_companion_one_guard_topsecret",
 })
 
+MOBILE_RETIRED_RULE_KEYS = MOBILE_TECH_RULE_KEYS | MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS
 MOBILE_RETIRED_GROUP_LABELS = frozenset({
     "技術陪",
     "一陪一護",
@@ -32,7 +33,7 @@ MOBILE_RETIRED_GROUP_LABELS = frozenset({
 _MOBILE_RESULT_GROUPS = (
     {
         "key": "mobile_trial",
-        "label": "護航體驗單",
+        "label": "體驗單",
         "selector_label": "方案",
         "description": "三角洲手遊護航入門方案；依累積帶出金額完成。",
         "variants": (
@@ -56,7 +57,7 @@ _MOBILE_RESULT_GROUPS = (
     },
     {
         "key": "mobile_guarantee",
-        "label": "護航保底單",
+        "label": "保底單",
         "selector_label": "累積保底",
         "description": "依選擇方案提供累積帶出金額保底。",
         "variants": (
@@ -121,20 +122,20 @@ _MOBILE_RESULT_GROUPS = (
     },
     {
         "key": "mobile_babel",
-        "label": "巴別塔限定",
+        "label": "絕巴保底單",
         "selector_label": "方案",
-        "description": "巴別塔結果型護航方案；依選擇內容完成後結單。",
+        "description": "絕密巴克什結果型保底方案；依選擇內容完成後結單。",
         "variants": (
             {
                 "key": "delta_mobile_babel_basic",
-                "label": "基礎護航",
+                "label": "基礎方案",
                 "value": "basic",
                 "price": 600,
                 "note": "2 個沙色保險＋800W 保底。",
             },
             {
                 "key": "delta_mobile_babel_advanced",
-                "label": "進階護航",
+                "label": "進階方案",
                 "value": "advanced",
                 "price": 3000,
                 "note": "累積 10 個沙色保險＋6000W 保底。",
@@ -165,9 +166,58 @@ def _set_code_rule(order_rules, key: str, rule: OrderRule) -> None:
     order_rules._BASE_ORDER_RULES[key] = rule
 
 
+def _retire_mobile_hourly_guard_products() -> None:
+    """Remove retired handheld guard products from every active runtime registry.
+
+    Historical order rows remain in the databases. Only current product/rule
+    registries and self-service indexes are retired so the old hourly products
+    cannot reappear in Product & Rules, Web, or Discord.
+    """
+    from services import order_rules, orders
+
+    for key in MOBILE_RETIRED_RULE_KEYS:
+        if dict.__contains__(order_rules.ORDER_RULES, key):
+            dict.__delitem__(order_rules.ORDER_RULES, key)
+        order_rules._BASE_ORDER_RULES.pop(key, None)
+        order_rules.ORDER_RULES._custom_cache.pop(key, None)
+        order_rules.ORDER_RULES._override_cache.pop(key, None)
+
+    mobile_groups = orders.SELF_SERVICE_ORDER_CATALOG.setdefault("delta_mobile_basic", [])
+    cleaned_groups: list[dict] = []
+    for group in mobile_groups:
+        details = [
+            dict(detail)
+            for detail in group.get("details", [])
+            if str(detail.get("rule_key") or "") not in MOBILE_RETIRED_RULE_KEYS
+        ]
+        label = str(group.get("label") or "")
+        if label in MOBILE_RETIRED_GROUP_LABELS and not details:
+            continue
+        if not details and any(
+            str(detail.get("rule_key") or "") in MOBILE_RETIRED_RULE_KEYS
+            for detail in group.get("details", [])
+        ):
+            continue
+        item = dict(group)
+        item["details"] = details
+        cleaned_groups.append(item)
+    mobile_groups[:] = cleaned_groups
+
+    for label, rule_key in tuple(orders.ORDER_RULE_KEY_BY_LABEL.items()):
+        if str(rule_key or "") in MOBILE_RETIRED_RULE_KEYS:
+            orders.ORDER_RULE_KEY_BY_LABEL.pop(label, None)
+            orders.ORDER_ITEM_TO_CATEGORY.pop(label, None)
+
+    orders.ORDER_ITEMS_BY_CATEGORY["delta_mobile_basic"] = [
+        rule.label
+        for rule in order_rules.get_rules_by_category("delta_mobile_basic")
+    ]
+
+
 def _install_rules() -> None:
     from services import order_rules
 
+    _retire_mobile_hourly_guard_products()
     for group in _MOBILE_RESULT_GROUPS:
         group_label = str(group["label"])
         for variant in group["variants"]:
@@ -214,12 +264,7 @@ def _discord_group(group: dict) -> dict:
 
 
 def _install_mobile_group_selector_filter(orders) -> None:
-    """Hide retired handheld groups without deleting their resolver data.
-
-    ORDER_ITEM_GROUPS_BY_CATEGORY is a DynamicOrderItemGroups instance. Giving the
-    instance its own get() keeps this visibility policy intact even when the product
-    status subsystem later swaps the class-level get() implementation in place.
-    """
+    """Defensively suppress retired handheld groups if an external row resurfaces."""
     groups = orders.ORDER_ITEM_GROUPS_BY_CATEGORY
     if getattr(groups, "_delta_mobile_result_filter_installed", False):
         return
@@ -241,6 +286,7 @@ def _install_mobile_group_selector_filter(orders) -> None:
 def _install_discord_catalog() -> None:
     from services import order_rules, orders
 
+    _retire_mobile_hourly_guard_products()
     mobile_groups = orders.SELF_SERVICE_ORDER_CATALOG.setdefault(
         "delta_mobile_basic",
         [],
@@ -252,14 +298,24 @@ def _install_discord_catalog() -> None:
         for variant in group["variants"]
     }
 
-    # Keep old 技術陪 / 一陪一護 group data for historical and already-open
-    # interactions. Only remove previous copies of the new result groups.
+    # Remove retired hourly guard groups and previous copies/names of result groups.
+    legacy_result_labels = {
+        "護航體驗單",
+        "護航保底單",
+        "巴別塔限定",
+        "體驗單",
+        "保底單",
+        "大紅單",
+        "絕巴保底單",
+    }
     mobile_groups[:] = [
         group
         for group in mobile_groups
-        if str(group.get("label") or "") not in new_group_labels
+        if str(group.get("label") or "") not in MOBILE_RETIRED_GROUP_LABELS
+        and str(group.get("label") or "") not in legacy_result_labels
+        and str(group.get("label") or "") not in new_group_labels
         and not any(
-            str(detail.get("rule_key") or "") in new_rule_keys
+            str(detail.get("rule_key") or "") in new_rule_keys | MOBILE_RETIRED_RULE_KEYS
             for detail in group.get("details", [])
         )
     ]
@@ -325,12 +381,7 @@ def _filter_public_mobile_groups(groups: list[dict]) -> list[dict]:
 
 
 def _install_public_web_entry_filter() -> None:
-    """Hide retired groups on real customer routes while keeping internal resolvers.
-
-    Only the route module's already-imported bindings are wrapped. The underlying
-    order_catalog_cards service stays untouched so its cache identity/TTL contract
-    remains exactly as before.
-    """
+    """Defensively hide retired groups if stale external data resurfaces."""
     from web.app.routers import site
 
     if getattr(site, "_delta_mobile_result_filter_installed", False):
@@ -364,15 +415,20 @@ def _install_public_web_entry_filter() -> None:
 
 
 def install_delta_mobile_result_web_catalog_20261101() -> None:
-    """Install new Web cards while hiding retired mobile entry points."""
+    """Install approved Web cards and remove retired handheld guard specs."""
     from web.app.services import order_groups
 
-    # Do not delete tech_play_mobile from GROUP_SPECS. Keeping it as resolver data
-    # preserves old snapshots and existing regression contracts; customer routes are
-    # filtered below so no new customer can start the retired hourly product.
     new_specs = mobile_result_web_group_specs()
     new_keys = {str(spec["key"]) for spec in new_specs}
-    new_labels = {str(spec["label"]) for spec in new_specs}
+    current_and_legacy_labels = {
+        "護航體驗單",
+        "護航保底單",
+        "巴別塔限定",
+        "體驗單",
+        "保底單",
+        "大紅單",
+        "絕巴保底單",
+    }
 
     order_groups.GROUP_SPECS[:] = [
         spec
@@ -380,7 +436,11 @@ def install_delta_mobile_result_web_catalog_20261101() -> None:
         if str(spec.get("key") or "") not in new_keys
         and not (
             str(spec.get("category") or "") == "delta_mobile_basic"
-            and str(spec.get("label") or "") in new_labels
+            and (
+                str(spec.get("key") or "") == "tech_play_mobile"
+                or str(spec.get("label") or "") == "一陪一護"
+                or str(spec.get("label") or "") in current_and_legacy_labels
+            )
         )
     ]
 
@@ -405,6 +465,7 @@ def install_delta_mobile_result_catalog_20261101() -> None:
 __all__ = [
     "MOBILE_ONE_COMPANION_ONE_GUARD_RULE_KEYS",
     "MOBILE_RETIRED_GROUP_LABELS",
+    "MOBILE_RETIRED_RULE_KEYS",
     "MOBILE_TECH_RULE_KEYS",
     "install_delta_mobile_result_catalog_20261101",
     "install_delta_mobile_result_web_catalog_20261101",
