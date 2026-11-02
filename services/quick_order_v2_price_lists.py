@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import unicodedata
+from pathlib import Path
 
 import discord
 
@@ -15,6 +17,10 @@ _PRICE_LIST_LABEL_BY_CHANNEL_ID = {
     int(quick.QUICK_ORDER_V2_CHANNELS["apex"]): "APEX",
     int(quick.QUICK_ORDER_V2_CHANNELS["steam"]): "STEAM",
 }
+
+_ROOT_DIR = Path(__file__).resolve().parents[1]
+_PUBLIC_BASE_URL = "https://mowanentertainment.com/static"
+_DELTA_FARM_3X3_ASSET = "price_lists/delta_farm_3x3.jpg"
 
 
 def _display_width(value: str) -> int:
@@ -34,6 +40,18 @@ def _aligned_code_block(rows: tuple[tuple[str, str], ...]) -> str:
         padding = " " * (label_width - _display_width(label) + 4)
         lines.append(f"{label}{padding}{value}")
     return "```text\n" + "\n".join(lines) + "\n```"
+
+
+def _static_asset_url(relative_path: str) -> str:
+    """Return a cache-busted public static URL based on the deployed file contents."""
+    clean = str(relative_path or "").strip().lstrip("/")
+    local_path = _ROOT_DIR / "web" / "app" / "static" / clean
+    version = "missing"
+    try:
+        version = hashlib.sha256(local_path.read_bytes()).hexdigest()[:16]
+    except OSError:
+        pass
+    return f"{_PUBLIC_BASE_URL}/{clean}?v={version}"
 
 
 DELTA_PRICE_LIST_CATEGORIES = (
@@ -104,6 +122,35 @@ DELTA_MOBILE_PRICE_LISTS = {
 📌 **指定人員**
 {_aligned_code_block((("指定打手／教學人員", "每人 +100T"),))}
 ⚠️ **2H 或 2局以上免指定費**""",
+    },
+}
+
+DELTA_FARM_PRICE_LISTS = {
+    "aw_collision": {
+        "label": "AW子彈代撞",
+        "text": f"""**AW子彈代撞**
+{_aligned_code_block((("1～100 發", "每發 5T"), ("101～500 發", "每發 4.5T"), ("501 發以上", "每發 4T")))}""",
+    },
+    "night_population": {
+        "label": "守夜人口風琴",
+        "text": f"""**守夜人口風琴**
+{_aligned_code_block((("價格", "800T"),))}
+📌 **服務說明**
+需登入 **3 天**，每次登入前會通知。""",
+    },
+    "department_mission": {
+        "label": "代解部門任務",
+        "text": f"""**代解部門任務**
+{_aligned_code_block((("等級 1～3", "25T / 聲望"), ("等級 3～4", "40T / 聲望")))}
+📌 **各等級所需聲望**
+{_aligned_code_block((("等級 1→2", "20 聲望"), ("等級 2→3", "30 聲望"), ("等級 3→4", "30 聲望")))}
+⚠️ **作業時間最久兩週內結單**
+⚠️ **包損耗 +500T**""",
+    },
+    "safe_box_3x3": {
+        "label": "3×3安全箱",
+        "text": "**3×3安全箱**\n詳細方案、包損與預約優惠請見下圖。",
+        "image": _DELTA_FARM_3X3_ASSET,
     },
 }
 
@@ -253,7 +300,7 @@ def _delta_category_embed(category: str) -> discord.Embed:
     label = _delta_category_label(category)
     description = (
         "請選擇要查看的單子。"
-        if category == "mobile"
+        if category in {"mobile", "farm"}
         else "此分類價目表內容整理中。"
     )
     return discord.Embed(
@@ -270,6 +317,19 @@ def _delta_mobile_embed(plan_key: str) -> discord.Embed:
         description=str(plan["text"]),
         color=discord.Color.blurple(),
     )
+
+
+def _delta_farm_embed(plan_key: str) -> discord.Embed:
+    plan = DELTA_FARM_PRICE_LISTS[plan_key]
+    embed = discord.Embed(
+        title=f"📋 三角洲行動・代肝代解・{plan['label']}",
+        description=str(plan["text"]),
+        color=discord.Color.blurple(),
+    )
+    image = str(plan.get("image") or "").strip()
+    if image:
+        embed.set_image(url=_static_asset_url(image))
+    return embed
 
 
 class DeltaPriceListCategorySelect(discord.ui.Select):
@@ -325,16 +385,45 @@ class DeltaMobilePriceListSelect(discord.ui.Select):
         )
 
 
+class DeltaFarmPriceListSelect(discord.ui.Select):
+    def __init__(self, selected: str | None = None):
+        super().__init__(
+            placeholder="請選擇代肝代解項目",
+            min_values=1,
+            max_values=1,
+            row=1,
+            custom_id="quick_order_v2_delta_farm_price_list",
+            options=[
+                discord.SelectOption(
+                    label=str(plan["label"]),
+                    value=key,
+                    default=key == selected,
+                )
+                for key, plan in DELTA_FARM_PRICE_LISTS.items()
+            ],
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        plan_key = str(self.values[0])
+        await interaction.response.edit_message(
+            embed=_delta_farm_embed(plan_key),
+            view=DeltaPriceListView(category="farm", farm_plan=plan_key),
+        )
+
+
 class DeltaPriceListView(discord.ui.View):
     def __init__(
         self,
         category: str | None = None,
         mobile_plan: str | None = None,
+        farm_plan: str | None = None,
     ):
         super().__init__(timeout=180)
         self.add_item(DeltaPriceListCategorySelect(selected=category))
         if category == "mobile":
             self.add_item(DeltaMobilePriceListSelect(selected=mobile_plan))
+        elif category == "farm":
+            self.add_item(DeltaFarmPriceListSelect(selected=farm_plan))
 
 
 def has_price_list(channel_id: int) -> bool:
@@ -381,8 +470,10 @@ def add_price_list_control(view: discord.ui.View, channel_id: int) -> discord.ui
 
 
 __all__ = [
+    "DELTA_FARM_PRICE_LISTS",
     "DELTA_MOBILE_PRICE_LISTS",
     "DELTA_PRICE_LIST_CATEGORIES",
+    "DeltaFarmPriceListSelect",
     "DeltaPriceListView",
     "QuickPriceListButton",
     "add_price_list_control",
