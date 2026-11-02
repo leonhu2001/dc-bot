@@ -83,7 +83,7 @@ DELTA_MOBILE_PRICE_LISTS = {
         "text": f"""**娛樂陪**
 {_aligned_code_block((("單陪", "320T / H"), ("雙陪", "600T / H")))}
 🎁 **娛樂陪累積回饋**
-累積 **10 小時** → 贈送 **1 小時券**
+{_aligned_code_block((("計時", "累積 10 小時 → 贈送 1 小時券"),))}
 
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
@@ -185,7 +185,7 @@ def _apex_price_list(interaction: discord.Interaction) -> str:
 {_aligned_code_block((("NG", "每人 580T / H"), ("積分", "每人 630T / H")))}
 
 🎁 **娛樂陪累積回饋**
-累積 **10 小時** → 贈送 **1 小時券**
+{_aligned_code_block((("計時", "累積 10 小時 → 贈送 1 小時券"),))}
 
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
