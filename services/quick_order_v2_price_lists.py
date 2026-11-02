@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 import discord
 
@@ -15,6 +16,26 @@ _PRICE_LIST_LABEL_BY_CHANNEL_ID = {
     int(quick.QUICK_ORDER_V2_CHANNELS["steam"]): "STEAM",
 }
 
+
+def _display_width(value: str) -> int:
+    return sum(
+        2 if unicodedata.east_asian_width(char) in {"W", "F"} else 1
+        for char in str(value)
+    )
+
+
+def _aligned_code_block(rows: tuple[tuple[str, str], ...]) -> str:
+    """Render two-column Discord price rows with CJK-aware spacing."""
+    if not rows:
+        return "```text\n```"
+    label_width = max(_display_width(label) for label, _ in rows)
+    lines = []
+    for label, value in rows:
+        padding = " " * (label_width - _display_width(label) + 4)
+        lines.append(f"{label}{padding}{value}")
+    return "```text\n" + "\n".join(lines) + "\n```"
+
+
 DELTA_PRICE_LIST_CATEGORIES = (
     ("desktop", "端遊", "🖥️"),
     ("mobile", "手遊", "📱"),
@@ -25,42 +46,25 @@ DELTA_PRICE_LIST_CATEGORIES = (
 DELTA_MOBILE_PRICE_LISTS = {
     "trial": {
         "label": "體驗單",
-        "text": """**體驗單**
-```text
-777W       400T
-1688W      800T
-```""",
+        "text": f"""**體驗單**
+{_aligned_code_block((("777W", "400T"), ("1688W", "800T")))}""",
     },
     "guarantee": {
         "label": "保底單",
-        "text": """**累積保底**
-```text
-1500W       600T
-4200W      2000T
-110M       4000T
-300M      10000T
-```""",
+        "text": f"""**累積保底**
+{_aligned_code_block((("1500W", "600T"), ("4200W", "2000T"), ("110M", "4000T"), ("300M", "10000T")))}""",
     },
     "big_red": {
         "label": "大紅單",
-        "text": """**累積帶出**
-```text
-1 大紅      1000T
-5 大紅      4000T
-10 大紅     7000T
-```
+        "text": f"""**累積帶出**
+{_aligned_code_block((("1 大紅", "1000T"), ("5 大紅", "4000T"), ("10 大紅", "7000T")))}
 📌 **大紅定義**
 價值 **100萬以上** 的紅色物資即計為大紅。""",
     },
     "babel": {
         "label": "絕巴保底單",
-        "text": """**絕巴保底方案**
-```text
-基礎方案       600T
-進階方案      3000T
-最強方案      5000T
-三幻神挑戰    5000T
-```
+        "text": f"""**絕巴保底方案**
+{_aligned_code_block((("基礎方案", "600T"), ("進階方案", "3000T"), ("最強方案", "5000T"), ("三幻神挑戰", "5000T")))}
 **基礎方案**
 2 個沙色保險 ＋ 800W 保底
 
@@ -76,37 +80,29 @@ DELTA_MOBILE_PRICE_LISTS = {
     },
     "entertainment": {
         "label": "娛樂陪",
-        "text": """**娛樂陪**
-```text
-單陪      320T / H
-雙陪      600T / H
-```
+        "text": f"""**娛樂陪**
+{_aligned_code_block((("單陪", "320T / H"), ("雙陪", "600T / H")))}
 🎁 **娛樂陪累積回饋**
 累積 **10 小時** → 贈送 **1 小時券**
 
 📌 **指定陪玩**
-指定打手／陪玩　每人 **+100T**
+{_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 或 2局以上免指定費**""",
     },
     "sweet": {
         "label": "甜蜜單",
-        "text": """**甜蜜單**
-```text
-單陪      520T / H
-雙陪     1314T / H
-```
+        "text": f"""**甜蜜單**
+{_aligned_code_block((("單陪", "520T / H"), ("雙陪", "1314T / H")))}
 📌 **指定陪玩**
-指定打手／陪玩　每人 **+100T**
+{_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 或 2局以上免指定費**""",
     },
     "teaching": {
         "label": "教學單",
-        "text": """**1對1教學**
-```text
-每人      500T / H
-```
+        "text": f"""**1對1教學**
+{_aligned_code_block((("每人", "500T / H"),))}
 📌 **指定人員**
-指定打手／教學人員　每人 **+100T**
+{_aligned_code_block((("指定打手／教學人員", "每人 +100T"),))}
 ⚠️ **2H 或 2局以上免指定費**""",
     },
 }
@@ -156,88 +152,73 @@ def _rank_heading(interaction: discord.Interaction, emoji_token: str, label: str
 
 def _valorant_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
-NG｜每人 **300T / H**
-積分｜每人 **250T / 局**
+{_aligned_code_block((("NG", "每人 300T / H"), ("積分", "每人 250T / 局")))}
 
 {_rank_heading(interaction, "Ascendant", "超凡陪")}
-NG｜每人 **330T / H**
-積分｜每人 **290T / 局**
+{_aligned_code_block((("NG", "每人 330T / H"), ("積分", "每人 290T / 局")))}
 
 {_rank_heading(interaction, "Immortal", "神話陪")}
-NG｜每人 **350T / H**
-積分｜每人 **330T / 局**
+{_aligned_code_block((("NG", "每人 350T / H"), ("積分", "每人 330T / 局")))}
 
 {_rank_heading(interaction, "Radiant", "輻能陪")}
-NG｜每人 **380T / H**
-積分｜每人 **370T / 局**
+{_aligned_code_block((("NG", "每人 380T / H"), ("積分", "每人 370T / 局")))}
 
 🎁 **娛樂陪累積回饋**
-計局｜累積 **15 局** → 贈送 **1 局券**
-計時｜累積 **10 小時** → 贈送 **1 小時券**
+{_aligned_code_block((("計局", "累積 15 局 → 贈送 1 局券"), ("計時", "累積 10 小時 → 贈送 1 小時券")))}
 
 📌 **指定陪玩**
-指定打手／陪玩｜每人 **+100T**
+{_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 或 2局以上免指定費**"""
 
 
 def _apex_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
-NG｜每人 **300T / H**
-積分｜每人 **350T / H**
+{_aligned_code_block((("NG", "每人 300T / H"), ("積分", "每人 350T / H")))}
 
 {_rank_heading(interaction, "Diamond", "鑽石陪")}
-NG｜每人 **400T / H**
-積分｜每人 **450T / H**
+{_aligned_code_block((("NG", "每人 400T / H"), ("積分", "每人 450T / H")))}
 
 {_rank_heading(interaction, "Master~1", "大師陪")}
-NG｜每人 **480T / H**
-積分｜每人 **530T / H**
+{_aligned_code_block((("NG", "每人 480T / H"), ("積分", "每人 530T / H")))}
 
 {_rank_heading(interaction, "Predator", "頂獵陪")}
-NG｜每人 **580T / H**
-積分｜每人 **630T / H**
+{_aligned_code_block((("NG", "每人 580T / H"), ("積分", "每人 630T / H")))}
 
 🎁 **娛樂陪累積回饋**
 累積 **10 小時** → 贈送 **1 小時券**
 
 📌 **指定陪玩**
-指定打手／陪玩｜每人 **+100T**
+{_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 以上免指定費**"""
 
 
 def _lol_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
-ARAM｜每人 **300T / H**
-NG｜每人 **300T / H**
-積分｜每人 **250T / 局**
+{_aligned_code_block((("ARAM", "每人 300T / H"), ("NG", "每人 300T / H"), ("積分", "每人 250T / 局")))}
 
 {_rank_heading(interaction, "Master", "大師陪")}
-NG｜每人 **340T / H**
-積分｜每人 **300T / 局**
+{_aligned_code_block((("NG", "每人 340T / H"), ("積分", "每人 300T / 局")))}
 
 {_rank_heading(interaction, "Grandmaster", "宗師陪")}
-NG｜每人 **360T / H**
-積分｜每人 **300T / 局**
+{_aligned_code_block((("NG", "每人 360T / H"), ("積分", "每人 300T / 局")))}
 
 {_rank_heading(interaction, "Challenger", "菁英陪")}
-NG｜每人 **400T / H**
-積分｜每人 **400T / 局**
+{_aligned_code_block((("NG", "每人 400T / H"), ("積分", "每人 400T / 局")))}
 
 🎁 **娛樂陪累積回饋**
-計局｜累積 **15 局** → 贈送 **1 局券**
-計時｜累積 **10 小時** → 贈送 **1 小時券**
+{_aligned_code_block((("計局", "累積 15 局 → 贈送 1 局券"), ("計時", "累積 10 小時 → 贈送 1 小時券")))}
 
 📌 **指定陪玩**
-指定打手／陪玩｜每人 **+100T**
+{_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 或 2局以上免指定費**"""
 
 
 def _steam_price_list(_: discord.Interaction) -> str:
-    return """**娛樂陪**
-每人 **320T / H**
+    return f"""**娛樂陪**
+{_aligned_code_block((("一般陪玩", "每人 320T / H"),))}
 
 📌 **指定陪玩**
-指定打手／陪玩｜每人 **+100T**
+{_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 以上免指定費**"""
 
 
@@ -385,7 +366,7 @@ class QuickPriceListButton(discord.ui.Button):
             "遊戲",
         )
         embed = discord.Embed(
-            title=f"📋 {label}｜陪玩價目",
+            title=f"📋 {label}・陪玩價目",
             description=_price_list_text(interaction, self.source_channel_id),
             color=discord.Color.blurple(),
         )
