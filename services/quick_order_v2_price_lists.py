@@ -24,74 +24,89 @@ DELTA_PRICE_LIST_CATEGORIES = (
 
 DELTA_MOBILE_PRICE_LISTS = {
     "trial": {
-        "label": "護航體驗單",
-        "text": """**護航體驗**
-累積帶出 **777W**｜**400T**
-累積帶出 **1688W**｜**800T**""",
+        "label": "體驗單",
+        "text": """**體驗單**
+```text
+777W       400T
+1688W      800T
+```""",
     },
     "guarantee": {
-        "label": "護航保底單",
+        "label": "保底單",
         "text": """**累積保底**
-**1500W**｜**600T**
-**4200W**｜**2000T**
-**110M**｜**4000T**
-**300M**｜**10000T**""",
+```text
+1500W       600T
+4200W      2000T
+110M       4000T
+300M      10000T
+```""",
     },
     "big_red": {
         "label": "大紅單",
         "text": """**累積帶出**
-**1 大紅**｜**1000T**
-**5 大紅**｜**4000T**
-**10 大紅**｜**7000T**
-
+```text
+1 大紅      1000T
+5 大紅      4000T
+10 大紅     7000T
+```
 📌 **大紅定義**
 價值 **100萬以上** 的紅色物資即計為大紅。""",
     },
     "babel": {
-        "label": "巴別塔限定",
-        "text": """**基礎護航｜600T**
-2個沙色保險＋800W保底
+        "label": "絕巴保底單",
+        "text": """**絕巴保底方案**
+```text
+基礎方案       600T
+進階方案      3000T
+最強方案      5000T
+三幻神挑戰    5000T
+```
+**基礎方案**
+2 個沙色保險 ＋ 800W 保底
 
-**進階護航｜3000T**
-累積10個沙色保險＋6000W保底
+**進階方案**
+累積 10 個沙色保險 ＋ 6000W 保底
 
-**最強方案｜5000T**
-累積20個沙色保險＋100M保底
+**最強方案**
+累積 20 個沙色保險 ＋ 100M 保底
 
-**三幻神挑戰｜5000T**
+**三幻神挑戰**
 三幻神任一出現即完成
-**不出不結單**""",
+⚠️ **不出不結單**""",
     },
     "entertainment": {
         "label": "娛樂陪",
         "text": """**娛樂陪**
-單陪｜**320T / H**
-雙陪｜**600T / H**
-
+```text
+單陪      320T / H
+雙陪      600T / H
+```
 🎁 **娛樂陪累積回饋**
-計時｜累積 **10 小時** → 贈送 **1 小時券**
+累積 **10 小時** → 贈送 **1 小時券**
 
 📌 **指定陪玩**
-指定打手／陪玩｜每人 **+100T**
+指定打手／陪玩　每人 **+100T**
 ⚠️ **2H 或 2局以上免指定費**""",
     },
     "sweet": {
         "label": "甜蜜單",
         "text": """**甜蜜單**
-單陪｜**520T / H**
-雙陪｜**1314T / H**
-
+```text
+單陪      520T / H
+雙陪     1314T / H
+```
 📌 **指定陪玩**
-指定打手／陪玩｜每人 **+100T**
+指定打手／陪玩　每人 **+100T**
 ⚠️ **2H 或 2局以上免指定費**""",
     },
     "teaching": {
         "label": "教學單",
         "text": """**1對1教學**
-每人 **500T / H**
-
+```text
+每人      500T / H
+```
 📌 **指定人員**
-指定打手／教學人員｜每人 **+100T**
+指定打手／教學人員　每人 **+100T**
 ⚠️ **2H 或 2局以上免指定費**""",
     },
 }
@@ -247,7 +262,7 @@ def _delta_category_label(value: str) -> str:
 
 def _delta_root_embed() -> discord.Embed:
     return discord.Embed(
-        title="📋 三角洲行動｜價目表",
+        title="📋 三角洲行動・價目表",
         description="請先選擇價目表分類。",
         color=discord.Color.blurple(),
     )
@@ -261,7 +276,7 @@ def _delta_category_embed(category: str) -> discord.Embed:
         else "此分類價目表內容整理中。"
     )
     return discord.Embed(
-        title=f"📋 三角洲行動｜{label}價目",
+        title=f"📋 三角洲行動・{label}價目",
         description=description,
         color=discord.Color.blurple(),
     )
@@ -270,7 +285,7 @@ def _delta_category_embed(category: str) -> discord.Embed:
 def _delta_mobile_embed(plan_key: str) -> discord.Embed:
     plan = DELTA_MOBILE_PRICE_LISTS[plan_key]
     return discord.Embed(
-        title=f"📋 三角洲行動｜手遊｜{plan['label']}",
+        title=f"📋 三角洲行動・手遊・{plan['label']}",
         description=str(plan["text"]),
         color=discord.Color.blurple(),
     )
