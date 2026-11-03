@@ -431,7 +431,7 @@ def _shared_special_service_copy(game: str) -> str:
 ⚠️ **STEAM 教學單尚未開放自助下單**"""
     else:
         teacher, topics = teaching[game]
-        teaching_copy = f"""📚 **教學單｜1 對 1**
+        teaching_copy = f"""📚 **教學單（1 對 1）**
 {_aligned_code_block(((teacher, "500T / H"),))}
 ✨ **教學重點**
 {topics}
