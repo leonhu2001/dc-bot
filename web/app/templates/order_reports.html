@@ -55,9 +55,19 @@
     </div>
   </nav>
 
-  <form method="get" class="report-filter-bar">
-    <input type="search" name="q" value="{{ q }}" placeholder="搜尋訂單、老闆、單別">
-    <select name="status">
+  <form method="get" class="report-filter-bar" autocomplete="off">
+    <input
+      type="search"
+      name="q"
+      value="{{ q }}"
+      placeholder="搜尋訂單、老闆、單別"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      lang="zh-Hant"
+      aria-label="搜尋報單"
+    >
+    <select name="status" lang="zh-Hant" aria-label="報單狀態">
       <option value="" {% if not status_filter %}selected{% endif %}>全部狀態</option>
       <option value="missing" {% if status_filter == 'missing' %}selected{% endif %}>未報單</option>
       <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>待審核</option>
