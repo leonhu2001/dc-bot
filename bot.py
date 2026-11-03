@@ -2746,6 +2746,22 @@ async def register_core_persistent_views_once() -> None:
 async def _bot_setup_hook() -> None:
     await register_core_persistent_views_once()
 
+    # Register public quick-order controls before READY; otherwise their
+    # registration waits for potentially slow on_ready startup/recovery.
+    # Installers are idempotent when SetupCommands runs later.
+    from services.vip_timer_self_service import install_vip_timer_self_service
+    from services.quick_order_v2_fixes import install_quick_order_v2_fixes
+    from services.quick_order_v2_production import install_quick_order_v2_production
+    from services.quick_order_v2 import install_quick_order_v2
+    from services.quick_order_v2_select_display import install_quick_order_v2_select_display
+
+    install_vip_timer_self_service()
+    install_quick_order_v2_fixes(bot)
+    install_quick_order_v2_production(bot)
+    install_quick_order_v2(bot)
+    install_quick_order_v2_select_display(bot)
+    print("[persistent-views] quick-order controls registered before READY", flush=True)
+
 
 # discord.py calls setup_hook before READY. Registering persistent views here
 # prevents old ticket controls from depending on slow/failing on_ready work.
