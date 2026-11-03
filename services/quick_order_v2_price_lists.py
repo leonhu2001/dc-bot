@@ -408,6 +408,38 @@ def _rank_heading(interaction: discord.Interaction, emoji_token: str, label: str
     return f"{emoji} **{label}**" if emoji else f"**{label}**"
 
 
+def _shared_special_service_copy(game: str) -> str:
+    """Display existing sweet/teaching offers below each normal game price list."""
+    teaching = {
+        "valorant": ("輻能導師", "地圖觀念、技能搭配、槍線、實戰與復盤"),
+        "lol": ("菁英導師", "對線與兵線、地圖資源、團戰決策、實戰與復盤"),
+        "apex": ("頂獵導師", "落點與轉點、跑圈觀念、交戰配合、實戰與復盤"),
+    }
+    sweet_copy = f"""💗 **甜蜜單**
+{_aligned_code_block((("單陪", "520T / H"), ("雙陪", "1314T / H")))}
+可選女陪／男陪／不限，以互動陪玩及情緒價值為主。
+可設定專屬暱稱；互動須尊重彼此意願。
+
+📌 **甜蜜單指定陪玩**
+{_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
+⚠️ **2H 以上免指定費**"""
+
+    if game == "steam":
+        # Steam has sweet-companion rules but no teaching self-service rule.
+        teaching_copy = """📚 **教學單**
+依指定遊戲及教學需求，由客服確認可接單內容與報價。
+⚠️ **STEAM 教學單尚未開放自助下單**"""
+    else:
+        teacher, topics = teaching[game]
+        teaching_copy = f"""📚 **教學單｜1 對 1**
+{_aligned_code_block(((teacher, "500T / H"),))}
+✨ **教學重點**
+{topics}
+⚠️ **為確保教學品質，3H 起標**"""
+
+    return f"{sweet_copy}\n\n{teaching_copy}"
+
+
 def _valorant_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
 {_aligned_code_block((("NG", "每人 300T / H"), ("積分", "每人 250T / 局")))}
@@ -426,7 +458,9 @@ def _valorant_price_list(interaction: discord.Interaction) -> str:
 
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
-⚠️ **2H 或 2局以上免指定費**"""
+⚠️ **2H 或 2局以上免指定費**
+
+{_shared_special_service_copy("valorant")}"""
 
 
 def _apex_price_list(interaction: discord.Interaction) -> str:
@@ -447,7 +481,9 @@ def _apex_price_list(interaction: discord.Interaction) -> str:
 
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
-⚠️ **2H 以上免指定費**"""
+⚠️ **2H 以上免指定費**
+
+{_shared_special_service_copy("apex")}"""
 
 
 def _lol_price_list(interaction: discord.Interaction) -> str:
@@ -468,7 +504,9 @@ def _lol_price_list(interaction: discord.Interaction) -> str:
 
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
-⚠️ **2H 或 2局以上免指定費**"""
+⚠️ **2H 或 2局以上免指定費**
+
+{_shared_special_service_copy("lol")}"""
 
 
 def _steam_price_list(_: discord.Interaction) -> str:
@@ -477,7 +515,9 @@ def _steam_price_list(_: discord.Interaction) -> str:
 
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
-⚠️ **2H 以上免指定費**"""
+⚠️ **2H 以上免指定費**
+
+{_shared_special_service_copy("steam")}"""
 
 
 def _price_list_text(interaction: discord.Interaction, channel_id: int) -> str:
@@ -705,7 +745,7 @@ class DeltaPriceListView(discord.ui.View):
         farm_plan: str | None = None,
         fun_plan: str | None = None,
     ):
-        super().__init__(timeout=180)
+        super().__init__(timeout=840)
         self.add_item(DeltaPriceListCategorySelect(selected=category))
         if category == "desktop":
             self.add_item(DeltaDesktopPriceListSelect(selected=desktop_plan))
@@ -733,24 +773,40 @@ class QuickPriceListButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        if self.source_channel_id == int(quick.QUICK_ORDER_V2_CHANNELS["delta"]):
-            await interaction.response.send_message(
-                embed=_delta_root_embed(),
-                view=DeltaPriceListView(),
-                ephemeral=True,
-            )
-            return
+        # Acknowledge promptly to avoid the Discord "未及時回應" banner.
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            if self.source_channel_id == int(quick.QUICK_ORDER_V2_CHANNELS["delta"]):
+                await interaction.edit_original_response(
+                    embed=_delta_root_embed(),
+                    view=DeltaPriceListView(),
+                )
+                return
 
-        label = _PRICE_LIST_LABEL_BY_CHANNEL_ID.get(
-            self.source_channel_id,
-            "遊戲",
-        )
-        embed = discord.Embed(
-            title=f"📋 {label}・陪玩價目",
-            description=_price_list_text(interaction, self.source_channel_id),
-            color=discord.Color.blurple(),
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+            label = _PRICE_LIST_LABEL_BY_CHANNEL_ID.get(
+                self.source_channel_id,
+                "遊戲",
+            )
+            embed = discord.Embed(
+                title=f"📋 {label}・陪玩價目",
+                description=_price_list_text(interaction, self.source_channel_id),
+                color=discord.Color.blurple(),
+            )
+            await interaction.edit_original_response(embed=embed)
+        except Exception as exc:
+            print(
+                f"[quick-price-list] failed channel={self.source_channel_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            try:
+                await interaction.edit_original_response(
+                    content="價目表暫時無法載入，請稍後重試或聯繫客服。",
+                    embed=None,
+                    view=None,
+                )
+            except discord.HTTPException:
+                pass
 
 
 def add_price_list_control(view: discord.ui.View, channel_id: int) -> discord.ui.View:
