@@ -88,10 +88,11 @@ class _PublicDeltaCategoryButton(quick.QuickDeltaCategoryButton):
     """Canonical public Delta button, including the optional category cover."""
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        # Defer before reading the live catalog or building the response.
+        await interaction.response.defer(ephemeral=True, thinking=True)
         if not quick._options(self.category):
-            await interaction.response.send_message(
-                "這個分類目前沒有可下單服務。",
-                ephemeral=True,
+            await interaction.edit_original_response(
+                content="這個分類目前沒有可下單服務。",
             )
             return
 
@@ -100,7 +101,7 @@ class _PublicDeltaCategoryButton(quick.QuickDeltaCategoryButton):
             description="請選擇服務。",
             color=discord.Color.green(),
         )
-        view = discord.ui.View(timeout=180)
+        view = discord.ui.View(timeout=840)
         view.add_item(
             quick.QuickServiceSelect(
                 category=self.category,
@@ -121,10 +122,9 @@ class _PublicDeltaCategoryButton(quick.QuickDeltaCategoryButton):
                     flush=True,
                 )
 
-        await interaction.response.send_message(
+        await interaction.edit_original_response(
             embed=embed,
             view=view,
-            ephemeral=True,
         )
 
 
