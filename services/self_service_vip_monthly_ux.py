@@ -6,6 +6,7 @@ from typing import Any
 
 
 _INSTALLED = False
+_VIP_MONTHLY_FUNDING_COPY = "店家全額吸收，不影響陪玩／打手應得款項"
 
 
 def _current_original_service_amount(
@@ -116,9 +117,16 @@ def _option_description(status: dict[str, Any]) -> str:
     return f"未達低消：需 {minimum:,}T，目前 {current:,}T，尚差 {shortfall:,}T"
 
 
+def _vip_monthly_detail_segment(*, title: str, amount_text: str) -> str:
+    return (
+        f"VIP 月券 -{amount_text}（{title}；"
+        f"{_VIP_MONTHLY_FUNDING_COPY}）"
+    )
+
+
 def _insert_vip_monthly_into_detail(value: str, *, title: str, amount_text: str) -> str:
     text = str(value or "")
-    segment = f"VIP 月券 -{amount_text}（{title}）"
+    segment = _vip_monthly_detail_segment(title=title, amount_text=amount_text)
     if segment in text:
         return text
     marker = "｜打手分潤基準"
@@ -148,7 +156,12 @@ def merge_vip_monthly_into_quote_rows(
             detail_found = True
         merged.append((name, value))
     if not detail_found:
-        merged.append(("金額明細", f"VIP 月券 -{amount_text}（{title}）"))
+        merged.append(
+            (
+                "金額明細",
+                _vip_monthly_detail_segment(title=title, amount_text=amount_text),
+            )
+        )
     return merged
 
 
