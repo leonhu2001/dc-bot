@@ -15,7 +15,7 @@ def test_discount_funding_policy_matches_business_rules():
     assert get_discount_funding_policy("promotion_percent") == FUNDING_SHARED
     assert get_discount_funding_policy("manual_fixed") == FUNDING_SHARED
     assert get_discount_funding_policy("point_cash") == FUNDING_SHARED
-    assert get_discount_funding_policy("vip_monthly_cash") == FUNDING_SHARED
+    assert get_discount_funding_policy("vip_monthly_cash") == FUNDING_STORE
 
     assert get_discount_funding_policy("customer_compensation") == FUNDING_STORE
     assert get_discount_funding_policy("point_specify") == FUNDING_STORE
