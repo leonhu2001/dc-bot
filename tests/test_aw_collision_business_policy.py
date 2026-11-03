@@ -1,8 +1,10 @@
 from services import order_rules
 from services.aw_collision_catalog import AW_RULE_KEYS
-from services import aw_collision_business_policy
 from services import one_companion_one_guard_payout as role_payout
 from services import self_service_financials
+from services.special_receiver_roles_20261103 import (
+    install_special_receiver_roles_20261103,
+)
 
 
 def test_aw_rules_disable_member_benefits_and_specify():
@@ -60,7 +62,13 @@ def test_aw_financial_policy_is_direct_and_ignores_discount_stacking():
     assert result["store_absorbed_amount"] == 0
 
 
-def test_aw_business_compatibility_installer_does_not_replace_core_functions():
+def test_current_special_receiver_installer_is_idempotent_and_keeps_aw_financial_core():
     before_financial = self_service_financials.calculate_self_service_financials
-    aw_collision_business_policy.install_aw_collision_business_policy()
+    install_special_receiver_roles_20261103()
+    install_special_receiver_roles_20261103()
+
     assert self_service_financials.calculate_self_service_financials is before_financial
+    assert order_rules.SPECIAL_RECEIVER_ROLE_IDS_BY_KEY == {
+        order_rules.AW_COLLISION_RECEIVER_ROLE_KEY: "1565369317929918554",
+        order_rules.HALFCOIN_RECEIVER_ROLE_KEY: "1565369029005287595",
+    }
