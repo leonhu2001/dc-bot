@@ -6,15 +6,16 @@ from dataclasses import dataclass
 FUNDING_SHARED = "shared"
 FUNDING_STORE = "store"
 
-# 單一規則來源：正常銷售優惠共同分攤；責任型補償與免費服務由店家吸收。
-# 未知來源仍預設 store，避免未審核的新福利默默降低打手／客服薪資。
+# 單一規則來源：一般銷售折扣共同分攤；責任型補償、免費服務與
+# VIP 每月折現券由店家吸收。未知來源仍預設 store，避免未審核的新福利
+# 默默降低打手／客服薪資。
 DISCOUNT_FUNDING_POLICY: dict[str, str] = {
     "vip_percent": FUNDING_SHARED,
     "manual_percent": FUNDING_SHARED,
     "promotion_percent": FUNDING_SHARED,
     "manual_fixed": FUNDING_SHARED,
     "point_cash": FUNDING_SHARED,
-    "vip_monthly_cash": FUNDING_SHARED,
+    "vip_monthly_cash": FUNDING_STORE,
     "customer_compensation": FUNDING_STORE,
     "point_specify": FUNDING_STORE,
     "point_service": FUNDING_STORE,
@@ -48,16 +49,16 @@ def allocate_store_absorbed_fixed_discount(
     additional_store_discount_amount: int = 0,
     extra_customer_charge_amount: int = 0,
 ) -> FixedDiscountAllocation:
-    """Compatibility allocator for ordinary fixed cash discounts.
+    """Compatibility allocator for ordinary shared fixed cash discounts.
 
-    Historical callers use this function for manual fixed discounts and for the
-    point/VIP monthly *cash* discounts. From the 2026-10-17 policy these are
-    normal sales discounts: they reduce customer payment *and* the payout base,
-    so worker / customer-service / store share them proportionally.
+    Historical callers use this function for manual fixed discounts and point-cash
+    discounts. Those are normal sales discounts: they reduce customer payment and
+    the payout base, so worker / customer-service / store share them proportionally.
 
-    Store-responsibility compensation and service gifts must use
-    ``allocate_store_funded_discount`` instead. Keeping that path explicit is
-    intentional: a newly added benefit must never silently cut worker pay.
+    VIP monthly cash is explicitly store-funded from 2026-11-03. New code must use
+    ``allocate_store_funded_discount`` for that benefit. The self-service compatibility
+    path applies its dedicated monthly policy after this shared allocation so older
+    call signatures remain safe without changing ordinary fixed/point behavior.
     """
     after_percent = max(0, int(after_percent_amount or 0))
     fixed_discount = max(
@@ -66,8 +67,9 @@ def allocate_store_absorbed_fixed_discount(
     )
     after_fixed = max(0, after_percent - fixed_discount)
 
-    # Parameter name is retained for source compatibility. Existing callers put
-    # point-cash / VIP monthly cash here; those are now shared fixed discounts.
+    # Parameter name is retained for source compatibility. Amounts supplied here
+    # are treated as shared discounts; store-funded benefits are corrected/applied
+    # through their explicit policy path instead of silently changing this allocator.
     additional_shared_discount = max(
         0,
         min(after_fixed, int(additional_store_discount_amount or 0)),
