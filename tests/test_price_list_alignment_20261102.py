@@ -18,6 +18,7 @@ def test_every_discord_price_list_is_separator_free_and_uses_aligned_blocks() ->
         price_lists._apex_price_list(interaction),
         price_lists._lol_price_list(interaction),
         price_lists._steam_price_list(interaction),
+        *(str(plan["text"]) for plan in price_lists.DELTA_DESKTOP_PRICE_LISTS.values()),
         *(str(plan["text"]) for plan in price_lists.DELTA_MOBILE_PRICE_LISTS.values()),
     ]
 
