@@ -99,3 +99,12 @@ from .point_benefit_policy_bridge import (
 )
 
 _install_shared_point_benefit_policy()
+
+# Once payment is applied, customer-facing member pages must not combine an active
+# order with the legacy "待付款" fallback. Keep the label and payment-method fallback
+# aligned with the canonical active state in one Web presentation policy.
+from .customer_portal_status_policy import (
+    install_customer_portal_status_policy as _install_customer_portal_status_policy,
+)
+
+_install_customer_portal_status_policy()
