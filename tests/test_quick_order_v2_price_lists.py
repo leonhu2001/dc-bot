@@ -26,6 +26,57 @@ def test_delta_price_list_keeps_four_top_level_categories() -> None:
     ]
 
 
+
+def test_delta_desktop_price_list_has_nine_requested_order_types() -> None:
+    labels = [str(plan["label"]) for plan in price_lists.DELTA_DESKTOP_PRICE_LISTS.values()]
+    assert labels == [
+        "娛樂陪",
+        "一陪一護",
+        "黑潮爆破",
+        "甜蜜單",
+        "體驗單",
+        "技術陪",
+        "教學單",
+        "油鍋單",
+        "賭約單",
+    ]
+
+
+def test_delta_desktop_price_list_prices_and_rules_match_approved_copy() -> None:
+    plans = price_lists.DELTA_DESKTOP_PRICE_LISTS
+    expected = {
+        "entertainment": ("320T / H", "600T / H", "10 小時", "1 小時券", "+100T", "不保撤"),
+        "one_guard": ("720T / H", "770T / H", "8 殺", "6 殺", "+100T"),
+        "black_tide": ("320T / H", "300T / H", "400T / H", "380T / H", "30 分鐘券"),
+        "sweet": ("520T / H", "1314T / H", "專屬暱稱", "管理層", "+100T"),
+        "trial": ("450T", "777W", "900T", "1688W", "金級以上", "打手選圖"),
+        "technical": ("400T / H", "750T / H", "450T / H", "850T / H", "1000T / H", "666W", "800W", "500W + 2 沙保", "4 沙保", "+100T"),
+        "teaching": ("500T / H", "3H 起標", "地圖理解", "復盤"),
+        "oil": ("2600T", "2000W", "1800T", "1500W", "4000T", "3500W", "航天基地", "撞場"),
+        "bet": ("800T", "800W", "1200T", "1000W", "1500T", "1200W", "打手選圖"),
+    }
+    assert set(plans) == set(expected)
+    for key, terms in expected.items():
+        text = str(plans[key]["text"])
+        assert "抱歉" not in text
+        assert "｜" not in text
+        assert "```text" in text
+        for term in terms:
+            assert term in text, (key, term)
+
+
+def test_delta_desktop_selector_uses_existing_two_level_private_view() -> None:
+    view = price_lists.DeltaPriceListView(category="desktop", desktop_plan="technical")
+    assert len(view.children) == 2
+    assert isinstance(view.children[0], price_lists.DeltaPriceListCategorySelect)
+    select = view.children[1]
+    assert isinstance(select, price_lists.DeltaDesktopPriceListSelect)
+    assert select.custom_id == "quick_order_v2_delta_desktop_price_list"
+    assert [option.label for option in select.options] == [
+        str(plan["label"]) for plan in price_lists.DELTA_DESKTOP_PRICE_LISTS.values()
+    ]
+    assert [option.value for option in select.options if option.default] == ["technical"]
+
 def test_delta_mobile_price_list_has_only_approved_seven_order_types() -> None:
     labels = [
         str(plan["label"])
@@ -123,6 +174,8 @@ def test_delta_price_list_button_routes_to_selector_without_changing_other_games
 
     assert price_lists.has_price_list(delta_channel)
     assert "DeltaPriceListCategorySelect" in source
+    assert "DeltaDesktopPriceListSelect" in source
+    assert 'custom_id="quick_order_v2_delta_desktop_price_list"' in source
     assert "DeltaMobilePriceListSelect" in source
     assert 'custom_id="quick_order_v2_delta_price_list_category"' in source
     assert 'custom_id="quick_order_v2_delta_mobile_price_list"' in source

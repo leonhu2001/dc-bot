@@ -63,6 +63,123 @@ DELTA_PRICE_LIST_CATEGORIES = (
     ("fun", "趣味單", "🎉"),
 )
 
+DELTA_DESKTOP_PRICE_LISTS = {
+    "entertainment": {
+        "label": "娛樂陪",
+        "text": f"""**娛樂陪**
+{_aligned_code_block((("單陪", "320T / H"), ("雙陪", "600T / H")))}
+⚠️ **不保撤、無保底**
+
+🎁 **娛樂陪累積回饋**
+{_aligned_code_block((("計時", "累積 10 小時 → 贈送 1 小時券"),))}
+
+📌 **指定陪玩**
+{_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
+⚠️ **2H 以上免指定費**""",
+    },
+    "one_guard": {
+        "label": "一陪一護",
+        "text": f"""**一陪一護**
+{_aligned_code_block((("機密", "720T / H"), ("絕密", "770T / H")))}
+
+🛡️ **護航保證**
+{_aligned_code_block((("機密", "1 小時內 8 殺"), ("絕密", "1 小時內 6 殺")))}
+
+📌 **指定打手**
+{_aligned_code_block((("指定打手", "每人 +100T"),))}
+⚠️ **2H 以上免指定費**""",
+    },
+    "black_tide": {
+        "label": "黑潮爆破",
+        "text": f"""**黑潮爆破（端遊）**
+
+**娛樂陪**
+{_aligned_code_block((("單陪", "320T / H"), ("雙／四陪", "每人 300T / H")))}
+
+**技術陪**
+{_aligned_code_block((("單陪", "400T / H"), ("雙／四陪", "每人 380T / H")))}
+
+🎁 **累積回饋**
+{_aligned_code_block((("計時", "累積 10 小時 → 贈送 30 分鐘券"),))}""",
+    },
+    "sweet": {
+        "label": "甜蜜單",
+        "text": f"""**甜蜜單**
+{_aligned_code_block((("單陪", "520T / H"), ("雙陪", "1314T / H")))}
+⚠️ **不保撤、無保底**
+
+📌 **指定陪玩**
+{_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
+⚠️ **2H 以上免指定費**
+
+💗 **互動說明**
+可設定專屬暱稱（例如：寶寶／寶貝）。
+以提供情緒價值及情侶般互動為主。
+⚠️ 如接單過程有任何讓陪玩感到不適的情況，管理層有權直接暫停服務。""",
+    },
+    "trial": {
+        "label": "體驗單",
+        "text": f"""**體驗單**
+{_aligned_code_block((("普通體驗單", "450T　保底 777W"), ("尊爵體驗單", "900T　保底 1688W")))}
+
+⚠️ **普通體驗單每週限一次**
+⚠️ **尊爵體驗單每月限一次；金級以上每週限一次**
+⚠️ **不適用任何折扣、加碼活動**
+⚠️ **此單為打手選圖**""",
+    },
+    "technical": {
+        "label": "技術陪",
+        "text": f"""**機密／絕密技術陪**
+{_aligned_code_block((("機密單護", "400T / H"), ("機密雙護", "750T / H"), ("絕密單護", "450T / H"), ("絕密雙護", "850T / H")))}
+
+🛡️ **保證／保底**
+{_aligned_code_block((("機密單護", "1 小時內 8 殺"), ("機密雙護", "666W 保底"), ("絕密單護", "1 小時內 6 殺"), ("絕密雙護", "800W 保底")))}
+
+**絕巴技術陪**
+{_aligned_code_block((("價格", "1000T / H"),))}
+
+🛡️ **保底三選一**
+{_aligned_code_block((("方案 1", "800W"), ("方案 2", "500W + 2 沙保"), ("方案 3", "4 沙保")))}
+
+📌 **指定打手**
+{_aligned_code_block((("指定打手", "每人 +100T"),))}
+⚠️ **2H 以上免指定費**""",
+    },
+    "teaching": {
+        "label": "教學單",
+        "text": f"""**1 對 1 教學**
+{_aligned_code_block((("最高段位導師", "500T / H"),))}
+由對應遊戲最高段位的導師進行教學。
+
+⚠️ **為確保教學品質，此單 3H 起標**
+
+✨ **教學重點**
+1. 地圖理解
+2. 幹員定位
+3. 實戰
+4. 復盤
+5. 總結""",
+    },
+    "oil": {
+        "label": "油鍋單",
+        "text": f"""**油鍋單**
+{_aligned_code_block((("火箭燃油", "2600T　保底 2000W"), ("GT 衛星通信天線", "1800T　保底 1500W"), ("全包", "4000T　保底 3500W")))}
+
+⚠️ **此單限制「航天基地」**
+⚠️ **撤離時帶出即結單**
+⚠️ **已過保底仍未出貨，下場會改以撞場形式交貨**""",
+    },
+    "bet": {
+        "label": "賭約單",
+        "text": f"""**賭約單**
+{_aligned_code_block((("800T", "單局 800W"), ("1200T", "單局 1000W"), ("1500T", "單局 1200W")))}
+
+⚠️ **未達指定金額不結單**
+⚠️ **此單為打手選圖**""",
+    },
+}
+
+
 DELTA_MOBILE_PRICE_LISTS = {
     "trial": {
         "label": "體驗單",
@@ -394,12 +511,21 @@ def _delta_category_embed(category: str) -> discord.Embed:
     label = _delta_category_label(category)
     description = (
         "請選擇要查看的單子。"
-        if category in {"mobile", "farm", "fun"}
+        if category in {"desktop", "mobile", "farm", "fun"}
         else "此分類價目表內容整理中。"
     )
     return discord.Embed(
         title=f"📋 三角洲行動・{label}價目",
         description=description,
+        color=discord.Color.blurple(),
+    )
+
+
+def _delta_desktop_embed(plan_key: str) -> discord.Embed:
+    plan = DELTA_DESKTOP_PRICE_LISTS[plan_key]
+    return discord.Embed(
+        title=f"📋 三角洲行動・端遊・{plan['label']}",
+        description=str(plan["text"]),
         color=discord.Color.blurple(),
     )
 
@@ -463,6 +589,32 @@ class DeltaPriceListCategorySelect(discord.ui.Select):
         await interaction.response.edit_message(
             embed=_delta_category_embed(category),
             view=DeltaPriceListView(category=category),
+        )
+
+
+class DeltaDesktopPriceListSelect(discord.ui.Select):
+    def __init__(self, selected: str | None = None):
+        super().__init__(
+            placeholder="請選擇端遊單子",
+            min_values=1,
+            max_values=1,
+            row=1,
+            custom_id="quick_order_v2_delta_desktop_price_list",
+            options=[
+                discord.SelectOption(
+                    label=str(plan["label"]),
+                    value=key,
+                    default=key == selected,
+                )
+                for key, plan in DELTA_DESKTOP_PRICE_LISTS.items()
+            ],
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        plan_key = str(self.values[0])
+        await interaction.response.edit_message(
+            embed=_delta_desktop_embed(plan_key),
+            view=DeltaPriceListView(category="desktop", desktop_plan=plan_key),
         )
 
 
@@ -548,13 +700,16 @@ class DeltaPriceListView(discord.ui.View):
     def __init__(
         self,
         category: str | None = None,
+        desktop_plan: str | None = None,
         mobile_plan: str | None = None,
         farm_plan: str | None = None,
         fun_plan: str | None = None,
     ):
         super().__init__(timeout=180)
         self.add_item(DeltaPriceListCategorySelect(selected=category))
-        if category == "mobile":
+        if category == "desktop":
+            self.add_item(DeltaDesktopPriceListSelect(selected=desktop_plan))
+        elif category == "mobile":
             self.add_item(DeltaMobilePriceListSelect(selected=mobile_plan))
         elif category == "farm":
             self.add_item(DeltaFarmPriceListSelect(selected=farm_plan))
@@ -606,10 +761,12 @@ def add_price_list_control(view: discord.ui.View, channel_id: int) -> discord.ui
 
 
 __all__ = [
+    "DELTA_DESKTOP_PRICE_LISTS",
     "DELTA_FARM_PRICE_LISTS",
     "DELTA_FUN_PRICE_LISTS",
     "DELTA_MOBILE_PRICE_LISTS",
     "DELTA_PRICE_LIST_CATEGORIES",
+    "DeltaDesktopPriceListSelect",
     "DeltaFarmPriceListSelect",
     "DeltaFunPriceListSelect",
     "DeltaPriceListView",
