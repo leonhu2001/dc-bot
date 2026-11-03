@@ -408,6 +408,11 @@ def _rank_heading(interaction: discord.Interaction, emoji_token: str, label: str
     return f"{emoji} **{label}**" if emoji else f"**{label}**"
 
 
+# Strong, readable dividers for the four single-page non-Delta price lists only.
+# Keep the Delta category pages unchanged.
+_GAME_PRICE_SECTION_DIVIDER = "━━━━━━━━━━━━━━━━━━"
+
+
 def _shared_special_service_copy(game: str) -> str:
     """Display existing sweet/teaching offers below each normal game price list."""
     teaching = {
@@ -437,28 +442,40 @@ def _shared_special_service_copy(game: str) -> str:
 {topics}
 ⚠️ **為確保教學品質，3H 起標**"""
 
-    return f"{sweet_copy}\n\n{teaching_copy}"
+    return f"{sweet_copy}\n\n{_GAME_PRICE_SECTION_DIVIDER}\n\n{teaching_copy}"
 
 
 def _valorant_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
 {_aligned_code_block((("NG", "每人 300T / H"), ("積分", "每人 250T / 局")))}
 
+{_GAME_PRICE_SECTION_DIVIDER}
+
 {_rank_heading(interaction, "Ascendant", "超凡陪")}
 {_aligned_code_block((("NG", "每人 330T / H"), ("積分", "每人 290T / 局")))}
+
+{_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Immortal", "神話陪")}
 {_aligned_code_block((("NG", "每人 350T / H"), ("積分", "每人 330T / 局")))}
 
+{_GAME_PRICE_SECTION_DIVIDER}
+
 {_rank_heading(interaction, "Radiant", "輻能陪")}
 {_aligned_code_block((("NG", "每人 380T / H"), ("積分", "每人 370T / 局")))}
+
+{_GAME_PRICE_SECTION_DIVIDER}
 
 🎁 **娛樂陪累積回饋**
 {_aligned_code_block((("計局", "累積 15 局 → 贈送 1 局券"), ("計時", "累積 10 小時 → 贈送 1 小時券")))}
 
+{_GAME_PRICE_SECTION_DIVIDER}
+
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 或 2局以上免指定費**
+
+{_GAME_PRICE_SECTION_DIVIDER}
 
 {_shared_special_service_copy("valorant")}"""
 
@@ -467,21 +484,33 @@ def _apex_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
 {_aligned_code_block((("NG", "每人 300T / H"), ("積分", "每人 350T / H")))}
 
+{_GAME_PRICE_SECTION_DIVIDER}
+
 {_rank_heading(interaction, "Diamond", "鑽石陪")}
 {_aligned_code_block((("NG", "每人 400T / H"), ("積分", "每人 450T / H")))}
+
+{_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Master~1", "大師陪")}
 {_aligned_code_block((("NG", "每人 480T / H"), ("積分", "每人 530T / H")))}
 
+{_GAME_PRICE_SECTION_DIVIDER}
+
 {_rank_heading(interaction, "Predator", "頂獵陪")}
 {_aligned_code_block((("NG", "每人 580T / H"), ("積分", "每人 630T / H")))}
+
+{_GAME_PRICE_SECTION_DIVIDER}
 
 🎁 **娛樂陪累積回饋**
 {_aligned_code_block((("計時", "累積 10 小時 → 贈送 1 小時券"),))}
 
+{_GAME_PRICE_SECTION_DIVIDER}
+
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 以上免指定費**
+
+{_GAME_PRICE_SECTION_DIVIDER}
 
 {_shared_special_service_copy("apex")}"""
 
@@ -490,21 +519,33 @@ def _lol_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
 {_aligned_code_block((("ARAM", "每人 300T / H"), ("NG", "每人 300T / H"), ("積分", "每人 250T / 局")))}
 
+{_GAME_PRICE_SECTION_DIVIDER}
+
 {_rank_heading(interaction, "Master", "大師陪")}
 {_aligned_code_block((("NG", "每人 340T / H"), ("積分", "每人 300T / 局")))}
+
+{_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Grandmaster", "宗師陪")}
 {_aligned_code_block((("NG", "每人 360T / H"), ("積分", "每人 300T / 局")))}
 
+{_GAME_PRICE_SECTION_DIVIDER}
+
 {_rank_heading(interaction, "Challenger", "菁英陪")}
 {_aligned_code_block((("NG", "每人 400T / H"), ("積分", "每人 400T / 局")))}
+
+{_GAME_PRICE_SECTION_DIVIDER}
 
 🎁 **娛樂陪累積回饋**
 {_aligned_code_block((("計局", "累積 15 局 → 贈送 1 局券"), ("計時", "累積 10 小時 → 贈送 1 小時券")))}
 
+{_GAME_PRICE_SECTION_DIVIDER}
+
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 或 2局以上免指定費**
+
+{_GAME_PRICE_SECTION_DIVIDER}
 
 {_shared_special_service_copy("lol")}"""
 
@@ -513,9 +554,13 @@ def _steam_price_list(_: discord.Interaction) -> str:
     return f"""**娛樂陪**
 {_aligned_code_block((("一般陪玩", "每人 320T / H"),))}
 
+{_GAME_PRICE_SECTION_DIVIDER}
+
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 以上免指定費**
+
+{_GAME_PRICE_SECTION_DIVIDER}
 
 {_shared_special_service_copy("steam")}"""
 

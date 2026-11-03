@@ -77,6 +77,39 @@ def test_delta_desktop_selector_uses_existing_two_level_private_view() -> None:
     ]
     assert [option.value for option in select.options if option.default] == ["technical"]
 
+def test_other_game_single_page_price_lists_have_clear_visual_separators() -> None:
+    interaction = SimpleNamespace(guild=None)
+    divider = price_lists._GAME_PRICE_SECTION_DIVIDER
+    assert divider == "━━━━━━━━━━━━━━━━━━"
+
+    for renderer, expected_sections in (
+        (price_lists._valorant_price_list, ("超凡陪", "神話陪", "輻能陪")),
+        (price_lists._lol_price_list, ("大師陪", "宗師陪", "菁英陪")),
+        (price_lists._apex_price_list, ("鑽石陪", "大師陪", "頂獵陪")),
+        (price_lists._steam_price_list, ()),
+    ):
+        rendered = renderer(interaction)
+        # Every rank, reward or service gets its own visual block.
+        assert rendered.count(divider) == (7 if expected_sections else 3)
+        assert rendered.startswith("**娛樂陪**")
+        for label in expected_sections:
+            assert f"{divider}\\n\\n" not in rendered  # No literal escaped newline sequences.
+            assert f"**{label}**" in rendered
+        assert f"{divider}\\n\\n💗 **甜蜜單**" not in rendered
+        assert f"{divider}\n\n💗 **甜蜜單**" in rendered
+        assert f"{divider}\n\n📚 **教學單" in rendered
+        assert rendered.count("520T / H") == 1
+        assert rendered.count("1314T / H") == 1
+        assert len(rendered) <= 4096
+
+    # The desktop and mobile Delta category views must remain unchanged.
+    for plan in (
+        *price_lists.DELTA_DESKTOP_PRICE_LISTS.values(),
+        *price_lists.DELTA_MOBILE_PRICE_LISTS.values(),
+    ):
+        assert divider not in str(plan["text"])
+
+
 def test_shared_special_offers_follow_existing_game_price_lists() -> None:
     interaction = SimpleNamespace(guild=None)
     for price_list, teacher in (
