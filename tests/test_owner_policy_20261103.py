@@ -18,6 +18,10 @@ def test_aw_and_halfcoin_receiver_roles_are_distinct_and_owner_approved():
         order_rules.ALL_ROLE_IDS[order_rules.HALFCOIN_RECEIVER_ROLE_KEY]
         == "1565369029005287595"
     )
+    assert order_rules.SPECIAL_RECEIVER_ROLE_IDS_BY_KEY == {
+        order_rules.AW_COLLISION_RECEIVER_ROLE_KEY: "1565369317929918554",
+        order_rules.HALFCOIN_RECEIVER_ROLE_KEY: "1565369029005287595",
+    }
 
 
 def test_vip_monthly_cash_is_store_funded_without_changing_customer_payment():
