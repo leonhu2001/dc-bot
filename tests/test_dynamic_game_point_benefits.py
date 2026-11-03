@@ -222,8 +222,11 @@ def test_valorant_two_units_are_free_specify_fee_in_rule_and_copy() -> None:
     assert result.specify_fee == 0
 
     text = _valorant_price_list(SimpleNamespace(guild=None))
-    assert "2H 或 2局以上免指定費" in text
-    assert "500T" not in text
+    regular, special = text.split("💗 **甜蜜單**", 1)
+    assert "2H 或 2局以上免指定費" in regular
+    # 500T is an approved 1:1 teaching price, not a specify fee.
+    assert "500T" not in regular
+    assert "500T / H" in special
 
 
 def test_discord_point_free_specify_fee_is_not_common_payout_or_store_subsidy() -> None:
