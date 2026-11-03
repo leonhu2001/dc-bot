@@ -1,5 +1,9 @@
 from services import order_rules
-from services.self_service_financials import calculate_manual_price_adjustment
+from services.order_discounts import FUNDING_SHARED, FUNDING_STORE, get_discount_funding_policy
+from services.vip_monthly_store_funding_policy_20261103 import (
+    apply_vip_monthly_store_funding,
+)
+from services.vip_monthly_store_funding_repair_20261103 import _monthly_evidence
 from web.app.services import customer_portal
 
 
@@ -16,20 +20,52 @@ def test_aw_and_halfcoin_receiver_roles_are_distinct_and_owner_approved():
     )
 
 
-def test_store_funded_fixed_discount_does_not_reduce_payout_base():
-    result = calculate_manual_price_adjustment(
-        1800,
+def test_vip_monthly_cash_is_store_funded_without_changing_customer_payment():
+    # 1800T at 96% => 1728T. The historical shared allocator then subtracted
+    # the 200T monthly voucher from both payment and payout base => 1528T.
+    # The owner-approved policy keeps customer payment 1528T but restores the
+    # worker payout basis to 1728T and makes the store absorb the 200T.
+    result = apply_vip_monthly_store_funding(
         {
-            "manual_discount_percent": 96,
-            "manual_discount_mode": "pay_rate",
-            "cash_coupon_amount": 200,
-        },
+            "payout_base_amount": 1528,
+            "customer_pay_amount": 1528,
+            "store_absorbed_amount": 0,
+            "vip_monthly_benefit_key": "monthly_coupon_200",
+            "vip_monthly_cash_amount": 200,
+        }
     )
 
     assert result["payout_base_amount"] == 1728
-    assert result["cash_coupon_amount"] == 200
-    assert result["store_absorbed_amount"] == 200
     assert result["customer_pay_amount"] == 1528
+    assert result["store_absorbed_amount"] == 200
+    assert result["vip_monthly_funding"] == "store"
+    assert get_discount_funding_policy("vip_monthly_cash") == FUNDING_STORE
+
+    # Ordinary fixed/point discounts are not part of this owner correction.
+    assert get_discount_funding_policy("manual_fixed") == FUNDING_SHARED
+    assert get_discount_funding_policy("point_cash") == FUNDING_SHARED
+
+
+def test_november_repair_requires_explicit_vip_monthly_evidence():
+    key, amount, _ = _monthly_evidence(
+        {
+            "preview": {
+                "finance": {
+                    "vip_monthly_benefit_key": "monthly_coupon_200",
+                    "vip_monthly_cash_amount": 200,
+                }
+            }
+        }
+    )
+    assert key == "monthly_coupon_200"
+    assert amount == 200
+
+    # A generic 200T fixed discount must never be mistaken for a VIP monthly voucher.
+    key, amount, _ = _monthly_evidence(
+        {"preview": {"finance": {"fixed_discount_amount": 200}}}
+    )
+    assert key == ""
+    assert amount == 0
 
 
 def test_active_member_order_never_falls_back_to_waiting_payment():
