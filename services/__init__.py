@@ -60,13 +60,13 @@ from .aw_collision_catalog import install_aw_collision_catalog as _install_aw_co
 
 _install_aw_collision_catalog()
 
-# AW is a pass-through service: no member/point discounts or specification,
-# optional CSR internal pricing, and 100% of the payout basis to the worker.
-from .aw_collision_business_policy import (
-    install_aw_collision_business_policy as _install_aw_collision_business_policy,
+# AW 與哈夫幣各自只保留目前正式的接單身分組。已刪除的舊 AW 身分組
+# 不再保留 alias / fallback，避免歷史資格重新進入接單判斷。
+from .special_receiver_roles_20261103 import (
+    install_special_receiver_roles_20261103 as _install_special_receiver_roles_20261103,
 )
 
-_install_aw_collision_business_policy()
+_install_special_receiver_roles_20261103()
 
 # The legacy Black Diamond monthly free-choice benefit has been retired. Install
 # this before monthly-benefit integration so both Web and Discord read the same
