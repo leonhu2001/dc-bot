@@ -85,7 +85,7 @@ def test_shared_special_offers_follow_existing_game_price_lists() -> None:
         (price_lists._apex_price_list(interaction), "頂獵導師"),
     ):
         assert price_list.index("📌 **指定陪玩**") < price_list.index("💗 **甜蜜單**")
-        assert price_list.index("💗 **甜蜜單**") < price_list.index("📚 **教學單｜1 對 1**")
+        assert price_list.index("💗 **甜蜜單**") < price_list.index("📚 **教學單（1 對 1）**")
         for value in ("520T / H", "1314T / H", "500T / H", "3H 起標", teacher):
             assert value in price_list
         assert len(price_list) <= 4096
