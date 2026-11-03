@@ -7,6 +7,7 @@ import sys
 _INSTALLED = False
 _SHARED_COPY = "共同分攤，折後金額計入分潤基準"
 _STORE_COPY = "店家吸收，不降低打手／客服分潤基準"
+_VIP_MONTHLY_COPY = "店家全額吸收，不影響陪玩／打手應得款項"
 
 _SETTLED_FINANCIAL_KEYS = frozenset(
     {
@@ -238,7 +239,7 @@ def install_self_service_financial_copy_policy() -> None:
                     name="VIP 月券",
                     value=(
                         f"{title}\n-{financials._format_plain_amount(amount)}\n"
-                        f"{_SHARED_COPY}"
+                        f"{_VIP_MONTHLY_COPY}"
                     ),
                     inline=False,
                 )
@@ -279,7 +280,7 @@ def install_self_service_financial_copy_policy() -> None:
                         "VIP 月券",
                         (
                             f"{title}｜-{financials._format_plain_amount(amount)}｜"
-                            f"{_SHARED_COPY}"
+                            f"{_VIP_MONTHLY_COPY}"
                         ),
                     )
                 )
