@@ -323,3 +323,28 @@ def create_all_tables() -> None:
     # created; only future close transitions become missing reports.
     from web.app.services.order_reporting import ensure_order_reporting_tables
     ensure_order_reporting_tables(engine)
+
+    # 2026-11-03: repair orders created this month while VIP monthly cash was
+    # incorrectly shared with workers. The repair is evidence-gated and
+    # idempotent, and never changes the customer's payment amount.
+    try:
+        from services.vip_monthly_store_funding_repair_20261103 import (
+            repair_november_vip_monthly_store_funding,
+        )
+
+        repair_summary = repair_november_vip_monthly_store_funding()
+        if repair_summary.get("matched"):
+            print(
+                "[vip-monthly-repair] "
+                f"matched={repair_summary.get('matched', 0)} "
+                f"repaired={repair_summary.get('repaired', 0)} "
+                f"recalculated={repair_summary.get('payouts_recalculated', 0)} "
+                f"preserved={repair_summary.get('payouts_preserved', 0)}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(
+            "[vip-monthly-repair] startup repair failed: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
