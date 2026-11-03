@@ -19,8 +19,10 @@ from web.app.services.order_service import recalculate_order_payouts
 
 
 REPAIR_VERSION = "2026-11-03-v1"
-MONTH_START = datetime(2026, 11, 1)
-MONTH_END = datetime(2026, 12, 1)
+# WebOrder.created_at is stored as naive UTC. These are the UTC boundaries for
+# 2026-11-01 00:00 through 2026-12-01 00:00 in Asia/Taipei (UTC+8).
+MONTH_START = datetime(2026, 10, 31, 16, 0, 0)
+MONTH_END = datetime(2026, 11, 30, 16, 0, 0)
 VIP_MONTHLY_KEYS = {"monthly_coupon_200", "monthly_coupon_500"}
 
 
