@@ -82,7 +82,10 @@ def test_vip_monthly_discount_is_merged_into_amount_detail() -> None:
 
     assert all(name != "VIP 月券" for name, _ in merged)
     detail = dict(merged)["金額明細"]
-    assert "VIP 月券 -200T（VIP 每月 200T 折現券）" in detail
+    assert (
+        "VIP 月券 -200T（VIP 每月 200T 折現券；"
+        "店家全額吸收，不影響陪玩／打手應得款項）"
+    ) in detail
     assert detail.index("VIP 月券 -200T") < detail.index("打手分潤基準")
     assert dict(merged)["顧客應付"] == "1,336T"
 
