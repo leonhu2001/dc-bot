@@ -664,11 +664,11 @@ def test_delta_farm_orders_accept_either_desktop_or_mobile_identity():
 
 def test_dedicated_farm_products_use_only_their_receiver_role():
     expected = {
-        "farm_halfcoin_120m": ("halfcoin_receiver", "1565369317929918554"),
-        "farm_halfcoin_360m": ("halfcoin_receiver", "1565369317929918554"),
-        "farm_aw_collision_1_100": ("aw_collision_receiver", "1565369029005287595"),
-        "farm_aw_collision_101_500": ("aw_collision_receiver", "1565369029005287595"),
-        "farm_aw_collision_501_plus": ("aw_collision_receiver", "1565369029005287595"),
+        "farm_halfcoin_120m": ("halfcoin_receiver", "1565369029005287595"),
+        "farm_halfcoin_360m": ("halfcoin_receiver", "1565369029005287595"),
+        "farm_aw_collision_1_100": ("aw_collision_receiver", "1565369317929918554"),
+        "farm_aw_collision_101_500": ("aw_collision_receiver", "1565369317929918554"),
+        "farm_aw_collision_501_plus": ("aw_collision_receiver", "1565369317929918554"),
     }
     for rule_key, (role_key, role_id) in expected.items():
         rule = ORDER_RULES[rule_key]
