@@ -77,6 +77,36 @@ def test_delta_desktop_selector_uses_existing_two_level_private_view() -> None:
     ]
     assert [option.value for option in select.options if option.default] == ["technical"]
 
+def test_shared_special_offers_follow_existing_game_price_lists() -> None:
+    interaction = SimpleNamespace(guild=None)
+    for price_list, teacher in (
+        (price_lists._valorant_price_list(interaction), "輻能導師"),
+        (price_lists._lol_price_list(interaction), "菁英導師"),
+        (price_lists._apex_price_list(interaction), "頂獵導師"),
+    ):
+        assert price_list.index("📌 **指定陪玩**") < price_list.index("💗 **甜蜜單**")
+        assert price_list.index("💗 **甜蜜單**") < price_list.index("📚 **教學單｜1 對 1**")
+        for value in ("520T / H", "1314T / H", "500T / H", "3H 起標", teacher):
+            assert value in price_list
+        assert len(price_list) <= 4096
+
+    steam = price_lists._steam_price_list(interaction)
+    assert steam.index("📌 **指定陪玩**") < steam.index("💗 **甜蜜單**")
+    assert steam.index("💗 **甜蜜單**") < steam.index("📚 **教學單**")
+    assert "520T / H" in steam and "1314T / H" in steam
+    assert "尚未開放自助下單" in steam
+    assert "500T / H" not in steam
+    assert len(steam) <= 4096
+
+
+def test_public_price_list_acks_before_loading_content() -> None:
+    source = SOURCE.read_text(encoding="utf-8")
+    callback = source.split("class QuickPriceListButton(", 1)[1]
+    assert "await interaction.response.defer(ephemeral=True, thinking=True)" in callback
+    assert "await interaction.edit_original_response(" in callback
+    assert callback.index("await interaction.response.defer(") < callback.index("_price_list_text(")
+
+
 def test_delta_mobile_price_list_has_only_approved_seven_order_types() -> None:
     labels = [
         str(plan["label"])
