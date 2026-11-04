@@ -164,6 +164,26 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             ],
         },
     ],
+    "staff_internal": [
+        {
+            "label": "倒子彈｜500M",
+            "details": [
+                {"label": "倒子彈｜500M", "value": "ammo_dump_500m", "rule_key": "staff_internal_ammo_dump_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+            ],
+        },
+        {
+            "label": "撞車｜500M",
+            "details": [
+                {"label": "撞車｜500M", "value": "car_500m", "rule_key": "staff_internal_car_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+            ],
+        },
+        {
+            "label": "AW 子彈",
+            "details": [
+                {"label": "4T／發", "value": "aw_4t", "rule_key": "staff_internal_aw_collision", "quantity_unit": "發", "min_quantity": 1, "max_quantity": 999999, "quantity_input_mode": "modal"},
+            ],
+        },
+    ],
     "steam": [
         {"label": "娛樂陪", "details": [
             {"label": "娛樂陪", "value": "play", "rule_key": "steam_play", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
