@@ -38,6 +38,7 @@ from services.self_service_financials import (
     is_self_service_staff_price_required,
 )
 from services.self_service_retract import SelfServiceDispatchedView
+from services.staff_internal_ammo_dump_policy import require_ammo_dump_named_selection
 from services.self_service_selection_runtime import (
     SelfServicePointBenefitView,
     SelfServiceSpecifiedStaffDropdownView,
@@ -861,6 +862,12 @@ class SelfServiceOrderView(discord.ui.View):
             return
 
         normalize_self_service_staff_count(data)
+
+        try:
+            require_ammo_dump_named_selection(rule, data)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
 
         if getattr(rule, "player_count_enabled", False) and not _to_int(data.get("player_count")):
             await interaction.response.send_modal(SelfServicePlayerCountModal(self.customer_id, self.channel_id))
