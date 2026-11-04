@@ -13,6 +13,15 @@ CREDENTIAL_NOTE_PLACEHOLDER = (
     "例如 Steam、Garena、Google 登入、其他登入注意事項；請補充安全箱格數"
 )
 AW_COLLISION_PLANS: dict[str, dict[str, Any]] = {key: dict(plan) for key, plan in AW_COLLISION_PRICING_BY_RULE.items()}
+# Separate internal tier: keep the public AW tier selector and AW_RULE_KEYS unchanged.
+AW_COLLISION_PLANS["staff_internal_aw_collision"] = {
+    "label": "內部 AW｜4T／發",
+    "short_label": "內部 AW",
+    "min": 1,
+    "max": 999999,
+    "rate_x2": 8,
+    "rate_text": "4",
+}
 
 _INSTALLED = False
 _ORIGINAL_QUANTITY_SELECT = None

@@ -25,6 +25,7 @@ QUICK_ORDER_V2_CHANNELS = {
     "apex": 1562940146632888450,
     "steam": 1562940249171042415,
     "vip_timer": 1562941512504053822,
+    "staff_internal": 1565023979083800638,
 }
 
 CUSTOMER_CATEGORY_ID = config_int("CUSTOMER_CATEGORY_ID", 1483895536938651809)
@@ -40,6 +41,7 @@ _GAME_ENTRY_META = {
     QUICK_ORDER_V2_CHANNELS["lol"]: ("lol", "⚔️ 英雄聯盟"),
     QUICK_ORDER_V2_CHANNELS["apex"]: ("apex", "🔺 APEX"),
     QUICK_ORDER_V2_CHANNELS["steam"]: ("steam", "🎮 STEAM 遊戲"),
+    QUICK_ORDER_V2_CHANNELS["staff_internal"]: ("staff_internal", "🛠️ 內部專用"),
 }
 
 _DELTA_BUTTONS = (
@@ -137,6 +139,20 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
                 "🛠️ **代肝代解**｜賽季、任務與代解服務"
             ),
             color=discord.Color.green(),
+        )
+    elif channel_id == QUICK_ORDER_V2_CHANNELS["staff_internal"]:
+        embed = discord.Embed(
+            title="🛠️ 內部專用｜洗幣與 AW 子彈",
+            description=(
+                "**洗幣｜500M**\n"
+                "• 倒子彈：**2,650T／單**\n"
+                "• 撞車：**2,480T／單**\n\n"
+                "**AW 子彈**\n"
+                "• 代撞：**4T／發**（發數自行輸入）\n\n"
+                "請在下方選擇服務，再確認建立私人下單票口。\n"
+                "票口沿用一般接單與付款流程，無須提供遊戲帳密。"
+            ),
+            color=discord.Color.blue(),
         )
     elif channel_id == QUICK_ORDER_V2_CHANNELS["vip_timer"]:
         embed = discord.Embed(
@@ -449,6 +465,11 @@ async def _send_confirmation(
         return
 
     timer = category == VIP_TIMER_CATEGORY
+    quantity_instruction = (
+        "洗幣兩方案皆為固定 500M；AW 在票口內自行輸入發數。"
+        if category == "staff_internal"
+        else "票口內再完成剩餘規格與數量。"
+    )
     embed = discord.Embed(
         title="💎 VIP 自由計時｜確認下單" if timer else "🛒 確認下單",
         description=(
@@ -456,7 +477,7 @@ async def _send_confirmation(
             f"{VIP_TIMER_CATEGORY_LABEL if timer else ORDER_CATEGORY_LABELS.get(category, category)}\n"
             f"**{'起始遊戲' if timer else '服務'}：** {item_group}\n\n"
             "按下 **確認下單** 後才會建立私人票口。\n"
-            "票口內再完成剩餘規格與數量。\n\n"
+            f"{quantity_instruction}\n\n"
             "確認下單即表示已閱讀並同意店內下單規章。"
         ),
         color=discord.Color.green(),
