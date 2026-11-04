@@ -75,6 +75,9 @@ def test_vip_timer_quick_order_builds_private_ticket_for_current_and_legacy_game
         class FakeMember:
             id = 777
             mention = "<@777>"
+            display_name = "vip-test-customer"
+            name = "vip-test-customer"
+            global_name = "vip-test-customer"
             def __str__(self):
                 return "customer"
 
