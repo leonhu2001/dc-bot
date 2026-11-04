@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+
+import asyncio
 from types import SimpleNamespace
 
 from services import quick_order_v2 as quick
@@ -77,37 +79,132 @@ def test_delta_desktop_selector_uses_existing_two_level_private_view() -> None:
     ]
     assert [option.value for option in select.options if option.default] == ["technical"]
 
-def test_other_game_single_page_price_lists_have_clear_visual_separators() -> None:
+def test_other_games_use_service_dropdown_without_legacy_dividers() -> None:
     interaction = SimpleNamespace(guild=None)
-    divider = price_lists._GAME_PRICE_SECTION_DIVIDER
-    assert divider == "━━━━━━━━━━━━━━━━━━"
+    for game in ("valorant", "lol", "apex", "steam"):
+        channel_id = int(quick.QUICK_ORDER_V2_CHANNELS[game])
+        expected_labels = (
+            ["娛樂陪", "甜蜜單"]
+            if game == "steam"
+            else ["娛樂陪", "技術陪", "甜蜜單", "教學單"]
+        )
+        view = price_lists.GamePriceListView(channel_id)
+        assert len(view.children) == 1
+        select = view.children[0]
+        assert isinstance(select, price_lists.GamePriceListSelect)
+        assert select.custom_id == f"quick_order_v2_game_price_list_{channel_id}"
+        assert [option.label for option in select.options] == expected_labels
+        assert view.timeout == 840
 
-    for renderer, expected_sections in (
-        (price_lists._valorant_price_list, ("超凡陪", "神話陪", "輻能陪")),
-        (price_lists._lol_price_list, ("大師陪", "宗師陪", "菁英陪")),
-        (price_lists._apex_price_list, ("鑽石陪", "大師陪", "頂獵陪")),
-        (price_lists._steam_price_list, ()),
-    ):
-        rendered = renderer(interaction)
-        # Every rank, reward or service gets its own visual block.
-        assert rendered.count(divider) == (7 if expected_sections else 3)
-        assert rendered.startswith("**娛樂陪**")
-        for label in expected_sections:
-            assert f"{divider}\\n\\n" not in rendered  # No literal escaped newline sequences.
-            assert f"**{label}**" in rendered
-        assert f"{divider}\\n\\n💗 **甜蜜單**" not in rendered
-        assert f"{divider}\n\n💗 **甜蜜單**" in rendered
-        assert f"{divider}\n\n📚 **教學單" in rendered
-        assert rendered.count("520T / H") == 1
-        assert rendered.count("1314T / H") == 1
-        assert len(rendered) <= 4096
+        root = price_lists._game_root_embed(channel_id)
+        assert "請選擇" in root.description
+        assert "━━━━━━━━" not in root.description
 
-    # The desktop and mobile Delta category views must remain unchanged.
-    for plan in (
-        *price_lists.DELTA_DESKTOP_PRICE_LISTS.values(),
-        *price_lists.DELTA_MOBILE_PRICE_LISTS.values(),
-    ):
-        assert divider not in str(plan["text"])
+        plans = price_lists._game_price_list_sections(interaction, channel_id)
+        assert list(plans) == [option.value for option in select.options]
+        assert all("━━━━━━━━" not in text for text in plans.values())
+        assert all("｜" not in text for text in plans.values())
+        assert all("廠商" not in text for text in plans.values())
+        for key, contents in plans.items():
+            embed = price_lists._game_plan_embed(interaction, channel_id, key)
+            assert embed.description == contents
+            assert key in dict(price_lists._game_price_list_options(channel_id))
+            assert 0 < len(embed.description) <= 4096
+
+
+def test_game_price_list_preserves_category_prices_and_rules() -> None:
+    interaction = SimpleNamespace(guild=None)
+    game_data = (
+        ("valorant", ("超凡陪", "神話陪", "輻能陪"), ("330T", "350T", "380T", "370T")),
+        ("lol", ("大師陪", "宗師陪", "菁英陪"), ("340T", "360T", "400T")),
+        ("apex", ("鑽石陪", "大師陪", "頂獵陪"), ("400T", "480T", "580T", "630T")),
+    )
+    for game, ranks, tech_prices in game_data:
+        channel_id = int(quick.QUICK_ORDER_V2_CHANNELS[game])
+        plans = price_lists._game_price_list_sections(interaction, channel_id)
+        entertainment = plans["entertainment"]
+        technical = plans["technical"]
+        sweet = plans["sweet"]
+        teaching = plans["teaching"]
+        assert "娛樂陪" in entertainment
+        assert "娛樂陪累積回饋" in entertainment
+        assert "指定陪玩" in entertainment and "+100T" in entertainment
+        assert "娛樂陪累積回饋" not in technical
+        for rank in ranks:
+            assert rank in technical
+            assert rank not in entertainment
+        for amount in tech_prices:
+            assert amount in technical
+        assert "指定陪玩" in technical and "+100T" in technical
+        assert "520T / H" in sweet and "1314T / H" in sweet
+        assert "指定陪玩" in sweet and "2H 以上免指定費" in sweet
+        assert "500T / H" in teaching and "3H 起標" in teaching
+        for other_key in ("entertainment", "technical", "sweet"):
+            assert "500T / H" not in plans[other_key]
+
+    steam_id = int(quick.QUICK_ORDER_V2_CHANNELS["steam"])
+    steam = price_lists._game_price_list_sections(interaction, steam_id)
+    assert tuple(steam) == ("entertainment", "sweet")
+    assert "一般陪玩" in steam["entertainment"]
+    assert "320T / H" in steam["entertainment"]
+    assert "520T / H" in steam["sweet"]
+    assert "1314T / H" in steam["sweet"]
+    assert all("教學單" not in p for p in steam.values())
+
+
+def test_non_delta_button_opens_private_dropdown_then_switches_selected_page() -> None:
+    class Response:
+        def __init__(self) -> None:
+            self.deferred: list[dict] = []
+
+        async def defer(self, **kwargs) -> None:
+            self.deferred.append(kwargs)
+
+    class Interaction:
+        def __init__(self) -> None:
+            self.guild = None
+            self.response = Response()
+            self.messages: list[dict] = []
+
+        async def edit_original_response(self, **kwargs) -> None:
+            self.messages.append(kwargs)
+
+    async def verify() -> None:
+        for game in ("apex", "lol", "valorant", "steam"):
+            channel_id = int(quick.QUICK_ORDER_V2_CHANNELS[game])
+            interaction = Interaction()
+            button = price_lists.QuickPriceListButton(channel_id)
+    
+            await button.callback(interaction)
+            assert interaction.response.deferred == [{"ephemeral": True, "thinking": True}]
+            assert len(interaction.messages) == 1
+            root = interaction.messages[0]
+            assert "請選擇" in root["embed"].description
+            view = root["view"]
+            assert isinstance(view, price_lists.GamePriceListView)
+            assert len(view.children[0].options) == (2 if game == "steam" else 4)
+    
+            key = "sweet" if game == "steam" else "technical"
+            select = view.children[0]
+            select._values = [key]
+            await select.callback(interaction)
+            assert interaction.response.deferred[-1] == {}
+            displayed = interaction.messages[-1]
+            assert isinstance(displayed["view"], price_lists.GamePriceListView)
+            assert displayed["embed"].description == (
+                price_lists._game_price_list_sections(interaction, channel_id)[key]
+            )
+            assert [o.value for o in displayed["view"].children[0].options if o.default] == [key]
+
+    asyncio.run(verify())
+
+
+def test_game_price_list_keeps_selected_option_checked() -> None:
+    for game in ("valorant", "lol", "apex"):
+        channel_id = int(quick.QUICK_ORDER_V2_CHANNELS[game])
+        view = price_lists.GamePriceListView(channel_id, selected="technical")
+        assert [opt.value for opt in view.children[0].options if opt.default] == ["technical"]
+
 
 
 def test_shared_special_offers_follow_existing_game_price_lists() -> None:
@@ -137,7 +234,8 @@ def test_public_price_list_acks_before_loading_content() -> None:
     callback = source.split("class QuickPriceListButton(", 1)[1]
     assert "await interaction.response.defer(ephemeral=True, thinking=True)" in callback
     assert "await interaction.edit_original_response(" in callback
-    assert callback.index("await interaction.response.defer(") < callback.index("_price_list_text(")
+    assert callback.index("await interaction.response.defer(") < callback.index("_game_root_embed(")
+    assert "view=GamePriceListView(self.source_channel_id)" in callback
 
 
 def test_delta_mobile_price_list_has_only_approved_seven_order_types() -> None:

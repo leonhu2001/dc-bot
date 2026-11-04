@@ -577,6 +577,131 @@ def _price_list_text(interaction: discord.Interaction, channel_id: int) -> str:
     return "價目表內容整理中，稍後更新。"
 
 
+
+# The four non-Delta games use the same one-select price-list interaction as
+# Delta's plan selector. Each option displays only the selected service.
+GAME_PRICE_LIST_OPTIONS = {
+    "valorant": (("entertainment", "娛樂陪"), ("technical", "技術陪"), ("sweet", "甜蜜單"), ("teaching", "教學單")),
+    "lol": (("entertainment", "娛樂陪"), ("technical", "技術陪"), ("sweet", "甜蜜單"), ("teaching", "教學單")),
+    "apex": (("entertainment", "娛樂陪"), ("technical", "技術陪"), ("sweet", "甜蜜單"), ("teaching", "教學單")),
+    "steam": (("entertainment", "娛樂陪"), ("sweet", "甜蜜單")),
+}
+
+_GAME_BY_CHANNEL_ID = {
+    int(quick.QUICK_ORDER_V2_CHANNELS[game]): game for game in GAME_PRICE_LIST_OPTIONS
+}
+
+
+def _game_price_list_options(channel_id: int) -> tuple[tuple[str, str], ...]:
+    return GAME_PRICE_LIST_OPTIONS[_GAME_BY_CHANNEL_ID[int(channel_id)]]
+
+
+def _game_price_list_sections(
+    interaction: discord.Interaction, channel_id: int
+) -> dict[str, str]:
+    """Reuse the existing approved price copy, displaying one service at a time.
+
+    The existing single-page builders stay as the sole source of amounts and
+    rule text. A fixed separator marks each segment; never show it to customers.
+    Check the segment count to prevent silent pricing omissions after copy edits.
+    """
+    game = _GAME_BY_CHANNEL_ID[int(channel_id)]
+    full = _price_list_text(interaction, channel_id)
+    blocks = full.split(f"\n\n{_GAME_PRICE_SECTION_DIVIDER}\n\n")
+    expected = 4 if game == "steam" else 8
+    if len(blocks) != expected:
+        raise ValueError(f"unexpected {game} price list layout: {len(blocks)} segments")
+
+    if game == "steam":
+        return {
+            "entertainment": "\n\n".join(blocks[:2]),
+            "sweet": blocks[2],
+        }
+
+    # Normal play owns loyalty rewards; rank-based play is technical.
+    # Both keep the existing specify-fee rules.
+    return {
+        "entertainment": "\n\n".join((blocks[0], blocks[4], blocks[5])),
+        "technical": "\n\n".join((*blocks[1:4], blocks[5])),
+        "sweet": blocks[6],
+        "teaching": blocks[7],
+    }
+
+
+def _game_root_embed(channel_id: int) -> discord.Embed:
+    label = _PRICE_LIST_LABEL_BY_CHANNEL_ID[int(channel_id)]
+    return discord.Embed(
+        title=f"📋 {label}・陪玩價目",
+        description="請選擇要查看的服務分類。",
+        color=discord.Color.blurple(),
+    )
+
+
+def _game_plan_embed(
+    interaction: discord.Interaction, channel_id: int, plan_key: str
+) -> discord.Embed:
+    options = dict(_game_price_list_options(channel_id))
+    if plan_key not in options:
+        raise ValueError(f"unknown game price list service: {plan_key}")
+    label = _PRICE_LIST_LABEL_BY_CHANNEL_ID[int(channel_id)]
+    text = _game_price_list_sections(interaction, channel_id)[plan_key]
+    return discord.Embed(
+        title=f"📋 {label}・{options[plan_key]}",
+        description=text,
+        color=discord.Color.blurple(),
+    )
+
+
+class GamePriceListSelect(discord.ui.Select):
+    def __init__(self, channel_id: int, selected: str | None = None):
+        self.source_channel_id = int(channel_id)
+        super().__init__(
+            placeholder="請選擇價目表分類",
+            min_values=1,
+            max_values=1,
+            row=0,
+            custom_id=f"quick_order_v2_game_price_list_{self.source_channel_id}",
+            options=[
+                discord.SelectOption(
+                    label=label,
+                    value=key,
+                    default=key == selected,
+                )
+                for key, label in _game_price_list_options(channel_id)
+            ],
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        # Acknowledge the component immediately; avoid the Discord 3s timeout.
+        await interaction.response.defer()
+        plan_key = str(self.values[0])
+        try:
+            await interaction.edit_original_response(
+                embed=_game_plan_embed(interaction, self.source_channel_id, plan_key),
+                view=GamePriceListView(self.source_channel_id, selected=plan_key),
+            )
+        except Exception as exc:
+            print(
+                f"[quick-price-list] game select failed channel={self.source_channel_id} "
+                f"plan={plan_key}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            try:
+                await interaction.edit_original_response(
+                    content="價目表暫時無法載入，請稍後重試或聯繫客服。",
+                    embed=None,
+                    view=None,
+                )
+            except discord.HTTPException:
+                pass
+
+
+class GamePriceListView(discord.ui.View):
+    def __init__(self, channel_id: int, selected: str | None = None):
+        super().__init__(timeout=840)
+        self.add_item(GamePriceListSelect(channel_id, selected=selected))
+
+
 def _delta_category_label(value: str) -> str:
     for key, label, _ in DELTA_PRICE_LIST_CATEGORIES:
         if key == value:
@@ -828,16 +953,10 @@ class QuickPriceListButton(discord.ui.Button):
                 )
                 return
 
-            label = _PRICE_LIST_LABEL_BY_CHANNEL_ID.get(
-                self.source_channel_id,
-                "遊戲",
+            await interaction.edit_original_response(
+                embed=_game_root_embed(self.source_channel_id),
+                view=GamePriceListView(self.source_channel_id),
             )
-            embed = discord.Embed(
-                title=f"📋 {label}・陪玩價目",
-                description=_price_list_text(interaction, self.source_channel_id),
-                color=discord.Color.blurple(),
-            )
-            await interaction.edit_original_response(embed=embed)
         except Exception as exc:
             print(
                 f"[quick-price-list] failed channel={self.source_channel_id}: "
@@ -867,6 +986,9 @@ __all__ = [
     "DELTA_FUN_PRICE_LISTS",
     "DELTA_MOBILE_PRICE_LISTS",
     "DELTA_PRICE_LIST_CATEGORIES",
+    "GAME_PRICE_LIST_OPTIONS",
+    "GamePriceListSelect",
+    "GamePriceListView",
     "DeltaDesktopPriceListSelect",
     "DeltaFarmPriceListSelect",
     "DeltaFunPriceListSelect",
