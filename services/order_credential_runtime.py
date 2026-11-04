@@ -127,6 +127,35 @@ def _credential_display_name(
     return str(user_id)
 
 
+def _build_credential_delivery_embed(
+    *,
+    customer_display_name: str,
+    account_value: str,
+    password_value: str,
+    note_value: str = "",
+) -> discord.Embed:
+    """Private credential DM: identify the boss by name, not by order number."""
+    embed = discord.Embed(
+        title="🔐 魔丸娛樂｜臨時帳號授權",
+        description=(
+            "此登入資料僅限本訂單服務使用。\n"
+            "完成、取消或重新提交後，機器人會嘗試自動撤回本訊息。"
+        ),
+        color=discord.Color.orange(),
+    )
+    embed.add_field(name="老闆", value=customer_display_name[:1024], inline=False)
+    embed.add_field(name="登入帳號", value=account_value[:1024], inline=False)
+    embed.add_field(name="登入密碼", value=password_value[:1024], inline=False)
+    if note_value:
+        embed.add_field(
+            name="登入方式／備註",
+            value=note_value[:1024],
+            inline=False,
+        )
+    embed.set_footer(text="請勿轉傳、截圖或用於本訂單以外用途")
+    return embed
+
+
 async def _resolve_credential_owner(
     guild: discord.Guild | None,
 ) -> discord.Member | discord.User | None:
@@ -355,11 +384,13 @@ class OrderCredentialModal(discord.ui.Modal, title="代肝／代解登入資料"
             seen_ids.add(owner_id)
             recipients.append((owner_id, "owner", owner_user))
 
-        order_no = str(
-            data.get("order_no")
-            or data.get("receipt_id")
-            or context.get("bot_order_no")
-            or f"WEB-{order_id}"
+        # The submitting user has already passed the customer-ID check.
+        # Use their server nickname first, then Discord display name, so
+        # workers can recognize and find the boss without looking up order IDs.
+        customer_display_name = _credential_display_name(
+            interaction.guild,
+            interaction.user,
+            customer_id,
         )
         account_value = str(self.account.value or "").strip()
         password_value = str(self.password.value or "")
@@ -375,27 +406,19 @@ class OrderCredentialModal(discord.ui.Modal, title="代肝／代解登入資料"
             )
             label = "店長" if recipient_type == "owner" else "接單人員"
 
-            credential_embed = discord.Embed(
-                title="🔐 魔丸娛樂｜臨時帳號授權",
-                description=(
-                    "此登入資料僅限本訂單服務使用。\n"
-                    "完成、取消或重新提交後，機器人會嘗試自動撤回本訊息。"
-                ),
-                color=discord.Color.orange(),
+            credential_embed = _build_credential_delivery_embed(
+                customer_display_name=customer_display_name,
+                account_value=account_value,
+                password_value=password_value,
+                note_value=note_value,
             )
-            credential_embed.add_field(name="訂單", value=order_no, inline=False)
-            credential_embed.add_field(name="登入帳號", value=account_value[:1024], inline=False)
-            credential_embed.add_field(name="登入密碼", value=password_value[:1024], inline=False)
-            if note_value:
-                credential_embed.add_field(
-                    name="登入方式／備註",
-                    value=note_value[:1024],
-                    inline=False,
-                )
-            credential_embed.set_footer(text="請勿轉傳、截圖或用於本訂單以外用途")
 
             try:
-                dm_message = await recipient.send(embed=credential_embed)
+                dm_message = await recipient.send(
+                    content=f"老闆：{customer_display_name}",
+                    embed=credential_embed,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
             except Exception:
                 await revoke_order_credential_messages(
                     order_id,
@@ -429,7 +452,7 @@ class OrderCredentialModal(discord.ui.Modal, title="代肝／代解登入資料"
 
         receipt_text = (
             f"🛡️ **帳號資料已安全交付**\n"
-            f"訂單：**{order_no}**\n\n"
+            f"老闆：**{customer_display_name}**\n\n"
             "目前取得本次帳號資料的人員：\n"
             + "\n".join(delivered_display)
             + "\n\n除上述人員外，機器人未將帳密送給其他店內成員。"
