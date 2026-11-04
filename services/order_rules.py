@@ -114,6 +114,19 @@ VALORANT_GAME_ROLE = ("valorant_game",)
 LOL_GAME_ROLE = ("lol_game",)
 APEX_GAME_ROLE = ("apex_game",)
 
+# 這些已上架的代洗／AW 商品無論來源，都只能由共享職位接單。
+# 尚未新增的「幣號」商品上架時，將 key 加到此表並使用共享職位。
+COIN_WASH_AW_ORDER_RULE_KEYS = frozenset({
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
+    "farm_aw_collision_1_100",
+    "farm_aw_collision_101_500",
+    "farm_aw_collision_501_plus",
+    "staff_internal_ammo_dump_500m",
+    "staff_internal_car_500m",
+    "staff_internal_aw_collision",
+})
+
 AW_COLLISION_PRICING_BY_RULE: dict[str, dict[str, Any]] = {
     "farm_aw_collision_1_100": {"label": "1～100發｜5T/發", "short_label": "1～100發", "min": 1, "max": 100, "rate_x2": 10, "rate_text": "5"},
     "farm_aw_collision_101_500": {"label": "101～500發｜4.5T/發", "short_label": "101～500發", "min": 101, "max": 500, "rate_x2": 9, "rate_text": "4.5"},
@@ -1646,16 +1659,7 @@ SOURCE_AUTHORITY_RULE_KEYS = frozenset(
 
 # Owner-approved structural qualifications. Manager overrides may change ordinary
 # commercial fields but cannot broaden who may claim these system products.
-SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS = frozenset({
-    "farm_halfcoin_120m",
-    "farm_halfcoin_360m",
-    "farm_aw_collision_1_100",
-    "farm_aw_collision_101_500",
-    "farm_aw_collision_501_plus",
-    "staff_internal_ammo_dump_500m",
-    "staff_internal_car_500m",
-    "staff_internal_aw_collision",
-})
+SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS = COIN_WASH_AW_ORDER_RULE_KEYS
 
 
 class EffectiveOrderRules(dict):
@@ -1883,6 +1887,7 @@ __all__ = [
     "HALFCOIN_RECEIVER_ROLE_ID",
     "COIN_WASH_AW_RECEIVER_ROLE_ID",
     "COIN_WASH_AW_RECEIVER_ROLES",
+    "COIN_WASH_AW_ORDER_RULE_KEYS",
     "ALL_ROLE_IDS",
     "ALL_ROLE_LABELS",
     "CATEGORY_LABELS",
