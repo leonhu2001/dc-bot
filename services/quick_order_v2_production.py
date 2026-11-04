@@ -17,8 +17,6 @@ from services.quick_order_v2_select_display import (
     LEGACY_RESELECT_FLAG,
     apply_quick_order_select_display,
 )
-from services.staff_internal_ammo_dump_policy import is_internal_ammo_dump_rule
-from services.staff_internal_ammo_dump_ui import InternalAmmoNamedButton
 
 
 _INSTALLED = False
@@ -409,14 +407,6 @@ def _install_ticket_ui_policy() -> None:
                 child.disabled = True
 
         apply_quick_order_select_display(self, data)
-        if is_internal_ammo_dump_rule(rule_key):
-            self.add_item(
-                InternalAmmoNamedButton(
-                    customer_id=customer_id,
-                    channel_id=channel_id,
-                    data=data,
-                )
-            )
         if rule_key == "staff_internal_aw_collision":
             for child in self.children:
                 if getattr(child, "custom_id", None) == "self_service_order_quantity_select":
