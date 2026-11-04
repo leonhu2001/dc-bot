@@ -130,6 +130,19 @@ def test_vip_timer_quick_order_builds_private_ticket_for_current_and_legacy_game
             assert ticket is not None, f"ticket not created for {label}"
             assert len(ticket.sent) == 2
             assert not ticket.delete.await_count
+            view = ticket.sent[1][1]["view"]
+            selects = [child for child in view.children if isinstance(child, quick.discord.ui.Select)]
+            assert [(item.custom_id, item.row) for item in selects] == [
+                ("vip_timer_game_select", 0),
+                ("vip_timer_category_select", 1),
+                ("vip_timer_gameplay_select", 2),
+                ("vip_timer_headcount_select", 3),
+            ], [(item.custom_id, item.row) for item in view.children]
+            buttons = [child for child in view.children if isinstance(child, quick.discord.ui.Button)]
+            assert len(buttons) == 1
+            assert buttons[0].custom_id == "self_service_order_go_payment_button"
+            assert buttons[0].label == "送出 VIP 計時單"
+            assert "三角洲" in ticket.sent[0][0][0] if "三角洲" in label else True
 
         async def main():
             from services import orders
@@ -139,6 +152,7 @@ def test_vip_timer_quick_order_builds_private_ticket_for_current_and_legacy_game
             await run(groups[0])
             # Historic panel value should be accepted without a generic ValueError.
             await run("三角洲行動｜端遊")
+            await run("三角洲｜端遊")
 
         asyncio.run(main())
         '''
