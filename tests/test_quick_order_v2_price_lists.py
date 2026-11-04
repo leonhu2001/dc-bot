@@ -29,18 +29,19 @@ def test_delta_price_list_keeps_four_top_level_categories() -> None:
 
 
 
-def test_delta_desktop_price_list_has_nine_requested_order_types() -> None:
+def test_delta_desktop_price_list_has_ten_order_types_in_owner_requested_order() -> None:
     labels = [str(plan["label"]) for plan in price_lists.DELTA_DESKTOP_PRICE_LISTS.values()]
     assert labels == [
         "娛樂陪",
         "一陪一護",
-        "黑潮爆破",
-        "甜蜜單",
         "體驗單",
         "技術陪",
-        "教學單",
-        "油鍋單",
+        "絕巴技術陪",
         "賭約單",
+        "油鍋單",
+        "黑潮爆破",
+        "甜蜜單",
+        "教學單",
     ]
 
 
@@ -52,7 +53,8 @@ def test_delta_desktop_price_list_prices_and_rules_match_approved_copy() -> None
         "black_tide": ("320T / H", "300T / H", "400T / H", "380T / H", "30 分鐘券"),
         "sweet": ("520T / H", "1314T / H", "專屬暱稱", "管理層", "+100T"),
         "trial": ("450T", "777W", "900T", "1688W", "金級以上", "打手選圖"),
-        "technical": ("400T / H", "750T / H", "450T / H", "850T / H", "1000T / H", "666W", "800W", "500W + 2 沙保", "4 沙保", "+100T"),
+        "technical": ("400T / H", "750T / H", "450T / H", "850T / H", "666W", "800W", "+100T"),
+        "babel_technical": ("1000T / H", "800W", "500W + 2 沙保", "4 沙保", "+100T", "2H 以上免指定費"),
         "teaching": ("500T / H", "3H 起標", "地圖理解", "復盤"),
         "oil": ("2600T", "2000W", "1800T", "1500W", "4000T", "3500W", "航天基地", "撞場"),
         "bet": ("800T", "800W", "1200T", "1000W", "1500T", "1200W", "打手選圖"),
@@ -65,6 +67,34 @@ def test_delta_desktop_price_list_prices_and_rules_match_approved_copy() -> None
         assert "```text" in text
         for term in terms:
             assert term in text, (key, term)
+
+
+def test_delta_desktop_babel_is_separate_and_black_tide_is_not_tagged_desktop() -> None:
+    plans = price_lists.DELTA_DESKTOP_PRICE_LISTS
+    technical = str(plans["technical"]["text"])
+    babel = str(plans["babel_technical"]["text"])
+    black_tide = str(plans["black_tide"]["text"])
+
+    assert "1000T / H" not in technical
+    assert "保底三選一" not in technical
+    assert "絕巴技術陪" not in technical
+    assert "**絕巴技術陪**" in babel
+    assert "1000T / H" in babel
+    for term in ("800W", "500W + 2 沙保", "4 沙保", "每人 +100T", "2H 以上免指定費"):
+        assert term in babel
+    for term in ("400T / H", "750T / H", "450T / H", "850T / H", "機密", "絕密"):
+        assert term in technical
+    assert black_tide.startswith("**黑潮爆破**")
+    assert "（端遊）" not in black_tide
+
+    selected = price_lists.DeltaPriceListView(category="desktop", desktop_plan="babel_technical")
+    selector = selected.children[1]
+    assert [item.label for item in selector.options] == [
+        str(plan["label"]) for plan in plans.values()
+    ]
+    assert [item.value for item in selector.options if item.default] == ["babel_technical"]
+    assert len(selector.options) == 10
+    assert "1000T / H" in price_lists._delta_desktop_embed("babel_technical").description
 
 
 def test_delta_desktop_selector_uses_existing_two_level_private_view() -> None:
