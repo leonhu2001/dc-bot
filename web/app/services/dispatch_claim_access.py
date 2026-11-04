@@ -12,6 +12,7 @@ from shared.order_acceptance import (
     ACCEPTED_PENDING_PAY,
     EXACT_ONE_PROTECTOR_RULE_KEYS,
     PROTECTOR_ROLE_IDS,
+    _effective_claim_role_requirements,
     PUBLIC_ACCEPTANCE_LOCK_SECONDS,
     WAITING_ACCEPTANCE,
 )
@@ -212,6 +213,11 @@ def evaluate_dispatch_claim_access(
 
     allowed_role_ids = set(_json_list(meta.get("allowed_role_ids_json")))
     required_game_role_ids = set(_json_list(meta.get("required_game_role_ids_json")))
+    allowed_role_ids, required_game_role_ids = _effective_claim_role_requirements(
+        str(meta.get("order_rule_key") or ""),
+        allowed_role_ids,
+        required_game_role_ids,
+    )
 
     if not role_ids_match_requirements(
         role_ids,
@@ -405,6 +411,8 @@ def decorate_dispatch_order(
     )
     service = build_dispatch_service_context(order)
 
+    # Reuse the same authoritative role snapshot for per-order support dropdowns.
+    setattr(order, "dispatch_acceptance_meta", dict(snapshot.get("meta") or {}) if snapshot else None)
     setattr(order, "dispatch_user_can_claim_now", bool(access["allowed"]))
     setattr(order, "dispatch_user_claim_reason", str(access["reason"]))
     setattr(order, "dispatch_user_is_specified", bool(access["is_specified"]))
