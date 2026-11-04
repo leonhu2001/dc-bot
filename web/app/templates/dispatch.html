@@ -88,7 +88,7 @@
                 <form class="dispatch-support-form" method="post" action="/dispatch/orders/{{ order.id }}/support-assign">
                     <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}">
                     <select name="companion_discord_id" required>
-                        <option value="">選擇符合此單資格的接單人員</option>
+                        <option value="">{% if order.dispatch_assignment_role_label %}{% if order.dispatch_companion_options %}選擇具備「{{ order.dispatch_assignment_role_label }}」身分組的人員{% else %}沒有符合「{{ order.dispatch_assignment_role_label }}」身分組的人員{% endif %}{% else %}{% if order.dispatch_companion_options %}選擇符合此單資格的接單人員{% else %}目前沒有符合此單資格的人員{% endif %}{% endif %}</option>
                         {% for companion in order.dispatch_companion_options %}
                             <option value="{{ companion.discord_id }}">{{ companion.display_name or companion.global_name or companion.username or companion.discord_id }}</option>
                         {% endfor %}
