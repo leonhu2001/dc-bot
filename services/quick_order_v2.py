@@ -149,7 +149,7 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
                 "• 撞車：**2,480T／單**\n\n"
                 "**AW 子彈**\n"
                 "• 代撞：**4T／發**（發數自行輸入）\n\n"
-                "請在下方選擇服務，再確認建立私人下單票口。"
+                "請在下方選擇服務，再確認建立私人下單票口。\n"
                 "票口沿用一般接單與付款流程，無須提供遊戲帳密。"
             ),
             color=discord.Color.blue(),
@@ -465,6 +465,11 @@ async def _send_confirmation(
         return
 
     timer = category == VIP_TIMER_CATEGORY
+    quantity_instruction = (
+        "洗幣兩方案皆為固定 500M；AW 在票口內自行輸入發數。"
+        if category == "staff_internal"
+        else "票口內再完成剩餘規格與數量。"
+    )
     embed = discord.Embed(
         title="💎 VIP 自由計時｜確認下單" if timer else "🛒 確認下單",
         description=(
@@ -472,11 +477,7 @@ async def _send_confirmation(
             f"{VIP_TIMER_CATEGORY_LABEL if timer else ORDER_CATEGORY_LABELS.get(category, category)}\n"
             f"**{'起始遊戲' if timer else '服務'}：** {item_group}\n\n"
             "按下 **確認下單** 後才會建立私人票口。\n"
-            (
-                "洗幣兩方案皆為固定 500M；AW 在票口內自行輸入發數。\n\n"
-                if category == "staff_internal"
-                else "票口內再完成剩餘規格與數量。\n\n"
-            )
+            f"{quantity_instruction}\n\n"
             "確認下單即表示已閱讀並同意店內下單規章。"
         ),
         color=discord.Color.green(),
