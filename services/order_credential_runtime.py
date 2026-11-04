@@ -53,13 +53,25 @@ def configure_order_credentials(
     save_bot_data = save_data
 
 
+def _is_staff_internal_credential_order(data: dict | None) -> bool:
+    if not isinstance(data, dict):
+        return False
+    rule_key = str(data.get("order_rule_key") or "").strip().lower()
+    category = str(data.get("category") or "").strip().lower()
+    return category == "staff_internal" or rule_key.startswith("staff_internal_")
+
+
 def _order_requires_credentials(data: dict | None) -> bool:
     if not isinstance(data, dict):
         return False
 
     rule_key = str(data.get("order_rule_key") or "").strip().lower()
     category = str(data.get("category") or "").strip().lower()
-    return rule_key.startswith("farm_") or category == "farm"
+    return (
+        rule_key.startswith("farm_")
+        or category == "farm"
+        or _is_staff_internal_credential_order(data)
+    )
 
 
 async def _credential_user_for_id(
@@ -180,7 +192,7 @@ async def ensure_order_credential_request(
             pass
 
     embed = discord.Embed(
-        title="🔐 代肝／代解登入資料",
+        title=("🔐 內部服務登入資料" if _is_staff_internal_credential_order(data) else "🔐 代肝／代解登入資料"),
         description=(
             "此訂單需要登入您的遊戲帳號。\n\n"
             "帳號與密碼**不會寫入魔丸娛樂資料庫**，只會在您送出時由機器人"
@@ -240,8 +252,10 @@ class OrderCredentialModal(discord.ui.Modal, title="代肝／代解登入資料"
         max_length=500,
     )
 
-    def __init__(self, order_channel_id: int):
-        super().__init__()
+    def __init__(self, order_channel_id: int, *, internal_order: bool = False):
+        super().__init__(
+            title="內部服務登入資料" if internal_order else "代肝／代解登入資料"
+        )
         self.order_channel_id = int(order_channel_id)
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -486,7 +500,10 @@ class OrderCredentialEntryView(discord.ui.View):
             return
 
         await interaction.response.send_modal(
-            OrderCredentialModal(interaction.channel.id)
+            OrderCredentialModal(
+                interaction.channel.id,
+                internal_order=_is_staff_internal_credential_order(data),
+            )
         )
 
 
