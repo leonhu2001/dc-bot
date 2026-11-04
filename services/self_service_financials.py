@@ -4,6 +4,11 @@ import json
 from typing import Any, Callable
 
 from services.aw_collision_financials import calculate_aw_collision_financials, is_aw_collision_rule
+from services.staff_internal_ammo_dump_policy import (
+    calculate_internal_ammo_dump_financials,
+    is_internal_ammo_dump_rule,
+    selected_ammo_dump_named,
+)
 
 import discord
 
@@ -147,80 +152,13 @@ def add_self_service_financial_breakdown_fields(
     src: dict,
     final_label="顧客應付",
 ):
-    src = dict(src or {})
-    original = max(
-        0,
-        _price_int(src, "service_original_amount", "original_amount", default=0),
+    # Public API preserved for Discord and web order consumers.
+    from services.self_service_financial_breakdown_display import (
+        render_self_service_financial_breakdown_fields,
     )
-    percent_off = max(
-        0,
-        _price_int(src, "percent_discount_amount", "manual_discount_amount", default=0),
+    return render_self_service_financial_breakdown_fields(
+        embed, src, final_label=final_label
     )
-    fixed = max(
-        0,
-        _price_int(src, "fixed_discount_amount", "cash_coupon_amount", default=0),
-    )
-    point_cash = max(0, _price_int(src, "point_discount_coupon_amount", default=0))
-    specify_before = max(0, _price_int(src, "specified_fee_before_waiver", default=0))
-    point_specify = max(0, _price_int(src, "point_waived_specify_fee", default=0))
-    specify_effective = src.get("effective_specify_fee")
-    if specify_effective is None:
-        specify_effective = max(0, specify_before - point_specify)
-    else:
-        specify_effective = max(0, _to_int(specify_effective, 0) or 0)
-    final = max(
-        0,
-        _price_int(src, "customer_pay_amount", "amount", "total_amount", default=0),
-    )
-    payout = max(0, _price_int(src, "payout_base_amount", default=0))
-    rate = _price_rate(src)
-
-    embed.add_field(name="商品原價", value=_format_plain_amount(original), inline=True)
-    if rate < 100 or percent_off:
-        embed.add_field(
-            name="百分比折扣",
-            value=f"折後 {_format_percent_value(rate)}%\n-{_format_plain_amount(percent_off)}",
-            inline=True,
-        )
-    if fixed:
-        reason = str(src.get("cash_coupon_reason") or "").strip()
-        text = f"-{_format_plain_amount(fixed)}"
-        if reason:
-            text += f"\n{reason}"
-        text += "\n店內吸收，不影響打手分潤"
-        embed.add_field(name="固定折扣", value=text, inline=True)
-    if point_cash:
-        embed.add_field(
-            name="點數折價",
-            value=f"-{_format_plain_amount(point_cash)}\n店內吸收，不扣打手分潤",
-            inline=True,
-        )
-    if specify_before:
-        if specify_effective == 0:
-            text = f"原 {_format_plain_amount(specify_before)}\n已免除"
-        else:
-            text = f"+{_format_plain_amount(specify_effective)}"
-        embed.add_field(name="指定費", value=text, inline=True)
-
-    embed.add_field(name=final_label, value=_format_plain_amount(final), inline=True)
-    embed.add_field(name="打手分潤基準", value=_format_plain_amount(payout), inline=True)
-
-    benefit_name = str(src.get("point_benefit_name") or "").strip()
-    bonus = str(src.get("service_bonus_text") or "").strip()
-    if benefit_name:
-        lines = [f"{_price_int(src, 'point_benefit_cost', default=0)} 點｜{benefit_name}"]
-        if point_cash:
-            lines.append(f"已直接折抵價格：-{_format_plain_amount(point_cash)}")
-        if bonus:
-            lines.append(f"訂單備註：{bonus}")
-        embed.add_field(name="點數福利", value="\n".join(lines), inline=False)
-    elif bonus:
-        embed.add_field(name="訂單福利備註", value=bonus, inline=False)
-
-    service_promotion_text = str(src.get("service_promotion_text") or "").strip()
-    if service_promotion_text:
-        embed.add_field(name="活動加贈", value=service_promotion_text, inline=False)
-    return embed
 
 
 def _format_percent_value(value) -> str:
@@ -402,12 +340,12 @@ def _quote_preview_lines_for_self_service(
     else:
         adjustment = calculate_self_service_financials(rule, price, data)
         if adjustment.get("manual_price_missing"):
-            lines.append(("顧客應付", "客服待填價"))
+            lines.append(("顧客應付", "等待客服選擇掛名" if is_internal_ammo_dump_rule(rule) else "客服待填價"))
         else:
             lines.append(("顧客應付", _format_plain_amount(adjustment["customer_pay_amount"])))
 
         detail_parts = [
-            "客服待填價格"
+            ("客服待選擇掛名" if is_internal_ammo_dump_rule(rule) else "客服待填價格")
             if adjustment.get("manual_price_missing")
             else f"商品原價 {_format_plain_amount(adjustment['service_original_amount'])}"
         ]
@@ -430,6 +368,11 @@ def _quote_preview_lines_for_self_service(
                 f" -{_format_plain_amount(adjustment['manual_discount_amount'])}（{reason}）"
             )
         detail_parts.append(f"打手分潤基準 {_format_plain_amount(adjustment['payout_base_amount'])}")
+        if is_internal_ammo_dump_rule(rule):
+            named = selected_ammo_dump_named(data)
+            lines.append(("掛名狀態", "有掛名" if named is True else "無掛名" if named is False else "等待客服勾選"))
+            if named is False:
+                detail_parts.append("店家收入差額 350（店家全額保留）")
         if adjustment["point_discount_coupon_amount"] > 0:
             detail_parts.append(
                 f"點數折價 -{_format_plain_amount(adjustment['point_discount_coupon_amount'])}（店內吸收）"
@@ -519,6 +462,8 @@ def _format_point_hours(hours) -> str:
 
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
+    if is_internal_ammo_dump_rule(rule):
+        return calculate_internal_ammo_dump_financials(price_result, data)
     if is_aw_collision_rule(rule):
         return calculate_aw_collision_financials(price_result, data)
 

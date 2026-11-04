@@ -205,6 +205,9 @@ async def _create_waiting_acceptance_order_once(
         specified_staff_ids,
     )
 
+    from services.staff_internal_ammo_dump_policy import require_ammo_dump_named_selection
+    require_ammo_dump_named_selection(rule, data)
+
     price_result = calculate_price(
         rule,
         quantity=quantity,
@@ -262,6 +265,8 @@ async def _create_waiting_acceptance_order_once(
         "manual_discount_percent": price_adjustment.get("manual_discount_percent"),
         "manual_discount_amount": price_adjustment.get("manual_discount_amount"),
         "payout_base_amount": price_adjustment.get("payout_base_amount"),
+        "store_margin_amount": price_adjustment.get("store_margin_amount", 0),
+        "staff_internal_ammo_named": price_adjustment.get("staff_internal_ammo_named"),
         "cash_coupon_amount": price_adjustment.get("cash_coupon_amount"),
         "point_benefit_key": price_adjustment.get("point_benefit_key"),
         "point_benefit_name": price_adjustment.get("point_benefit_name"),
@@ -397,6 +402,14 @@ async def _create_waiting_acceptance_order_once(
     if staff_order_note:
         web_note_parts.append(
             f"客服備註：{staff_order_note}"
+        )
+
+    if rule.key == "staff_internal_ammo_dump_500m":
+        named = price_adjustment.get("staff_internal_ammo_named")
+        web_note_parts.append(
+            "掛名：有掛名｜顧客 2650T｜代肝 2650T"
+            if named is True
+            else "掛名：無掛名｜顧客 3000T｜代肝 2650T｜店抽 350T"
         )
 
     if price_adjustment.get(

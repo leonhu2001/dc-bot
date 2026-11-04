@@ -19,6 +19,9 @@ ONE_COMPANION_ONE_GUARD_PAYOUT_BASES: dict[str, tuple[int, int]] = {
 FULL_WORKER_PAYOUT_RULE_KEYS = frozenset({
     "farm_halfcoin_120m",
     "farm_halfcoin_360m",
+    "staff_internal_ammo_dump_500m",
+    "staff_internal_car_500m",
+    "staff_internal_aw_collision",
 })
 FULL_WORKER_PAYOUT_RULE_PREFIXES = ("farm_aw_collision_",)
 
