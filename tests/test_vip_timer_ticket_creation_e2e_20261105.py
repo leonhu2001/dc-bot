@@ -92,7 +92,7 @@ def test_vip_timer_quick_order_builds_private_ticket_for_current_and_legacy_game
                 return SimpleNamespace(id=999)
 
         class FakeGuild:
-            default_role = SimpleNamespace()
+            default_role = object()
             me = None
             def __init__(self):
                 self.channels = []
