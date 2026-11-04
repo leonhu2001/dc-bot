@@ -20,6 +20,8 @@ from web.app.services.dispatch_support import (
     can_manage_dispatch_orders,
 )
 from web.app.services.dispatch_claim_access import decorate_dispatch_order
+from web.app.services.dispatch_assignment_eligibility import eligible_dispatch_assignees
+from services.order_rules import COIN_WASH_AW_ORDER_RULE_KEYS
 from web.app.services.order_service import (
     claim_order_for_worker,
     create_demo_orders_if_empty,
@@ -30,7 +32,10 @@ from web.app.services.order_service import (
     partition_dispatch_orders,
     unclaim_order_for_worker,
 )
-from web.app.services.staff_service import list_companion_members
+from web.app.services.staff_service import (
+    list_worker_members,
+    refresh_staff_members_if_stale,
+)
 
 router = APIRouter(tags=["dispatch"])
 
@@ -112,6 +117,14 @@ async def dispatch_dashboard(
         or user.get("is_companion")
     )
 
+    if support_can_manage:
+        try:
+            # Update the dedicated role and all other staff qualifications from
+            # Discord (up to once per minute), not the legacy companion flag.
+            refresh_staff_members_if_stale(max_age_seconds=60)
+        except Exception as exc:
+            print(f"[dispatch] staff role refresh failed: {type(exc).__name__}: {exc}", flush=True)
+
     db = SessionLocal()
 
     try:
@@ -128,11 +141,16 @@ async def dispatch_dashboard(
         active_order_count = get_worker_active_order_count(db, str(user["id"]))
         claimed_order_ids = get_worker_active_order_ids(db, str(user["id"]))
         claimed_orders = [order for order in orders if order.id in claimed_order_ids]
-        companion_options = (
-            list_companion_members(db)
-            if support_can_manage
-            else []
-        )
+        companion_options = list_worker_members(db) if support_can_manage else []
+        for order in orders:
+            order.dispatch_companion_options = eligible_dispatch_assignees(
+                order, companion_options
+            ) if support_can_manage else []
+            order.dispatch_assignment_role_label = (
+                "幣號／代洗／AW"
+                if str(order.order_rule_key or "") in COIN_WASH_AW_ORDER_RULE_KEYS
+                else ""
+            )
 
         guild_id = str(config.DISCORD_GUILD_ID or "").strip()
         claimed_order_summaries = {}

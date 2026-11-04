@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from services.order_rules import COIN_WASH_AW_RECEIVER_ROLE_ID
+
 from services.game_roles import (
     GAME_ROLES,
     GAME_ROLE_IDS,
@@ -34,7 +36,11 @@ COMPANION_ROLES = [
     StaffRole("1482080315798192210", "魔丸♟女陪", "companion"),
 ]
 
-RECEIVER_ROLES = PROTECTOR_ROLES + COMPANION_ROLES
+SPECIAL_RECEIVER_ROLES = [
+    StaffRole(COIN_WASH_AW_RECEIVER_ROLE_ID, "幣號／代洗／AW", "special_receiver"),
+]
+
+RECEIVER_ROLES = PROTECTOR_ROLES + COMPANION_ROLES + SPECIAL_RECEIVER_ROLES
 
 PROTECTOR_ROLE_IDS = {role.role_id for role in PROTECTOR_ROLES}
 COMPANION_ROLE_IDS = {role.role_id for role in COMPANION_ROLES}

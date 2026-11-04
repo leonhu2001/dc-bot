@@ -15,6 +15,11 @@ from web.app.services.admin_service import (
     write_admin_audit_log,
 )
 from web.app.services.order_service import create_sync_event
+from web.app.services.dispatch_assignment_eligibility import (
+    cached_staff_role_ids,
+    is_eligible_dispatch_assignee,
+)
+from web.app.services.dispatch_claim_access import load_dispatch_claim_snapshot
 from web.app.services.staff_service import (
     get_staff_display_name,
     get_staff_member_by_id,
@@ -77,14 +82,21 @@ def assign_companion_from_dispatch(
     if member is None or not bool(getattr(member, "is_active", False)):
         raise ValueError("找不到這位陪玩，或該員工目前不是啟用狀態。")
 
-    if not bool(getattr(member, "is_companion", False)):
-        raise ValueError("客服快速指派目前只顯示並允許陪玩身分。")
+    # An exclusive coin-wash/AW receiver may have no companion rank.
+    # Always validate the chosen worker against this concrete order, including
+    # direct forged POST requests and already-active orders.
+    order_status = str(getattr(order, "status", "") or "").strip()
+    if order_status in PREPAY_STATUSES:
+        snapshot = load_dispatch_claim_snapshot(db, int(order_id))
+        setattr(order, "dispatch_acceptance_meta", dict(snapshot.get("meta") or {}) if snapshot else None)
+
+    if not is_eligible_dispatch_assignee(order, member):
+        raise ValueError("此人沒有這張訂單所需的 Discord 接單身分組，不能指派。")
 
     companion_name = get_staff_display_name(member)
-    order_status = str(getattr(order, "status", "") or "").strip()
 
     if order_status in PREPAY_STATUSES:
-        role_ids = _member_role_ids(member)
+        role_ids = list(cached_staff_role_ids(member))
         if not role_ids:
             raise ValueError("這位陪玩的 Discord 身分組資料尚未同步，請稍後再試。")
 

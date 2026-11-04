@@ -160,7 +160,7 @@ def classify_roles(role_ids: list[str]) -> tuple[bool, bool, bool]:
     )
 
     is_customer_service = catalog_is_customer_service(role_set, customer_service_role_ids)
-    is_worker = is_protector(role_set) or catalog_is_companion(role_set) or bool(role_set & GAME_ROLE_IDS)
+    is_worker = bool(role_set & RECEIVER_ROLE_IDS) or bool(role_set & GAME_ROLE_IDS)
     is_companion = catalog_is_companion(role_set)
 
     return is_customer_service, is_worker, is_companion
