@@ -21,6 +21,7 @@ from web.app.services.dispatch_support import (
 )
 from web.app.services.dispatch_claim_access import decorate_dispatch_order
 from web.app.services.dispatch_assignment_eligibility import eligible_dispatch_assignees
+from services.order_rules import COIN_WASH_AW_ORDER_RULE_KEYS
 from web.app.services.order_service import (
     claim_order_for_worker,
     create_demo_orders_if_empty,
@@ -145,6 +146,11 @@ async def dispatch_dashboard(
             order.dispatch_companion_options = eligible_dispatch_assignees(
                 order, companion_options
             ) if support_can_manage else []
+            order.dispatch_assignment_role_label = (
+                "幣號／代洗／AW"
+                if str(order.order_rule_key or "") in COIN_WASH_AW_ORDER_RULE_KEYS
+                else ""
+            )
 
         guild_id = str(config.DISCORD_GUILD_ID or "").strip()
         claimed_order_summaries = {}
