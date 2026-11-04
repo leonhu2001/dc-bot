@@ -22,10 +22,8 @@ from services.staff_internal_ammo_dump_policy import (
     require_ammo_dump_named_selection,
     selected_ammo_dump_named,
 )
-from services.staff_internal_ammo_dump_ui import (
-    InternalAmmoNamedButton,
-    InternalAmmoNamedView,
-)
+from services.staff_internal_ammo_dump_ui import InternalAmmoNamedView
+from services.self_service_ui_runtime import SelfServiceSubmitNoteModal
 
 
 @pytest.mark.parametrize(
@@ -120,22 +118,24 @@ def test_named_state_clears_when_switching_product():
     assert "store_margin_amount" not in data
 
 
-def test_ticket_staff_checkbox_has_distinct_named_and_unnamed_options():
-    for named, label in [
-        (None, "待選擇"),
-        (True, "有掛名"),
-        (False, "無掛名"),
-    ]:
-        data = {} if named is None else {NAMED_SELECTION_KEY: named}
-        button = InternalAmmoNamedButton(customer_id=1, channel_id=99, data=data)
-        assert label in button.label
-        assert button.custom_id == "staff_internal_ammo_named_button"
-        assert button.row == 4
-
+def test_send_order_uses_named_dropdown_then_existing_note_modal():
+    # No extra persistent button on the busy Discord ticket row.
     view = InternalAmmoNamedView(customer_id=1, channel_id=99, panel_message_id=123)
     assert len(view.children) == 1
     control = view.children[0]
+    assert control.custom_id == "staff_internal_ammo_named_select"
     assert [o.value for o in control.options] == ["named", "unnamed"]
+    assert "送單時選擇" in control.placeholder
+
+    named_note = SelfServiceSubmitNoteModal(
+        customer_id=1, channel_id=99, ammo_named_selection=True
+    )
+    unnamed_note = SelfServiceSubmitNoteModal(
+        customer_id=1, channel_id=99, ammo_named_selection=False
+    )
+    assert named_note.ammo_named_selection is True
+    assert unnamed_note.ammo_named_selection is False
+
 
 
 def test_store_internal_panel_displays_both_ammo_prices_and_cs_choice():
