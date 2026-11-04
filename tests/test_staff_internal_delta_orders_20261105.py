@@ -4,7 +4,7 @@ import pytest
 
 from services import orders, self_service_financials
 from services.aw_collision_catalog import AW_RULE_KEYS, aw_collision_original_amount, validate_aw_quantity_for_rule
-from services.order_credential_runtime import _order_requires_credentials
+from services.order_credential_runtime import OrderCredentialModal, _order_requires_credentials
 from services.order_rules import ALL_CLAIM_ROLES, ORDER_RULES, calculate_price
 from services.quick_order_v2 import (
     QUICK_ORDER_V2_CHANNELS,
@@ -39,6 +39,7 @@ def test_internal_panel_is_channel_scoped_and_not_in_public_category_picker():
     assert "2,650T" in panel.description
     assert "2,480T" in panel.description
     assert "4T／發" in panel.description
+    assert "私密表單提交登入帳密" in panel.description
 
 
 @pytest.mark.parametrize(
@@ -56,7 +57,7 @@ def test_internal_500m_coin_wash_is_one_fixed_normal_order(group, rule_key, expe
     assert detail is not None
     assert draft["order_rule_key"] == rule_key
     assert draft["quantity"] == 1
-    assert _order_requires_credentials(draft) is False
+    assert _order_requires_credentials(draft) is True
 
     rule = ORDER_RULES[rule_key]
     assert rule.category == INTERNAL_CATEGORY
@@ -82,7 +83,7 @@ def test_internal_aw_modal_quantity_and_exact_4t_per_round():
     assert detail is not None
     assert detail["quantity_input_mode"] == "modal"
     assert draft["order_rule_key"] == INTERNAL_AW_RULE
-    assert _order_requires_credentials(draft) is False
+    assert _order_requires_credentials(draft) is True
 
     rule = ORDER_RULES[INTERNAL_AW_RULE]
     assert rule.category == INTERNAL_CATEGORY
@@ -121,3 +122,28 @@ def test_internal_aw_keeps_special_direct_payment_calculation():
     assert result["manual_discount_amount"] == 0
     assert result["cash_coupon_amount"] == 0
     assert result["point_discount_coupon_amount"] == 0
+
+
+@pytest.mark.parametrize(
+    "rule_key",
+    [
+        "staff_internal_ammo_dump_500m",
+        "staff_internal_car_500m",
+        "staff_internal_aw_collision",
+    ],
+)
+def test_all_internal_services_use_existing_private_credential_flow(rule_key):
+    assert _order_requires_credentials({
+        "category": INTERNAL_CATEGORY,
+        "order_rule_key": rule_key,
+    })
+    # Historic or recovered tickets can still be recognized from their stable rule.
+    assert _order_requires_credentials({"order_rule_key": rule_key})
+    assert not _order_requires_credentials({"category": "valorant", "order_rule_key": "valorant_entertain_ng"})
+
+
+def test_internal_credential_modal_has_internal_title():
+    modal = OrderCredentialModal(1234, internal_order=True)
+    assert modal.title == "內部服務登入資料"
+    legacy_modal = OrderCredentialModal(1234)
+    assert legacy_modal.title == "代肝／代解登入資料"
