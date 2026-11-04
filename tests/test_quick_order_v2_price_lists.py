@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
+import asyncio
 from types import SimpleNamespace
 
 from services import quick_order_v2 as quick
@@ -152,8 +152,7 @@ def test_game_price_list_preserves_category_prices_and_rules() -> None:
     assert all("教學單" not in p for p in steam.values())
 
 
-@pytest.mark.asyncio
-async def test_non_delta_button_opens_private_dropdown_then_switches_selected_page() -> None:
+def test_non_delta_button_opens_private_dropdown_then_switches_selected_page() -> None:
     class Response:
         def __init__(self) -> None:
             self.deferred: list[dict] = []
@@ -170,31 +169,34 @@ async def test_non_delta_button_opens_private_dropdown_then_switches_selected_pa
         async def edit_original_response(self, **kwargs) -> None:
             self.messages.append(kwargs)
 
-    for game in ("apex", "lol", "valorant", "steam"):
-        channel_id = int(quick.QUICK_ORDER_V2_CHANNELS[game])
-        interaction = Interaction()
-        button = price_lists.QuickPriceListButton(channel_id)
+    async def verify() -> None:
+        for game in ("apex", "lol", "valorant", "steam"):
+            channel_id = int(quick.QUICK_ORDER_V2_CHANNELS[game])
+            interaction = Interaction()
+            button = price_lists.QuickPriceListButton(channel_id)
+    
+            await button.callback(interaction)
+            assert interaction.response.deferred == [{"ephemeral": True, "thinking": True}]
+            assert len(interaction.messages) == 1
+            root = interaction.messages[0]
+            assert "請選擇" in root["embed"].description
+            view = root["view"]
+            assert isinstance(view, price_lists.GamePriceListView)
+            assert len(view.children[0].options) == (2 if game == "steam" else 4)
+    
+            key = "sweet" if game == "steam" else "technical"
+            select = view.children[0]
+            select._values = [key]
+            await select.callback(interaction)
+            assert interaction.response.deferred[-1] == {}
+            displayed = interaction.messages[-1]
+            assert isinstance(displayed["view"], price_lists.GamePriceListView)
+            assert displayed["embed"].description == (
+                price_lists._game_price_list_sections(interaction, channel_id)[key]
+            )
+            assert [o.value for o in displayed["view"].children[0].options if o.default] == [key]
 
-        await button.callback(interaction)
-        assert interaction.response.deferred == [{"ephemeral": True, "thinking": True}]
-        assert len(interaction.messages) == 1
-        root = interaction.messages[0]
-        assert "請選擇" in root["embed"].description
-        view = root["view"]
-        assert isinstance(view, price_lists.GamePriceListView)
-        assert len(view.children[0].options) == (2 if game == "steam" else 4)
-
-        key = "sweet" if game == "steam" else "technical"
-        select = view.children[0]
-        select._values = [key]
-        await select.callback(interaction)
-        assert interaction.response.deferred[-1] == {}
-        displayed = interaction.messages[-1]
-        assert isinstance(displayed["view"], price_lists.GamePriceListView)
-        assert displayed["embed"].description == (
-            price_lists._game_price_list_sections(interaction, channel_id)[key]
-        )
-        assert [o.value for o in displayed["view"].children[0].options if o.default] == [key]
+    asyncio.run(verify())
 
 
 def test_game_price_list_keeps_selected_option_checked() -> None:
