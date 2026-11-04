@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 
-AW_COLLISION_RECEIVER_ROLE_ID = "1565369317929918554"
-HALFCOIN_RECEIVER_ROLE_ID = "1565369029005287595"
+# 內部／對外「幣號、代洗、AW 代撞」使用同一 Discord 接單身分組。
+COIN_WASH_AW_RECEIVER_ROLE_ID = "1565369317929918554"
+AW_COLLISION_RECEIVER_ROLE_ID = COIN_WASH_AW_RECEIVER_ROLE_ID
+HALFCOIN_RECEIVER_ROLE_ID = COIN_WASH_AW_RECEIVER_ROLE_ID
 
 
 def install_special_receiver_roles_20261103() -> None:
-    """Install the only active special receiver roles.
+    """Install one shared role for coin wash and AW orders.
 
-    The retired AW role is intentionally not preserved as an alias or fallback.
-    AW collision and halfcoin each resolve to exactly one current Discord role.
+    Keep legacy rule keys for existing tickets, but do not revive retired IDs.
     """
     from services import order_rules
 
@@ -36,6 +37,7 @@ def install_special_receiver_roles_20261103() -> None:
 
 
 __all__ = [
+    "COIN_WASH_AW_RECEIVER_ROLE_ID",
     "AW_COLLISION_RECEIVER_ROLE_ID",
     "HALFCOIN_RECEIVER_ROLE_ID",
     "install_special_receiver_roles_20261103",

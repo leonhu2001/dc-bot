@@ -38,18 +38,21 @@ ROLE_IDS: dict[RoleKey, str] = {
     "female_companion": "1482080315798192210",
 }
 
+# 幣號／代洗／AW 代撞（內部及對外）共用唯一可接單身分組。
+# 舊的 aw_collision_receiver / halfcoin_receiver key 保留相容歷史訂單及設定。
+COIN_WASH_AW_RECEIVER_ROLE_ID = "1565369317929918554"
 AW_COLLISION_RECEIVER_ROLE_KEY = "aw_collision_receiver"
-AW_COLLISION_RECEIVER_ROLE_ID = "1565369029005287595"
+AW_COLLISION_RECEIVER_ROLE_ID = COIN_WASH_AW_RECEIVER_ROLE_ID
 HALFCOIN_RECEIVER_ROLE_KEY = "halfcoin_receiver"
-HALFCOIN_RECEIVER_ROLE_ID = "1565369317929918554"
+HALFCOIN_RECEIVER_ROLE_ID = COIN_WASH_AW_RECEIVER_ROLE_ID
 
 SPECIAL_RECEIVER_ROLE_IDS_BY_KEY: dict[str, str] = {
     AW_COLLISION_RECEIVER_ROLE_KEY: AW_COLLISION_RECEIVER_ROLE_ID,
     HALFCOIN_RECEIVER_ROLE_KEY: HALFCOIN_RECEIVER_ROLE_ID,
 }
 SPECIAL_RECEIVER_ROLE_LABELS_BY_KEY: dict[str, str] = {
-    AW_COLLISION_RECEIVER_ROLE_KEY: "AW代撞接單",
-    HALFCOIN_RECEIVER_ROLE_KEY: "哈夫幣代洗接單",
+    AW_COLLISION_RECEIVER_ROLE_KEY: "幣號／代洗／AW",
+    HALFCOIN_RECEIVER_ROLE_KEY: "幣號／代洗／AW",
 }
 
 GAME_ROLE_IDS_BY_KEY: dict[str, str] = {
@@ -98,6 +101,8 @@ COMPANION_ROLES: tuple[RoleKey, ...] = (
 ALL_RECEIVER_ROLES: tuple[RoleKey, ...] = PROTECTOR_ROLES + COMPANION_ROLES
 AW_COLLISION_RECEIVER_ROLES: tuple[RoleKey, ...] = ("aw_collision_receiver",)
 HALFCOIN_RECEIVER_ROLES: tuple[RoleKey, ...] = ("halfcoin_receiver",)
+# 新增幣號商品時沿用此共享職位，不建立另一組接單角色。
+COIN_WASH_AW_RECEIVER_ROLES: tuple[RoleKey, ...] = HALFCOIN_RECEIVER_ROLES
 SPECIAL_RECEIVER_ROLES: tuple[RoleKey, ...] = AW_COLLISION_RECEIVER_ROLES + HALFCOIN_RECEIVER_ROLES
 ALL_CLAIM_ROLES: tuple[RoleKey, ...] = ALL_RECEIVER_ROLES + SPECIAL_RECEIVER_ROLES
 
@@ -108,6 +113,19 @@ STEAM_GAME_ROLE = ("steam_game",)
 VALORANT_GAME_ROLE = ("valorant_game",)
 LOL_GAME_ROLE = ("lol_game",)
 APEX_GAME_ROLE = ("apex_game",)
+
+# 這些已上架的代洗／AW 商品無論來源，都只能由共享職位接單。
+# 尚未新增的「幣號」商品上架時，將 key 加到此表並使用共享職位。
+COIN_WASH_AW_ORDER_RULE_KEYS = frozenset({
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
+    "farm_aw_collision_1_100",
+    "farm_aw_collision_101_500",
+    "farm_aw_collision_501_plus",
+    "staff_internal_ammo_dump_500m",
+    "staff_internal_car_500m",
+    "staff_internal_aw_collision",
+})
 
 AW_COLLISION_PRICING_BY_RULE: dict[str, dict[str, Any]] = {
     "farm_aw_collision_1_100": {"label": "1～100發｜5T/發", "short_label": "1～100發", "min": 1, "max": 100, "rate_x2": 10, "rate_text": "5"},
@@ -1073,7 +1091,7 @@ for key, plan in AW_COLLISION_PRICING_BY_RULE.items():
 
 
 # 內部員工固定價商品。只由內部下單頻道提供入口，並不加入公開分類選項。
-# 票口走一般訂單與接單流程；不是 farm 類別，因此不要求登入帳密。
+# 票口沿用正常接單流程；付款成立後觸發帳號密碼私密流程。
 for key, label, price in (
     ("staff_internal_ammo_dump_500m", "內部洗幣｜倒子彈 500M", 2650),
     ("staff_internal_car_500m", "內部洗幣｜撞車 500M", 2480),
@@ -1081,7 +1099,7 @@ for key, label, price in (
     _add(OrderRule(
         category="staff_internal", key=key, label=label,
         pricing_type="fixed", price=price,
-        allowed_roles=ALL_CLAIM_ROLES, required_staff_count=1,
+        allowed_roles=COIN_WASH_AW_RECEIVER_ROLES, required_staff_count=1,
         min_quantity=1, max_quantity=1, allow_specify=False,
         vip_discount_allowed=False, point_benefits_allowed=False,
         loyalty_benefits_enabled=False, required_game_roles=(),
@@ -1092,7 +1110,7 @@ _add(OrderRule(
     key="staff_internal_aw_collision",
     label="內部 AW 子彈｜4T／發",
     pricing_type="unit", price=4, unit_label="發",
-    allowed_roles=ALL_CLAIM_ROLES, required_staff_count=1,
+    allowed_roles=COIN_WASH_AW_RECEIVER_ROLES, required_staff_count=1,
     min_quantity=1, max_quantity=999999, allow_specify=False,
     vip_discount_allowed=False, point_benefits_allowed=False,
     loyalty_benefits_enabled=False, required_game_roles=(),
@@ -1641,13 +1659,7 @@ SOURCE_AUTHORITY_RULE_KEYS = frozenset(
 
 # Owner-approved structural qualifications. Manager overrides may change ordinary
 # commercial fields but cannot broaden who may claim these system products.
-SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS = frozenset({
-    "farm_halfcoin_120m",
-    "farm_halfcoin_360m",
-    "farm_aw_collision_1_100",
-    "farm_aw_collision_101_500",
-    "farm_aw_collision_501_plus",
-})
+SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS = COIN_WASH_AW_ORDER_RULE_KEYS
 
 
 class EffectiveOrderRules(dict):
@@ -1873,6 +1885,9 @@ __all__ = [
     "AW_COLLISION_PRICING_BY_RULE",
     "HALFCOIN_RECEIVER_ROLES",
     "HALFCOIN_RECEIVER_ROLE_ID",
+    "COIN_WASH_AW_RECEIVER_ROLE_ID",
+    "COIN_WASH_AW_RECEIVER_ROLES",
+    "COIN_WASH_AW_ORDER_RULE_KEYS",
     "ALL_ROLE_IDS",
     "ALL_ROLE_LABELS",
     "CATEGORY_LABELS",

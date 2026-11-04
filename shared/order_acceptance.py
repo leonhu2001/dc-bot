@@ -9,7 +9,11 @@ from typing import Any
 
 from sqlalchemy import text
 
-from services.order_rules import role_ids_match_requirements
+from services.order_rules import (
+    COIN_WASH_AW_ORDER_RULE_KEYS,
+    COIN_WASH_AW_RECEIVER_ROLE_ID,
+    role_ids_match_requirements,
+)
 from shared.db import engine
 from shared.order_state import (
     ACCEPTED_PENDING_PAY,
@@ -39,6 +43,22 @@ COMPANION_ROLE_IDS = {
     "1500751059239440575",  # 魔丸♞男陪
     "1482080315798192210",  # 魔丸♟女陪
 }
+
+
+def _effective_claim_role_requirements(
+    order_rule_key: str,
+    allowed_role_ids: set[str],
+    required_game_role_ids: set[str],
+) -> tuple[set[str], set[str]]:
+    """Honor the dedicated coin-wash/AW receiver group, even on old order snapshots.
+
+    Old dispatched internal orders recorded all receiver groups, and old AW
+    orders recorded a separate AW-only role. Never trust those stale role
+    lists when deciding who may actually claim an order.
+    """
+    if str(order_rule_key or "").strip() in COIN_WASH_AW_ORDER_RULE_KEYS:
+        return {COIN_WASH_AW_RECEIVER_ROLE_ID}, set()
+    return allowed_role_ids, required_game_role_ids
 
 
 def _assignment_role_type_from_role_ids(
@@ -522,6 +542,11 @@ def claim_acceptance_order(
             _load_json_list(meta.get("required_game_role_ids_json"))
         )
         specified_staff_ids = _load_json_list(meta.get("specified_staff_ids_json"))
+        allowed_role_ids, required_game_role_ids = _effective_claim_role_requirements(
+            order_rule_key,
+            allowed_role_ids,
+            required_game_role_ids,
+        )
 
         if (
             staff_discord_id not in specified_staff_ids
