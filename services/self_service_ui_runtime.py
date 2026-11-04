@@ -38,7 +38,11 @@ from services.self_service_financials import (
     is_self_service_staff_price_required,
 )
 from services.self_service_retract import SelfServiceDispatchedView
-from services.staff_internal_ammo_dump_policy import require_ammo_dump_named_selection
+from services.staff_internal_ammo_dump_policy import (
+    NAMED_SELECTION_KEY,
+    is_internal_ammo_dump_rule,
+    require_ammo_dump_named_selection,
+)
 from services.self_service_selection_runtime import (
     SelfServicePointBenefitView,
     SelfServiceSpecifiedStaffDropdownView,
@@ -420,11 +424,19 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
         max_length=800,
     )
 
-    def __init__(self, customer_id: int, channel_id: int, panel_message_id: int | None = None):
+    def __init__(
+        self,
+        customer_id: int,
+        channel_id: int,
+        panel_message_id: int | None = None,
+        *,
+        ammo_named_selection: bool | None = None,
+    ):
         super().__init__()
         self.customer_id = int(customer_id)
         self.channel_id = int(channel_id)
         self.panel_message_id = panel_message_id
+        self.ammo_named_selection = ammo_named_selection
 
     async def on_submit(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
@@ -432,6 +444,21 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
             return
 
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        rule_key = str(data.get("order_rule_key") or "")
+        if is_internal_ammo_dump_rule(rule_key):
+            if type(self.ammo_named_selection) is not bool:
+                await interaction.response.send_message("請重新按送出訂單，選擇有掛名或無掛名。", ephemeral=True)
+                return
+            if data.get("dispatch_message_id"):
+                await interaction.response.send_message("這張訂單已送出，不能再修改掛名狀態。", ephemeral=True)
+                return
+            data[NAMED_SELECTION_KEY] = self.ammo_named_selection
+            data["staff_internal_ammo_named_set_by"] = interaction.user.id
+            data["staff_internal_ammo_named_set_at"] = get_taipei_now_iso()
+            data.pop("payment_method", None)
+        elif self.ammo_named_selection is not None:
+            await interaction.response.send_message("商品已變更，請重新按送出訂單。", ephemeral=True)
+            return
         note_text = str(self.note.value or "").strip()
 
         if note_text:
@@ -863,12 +890,6 @@ class SelfServiceOrderView(discord.ui.View):
 
         normalize_self_service_staff_count(data)
 
-        try:
-            require_ammo_dump_named_selection(rule, data)
-        except ValueError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
-            return
-
         if getattr(rule, "player_count_enabled", False) and not _to_int(data.get("player_count")):
             await interaction.response.send_modal(SelfServicePlayerCountModal(self.customer_id, self.channel_id))
             return
@@ -885,6 +906,21 @@ class SelfServiceOrderView(discord.ui.View):
             return
 
         panel_message_id = interaction.message.id if interaction.message is not None else None
+        if is_internal_ammo_dump_rule(rule):
+            from services.staff_internal_ammo_dump_ui import InternalAmmoNamedView
+
+            await interaction.response.send_message(
+                "送出倒子彈 500M 前，請由客服選擇掛名狀態。"
+                "\n有掛名 2,650T；無掛名 3,000T（多出的 350T 全歸店家）。",
+                view=InternalAmmoNamedView(
+                    customer_id=self.customer_id,
+                    channel_id=self.channel_id,
+                    panel_message_id=panel_message_id,
+                ),
+                ephemeral=True,
+            )
+            return
+
         await interaction.response.send_modal(
             SelfServiceSubmitNoteModal(
                 customer_id=self.customer_id,
