@@ -4,6 +4,11 @@ import json
 from typing import Any, Callable
 
 from services.aw_collision_financials import calculate_aw_collision_financials, is_aw_collision_rule
+from services.staff_internal_ammo_dump_policy import (
+    calculate_internal_ammo_dump_financials,
+    is_internal_ammo_dump_rule,
+    selected_ammo_dump_named,
+)
 
 import discord
 
@@ -204,6 +209,21 @@ def add_self_service_financial_breakdown_fields(
 
     embed.add_field(name=final_label, value=_format_plain_amount(final), inline=True)
     embed.add_field(name="打手分潤基準", value=_format_plain_amount(payout), inline=True)
+    if is_internal_ammo_dump_rule(src.get("order_rule_key")) or (
+        "staff_internal_ammo_named" in src
+    ):
+        named = selected_ammo_dump_named(src)
+        embed.add_field(
+            name="掛名狀態",
+            value="有掛名" if named is True else "無掛名" if named is False else "等待客服選擇",
+            inline=True,
+        )
+        if named is False:
+            embed.add_field(
+                name="店家收入差額",
+                value=f"{_price_int(src, 'store_margin_amount', default=0):,}T（全歸店家）",
+                inline=True,
+            )
 
     benefit_name = str(src.get("point_benefit_name") or "").strip()
     bonus = str(src.get("service_bonus_text") or "").strip()
@@ -402,12 +422,12 @@ def _quote_preview_lines_for_self_service(
     else:
         adjustment = calculate_self_service_financials(rule, price, data)
         if adjustment.get("manual_price_missing"):
-            lines.append(("顧客應付", "客服待填價"))
+            lines.append(("顧客應付", "等待客服選擇掛名" if is_internal_ammo_dump_rule(rule) else "客服待填價"))
         else:
             lines.append(("顧客應付", _format_plain_amount(adjustment["customer_pay_amount"])))
 
         detail_parts = [
-            "客服待填價格"
+            ("客服待選擇掛名" if is_internal_ammo_dump_rule(rule) else "客服待填價格")
             if adjustment.get("manual_price_missing")
             else f"商品原價 {_format_plain_amount(adjustment['service_original_amount'])}"
         ]
@@ -430,6 +450,11 @@ def _quote_preview_lines_for_self_service(
                 f" -{_format_plain_amount(adjustment['manual_discount_amount'])}（{reason}）"
             )
         detail_parts.append(f"打手分潤基準 {_format_plain_amount(adjustment['payout_base_amount'])}")
+        if is_internal_ammo_dump_rule(rule):
+            named = selected_ammo_dump_named(data)
+            lines.append(("掛名狀態", "有掛名" if named is True else "無掛名" if named is False else "等待客服勾選"))
+            if named is False:
+                detail_parts.append("店家收入差額 350（店家全額保留）")
         if adjustment["point_discount_coupon_amount"] > 0:
             detail_parts.append(
                 f"點數折價 -{_format_plain_amount(adjustment['point_discount_coupon_amount'])}（店內吸收）"
@@ -519,6 +544,8 @@ def _format_point_hours(hours) -> str:
 
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
+    if is_internal_ammo_dump_rule(rule):
+        return calculate_internal_ammo_dump_financials(price_result, data)
     if is_aw_collision_rule(rule):
         return calculate_aw_collision_financials(price_result, data)
 
