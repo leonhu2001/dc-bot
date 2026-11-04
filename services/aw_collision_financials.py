@@ -3,7 +3,7 @@ from __future__ import annotations
 
 def is_aw_collision_rule(rule_or_key) -> bool:
     key = str(getattr(rule_or_key, "key", rule_or_key) or "").strip()
-    return key.startswith("farm_aw_collision_")
+    return key.startswith("farm_aw_collision_") or key == "staff_internal_aw_collision"
 
 
 def _manual_staff_price(data: dict) -> int | None:
