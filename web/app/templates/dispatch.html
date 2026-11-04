@@ -88,12 +88,12 @@
                 <form class="dispatch-support-form" method="post" action="/dispatch/orders/{{ order.id }}/support-assign">
                     <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}">
                     <select name="companion_discord_id" required>
-                        <option value="">選擇陪玩指派到此單</option>
-                        {% for companion in companion_options %}
+                        <option value="">選擇符合此單資格的接單人員</option>
+                        {% for companion in order.dispatch_companion_options %}
                             <option value="{{ companion.discord_id }}">{{ companion.display_name or companion.global_name or companion.username or companion.discord_id }}</option>
                         {% endfor %}
                     </select>
-                    <button type="submit">指派陪玩</button>
+                    <button type="submit"{% if not order.dispatch_companion_options %} disabled{% endif %}>指派陪玩</button>
                 </form>
                 <div class="dispatch-support-links">
                     <a class="dispatch-support-link" href="/admin/order-workspace/{{ order.id }}">修改訂單</a>
