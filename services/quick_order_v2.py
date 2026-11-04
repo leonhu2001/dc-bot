@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import traceback
 
 import discord
 from discord.ext import commands
@@ -11,6 +12,7 @@ from services.orders import ORDER_CATEGORY_LABELS, ORDER_ITEM_GROUPS_BY_CATEGORY
 from services.rewards import format_customer_notes_for_ticket
 from services.ticket_identity import build_ticket_channel_name
 from services.vip_timer import VIP_TIMER_CATEGORY, VIP_TIMER_CATEGORY_LABEL
+from services.vip_timer_game_compat import resolve_vip_timer_game_label
 from services.vip_timer_self_service import (
     assert_vip_timer_self_service_eligible,
     prepare_vip_timer_draft,
@@ -361,10 +363,21 @@ class QuickVipGameSelect(discord.ui.Select):
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
+        # Historic public panels still send their old label values.
+        # Resolve to the *current* game before showing confirmation.
+        refresh_vip_timer_self_service_catalog()
+        canonical_game = resolve_vip_timer_game_label(selected)
+        if canonical_game is None:
+            await interaction.response.send_message(
+                "VIP 自由計時的遊戲清單已更新，請從下單面板重新選擇遊戲。",
+                ephemeral=True,
+            )
+            return
+
         await _send_confirmation(
             interaction,
             category=VIP_TIMER_CATEGORY,
-            item_group=selected,
+            item_group=canonical_game,
             source_channel_id=QUICK_ORDER_V2_CHANNELS["vip_timer"],
         )
 
@@ -538,6 +551,14 @@ async def _create_ticket(
             await interaction.response.send_message(str(exc), ephemeral=True)
             return None
         refresh_vip_timer_self_service_catalog()
+        canonical_game = resolve_vip_timer_game_label(item_group)
+        if canonical_game is None:
+            await interaction.response.send_message(
+                "VIP 自由計時的遊戲清單已更新，請從下單面板重新選擇遊戲後再開票。",
+                ephemeral=True,
+            )
+            return None
+        item_group = canonical_game
 
     await interaction.response.defer(ephemeral=True)
 
@@ -583,6 +604,7 @@ async def _create_ticket(
         )
 
     ticket: discord.TextChannel | None = None
+    stage = "create_channel"
     try:
         ticket = await guild.create_text_channel(
             name=build_ticket_channel_name("下單", member),
@@ -596,6 +618,7 @@ async def _create_ticket(
             reason=f"Order ticket opened by {member}",
         )
 
+        stage = "prepare_order_draft"
         from services import self_service_selection_state as selection_state
         from services import self_service_ui_runtime as ui
 
@@ -626,6 +649,7 @@ async def _create_ticket(
         )
         support_mention = role.mention if role is not None else "客服"
 
+        stage = "send_order_intro"
         await ticket.send(
             f"{support_mention} {member.mention} 下單票口已建立。\n"
             f"已選服務：**{selected_label}**\n"
@@ -639,6 +663,7 @@ async def _create_ticket(
             ),
         )
 
+        stage = "build_order_selector_panel"
         await ticket.send(
             embed=ui.build_self_service_panel_embed(member.id, data, guild),
             view=ui.SelfServiceOrderView(
@@ -660,14 +685,20 @@ async def _create_ticket(
                 pass
 
         print(
-            f"[quick-order-v2] create ticket failed: "
+            f"[quick-order-v2] create ticket failed "
+            f"stage={stage} category={category}: "
             f"{type(exc).__name__}: {exc}",
             flush=True,
         )
+        # The traceback belongs only in server logs, not Discord. Never log
+        # payment/credential fields from the order draft.
+        traceback.print_exc()
         await interaction.edit_original_response(
             content=(
-                f"建立下單票口失敗：{type(exc).__name__}。"
-                "請稍後重試或通知客服。"
+                "VIP 自由計時票口初始化失敗，未完成的票口已清理。"
+                "請通知客服確認機器人紀錄中的階段資訊。"
+                if category == VIP_TIMER_CATEGORY
+                else f"建立下單票口失敗：{type(exc).__name__}。請稍後重試或通知客服。"
             ),
             embed=None,
             view=None,

@@ -782,35 +782,45 @@ def _install_view_patch() -> None:
         channel_id: int,
         selected_category: str | None = None,
     ):
-        original(view, customer_id, channel_id, selected_category)
         data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
         category = str(selected_category or data.get("category") or "")
         if category != flow.VIP_TIMER_CATEGORY:
+            original(view, customer_id, channel_id, selected_category)
             return
 
-        replace_ids = {
-            "self_service_order_category_select",
-            "self_service_order_item_select",
-            "self_service_order_detail_select",
-            "self_service_order_quantity_select",
-            "vip_timer_service_type_select",
-            "vip_timer_rule_select",
-            "vip_timer_gameplay_select",
-            "vip_timer_service_select",
-            "vip_timer_game_select",
-            "vip_timer_category_select",
-            "vip_timer_headcount_select",
-        }
+        # VIP timer has four dedicated Select rows. Do NOT construct the
+        # historical generic/v1/v2 Select stack first: its nested wrappers can
+        # try to add two full-width Selects to row 3, raising
+        # ValueError("item would not fit at row 3 (10 > 5 width)") before
+        # we ever reach the cleanup loop. Initialize the decorated submit
+        # button directly, then add exactly four canonical Select controls.
+        discord.ui.View.__init__(view, timeout=86400)
+        view.customer_id = customer_id
+        view.channel_id = channel_id
+
         remove_timer_buttons = {
             "self_service_order_specified_staff_button",
             "self_service_order_point_benefit_button",
             "self_service_order_staff_price_button",
             "self_service_order_staff_discount_coupon_button",
         }
+        submit_button = None
         for child in list(view.children):
             custom_id = str(getattr(child, "custom_id", "") or "")
-            if custom_id in replace_ids or custom_id in remove_timer_buttons:
+            if custom_id == "self_service_order_go_payment_button":
+                submit_button = child
+            elif custom_id in remove_timer_buttons or isinstance(child, discord.ui.Select):
                 view.remove_item(child)
+
+        if submit_button is None:
+            raise RuntimeError("VIP 自由計時票口缺少客服送單按鈕。")
+        submit_button.label = "送出 VIP 計時單"
+
+        async def timer_submit_callback(interaction: discord.Interaction, _view=view):
+            from services.vip_timer_self_service import _timer_submit_from_view
+            await _timer_submit_from_view(_view, interaction)
+
+        submit_button.callback = timer_submit_callback
 
         view.add_item(VipTimerGameSelect(customer_id, channel_id))
         view.add_item(VipTimerCategorySelect(customer_id, channel_id))
