@@ -59,6 +59,11 @@ _PRODUCT_DEPENDENT_KEYS = (
     "manual_staff_price_reason",
     "manual_staff_price_set_by",
     "manual_staff_price_set_at",
+    # Customer-service named/unnamed classification belongs only to 500M ammo.
+    "staff_internal_ammo_named",
+    "staff_internal_ammo_named_set_by",
+    "staff_internal_ammo_named_set_at",
+    "store_margin_amount",
 )
 
 
