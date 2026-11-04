@@ -150,7 +150,7 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
                 "**AW 子彈**\n"
                 "• 代撞：**4T／發**（發數自行輸入）\n\n"
                 "請在下方選擇服務，再確認建立私人下單票口。\n"
-                "票口沿用一般接單與付款流程，無須提供遊戲帳密。"
+                "票口沿用一般接單與付款流程；付款成立後，請在私密表單提交登入帳密。"
             ),
             color=discord.Color.blue(),
         )
@@ -466,7 +466,7 @@ async def _send_confirmation(
 
     timer = category == VIP_TIMER_CATEGORY
     quantity_instruction = (
-        "洗幣兩方案皆為固定 500M；AW 在票口內自行輸入發數。"
+        "洗幣兩方案皆為固定 500M；AW 在票口內自行輸入發數。付款成立後需透過私密表單提交帳密。"
         if category == "staff_internal"
         else "票口內再完成剩餘規格與數量。"
     )
