@@ -122,6 +122,7 @@ CATEGORY_LABELS: dict[str, str] = {
     "delta_mobile_basic": "三角洲 基礎單<手遊>",
     "delta_desktop_fun": "三角洲 趣味單<端遊>",
     "farm": "台服代肝代解",
+    "staff_internal": "三角洲｜內部洗幣與 AW",
     "basic": "三角洲 基礎單",
     "fun": "三角洲 趣味單",
     "general": "通用單",
@@ -1068,6 +1069,35 @@ for key, plan in AW_COLLISION_PRICING_BY_RULE.items():
 
 
 
+
+
+
+# 內部員工固定價商品。只由內部下單頻道提供入口，並不加入公開分類選項。
+# 票口走一般訂單與接單流程；不是 farm 類別，因此不要求登入帳密。
+for key, label, price in (
+    ("staff_internal_ammo_dump_500m", "內部洗幣｜倒子彈 500M", 2650),
+    ("staff_internal_car_500m", "內部洗幣｜撞車 500M", 2480),
+):
+    _add(OrderRule(
+        category="staff_internal", key=key, label=label,
+        pricing_type="fixed", price=price,
+        allowed_roles=ALL_CLAIM_ROLES, required_staff_count=1,
+        min_quantity=1, max_quantity=1, allow_specify=False,
+        vip_discount_allowed=False, point_benefits_allowed=False,
+        loyalty_benefits_enabled=False, required_game_roles=(),
+    ))
+
+_add(OrderRule(
+    category="staff_internal",
+    key="staff_internal_aw_collision",
+    label="內部 AW 子彈｜4T／發",
+    pricing_type="unit", price=4, unit_label="發",
+    allowed_roles=ALL_CLAIM_ROLES, required_staff_count=1,
+    min_quantity=1, max_quantity=999999, allow_specify=False,
+    vip_discount_allowed=False, point_benefits_allowed=False,
+    loyalty_benefits_enabled=False, required_game_roles=(),
+    note="內部 AW 代撞每發 4T，使用發數輸入視窗。",
+))
 
 
 # ========= Steam 陪玩 =========
