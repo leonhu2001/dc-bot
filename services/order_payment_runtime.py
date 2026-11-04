@@ -486,7 +486,8 @@ async def finalize_accepted_pending_payment(
 
         response_text = f"已確認付款方式：{payment_method}，訂單正式成立。"
         if _order_requires_credentials(data):
-            response_text += "\n🔐 請在票口的登入資料面板填寫代肝／代解帳號資料。"
+            credential_hint = ("內部洗幣／AW 服務" if str(data.get("category") or "").strip().lower() == "staff_internal" else "代肝／代解")
+            response_text += f"\n🔐 請在票口的登入資料面板填寫{credential_hint}帳號資料。"
         if data.get("receipt_id"):
             response_text += f"\n交易收據已產生：{data.get('receipt_id')}"
         if order_point_benefit_result:
