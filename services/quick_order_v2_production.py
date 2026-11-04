@@ -332,7 +332,7 @@ def _install_ticket_ui_policy() -> None:
 
         category = str(data.get("category") or "")
         is_timer = category == quick.VIP_TIMER_CATEGORY
-        is_farm = category == "farm"
+        is_farm = category in {"farm", "staff_internal"}
         item = str(data.get("item") or "").strip()
         rule_key = str(data.get("order_rule_key") or "").strip()
         rule = ORDER_RULES.get(rule_key)
@@ -396,7 +396,7 @@ def _install_ticket_ui_policy() -> None:
                 "self_service_order_point_benefit_button",
                 "self_service_order_staff_discount_coupon_button",
             }:
-                if not item:
+                if not item or category == "staff_internal":
                     self.remove_item(child)
 
             elif is_farm and custom_id == "self_service_order_staff_price_button":
@@ -407,6 +407,10 @@ def _install_ticket_ui_policy() -> None:
                 child.disabled = True
 
         apply_quick_order_select_display(self, data)
+        if rule_key == "staff_internal_aw_collision":
+            for child in self.children:
+                if getattr(child, "custom_id", None) == "self_service_order_quantity_select":
+                    child.placeholder = "點此填寫 AW 發數"
 
     def ticket_panel_builder(
         customer_id: int,
