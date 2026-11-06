@@ -184,6 +184,9 @@ async def admin_order_workspace_r8(
             db, int(order_id)
         )
         workspace_cs_payouts = _mw_r8_cs_payout_rows(db, int(order_id))
+        from services.one_companion_one_guard_payout import is_full_worker_payout_rule
+
+        full_worker_payout = is_full_worker_payout_rule(order.get("rule_key"))
 
         acceptance_state = None
         if str(order.get("status") or "").strip().lower() in PREPAY_ACCEPTANCE_STATUSES:
@@ -207,6 +210,7 @@ async def admin_order_workspace_r8(
             "worker_members": worker_members,
             "workspace_assignments": workspace_assignments,
             "workspace_cs_payouts": workspace_cs_payouts,
+            "full_worker_payout": full_worker_payout,
             "stream_bonus_editable": stream_bonus_editable,
             "acceptance_state": acceptance_state,
             "paid_status": PayoutStatus.PAID.value,

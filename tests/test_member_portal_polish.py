@@ -44,7 +44,8 @@ def test_cs_payout_recalculation_uses_shared_separate_base_rule():
     # test to one wrapper's exact call spelling; wrappers may be refactored safely.
     assert "calculate_customer_service_payout_base_amount(" in order_source
     assert "calculate_customer_service_payout_base_amount(" in reconciliation_source
-    assert "customer_service_total_amount=(" in reconciliation_source
+    assert "customer_service_total_amount=cs_base" in reconciliation_source
+    assert "calculate_one_companion_one_guard_order_payout(" in reconciliation_source
 
 
 def test_member_center_uses_recomposed_dashboard():

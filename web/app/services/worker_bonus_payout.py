@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, inspect, select, text
 
+from services.one_companion_one_guard_payout import is_full_worker_payout_rule
 from shared.db import SessionLocal
 from shared.models import CustomerServicePayout, OrderAssignment, PayoutStatus, WebOrder, WorkerPayout
 from shared.payout import (
@@ -199,8 +200,11 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
             raise ValueError("找不到訂單。")
 
         legacy = _is_legacy_order(order)
-        stream_map = _approved_stream_map(db, int(order_id))
-        stream_override_map = _assignment_stream_override_map(db, int(order_id))
+        full_worker_payout = is_full_worker_payout_rule(order.order_rule_key)
+        stream_map = {} if full_worker_payout else _approved_stream_map(db, int(order_id))
+        stream_override_map = (
+            {} if full_worker_payout else _assignment_stream_override_map(db, int(order_id))
+        )
         payouts = list(
             db.scalars(
                 select(WorkerPayout).where(WorkerPayout.order_id == int(order_id))
@@ -210,6 +214,34 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
         details: list[dict] = []
         for payout in payouts:
             worker_id = str(payout.worker_discord_id or "")
+            if full_worker_payout:
+                # Farm/coin-wash/AW direct-pay products are 100% worker payout.
+                # Report named/streamed flags are informational only; they must
+                # never replace the payout with the generic 80-90% bonus model.
+                gross = max(0, int(payout.gross_share or 0))
+                manual_override = "手動指定分潤" in str(payout.note or "")
+                locked = payout.payout_status == PayoutStatus.PAID.value or manual_override
+                if not locked:
+                    payout.base_rate = 1.0
+                    payout.base_payout = gross
+                    payout.named_bonus_rate = 0.0
+                    payout.named_bonus_amount = 0
+                    payout.final_payout = gross
+                    payout.note = "特殊代肝單｜接單人員全額 100%｜無客服分潤及額外獎金"
+                details.append({
+                    "worker_id": worker_id,
+                    "rate": 1.0,
+                    "streamed": False,
+                    "stream_bonus_override": None,
+                    "named": bool(payout.has_named_bonus),
+                    "previous_month_performance": 0,
+                    "previous_month_paid_salary": 0,
+                    "previous_month_bonus": False,
+                    "store_bound_at_close": False,
+                    "locked": locked,
+                })
+                continue
+
             previous_performance = previous_month_performance(db, worker_id, now=now)
             previous_bonus = (not legacy) and previous_performance >= WORKER_PREVIOUS_MONTH_SALARY_THRESHOLD
             stream_override = stream_override_map.get(worker_id)
@@ -278,7 +310,10 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                 payout_base_amount=payout_base,
                 price_snapshot_json=order.price_snapshot_json,
             )
-            if legacy:
+            if full_worker_payout:
+                cs_rate = 0.0
+                cs_amount = 0
+            elif legacy:
                 cs_rate = LEGACY_CUSTOMER_SERVICE_GROSS_RATE
                 cs_amount = int(round(int(cs_base) * cs_rate))
             else:
