@@ -911,7 +911,7 @@ class SelfServiceOrderView(discord.ui.View):
 
             await interaction.response.send_message(
                 "送出倒子彈 500M 前，請由客服選擇掛名狀態。"
-                "\n有掛名 2,650T；無掛名 3,000T（多出的 350T 全歸店家）。",
+                "\n有掛名 2,650T；無掛名 3,000T（差額 350T：客服 88T、店家 262T）。",
                 view=InternalAmmoNamedView(
                     customer_id=self.customer_id,
                     channel_id=self.channel_id,

@@ -83,6 +83,10 @@ def test_dry_run_then_apply_repair_only_safe_unpaid_direct_pay_orders(monkeypatc
     assert preview["counts"]["skip_gross_mismatch"] == 1
     assert preview["counts"]["skip_invalid_internal_basis"] == 1
     assert len(preview["changes"]) == 4
+    unnamed_row = next(row for row in preview["changes"] if row["order_id"] == unnamed)
+    assert unnamed_row["worker_after"] == 2650
+    assert unnamed_row["cs_after"] == 88
+    assert unnamed_row["store_after"] == 262
 
     with Session(engine) as db:
         assert db.query(WorkerPayout).filter_by(order_id=named).one().final_payout == 2200
@@ -92,7 +96,7 @@ def test_dry_run_then_apply_repair_only_safe_unpaid_direct_pay_orders(monkeypatc
     with Session(engine) as db:
         for order_id, gross, expected_margin in [
             (named, 2650, 0),
-            (unnamed, 2650, 350),
+            (unnamed, 2650, 262),
             (car, 2480, 0),
             (aw, 80, 0),
         ]:
@@ -102,7 +106,7 @@ def test_dry_run_then_apply_repair_only_safe_unpaid_direct_pay_orders(monkeypatc
             assert payout.final_payout == gross
             assert payout.named_bonus_amount == 0
             assert payout.base_rate == 1.0
-            assert cs_row.payout_amount == 0
+            assert cs_row.payout_amount == (88 if order_id == unnamed else 0)
             assert order.customer_pay_amount - payout.final_payout - cs_row.payout_amount == expected_margin
         assert db.query(WorkerPayout).filter_by(order_id=paid).one().final_payout == 1984
         assert db.query(WorkerPayout).filter_by(order_id=manual).one().final_payout == 2111

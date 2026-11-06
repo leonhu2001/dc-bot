@@ -23,7 +23,7 @@ from web.app.services.order_service import get_worker_dispatch_payout_preview
     ("rule_key", "customer_pay", "worker_base", "expected_store"),
     [
         ("staff_internal_ammo_dump_500m", 2650, 2650, 0),
-        ("staff_internal_ammo_dump_500m", 3000, 2650, 350),
+        ("staff_internal_ammo_dump_500m", 3000, 2650, 262),
         ("staff_internal_car_500m", 2480, 2480, 0),
         ("staff_internal_aw_collision", 52, 52, 0),  # 13 AW rounds at 4T
         ("farm_halfcoin_120m", 1800, 1800, 0),
@@ -101,8 +101,9 @@ def test_approved_report_never_reapplies_generic_wage_or_cs_commission(
         assert payout.named_bonus_amount == 0
         assert payout.named_bonus_rate == 0
         assert "全額 100%" in payout.note
-        assert cs.rate == 0
-        assert cs.payout_amount == 0
+        expected_cs = 88 if rule_key == "staff_internal_ammo_dump_500m" and customer_pay == 3000 else 0
+        assert cs.payout_amount == expected_cs
+        assert cs.rate == pytest.approx(expected_cs / customer_pay if customer_pay else 0.0)
         assert customer_pay - payout.final_payout - cs.payout_amount == expected_store
 
     assert result["workers"][0]["rate"] == 1.0

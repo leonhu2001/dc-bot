@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from services.one_companion_one_guard_payout import is_full_worker_payout_rule
+from services.staff_internal_ammo_dump_policy import calculate_internal_ammo_dump_cs_payout
 from shared.payout import (
     CUSTOMER_SERVICE_PAYOUT_RATE,
     LEGACY_CUSTOMER_SERVICE_POLICY,
@@ -150,7 +151,8 @@ def _policy_consistency_for_order(
     rule_column = "order_rule_key" if "order_rule_key" in order_columns else "NULL AS order_rule_key"
     order = conn.execute(
         f"""
-        SELECT id, status, amount, payout_base_amount, price_snapshot_json, {rule_column}
+        SELECT id, status, amount, payout_base_amount, price_snapshot_json, {rule_column},
+               {("customer_pay_amount" if "customer_pay_amount" in order_columns else "amount AS customer_pay_amount")}
         FROM web_orders
         WHERE id = ?
         LIMIT 1
@@ -247,7 +249,12 @@ def _policy_consistency_for_order(
                 else 0.80
             )
             expected_cs = (
-                0
+                calculate_internal_ammo_dump_cs_payout(
+                    order["order_rule_key"],
+                    order["customer_pay_amount"]
+                    if order["customer_pay_amount"] is not None else order["amount"],
+                    payout_base,
+                )
                 if is_full_worker_payout_rule(order["order_rule_key"])
                 else int(
                     round(

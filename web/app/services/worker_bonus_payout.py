@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, inspect, select, text
 
 from services.one_companion_one_guard_payout import is_full_worker_payout_rule
+from services.staff_internal_ammo_dump_policy import calculate_internal_ammo_dump_cs_payout
 from shared.db import SessionLocal
 from shared.models import CustomerServicePayout, OrderAssignment, PayoutStatus, WebOrder, WorkerPayout
 from shared.payout import (
@@ -311,8 +312,14 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                 price_snapshot_json=order.price_snapshot_json,
             )
             if full_worker_payout:
-                cs_rate = 0.0
-                cs_amount = 0
+                customer_paid = int(
+                    order.customer_pay_amount
+                    if order.customer_pay_amount is not None else order.amount or 0
+                )
+                cs_amount = calculate_internal_ammo_dump_cs_payout(
+                    order.order_rule_key, customer_paid, payout_base
+                )
+                cs_rate = cs_amount / customer_paid if customer_paid > 0 else 0.0
             elif legacy:
                 cs_rate = LEGACY_CUSTOMER_SERVICE_GROSS_RATE
                 cs_amount = int(round(int(cs_base) * cs_rate))

@@ -50,6 +50,8 @@ def test_ammo_named_selection_is_only_price_input_and_worker_gets_full_2650(
     assert result["service_original_amount"] == customer_price
     assert result["payout_base_amount"] == 2650
     assert result["store_margin_amount"] == store_margin
+    assert result["customer_service_payout_amount"] == (88 if not named else 0)
+    assert result["store_retained_amount"] == (262 if not named else 0)
     assert result["manual_staff_amount"] is None
     assert result["manual_discount_amount"] == 0
     assert result["cash_coupon_amount"] == 0
@@ -67,7 +69,8 @@ def test_ammo_named_selection_is_only_price_input_and_worker_gets_full_2650(
     assert payout.total_worker_payout == 2650
     assert payout.worker_payouts[0].final_payout == 2650
     assert payout.worker_payouts[0].named_bonus_amount == 0
-    assert payout.customer_service_payout == 0
+    assert payout.customer_service_payout == (88 if not named else 0)
+    assert payout.total_payout == (2650 + (88 if not named else 0))
 
     embed = discord.Embed()
     add_self_service_financial_breakdown_fields(embed, result)
@@ -76,9 +79,12 @@ def test_ammo_named_selection_is_only_price_input_and_worker_gets_full_2650(
     assert fields["打手分潤基準"] == "2,650"
     assert fields["掛名狀態"] == ("有掛名" if named else "無掛名")
     if not named:
-        assert "350T" in fields["店家收入差額"]
+        assert fields["店家抽成前差額"] == "350T"
+        assert fields["客服分潤"].startswith("88T")
+        assert fields["店家實留"] == "262T"
     else:
-        assert "店家收入差額" not in fields
+        assert "店家抽成前差額" not in fields
+        assert "客服分潤" not in fields
 
 
 def test_ammo_requires_explicit_customer_service_choice_before_dispatch():
