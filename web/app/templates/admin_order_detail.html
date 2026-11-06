@@ -828,8 +828,8 @@
         <div class="mw-r8-editor-head">
             <div>
                 <small>CUSTOMER SERVICE PAYOUT</small>
-                <h3>{{ '特殊單｜客服不抽成' if full_worker_payout else '客服分潤' }}</h3>
-                <p>{{ '這類服務的代肝全額取得分潤基準，不產生客服抽成或額外掛名／直播獎金。' if full_worker_payout else '同一個工作區直接查看與切換客服分潤發放狀態。' }}</p>
+                <h3>{{ '無掛名倒子彈｜差額客服分潤 25%' if special_ammo_cs_payout else '特殊單｜客服不抽成' if full_worker_payout else '客服分潤' }}</h3>
+                <p>{{ '本單額外差額 350T，其中客服分潤 88T，店家實留 262T；代肝固定全額 2,650T。' if special_ammo_cs_payout else '這類服務的代肝全額取得分潤基準，不產生客服抽成或額外掛名／直播獎金。' if full_worker_payout else '同一個工作區直接查看與切換客服分潤發放狀態。' }}</p>
             </div>
         </div>
 
@@ -859,7 +859,7 @@
                     </div>
                 </div>
             {% else %}
-                <div class="mw-r8-meta">{{ '本單客服分潤為 0T，不需發放。' if full_worker_payout else '目前沒有客服分潤紀錄。' }}</div>
+                <div class="mw-r8-meta">{{ '本單應有客服分潤 88T，請檢查分潤資料。' if special_ammo_cs_payout else '本單客服分潤為 0T，不需發放。' if full_worker_payout else '目前沒有客服分潤紀錄。' }}</div>
             {% endfor %}
         </div>
     </div>
