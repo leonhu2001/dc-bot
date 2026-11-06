@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal, ROUND_FLOOR
+
+from services.staff_internal_ammo_dump_policy import calculate_internal_ammo_dump_cs_payout
 from typing import Iterable
 
 from shared.payout import OrderPayoutResult, calculate_order_payout
@@ -168,7 +171,7 @@ def calculate_one_companion_one_guard_order_payout(
             if customer_service_total_amount is None
             else max(0, int(customer_service_total_amount or 0))
         )
-        return calculate_order_payout(
+        payout = calculate_order_payout(
             total_amount=max(0, int(total_amount or 0)),
             worker_discord_ids=worker_ids,
             named_bonus_worker_ids=[],
@@ -177,6 +180,17 @@ def calculate_one_companion_one_guard_order_payout(
             named_bonus_rate=0.0,
             customer_service_total_amount=customer_service_amount,
         )
+        cs_payout = calculate_internal_ammo_dump_cs_payout(
+            rule_key, customer_service_amount, total_amount
+        )
+        if cs_payout:
+            return replace(
+                payout,
+                customer_service_rate=cs_payout / customer_service_amount,
+                customer_service_payout=cs_payout,
+                total_payout=payout.total_worker_payout + cs_payout,
+            )
+        return payout
 
     shares = allocate_integer_gross_shares(rule_key, workers, total_amount)
     if shares is None:
