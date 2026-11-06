@@ -372,7 +372,11 @@ def _quote_preview_lines_for_self_service(
             named = selected_ammo_dump_named(data)
             lines.append(("掛名狀態", "有掛名" if named is True else "無掛名" if named is False else "等待客服勾選"))
             if named is False:
-                detail_parts.append("店家收入差額 350（店家全額保留）")
+                detail_parts.append(
+                    "店家抽成前差額 350｜客服分潤 25%：88｜店家實留 262"
+                )
+                lines.append(("客服分潤", "88（350T 差額的 25%，整數 T 四捨五入）"))
+                lines.append(("店家實留", "262"))
         if adjustment["point_discount_coupon_amount"] > 0:
             detail_parts.append(
                 f"點數折價 -{_format_plain_amount(adjustment['point_discount_coupon_amount'])}（店內吸收）"
