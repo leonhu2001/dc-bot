@@ -17,6 +17,7 @@ from services.one_companion_one_guard_payout import (
     FULL_WORKER_PAYOUT_RULE_KEYS,
     is_full_worker_payout_rule,
 )
+from services.staff_internal_ammo_dump_policy import calculate_internal_ammo_dump_cs_payout
 from shared.db import SessionLocal
 from shared.models import (
     CustomerServicePayout,
@@ -101,7 +102,7 @@ def repair_unpaid_full_worker_payouts(*, apply: bool = False) -> dict:
             # Do not "repair" an already corrupted pricing basis by giving
             # the worker 3,000T on an unnamed 500M order. Named and unnamed
             # always use the same 2,650T worker basis; the extra 350T stays
-            # with the store. Other internal prices are fixed per product.
+            # split between CS and the store. Other internal prices are fixed per product.
             internal_basis = {
                 "staff_internal_ammo_dump_500m": 2650,
                 "staff_internal_car_500m": 2480,
@@ -117,27 +118,41 @@ def repair_unpaid_full_worker_payouts(*, apply: bool = False) -> dict:
                 counts["skip_gross_mismatch"] += 1
                 continue
 
-            old_worker_total = sum(int(row.final_payout or 0) for row in payouts)
-            old_cs_total = sum(int(row.payout_amount or 0) for row in cs_rows)
-            already_correct = (
-                old_worker_total == expected_basis
-                and old_cs_total == 0
-                and all(
-                    abs(float(row.base_rate or 0) - 1.0) < 0.00001
-                    and int(row.named_bonus_amount or 0) == 0
-                    for row in payouts
-                )
-                and all(float(row.rate or 0) == 0 for row in cs_rows)
-            )
-            if already_correct:
-                counts["already_correct"] += 1
-                continue
-
             customer_pay = max(0, int(
                 order.customer_pay_amount
                 if order.customer_pay_amount is not None
                 else order.amount or 0
             ))
+            expected_cs = calculate_internal_ammo_dump_cs_payout(
+                order.order_rule_key, customer_pay, expected_basis
+            )
+            # A positive CS share requires exactly one real customer-service
+            # payout row; don't claim a successful fix without one.
+            if expected_cs > 0 and len(cs_rows) != 1:
+                counts["skip_missing_cs_payout"] += 1
+                continue
+
+            old_worker_total = sum(int(row.final_payout or 0) for row in payouts)
+            old_cs_total = sum(int(row.payout_amount or 0) for row in cs_rows)
+            already_correct = (
+                old_worker_total == expected_basis
+                and old_cs_total == expected_cs
+                and all(
+                    abs(float(row.base_rate or 0) - 1.0) < 0.00001
+                    and int(row.named_bonus_amount or 0) == 0
+                    for row in payouts
+                )
+                and all(
+                    abs(float(row.rate or 0) - (
+                        expected_cs / customer_pay if customer_pay else 0
+                    )) < 0.00001
+                    for row in cs_rows
+                )
+            )
+            if already_correct:
+                counts["already_correct"] += 1
+                continue
+
             changes.append({
                 "order_id": order.id,
                 "order_rule_key": order.order_rule_key,
@@ -145,8 +160,8 @@ def repair_unpaid_full_worker_payouts(*, apply: bool = False) -> dict:
                 "worker_before": old_worker_total,
                 "worker_after": expected_basis,
                 "cs_before": old_cs_total,
-                "cs_after": 0,
-                "store_after": customer_pay - expected_basis,
+                "cs_after": expected_cs,
+                "store_after": customer_pay - expected_basis - expected_cs,
             })
             counts["correctable"] += 1
             if not apply:
@@ -161,8 +176,8 @@ def repair_unpaid_full_worker_payouts(*, apply: bool = False) -> dict:
                 row.final_payout = gross
                 row.note = "特殊代肝單｜接單人員全額 100%｜無客服分潤及額外獎金"
             for row in cs_rows:
-                row.rate = 0.0
-                row.payout_amount = 0
+                row.rate = expected_cs / customer_pay if customer_pay else 0.0
+                row.payout_amount = expected_cs
             counts["fixed"] += 1
 
         if apply:
