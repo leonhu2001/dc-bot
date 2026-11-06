@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from services.one_companion_one_guard_payout import is_full_worker_payout_rule
 from shared.payout import (
     CUSTOMER_SERVICE_PAYOUT_RATE,
     LEGACY_CUSTOMER_SERVICE_POLICY,
@@ -115,6 +116,8 @@ def _report_state(conn: sqlite3.Connection, order_id: int) -> tuple[str, bool] |
 
 def _rate_from_persisted_note(note: Any) -> float | None:
     text = _normalize(note)
+    if "特殊代肝單｜接單人員全額 100%" in text:
+        return 1.0
     if "分潤：基礎80%" not in text:
         return None
 
@@ -142,7 +145,7 @@ def _policy_consistency_for_order(
 ) -> dict[str, bool]:
     order = conn.execute(
         """
-        SELECT id, status, amount, payout_base_amount, price_snapshot_json
+        SELECT id, status, amount, payout_base_amount, price_snapshot_json, order_rule_key
         FROM web_orders
         WHERE id = ?
         LIMIT 1
@@ -238,12 +241,16 @@ def _policy_consistency_for_order(
                 if payout_base > 0
                 else 0.80
             )
-            expected_cs = int(
-                round(
-                    calculate_customer_service_payout(
-                        int(cs_base),
-                        CUSTOMER_SERVICE_PAYOUT_RATE,
-                        effective_worker_rate=effective_worker_rate,
+            expected_cs = (
+                0
+                if is_full_worker_payout_rule(order["order_rule_key"])
+                else int(
+                    round(
+                        calculate_customer_service_payout(
+                            int(cs_base),
+                            CUSTOMER_SERVICE_PAYOUT_RATE,
+                            effective_worker_rate=effective_worker_rate,
+                        )
                     )
                 )
             )
