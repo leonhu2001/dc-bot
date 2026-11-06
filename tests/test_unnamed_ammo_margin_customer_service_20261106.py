@@ -76,6 +76,12 @@ def test_web_order_recalculation_persists_margin_based_cs_not_generic_25pct(
 ):
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
+    # Production has the acceptance metadata table; its absence in an isolated
+    # SQLite fixture is unrelated to full-worker payroll calculations.
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "CREATE TABLE order_acceptance_meta (order_id INTEGER PRIMARY KEY, status TEXT)"
+        )
     with Session(engine) as db:
         order = WebOrder(
             category="staff_internal",
