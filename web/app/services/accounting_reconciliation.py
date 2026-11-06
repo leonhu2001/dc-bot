@@ -767,8 +767,16 @@ def _check_payouts(
                 _normalize(row["worker_discord_id"])
             ] = _as_int(row["manual_final_payout"])
 
+    # Old lightweight accounting DBs do not yet have order_rule_key.
+    # Real production orders do; read it when available without breaking audits
+    # of migrated/minimal databases.
+    web_order_columns = {
+        str(row[1])
+        for row in web.execute("PRAGMA table_info(web_orders)").fetchall()
+    }
+    rule_key_column = "order_rule_key" if "order_rule_key" in web_order_columns else "NULL AS order_rule_key"
     orders = web.execute(
-        """
+        f"""
         SELECT
             id,
             bot_order_no,
@@ -776,7 +784,7 @@ def _check_payouts(
             amount,
             payout_base_amount,
             price_snapshot_json,
-            order_rule_key,
+            {rule_key_column},
             payment_method,
             customer_service_discord_id,
             customer_service_display_name
