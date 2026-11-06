@@ -188,10 +188,10 @@ async def admin_order_workspace_r8(
         from services.staff_internal_ammo_dump_policy import calculate_internal_ammo_dump_cs_payout
 
         full_worker_payout = is_full_worker_payout_rule(order.get("rule_key"))
+        paid = order.get("customer_pay_amount")
         special_ammo_cs_payout = calculate_internal_ammo_dump_cs_payout(
             order.get("rule_key"),
-            order.get("customer_pay_amount")
-            if order.get("customer_pay_amount") is not None else order.get("raw_amount"),
+            paid if paid is not None else order.get("raw_amount"),
             order.get("payout_base_amount"),
         )
 
