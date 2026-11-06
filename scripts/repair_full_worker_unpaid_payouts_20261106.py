@@ -98,6 +98,21 @@ def repair_unpaid_full_worker_payouts(*, apply: bool = False) -> dict:
                 if order.payout_base_amount is not None
                 else order.amount or 0
             ))
+            # Do not "repair" an already corrupted pricing basis by giving
+            # the worker 3,000T on an unnamed 500M order. Named and unnamed
+            # always use the same 2,650T worker basis; the extra 350T stays
+            # with the store. Other internal prices are fixed per product.
+            internal_basis = {
+                "staff_internal_ammo_dump_500m": 2650,
+                "staff_internal_car_500m": 2480,
+            }.get(str(order.order_rule_key or ""))
+            if internal_basis is not None and expected_basis != internal_basis:
+                counts["skip_invalid_internal_basis"] += 1
+                continue
+            if str(order.order_rule_key or "") == "staff_internal_aw_collision" and expected_basis % 4:
+                counts["skip_invalid_internal_basis"] += 1
+                continue
+
             if expected_basis <= 0 or sum(max(0, int(row.gross_share or 0)) for row in payouts) != expected_basis:
                 counts["skip_gross_mismatch"] += 1
                 continue
