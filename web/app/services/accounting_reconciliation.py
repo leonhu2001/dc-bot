@@ -10,6 +10,9 @@ from shared.payout import (
     calculate_customer_service_payout_base_amount,
     calculate_order_payout,
 )
+from services.one_companion_one_guard_payout import (
+    calculate_one_companion_one_guard_order_payout,
+)
 
 
 OPEN_ACCOUNTING_ORDER_STATUSES = {"active", "stored", "closed"}
@@ -773,6 +776,7 @@ def _check_payouts(
             amount,
             payout_base_amount,
             price_snapshot_json,
+            order_rule_key,
             payment_method,
             customer_service_discord_id,
             customer_service_display_name
@@ -964,17 +968,26 @@ def _check_payouts(
             else None
         )
 
-        expected = calculate_order_payout(
-            total_amount=payout_base,
-            worker_discord_ids=worker_ids,
-            named_bonus_worker_ids=named_bonus_ids,
-            customer_service_total_amount=(
-                calculate_customer_service_payout_base_amount(
-                    payout_base_amount=payout_base,
-                    price_snapshot_json=order.get("price_snapshot_json"),
-                )
-            ),
+        cs_base = calculate_customer_service_payout_base_amount(
+            payout_base_amount=payout_base,
+            price_snapshot_json=order.get("price_snapshot_json"),
         )
+        # Reconciliation must use the same business-rule payout policy as Web
+        # settlement, or it will wrongly flag/repair 100%-worker orders as 80%.
+        expected = calculate_one_companion_one_guard_order_payout(
+            rule_key=order.get("order_rule_key"),
+            total_amount=payout_base,
+            worker_roles=[(person_id, "booster") for person_id in worker_ids],
+            named_bonus_worker_ids=named_bonus_ids,
+            customer_service_total_amount=cs_base,
+        )
+        if expected is None:
+            expected = calculate_order_payout(
+                total_amount=payout_base,
+                worker_discord_ids=worker_ids,
+                named_bonus_worker_ids=named_bonus_ids,
+                customer_service_total_amount=cs_base,
+            )
 
         expected_by_worker = {
             str(row.worker_discord_id): float(row.final_payout)
