@@ -79,9 +79,12 @@ def test_ammo_named_selection_is_only_price_input_and_worker_gets_full_2650(
     assert fields["打手分潤基準"] == "2,650"
     assert fields["掛名狀態"] == ("有掛名" if named else "無掛名")
     if not named:
-        assert "350T" in fields["店家收入差額"]
+        assert fields["店家抽成前差額"] == "350T"
+        assert fields["客服分潤"].startswith("88T")
+        assert fields["店家實留"] == "262T"
     else:
-        assert "店家收入差額" not in fields
+        assert "店家抽成前差額" not in fields
+        assert "客服分潤" not in fields
 
 
 def test_ammo_requires_explicit_customer_service_choice_before_dispatch():
