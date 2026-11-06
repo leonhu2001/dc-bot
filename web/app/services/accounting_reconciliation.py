@@ -785,6 +785,7 @@ def _check_payouts(
             payout_base_amount,
             price_snapshot_json,
             {rule_key_column},
+            {("customer_pay_amount" if "customer_pay_amount" in web_order_columns else "amount AS customer_pay_amount")},
             payment_method,
             customer_service_discord_id,
             customer_service_display_name
@@ -976,9 +977,14 @@ def _check_payouts(
             else None
         )
 
-        cs_base = calculate_customer_service_payout_base_amount(
-            payout_base_amount=payout_base,
-            price_snapshot_json=order.get("price_snapshot_json"),
+        from services.staff_internal_ammo_dump_policy import is_internal_ammo_dump_rule
+        cs_base = (
+            _as_int(order.get("customer_pay_amount") or order.get("amount"))
+            if is_internal_ammo_dump_rule(order.get("order_rule_key"))
+            else calculate_customer_service_payout_base_amount(
+                payout_base_amount=payout_base,
+                price_snapshot_json=order.get("price_snapshot_json"),
+            )
         )
         # Reconciliation must use the same business-rule payout policy as Web
         # settlement, or it will wrongly flag/repair 100%-worker orders as 80%.
