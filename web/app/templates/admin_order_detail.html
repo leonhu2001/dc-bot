@@ -740,6 +740,7 @@
                     </div>
 
                     <div class="mw-r8-actions csp-sa-291b7bbb01">
+                        {% if not full_worker_payout %}
                         <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/named-bonus?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <label class="mw-r8-check">
@@ -767,6 +768,7 @@
                             </small>
                         </form>
 
+                        {% endif %}
                         <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/manual-payout?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <input type="hidden" name="worker_discord_id" value="{{ row.worker_discord_id }}">
@@ -826,13 +828,13 @@
         <div class="mw-r8-editor-head">
             <div>
                 <small>CUSTOMER SERVICE PAYOUT</small>
-                <h3>客服分潤</h3>
-                <p>同一個工作區直接查看與切換客服分潤發放狀態。</p>
+                <h3>{{ '特殊單｜客服不抽成' if full_worker_payout else '客服分潤' }}</h3>
+                <p>{{ '這類服務的代肝全額取得分潤基準，不產生客服抽成或額外掛名／直播獎金。' if full_worker_payout else '同一個工作區直接查看與切換客服分潤發放狀態。' }}</p>
             </div>
         </div>
 
         <div class="mw-r8-cs-list">
-            {% for row in workspace_cs_payouts %}
+            {% for row in workspace_cs_payouts if not full_worker_payout or (row.payout_amount or 0) > 0 %}
                 <div class="mw-r8-person-row">
                     <div class="mw-r8-person-name">
                         <strong>{{ row.customer_service_display_name or row.customer_service_discord_id }}</strong>
@@ -857,7 +859,7 @@
                     </div>
                 </div>
             {% else %}
-                <div class="mw-r8-meta">目前沒有客服分潤紀錄。</div>
+                <div class="mw-r8-meta">{{ '本單客服分潤為 0T，不需發放。' if full_worker_payout else '目前沒有客服分潤紀錄。' }}</div>
             {% endfor %}
         </div>
     </div>
