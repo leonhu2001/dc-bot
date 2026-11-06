@@ -71,6 +71,7 @@ def test_dry_run_then_apply_repair_only_safe_unpaid_direct_pay_orders(monkeypatc
         paid = _create_order(db, rule_key="staff_internal_car_500m", pay=2480, basis=2480, wage=1984, cs=124, paid=True)
         manual = _create_order(db, rule_key="staff_internal_car_500m", pay=2480, basis=2480, wage=2111, cs=124, manual=True)
         mismatch = _create_order(db, rule_key="staff_internal_aw_collision", pay=80, basis=80, wage=60, cs=4, gross=100)
+        invalid_basis = _create_order(db, rule_key="staff_internal_ammo_dump_500m", pay=3000, basis=3000, wage=2400, cs=150)
         generic = _create_order(db, rule_key="valorant_fun", pay=1000, basis=1000, wage=800, cs=50)
         db.commit()
 
@@ -80,6 +81,7 @@ def test_dry_run_then_apply_repair_only_safe_unpaid_direct_pay_orders(monkeypatc
     assert preview["counts"]["skip_paid_or_locked"] == 1
     assert preview["counts"]["skip_manual_override"] == 1
     assert preview["counts"]["skip_gross_mismatch"] == 1
+    assert preview["counts"]["skip_invalid_internal_basis"] == 1
     assert len(preview["changes"]) == 4
 
     with Session(engine) as db:
@@ -105,6 +107,7 @@ def test_dry_run_then_apply_repair_only_safe_unpaid_direct_pay_orders(monkeypatc
         assert db.query(WorkerPayout).filter_by(order_id=paid).one().final_payout == 1984
         assert db.query(WorkerPayout).filter_by(order_id=manual).one().final_payout == 2111
         assert db.query(WorkerPayout).filter_by(order_id=mismatch).one().final_payout == 60
+        assert db.query(WorkerPayout).filter_by(order_id=invalid_basis).one().final_payout == 2400
         assert db.query(WorkerPayout).filter_by(order_id=generic).one().final_payout == 800
 
     again = repair.repair_unpaid_full_worker_payouts(apply=True)
