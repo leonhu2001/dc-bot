@@ -375,10 +375,22 @@ def get_worker_dispatch_payout_preview(
                     for index in range(1, required_count)
                 ],
             ]
-            payout_result = calculate_order_payout(
-                total_amount=total_amount,
-                worker_discord_ids=placeholder_ids,
+            from services.one_companion_one_guard_payout import (
+                calculate_one_companion_one_guard_order_payout,
+                is_full_worker_payout_rule,
             )
+
+            if is_full_worker_payout_rule(getattr(order, "order_rule_key", None)):
+                payout_result = calculate_one_companion_one_guard_order_payout(
+                    rule_key=order.order_rule_key,
+                    total_amount=total_amount,
+                    worker_roles=[(person_id, "booster") for person_id in placeholder_ids],
+                )
+            else:
+                payout_result = calculate_order_payout(
+                    total_amount=total_amount,
+                    worker_discord_ids=placeholder_ids,
+                )
             preview = next(
                 (
                     item
