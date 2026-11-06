@@ -143,9 +143,14 @@ def _policy_consistency_for_order(
     conn: sqlite3.Connection,
     order_id: int,
 ) -> dict[str, bool]:
+    order_columns = {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(web_orders)").fetchall()
+    }
+    rule_column = "order_rule_key" if "order_rule_key" in order_columns else "NULL AS order_rule_key"
     order = conn.execute(
-        """
-        SELECT id, status, amount, payout_base_amount, price_snapshot_json, order_rule_key
+        f"""
+        SELECT id, status, amount, payout_base_amount, price_snapshot_json, {rule_column}
         FROM web_orders
         WHERE id = ?
         LIMIT 1
