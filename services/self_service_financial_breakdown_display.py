@@ -89,9 +89,22 @@ def render_self_service_financial_breakdown_fields(
             inline=True,
         )
         if named is False:
+            margin = _price_int(src, "store_margin_amount", default=0)
+            cs_payout = _price_int(src, "customer_service_payout_amount", default=0)
+            retained = max(0, margin - cs_payout)
             embed.add_field(
-                name="店家收入差額",
-                value=f"{_price_int(src, 'store_margin_amount', default=0):,}T（全歸店家）",
+                name="店家抽成前差額",
+                value=f"{margin:,}T",
+                inline=True,
+            )
+            embed.add_field(
+                name="客服分潤",
+                value=f"{cs_payout:,}T（差額的 25%，整數 T 四捨五入）",
+                inline=True,
+            )
+            embed.add_field(
+                name="店家實留",
+                value=f"{retained:,}T",
                 inline=True,
             )
 
