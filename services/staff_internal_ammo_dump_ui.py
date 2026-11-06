@@ -27,7 +27,7 @@ class InternalAmmoNamedSelect(discord.ui.Select):
                 discord.SelectOption(
                     label="無掛名｜顧客 3,000T",
                     value="unnamed",
-                    description="代肝 2,650T；店家收入 350T",
+                    description="代肝 2,650T；客服 88T；店家 262T",
                 ),
             ],
             row=0,
