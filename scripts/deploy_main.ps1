@@ -116,7 +116,8 @@ $RequiredPanelAssetNames = @(
     "lol_panel.png",
     "steam_panel.png",
     "valorant_panel.png",
-    "delta_fun_panel.png"
+    "delta_fun_panel.png",
+    "delta_farm_3x3.png"
 )
 $PanelAssets = @()
 foreach ($PanelAssetName in $RequiredPanelAssetNames) {

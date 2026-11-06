@@ -20,7 +20,7 @@ _PRICE_LIST_LABEL_BY_CHANNEL_ID = {
 
 _ROOT_DIR = Path(__file__).resolve().parents[1]
 _PUBLIC_BASE_URL = "https://mowanentertainment.com/static"
-_DELTA_FARM_3X3_ASSET = "price_lists/delta_farm_3x3.jpg"
+_DELTA_FARM_3X3_ASSET = "order_panels/delta_farm_3x3.png"
 _DELTA_FUN_RUSSIAN_ROULETTE_ASSET = "price_lists/delta_fun_russian_roulette.jpg"
 _DELTA_FUN_RICH_ENOUGH_ASSET = "price_lists/delta_fun_hao_dao_ni_le_ma.jpg"
 
@@ -274,7 +274,7 @@ DELTA_FARM_PRICE_LISTS = {
     },
     "safe_box_3x3": {
         "label": "3×3安全箱",
-        "text": "**3×3安全箱**\n詳細方案、包損與預約優惠請見下圖。",
+        "text": "**三角洲行動 S12｜3×3安全箱**\n安全箱 5500T｜安全箱＋外觀 8000T\n包損＋500T｜賽前預約 −500T｜命運契約 600T／個\n詳細規則請見下圖。",
         "image": _DELTA_FARM_3X3_ASSET,
     },
 }

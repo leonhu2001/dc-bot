@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from services import quick_order_v2_price_lists as price_lists
+from services.order_rules import ORDER_RULES
 
 
 def test_delta_farm_price_list_has_owner_approved_four_items() -> None:
@@ -56,13 +59,38 @@ def test_delta_farm_department_mission_copy_matches_source() -> None:
 
 def test_delta_farm_3x3_uses_static_image_with_cache_busting() -> None:
     plan = price_lists.DELTA_FARM_PRICE_LISTS["safe_box_3x3"]
-    assert plan["image"] == "price_lists/delta_farm_3x3.jpg"
+    assert plan["image"] == "order_panels/delta_farm_3x3.png"
 
     embed = price_lists._delta_farm_embed("safe_box_3x3")
     image_url = str(embed.image.url)
     assert image_url.startswith(
-        "https://mowanentertainment.com/static/price_lists/delta_farm_3x3.jpg?v="
+        "https://mowanentertainment.com/static/order_panels/delta_farm_3x3.png?v="
     )
+
+
+def test_delta_farm_s12_prices_match_price_sheet() -> None:
+    expected = {
+        "farm_season_3x3_normal": 5500,
+        "farm_season_3x3_dc_loss": 6000,
+        "farm_season_3x3_dc_skin": 8000,
+        "farm_season_3x3_dc_skin_loss": 8500,
+        "farm_season_3x3_contract": 600,
+    }
+    for key, price in expected.items():
+        assert ORDER_RULES[key].price == price
+
+    regular = ORDER_RULES["farm_season_3x3_normal"]
+    assert regular.staff_adjustments == {"skin": 2500, "loss_cover": 500}
+
+    copy = price_lists.DELTA_FARM_PRICE_LISTS["safe_box_3x3"]["text"]
+    for amount in ("S12", "5500T", "8000T", "＋500T", "−500T", "600T"):
+        assert amount in copy
+
+
+def test_season_3x3_image_is_in_deployed_public_panel_assets() -> None:
+    script = Path("scripts/deploy_main.ps1").read_text(encoding="utf-8")
+    assert '"delta_farm_3x3.png"' in script
+    assert "web/app/static/order_panels" in script
 
 
 def test_delta_farm_category_opens_second_level_selector() -> None:
