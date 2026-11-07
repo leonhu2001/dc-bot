@@ -570,3 +570,46 @@
 }
 
 .market-item-chart-navigator + .market-item-chart-range { margin-top: 16px; justify-content: center; }
+
+/* Keep all non-duplicated item metrics in the thin strip directly above the price chart. */
+.market-item-chart-kpis[data-market-summary] {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: start;
+    gap: 8px 12px;
+    padding: 13px 16px;
+}
+.market-item-chart-stat { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.market-item-chart-stat > span {
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: .04em;
+    color: rgba(226, 231, 250, .58);
+}
+.market-item-chart-stat strong {
+    font-size: clamp(13px, 1.3vw, 16px);
+    font-weight: 850;
+    color: #edf5ff;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+}
+.market-item-chart-stat small {
+    font-size: 10px;
+    line-height: 1.25;
+    color: rgba(214, 220, 241, .55);
+    overflow-wrap: anywhere;
+}
+.market-item-chart-stat strong.is-positive { color: #58daa0; }
+.market-item-chart-stat strong.is-negative { color: #ff8585; }
+.market-item-chart-stat:nth-child(3) strong { color: #49c5f6; }
+@media (max-width: 820px) {
+    .market-item-chart-kpis[data-market-summary] {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 15px 12px;
+    }
+}
+@media (max-width: 470px) {
+    .market-item-chart-kpis[data-market-summary] {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

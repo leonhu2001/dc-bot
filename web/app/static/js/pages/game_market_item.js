@@ -133,13 +133,6 @@
     const navigator = root.querySelector("[data-market-navigator]");
     const navWindow = root.querySelector("[data-market-nav-window]");
     const navHandles = Array.from(root.querySelectorAll("[data-market-nav-handle]"));
-    const chartKpis = {
-        last: root.querySelector("[data-market-chart-last]"),
-        low: root.querySelector("[data-market-chart-low]"),
-        high: root.querySelector("[data-market-chart-high]"),
-        average: root.querySelector("[data-market-chart-avg]"),
-        count: root.querySelector("[data-market-chart-count]"),
-    };
     let selectedStart = null;
     let selectedEnd = null;
     let drag = null;
@@ -336,11 +329,6 @@
             }
         });
 
-        setText(chartKpis.last, formatPrice(points[points.length - 1].price));
-        setText(chartKpis.low, formatPrice(low));
-        setText(chartKpis.high, formatPrice(high));
-        setText(chartKpis.average, formatPrice(average));
-        setText(chartKpis.count, points.length + " 筆");
         const hours = (selectedEnd - selectedStart) / HOUR;
         if (chartStatus) {
             chartStatus.textContent = "已選範圍 " + formatTime(new Date(selectedStart)) +

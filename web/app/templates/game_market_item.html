@@ -2,9 +2,9 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
-<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261107-3">
+<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261107-4">
 <link rel="stylesheet" href="/static/css/pages/game_market_item_focus.css?v=20261101-1">
-<script src="/static/js/pages/game_market_item.js?v=20261107-3" defer></script>
+<script src="/static/js/pages/game_market_item.js?v=20261107-4" defer></script>
 <script src="/static/js/pages/game_market_item_focus.js?v=20261101-1" defer></script>
 {% endblock %}
 
@@ -33,38 +33,6 @@
         </div>
     </header>
 
-    <section class="market-item-stats" data-market-summary aria-label="品項行情摘要">
-        <article>
-            <span>目前</span>
-            <strong>{% if current_price is not none %}${{ "{:,}".format(current_price) }}{% else %}—{% endif %}</strong>
-            <small>最新台服價格</small>
-        </article>
-        <article>
-            <span>24H 漲跌</span>
-            <strong data-market-change-24h>累積中</strong>
-            <small data-market-change-24h-note>至少需要約 20 小時歷史</small>
-        </article>
-        <article>
-            <span>24H 區間</span>
-            <strong data-market-range-24h>累積中</strong>
-            <small>低點 → 高點</small>
-        </article>
-        <article>
-            <span>7D 均價</span>
-            <strong data-market-average-7d>累積中</strong>
-            <small>至少需要約 6 天覆蓋</small>
-        </article>
-        <article>
-            <span>7D 區間</span>
-            <strong data-market-range-7d>累積中</strong>
-            <small>低點 → 高點</small>
-        </article>
-        <article>
-            <span>歷史覆蓋</span>
-            <strong data-market-coverage>{{ point_count }} 筆</strong>
-            <small data-market-coverage-note>讀取中…</small>
-        </article>
-    </section>
 
     <section
         class="market-item-restock-card"
@@ -177,12 +145,29 @@
             </div>
         </div>
 
-        <div class="market-item-chart-kpis" data-market-chart-kpis aria-live="off">
-            <span>最新 <strong data-market-chart-last>—</strong></span>
-            <span>最低 <strong data-market-chart-low>—</strong></span>
-            <span>最高 <strong data-market-chart-high>—</strong></span>
-            <span>均價 <strong data-market-chart-avg>—</strong></span>
-            <span>樣本 <strong data-market-chart-count>—</strong></span>
+        <div class="market-item-chart-kpis" data-market-summary aria-label="價格走勢旁的行情摘要">
+            <div class="market-item-chart-stat">
+                <span>24H 漲跌</span>
+                <strong data-market-change-24h>累積中</strong>
+                <small data-market-change-24h-note>至少需要約 20 小時歷史</small>
+            </div>
+            <div class="market-item-chart-stat">
+                <span>24H 區間</span>
+                <strong data-market-range-24h>累積中</strong>
+            </div>
+            <div class="market-item-chart-stat">
+                <span>7D 均價</span>
+                <strong data-market-average-7d>累積中</strong>
+            </div>
+            <div class="market-item-chart-stat">
+                <span>7D 區間</span>
+                <strong data-market-range-7d>累積中</strong>
+            </div>
+            <div class="market-item-chart-stat">
+                <span>歷史覆蓋</span>
+                <strong data-market-coverage>{{ point_count }} 筆</strong>
+                <small data-market-coverage-note>讀取中…</small>
+            </div>
         </div>
         <div class="market-item-chart-stage" data-market-chart-stage>
             <div class="market-item-chart-empty" data-market-chart-empty>正在讀取歷史價格…</div>

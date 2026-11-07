@@ -86,8 +86,9 @@ bot_data.json
 cogs.bak.*/
 views.bak.*/
 
-# Deployment runtime marker
+# Deployment runtime markers (managed by running services, not source control)
 data/deployed_version.json
+data/market_poll_state.json
 
 # High-resolution local order-panel source artwork.
 # deploy_main.ps1 syncs these files to the website static directory on the VPS.

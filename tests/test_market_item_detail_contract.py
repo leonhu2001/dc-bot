@@ -39,3 +39,27 @@ def test_market_provider_example_is_fail_closed_until_database_is_configured():
 
     assert "# Verified Taiwan/Garena public reader: MARKET_PROVIDER=852941-tw" in env_example
     assert "\nMARKET_PROVIDER=\n" in env_example
+
+
+def test_market_summary_is_integrated_into_chart_without_duplicate_price_cards():
+    template = _read("web/app/templates/game_market_item.html")
+    script = _read("web/app/static/js/pages/game_market_item.js")
+    stylesheet = _read("web/app/static/css/pages/game_market_item.css")
+    assert 'class="market-item-stats"' not in template
+    assert template.count('data-market-summary') == 1
+    assert template.index('data-market-chart') < template.index('data-market-summary') < template.index('data-market-chart-stage')
+    for binding in (
+        "data-market-change-24h", "data-market-change-24h-note",
+        "data-market-range-24h", "data-market-average-7d",
+        "data-market-range-7d", "data-market-coverage",
+        "data-market-coverage-note",
+    ):
+        assert binding in template
+    assert 'data-market-chart-last' not in template
+    assert 'data-market-chart-low' not in template
+    assert 'data-market-chart-high' not in template
+    assert 'data-market-chart-avg' not in template
+    assert 'data-market-chart-count' not in template
+    assert 'data-market-chart-kpis' not in template
+    assert 'chartKpis' not in script
+    assert ".market-item-chart-kpis[data-market-summary]" in stylesheet

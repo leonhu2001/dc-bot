@@ -305,7 +305,7 @@ echo "=== 1. PRECHECK ==="
 
 DIRTY_WORKTREE="$(
     git status --porcelain --untracked-files=all \
-        | grep -vE '^\?\? data/deployed_version\.json$' \
+        | grep -vE '^\?\? data/(deployed_version|market_poll_state)\.json$' \
         || true
 )"
 
