@@ -518,17 +518,17 @@ def calculate_price(
     if specified_roles and not rule.allow_specify:
         raise ValueError(f"{rule.label} 不開放指定")
 
-    if rule.max_specified_count is not None and len(specified_roles) > rule.max_specified_count:
-        raise ValueError(f"{rule.label} 最多只能指定 {rule.max_specified_count} 位")
-
-    if len(specified_roles) > required_staff:
-        raise ValueError("指定人數不能超過需要接單人數")
-
     if rule.key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
         if len(specified_roles) > 1:
             raise ValueError("一陪一護只能指定 1 位陪玩")
         if any(role not in COMPANION_ROLES for role in specified_roles):
             raise ValueError("一陪一護僅可指定男陪或女陪，不可指定護衛")
+
+    if rule.max_specified_count is not None and len(specified_roles) > rule.max_specified_count:
+        raise ValueError(f"{rule.label} 最多只能指定 {rule.max_specified_count} 位")
+
+    if len(specified_roles) > required_staff:
+        raise ValueError("指定人數不能超過需要接單人數")
 
     allowed_specify_roles = set(rule.allowed_roles) | set(rule.allowed_game_roles)
 
