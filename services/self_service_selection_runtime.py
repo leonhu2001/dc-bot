@@ -104,7 +104,7 @@ def get_specified_staff_entries_for_rule(guild: discord.Guild, rule) -> list[dic
         ALL_ROLE_LABELS,
         ONE_COMPANION_ONE_GUARD_RULE_KEYS,
         get_allowed_role_keys,
-        one_guard_specifiable_companion_role,
+        one_guard_specifiable_staff_role,
     )
 
     entries = []
@@ -130,7 +130,7 @@ def get_specified_staff_entries_for_rule(guild: discord.Guild, rule) -> list[dic
             continue
 
         if str(getattr(rule, "key", "") or "") in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
-            display_role_key = one_guard_specifiable_companion_role(rule, member_role_ids)
+            display_role_key = one_guard_specifiable_staff_role(rule, member_role_ids)
             if display_role_key is None:
                 continue
         else:

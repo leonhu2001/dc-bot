@@ -416,7 +416,7 @@ async def _resolve_specified_roles_for_price(
 
         from services.order_rules import (
             ONE_COMPANION_ONE_GUARD_RULE_KEYS,
-            one_guard_specifiable_companion_role,
+            one_guard_specifiable_staff_role,
         )
 
         if str(getattr(rule, "key", "") or "") in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
@@ -425,10 +425,10 @@ async def _resolve_specified_roles_for_price(
                 for role in getattr(member, "roles", [])
                 if getattr(role, "id", None) is not None
             }
-            role_key = one_guard_specifiable_companion_role(rule, member_role_ids)
+            role_key = one_guard_specifiable_staff_role(rule, member_role_ids)
             if role_key is None:
                 raise ValueError(
-                    f"{member.mention} 不符合一陪一護可指定的端遊男陪／女陪資格，或同時具有護衛身分。"
+                    f"{member.mention} 不符合一陪一護可指定的端遊護航／陪玩資格。"
                 )
         else:
             role_key = _role_key_for_member(rule, member)

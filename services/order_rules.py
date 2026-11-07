@@ -100,32 +100,28 @@ COMPANION_ROLES: tuple[RoleKey, ...] = (
 
 ALL_RECEIVER_ROLES: tuple[RoleKey, ...] = PROTECTOR_ROLES + COMPANION_ROLES
 
-# These two desktop Delta products designate one companion slot only. A member
-# with a protector role must not appear as a companion in the specify picker.
+# Both desktop Delta one-companion-one-guard difficulties allow specifying any
+# eligible receiver (protector OR companion), but at most one person per order.
 ONE_COMPANION_ONE_GUARD_RULE_KEYS = frozenset({
     "basic_one_companion_one_guard_secret",
     "basic_one_companion_one_guard_topsecret",
 })
 
 
-def one_guard_specifiable_companion_role(
+def one_guard_specifiable_staff_role(
     rule: "OrderRule",
     member_role_ids: set[str] | list[str] | tuple[str, ...],
 ) -> str | None:
-    """Return the sole companion designate role for an eligible desktop member."""
+    """Resolve eligible desktop protector or companion, with protector priority."""
     if str(getattr(rule, "key", "") or "") not in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
         return None
     role_ids = {str(value) for value in member_role_ids}
-    if any(str(ROLE_IDS[role]) in role_ids for role in PROTECTOR_ROLES):
-        return None
-    if not any(str(ALL_ROLE_IDS[role]) in role_ids for role in COMPANION_ROLES):
-        return None
     if not role_ids_match_requirements(
         role_ids, get_allowed_role_ids(rule), get_required_game_role_ids(rule)
     ):
         return None
     return next(
-        (str(role) for role in COMPANION_ROLES if str(ROLE_IDS[role]) in role_ids),
+        (str(role) for role in ALL_RECEIVER_ROLES if str(ROLE_IDS[role]) in role_ids),
         None,
     )
 AW_COLLISION_RECEIVER_ROLES: tuple[RoleKey, ...] = ("aw_collision_receiver",)
@@ -520,9 +516,9 @@ def calculate_price(
 
     if rule.key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
         if len(specified_roles) > 1:
-            raise ValueError("一陪一護只能指定 1 位陪玩")
-        if any(role not in COMPANION_ROLES for role in specified_roles):
-            raise ValueError("一陪一護僅可指定男陪或女陪，不可指定護衛")
+            raise ValueError("一陪一護最多只能指定 1 位人員")
+        if any(role not in ALL_RECEIVER_ROLES for role in specified_roles):
+            raise ValueError("一陪一護只可指定符合資格的護航或陪玩")
 
     if rule.max_specified_count is not None and len(specified_roles) > rule.max_specified_count:
         raise ValueError(f"{rule.label} 最多只能指定 {rule.max_specified_count} 位")
@@ -1821,7 +1817,7 @@ class EffectiveOrderRules(dict):
                 )
             if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
                 # An old manager override may still say allow_specify=False.
-                # The approved companion-only designation policy is canonical.
+                # The approved protector-or-companion designation policy is canonical.
                 rule = replace(
                     rule,
                     allowed_roles=base.allowed_roles,
@@ -1831,7 +1827,7 @@ class EffectiveOrderRules(dict):
                     allow_specify=True,
                     max_specified_count=1,
                     specify_fee_default=100,
-                    specify_fee_by_role={role: 100 for role in COMPANION_ROLES},
+                    specify_fee_by_role={role: 100 for role in ALL_RECEIVER_ROLES},
                     specify_fee_by_game_role={},
                     specify_free_min_units=2,
                     specify_free_basis="quantity",

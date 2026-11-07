@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from services.order_rules import (
     ALL_RECEIVER_ROLES,
-    COMPANION_ROLES,
     DELTA_DESKTOP_GAME_ROLE,
     ORDER_RULES,
     OrderRule,
@@ -85,7 +84,7 @@ def _install_rules() -> None:
             allow_specify=True,
             max_specified_count=1,
             specify_fee_default=100,
-            specify_fee_by_role={role: 100 for role in COMPANION_ROLES},
+            specify_fee_by_role={role: 100 for role in ALL_RECEIVER_ROLES},
             specify_free_min_units=2,
             specify_free_basis="quantity",
             min_protector_count=1,
