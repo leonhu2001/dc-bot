@@ -49,4 +49,5 @@ def test_market_v2_runtime_filters_discord_items_and_starts_restock_worker():
     assert "ensure_market_restock_runtime_started" in runtime
     assert "_RESTOCK_LEAD_MINUTES = 15" in restock_runtime
     assert "_RESTOCK_MIN_CONFIDENCE = 65" in restock_runtime
-    assert "依歷史價格型態推估，非官方補貨時間" in restock_runtime
+    assert "依此商品自己的歷史價格推估；非官方補貨時間或保證" in restock_runtime
+    assert "_source_data_fresh" in restock_runtime
