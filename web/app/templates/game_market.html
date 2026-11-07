@@ -24,7 +24,7 @@
         <div>
             <span>MARKET DATA</span>
             <h2>
-                {% if snapshot.status == 'stale' %}行情更新暫停
+                {% if snapshot.status == 'stale' %}行情來源更新延遲
                 {% elif snapshot.status == 'source_error' %}行情服務暫時離線
                 {% elif snapshot.status == 'no_data' %}等待第一批正式行情
                 {% else %}行情資料源準備中
@@ -158,19 +158,19 @@
             </div>
             <div class="game-market-readiness">
                 {% if snapshot.market_event.restock_item_keys %}
-                <span>疑似補貨 <strong>{{ snapshot.market_event.restock_item_keys|length }} 種</strong></span>
+                <span>個別明顯降價 <strong>{{ snapshot.market_event.restock_item_keys|length }} 種</strong></span>
                 {% endif %}
                 {% if snapshot.market_event.predicted_window %}
-                <span>高機率低價時段 <strong>{{ snapshot.market_event.predicted_window }}</strong></span>
+                <span>整體降價時段未提供 <strong>{{ snapshot.market_event.predicted_window }}</strong></span>
                 <span>可信度 <strong>{{ snapshot.market_event.predicted_confidence }}%</strong></span>
                 {% endif %}
                 {% if snapshot.next_restock_item %}
-                <span>下一個單品 <strong>{{ snapshot.next_restock_item.name }}</strong></span>
+                <span>最近單品預測 <strong>{{ snapshot.next_restock_item.name }}</strong></span>
                 <span>預估 <strong>{{ snapshot.next_restock_item.restock_prediction_label }}</strong></span>
                 <span>單品可信度 <strong>{{ snapshot.next_restock_item.restock_confidence }}%</strong></span>
                 {% endif %}
             </div>
-            <span class="game-market-live-state">價格歷史推估</span>
+            <span class="game-market-live-state">各商品獨立歷史推估</span>
         </section>
         {% endif %}
 
@@ -239,11 +239,11 @@
                     {% if item.restock_prediction_label %}
                     <span
                         class="game-market-value-badge {% if item.restock_confidence is not none and item.restock_confidence >= 65 %}is-value-low{% else %}is-value-flat{% endif %}"
-                        title="歷史補貨型下跌樣本 {{ item.restock_event_count }} 次；時間抖動約 ±{{ item.restock_jitter_minutes or 0 }} 分鐘"
+                        title="該商品歷史明顯降價樣本 {{ item.restock_event_count }} 次；時間抖動約 ±{{ item.restock_jitter_minutes or 0 }} 分鐘"
                     >⏱ {{ item.restock_prediction_label }} · {{ item.restock_confidence }}%</span>
                     {% endif %}
                     {% if snapshot.market_event %}
-                        {% if item.item_key in snapshot.market_event.restock_item_keys %}<span class="game-market-value-badge is-value-low">📦 疑似補貨</span>{% endif %}
+                        {% if item.item_key in snapshot.market_event.restock_item_keys %}<span class="game-market-value-badge is-value-low">📉 單品降價</span>{% endif %}
                         {% if item.item_key in snapshot.market_event.abnormal_down_item_keys %}<span class="game-market-value-badge is-value-high">🟠 異常跌價</span>{% endif %}
                         {% if item.item_key in snapshot.market_event.abnormal_up_item_keys %}<span class="game-market-value-badge is-value-high">🔴 異常拉升</span>{% endif %}
                     {% endif %}

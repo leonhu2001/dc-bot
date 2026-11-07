@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import os
+from datetime import datetime, timezone
 
 import discord
 
@@ -13,6 +15,30 @@ MARKET_GAME_SLUG = "delta-force"
 MARKET_SITE_BASE_URL = "https://mowanentertainment.com"
 _RESTOCK_LEAD_MINUTES = 15
 _RESTOCK_MIN_CONFIDENCE = 65
+
+def _source_data_fresh(latest_items, *, now: datetime | None = None) -> bool:
+    """Never send forecast DMs based on stale upstream market prices."""
+    timestamps = [
+        item.source_updated_at
+        for item in latest_items
+        if getattr(item, "source_updated_at", None) is not None
+    ]
+    if not timestamps:
+        return False
+    latest = max(
+        at.replace(tzinfo=timezone.utc)
+        if at.tzinfo is None else at.astimezone(timezone.utc)
+        for at in timestamps
+    )
+    clock = now or datetime.now(timezone.utc)
+    if clock.tzinfo is None:
+        clock = clock.replace(tzinfo=timezone.utc)
+    try:
+        allowed_age = max(900, int(os.getenv("MARKET_STALE_SECONDS", "2700")))
+    except (TypeError, ValueError):
+        allowed_age = 2700
+    return max(0, (clock - latest).total_seconds()) <= allowed_age
+
 
 
 def _market_item_url(item_key: str) -> str:
@@ -44,6 +70,14 @@ async def market_restock_delivery_loop(bot: discord.Client) -> None:
             if restock_repository is None:
                 restock_repository = MarketRestockRepository(services.market)
                 await asyncio.to_thread(restock_repository.create_all)
+
+            source_items = await asyncio.to_thread(
+                services.market.list_latest, MARKET_GAME_KEY, limit=1
+            )
+            if not _source_data_fresh(source_items):
+                # Cached forecasts must not fire while upstream data is old.
+                await asyncio.sleep(30)
+                continue
 
             predictions = await asyncio.to_thread(
                 get_cached_item_restock_predictions,
@@ -121,12 +155,12 @@ async def market_restock_delivery_loop(bot: discord.Client) -> None:
                     predicted_ts = int(event.predicted_at.timestamp())
 
                     embed = discord.Embed(
-                        title="📦 預估補貨提醒",
+                        title="📦 個別商品預估降價提醒",
                         description=f"**{item_name}**",
                         color=discord.Color.from_rgb(111, 66, 193),
                     )
                     embed.add_field(
-                        name="預估補貨",
+                        name="預估降價時段",
                         value=f"<t:{predicted_ts}:t> · <t:{predicted_ts}:R>",
                         inline=False,
                     )
@@ -147,7 +181,7 @@ async def market_restock_delivery_loop(bot: discord.Client) -> None:
                             value=f"約 ±{event.jitter_minutes} 分鐘",
                             inline=True,
                         )
-                    embed.set_footer(text="依歷史價格型態推估，非官方補貨時間")
+                    embed.set_footer(text="依此商品自己的歷史價格推估；非官方補貨時間或保證")
 
                     view = discord.ui.View(timeout=None)
                     view.add_item(

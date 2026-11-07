@@ -204,7 +204,8 @@ def _item_signal_keys(
 
     for item_key, change_pct in event.item_changes:
         residual = change_pct - event.median_change_pct
-        if broad_market and change_pct <= _DROP_ITEM_PCT:
+        # Independent per-item candidate: no synchronized-market requirement.
+        if change_pct <= _ISOLATED_DROP_PCT:
             restock.append(item_key)
         if (
             change_pct <= _ISOLATED_DROP_PCT
@@ -268,7 +269,7 @@ def analyze_market_events(
     max_snapshots: int = 672,
     now: datetime | None = None,
 ) -> MarketEventSignal:
-    """Infer broad supply shocks and recurring low-price windows from price snapshots.
+    """Describe independent per-item price moves from historical snapshots.
 
     This is intentionally probabilistic. It uses only persisted public price history;
     it does not claim to know official restock schedules, order-book depth or volume.
@@ -364,40 +365,32 @@ def analyze_market_events(
             message="可比較的行情快照仍不足。",
         )
 
-    broad_events = _cluster_broad_events(transitions)
     current_at = transitions[-1].at
     active_cutoff = current_at - timedelta(minutes=_ACTIVE_EVENT_MINUTES)
-    recent_broad = [
+    recent_drops = [
         event for event in transitions
-        if event.broad_drop and event.at >= active_cutoff
-    ]
-    recent_isolated = [
-        event for event in transitions
-        if event.isolated_dump and event.at >= active_cutoff
+        if event.at >= active_cutoff
+        and any(change <= _ISOLATED_DROP_PCT for _key, change in event.item_changes)
     ]
     recent_spike = [
         event for event in transitions
-        if event.isolated_spike and event.at >= active_cutoff
+        if event.at >= active_cutoff
+        and any(change >= _ISOLATED_RISE_PCT for _key, change in event.item_changes)
     ]
 
     current = transitions[-1]
-    if recent_broad:
-        current = recent_broad[-1]
-        state = "broad_drop"
-        label = "📦 疑似補貨型下跌"
-        confidence = _event_confidence(current)
-        message = (
-            f"{current.falling_items}/{current.compared_items} 種同步下跌"
-            f" · 市場中位 {current.median_change_pct:.1f}%"
-        )
-    elif recent_isolated:
-        current = recent_isolated[-1]
-        state = "isolated_dump"
-        label = "🟠 單品異常拋售"
+    if recent_drops:
+        current = recent_drops[-1]
+        state = "item_drop"
+        label = "📉 個別商品明顯降價"
         confidence = None
+        drop_count = sum(
+            1 for _key, change in current.item_changes
+            if change <= _ISOLATED_DROP_PCT
+        )
         message = (
-            f"市場中位 {current.median_change_pct:.1f}%"
-            f" · 單品最大偏離 {current.maximum_negative_residual_pct:.1f}%"
+            f"{drop_count} 種商品在本批行情跌幅達 10%"
+            " · 各商品獨立判斷，不代表同步補貨"
         )
     elif recent_spike:
         current = recent_spike[-1]
@@ -419,23 +412,16 @@ def analyze_market_events(
         )
 
     restock_item_keys, abnormal_down_item_keys, abnormal_up_item_keys = (
-        _item_signal_keys(current, broad_market=current.broad_drop)
+        _item_signal_keys(current, broad_market=False)
     )
-
-    prediction_now = now or datetime.now(timezone.utc)
-    predicted_window, predicted_confidence, bucket_events = _prediction(
-        broad_events,
-        now=prediction_now,
+    historical_drop_batches = sum(
+        1 for event in transitions
+        if any(change <= _ISOLATED_DROP_PCT for _key, change in event.item_changes)
     )
-    if predicted_window is None:
-        learning_message = (
-            f"同步大跌樣本 {len(broad_events)}/{_MIN_PREDICTION_EVENTS}"
-        )
-        if len(broad_events) >= _MIN_PREDICTION_EVENTS:
-            learning_message = (
-                f"已有 {len(broad_events)} 次樣本，但時段尚未集中"
-            )
-        message = f"{message} · {learning_message}"
+    # Overall market timing is not useful for independently restocked goods.
+    predicted_window = None
+    predicted_confidence = None
+    bucket_events = 0
 
     return MarketEventSignal(
         state=state,
@@ -445,7 +431,7 @@ def analyze_market_events(
         falling_items=current.falling_items,
         falling_categories=current.falling_categories,
         median_change_pct=current.median_change_pct,
-        historical_event_count=len(broad_events),
+        historical_event_count=historical_drop_batches,
         predicted_window=predicted_window,
         predicted_confidence=predicted_confidence,
         predicted_window_events=bucket_events,

@@ -47,14 +47,13 @@ def test_synchronized_market_drop_is_classified_as_broad_supply_event(tmp_path):
 
     signal = analyze_market_events(repository, "delta_force")
 
-    assert signal.state == "broad_drop"
-    assert signal.label == "📦 疑似補貨型下跌"
+    assert signal.state == "item_drop"
+    assert signal.label == "📉 個別商品明顯降價"
     assert signal.compared_items == ITEM_COUNT
     assert signal.falling_items == ITEM_COUNT
     assert signal.falling_categories == 6
     assert signal.median_change_pct == -10.0
-    assert signal.confidence is not None
-    assert signal.confidence >= 50
+    assert signal.confidence is None
     assert len(signal.restock_item_keys) == ITEM_COUNT
     assert "ammo-00" in signal.restock_item_keys
     assert signal.abnormal_down_item_keys == ()
@@ -71,12 +70,12 @@ def test_single_item_crash_with_stable_market_is_classified_as_isolated_dump(tmp
 
     signal = analyze_market_events(repository, "delta_force")
 
-    assert signal.state == "isolated_dump"
-    assert signal.label == "🟠 單品異常拋售"
+    assert signal.state == "item_drop"
+    assert signal.label == "📉 個別商品明顯降價"
     assert signal.median_change_pct == 0.0
     assert signal.falling_items == 1
     assert signal.confidence is None
-    assert signal.restock_item_keys == ()
+    assert signal.restock_item_keys == ("ammo-00",)
     assert signal.abnormal_down_item_keys == ("ammo-00",)
     assert signal.abnormal_up_item_keys == ()
 
@@ -109,7 +108,7 @@ def test_broad_drop_can_still_flag_an_item_that_falls_far_more_than_market(tmp_p
 
     signal = analyze_market_events(repository, "delta_force")
 
-    assert signal.state == "broad_drop"
+    assert signal.state == "item_drop"
     assert "ammo-02" in signal.restock_item_keys
     assert signal.abnormal_down_item_keys == ("ammo-02",)
 
@@ -131,7 +130,7 @@ def test_small_market_move_remains_normal(tmp_path):
     assert signal.abnormal_up_item_keys == ()
 
 
-def test_repeated_evening_broad_drops_predict_next_taipei_low_price_window(tmp_path):
+def test_overall_market_drops_do_not_create_global_restock_time(tmp_path):
     repository = _repository(tmp_path)
     first_day = datetime(2026, 10, 28, 9, 50, tzinfo=timezone.utc)  # 17:50 Taipei
 
@@ -148,12 +147,12 @@ def test_repeated_evening_broad_drops_predict_next_taipei_low_price_window(tmp_p
     )
 
     assert signal.historical_event_count == 3
-    assert signal.predicted_window == "明天 18:00–20:00"
-    assert signal.predicted_window_events == 3
-    assert signal.predicted_confidence == 50
+    assert signal.predicted_window is None
+    assert signal.predicted_confidence is None
+    assert signal.predicted_window_events == 0
 
 
-def test_prediction_waits_for_three_broad_drop_samples(tmp_path):
+def test_two_drop_batches_do_not_imply_synchronized_restock(tmp_path):
     repository = _repository(tmp_path)
     first_day = datetime(2026, 10, 29, 9, 50, tzinfo=timezone.utc)
 
@@ -167,4 +166,5 @@ def test_prediction_waits_for_three_broad_drop_samples(tmp_path):
     assert signal.historical_event_count == 2
     assert signal.predicted_window is None
     assert signal.predicted_confidence is None
-    assert "同步大跌樣本 2/3" in signal.message
+    assert "同步補貨" not in signal.label
+    assert signal.predicted_window is None

@@ -8,12 +8,14 @@ from time import monotonic
 
 from sqlalchemy import select
 
-from services.market.event_detector import _cluster_broad_events, _transition
+from services.market.event_detector import _ISOLATED_DROP_PCT, _pct_change
 from services.market.scope import maximum_market_tier, minimum_market_tier
 from services.market.storage import MarketItem, MarketPrice, MarketRepository, MarketSourceRun
 
 
 _MIN_ITEM_EVENTS = 3
+_ITEM_EVENT_CLUSTER_MINUTES = 90
+_MAX_OBSERVATION_GAP_HOURS = 6
 _MIN_INTERVAL_MINUTES = 90
 _MAX_INTERVAL_MINUTES = 72 * 60
 _CACHE_TTL_SECONDS = 300
@@ -84,7 +86,7 @@ def _prediction_from_events(
     predicted = ordered[-1] + timedelta(minutes=interval_median)
     clean_now = _utc(now)
     # Never invent another cycle after a prediction has already been missed.
-    # A new forecast requires a newly observed broad restock-type event.
+    # A new forecast requires a newly observed independent item event.
     if predicted <= clean_now:
         return None
 
@@ -162,31 +164,36 @@ def predict_item_restocks(
             )
         ).all()
 
-    snapshots: dict[datetime, dict[str, tuple[int, str]]] = {}
-    for item_key, category, source_updated_at, price in rows:
-        at = _utc(source_updated_at)
-        snapshots.setdefault(at, {})[str(item_key)] = (int(price), str(category or ""))
-
-    times = sorted(snapshots)
-    transitions = []
-    for previous_at, current_at in zip(times, times[1:]):
-        transition = _transition(
-            current_at,
-            snapshots[previous_at],
-            snapshots[current_at],
+    # Restock-like price drops are independent for each ammunition type.
+    # Do not require (or infer) a simultaneous market-wide restock.
+    item_history: dict[str, list[tuple[datetime, int]]] = {}
+    for item_key, _category, source_updated_at, price in rows:
+        item_history.setdefault(str(item_key), []).append(
+            (_utc(source_updated_at), int(price))
         )
-        if transition is not None:
-            transitions.append(transition)
-
-    broad_events = _cluster_broad_events(transitions)
-    if not broad_events:
-        return ()
 
     item_events: dict[str, list[datetime]] = {}
-    for event in broad_events:
-        for item_key, change_pct in event.item_changes:
-            if change_pct <= -3.0:
-                item_events.setdefault(str(item_key), []).append(event.at)
+    for item_key, history in item_history.items():
+        history.sort(key=lambda row: row[0])
+        events: list[datetime] = []
+        for (previous_at, previous_price), (current_at, current_price) in zip(
+            history, history[1:]
+        ):
+            gap = current_at - previous_at
+            if not timedelta(0) < gap <= timedelta(hours=_MAX_OBSERVATION_GAP_HOURS):
+                continue
+            if previous_price <= 0 or current_price <= 0:
+                continue
+            if _pct_change(previous_price, current_price) > _ISOLATED_DROP_PCT:
+                continue
+            # Multiple decreases in a brief episode count only once.
+            if events and current_at - events[-1] < timedelta(
+                minutes=_ITEM_EVENT_CLUSTER_MINUTES
+            ):
+                continue
+            events.append(current_at)
+        if events:
+            item_events[item_key] = events
 
     clean_now = _utc(now or datetime.now(timezone.utc))
     predictions = [

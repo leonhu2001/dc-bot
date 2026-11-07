@@ -29,18 +29,23 @@ async def _scoped_latest_items():
 
 
 def _prediction_text(snapshot) -> str:
-    event = getattr(snapshot, "market_event", None)
-    if event is None:
-        return "模型學習中"
-    if event.predicted_window:
-        confidence = (
-            f" · 可信度 {event.predicted_confidence}%"
-            if event.predicted_confidence is not None
-            else ""
+    if getattr(snapshot, "status", None) == "stale":
+        return "來源行情延遲，暫停補貨預測與通知"
+    item = getattr(snapshot, "next_restock_item", None)
+    if item is not None and item.restock_predicted_at is not None:
+        return (
+            f"最近個別預估：**{item.name}**\n"
+            f"<t:{int(item.restock_predicted_at.timestamp())}:t>"
+            f" · {item.restock_event_count} 次歷史降價樣本"
+            f" · 模型信心 {item.restock_confidence}%"
         )
-        return f"**{event.predicted_window}**{confidence}"
-    return f"模型學習中 · 同步大跌樣本 {event.historical_event_count}/3"
-
+    event = getattr(snapshot, "market_event", None)
+    if event is not None and event.restock_item_keys:
+        return (
+            f"觀察到 {len(event.restock_item_keys)} 種商品明顯降價"
+            " · 各自累積預測樣本中"
+        )
+    return "各商品獨立分析中 · 尚無足夠的歷史降價樣本"
 
 def build_market_overview_embed(snapshot) -> discord.Embed:
     if snapshot is None:
@@ -60,7 +65,7 @@ def build_market_overview_embed(snapshot) -> discord.Embed:
 
     description = f"{status_text}　•　4級以上 {len(snapshot.items)} 種"
     if snapshot.updated_at is not None:
-        description += f"\n最後更新 <t:{int(snapshot.updated_at.timestamp())}:R>"
+        description += f"\n來源資料最後更新 <t:{int(snapshot.updated_at.timestamp())}:R>"
 
     embed = discord.Embed(
         title="📊 三角洲台服｜交易所雷達",
@@ -113,7 +118,7 @@ def build_market_overview_embed(snapshot) -> discord.Embed:
         ),
         inline=True,
     )
-    embed.set_footer(text="補貨時間依歷史價格型態推估")
+    embed.set_footer(text="本服務定期檢查外部行情，更新頻率取決於資料來源；預測為個別商品推估")
     return embed
 
 
@@ -125,7 +130,7 @@ def build_market_alerts_embed() -> discord.Embed:
     )
     embed.add_field(
         name="⭐ 收藏補貨提醒",
-        value="預估補貨前 **15 分鐘** 私訊\n至少 3 次樣本・可信度 ≥ 65%",
+        value="預估個別商品降價前 **15 分鐘** 私訊（不是行情更新間隔）\n至少 3 次樣本・可信度 ≥ 65%",
         inline=True,
     )
     embed.add_field(
@@ -321,7 +326,7 @@ async def _send_watchlist(interaction: discord.Interaction) -> None:
     predictions = await _prediction_map()
     embed = discord.Embed(
         title="⭐ 我的收藏",
-        description=f"共 {len(items)} 種 · 有可信預測時會在補貨前 15 分鐘私訊",
+        description=f"共 {len(items)} 種 · 有可信預測時會在個別商品預估降價前 15 分鐘私訊",
         color=_PURPLE,
     )
     await interaction.response.send_message(
