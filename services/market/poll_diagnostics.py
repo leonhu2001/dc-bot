@@ -27,6 +27,8 @@ def record_market_poll(
     provider: str,
     item_count: int = 0,
     inserted_price_count: int = 0,
+    source_updated_at: datetime | None = None,
+    price_signature: str = "",
     checked_at: datetime | None = None,
 ) -> None:
     """Persist fetch outcome even when a source timestamp has not changed.
@@ -35,11 +37,27 @@ def record_market_poll(
     A failed telemetry write must not stop the market worker.
     """
     at = _utc(checked_at or datetime.now(timezone.utc))
+    previous = load_market_poll(game_key=game_key)
+    source_text = _utc(source_updated_at).isoformat() if source_updated_at else ""
+    signature = str(price_signature or "")[:64]
+    clean_status = str(status)
+    # A current dashboard whose prices change with the same source timestamp
+    # must not be presented as an ordinary duplicate.
+    if clean_status == "duplicate" and previous and source_text:
+        same_source_time = previous.get("source_updated_at") == source_text
+        previous_signature = previous.get("price_signature")
+        if same_source_time and (
+            previous.get("status") == "timestamp_price_conflict"
+            or (signature and previous_signature and signature != previous_signature)
+        ):
+            clean_status = "timestamp_price_conflict"
     payload = {
         "checked_at": at.isoformat(),
         "game_key": str(game_key)[:64],
         "provider": str(provider)[:128],
-        "status": str(status)[:64],
+        "status": clean_status[:64],
+        "source_updated_at": source_text,
+        "price_signature": signature,
         "item_count": int(item_count),
         "inserted_price_count": int(inserted_price_count),
     }
@@ -61,7 +79,7 @@ def load_market_poll(*, game_key: str = "delta_force") -> dict[str, Any] | None:
     if not isinstance(payload, dict) or payload.get("game_key") != game_key:
         return None
     if str(payload.get("status") or "") not in {
-        "stored", "duplicate", "source_unavailable", "error"
+        "stored", "duplicate", "timestamp_price_conflict", "source_unavailable", "error"
     }:
         return None
     try:
@@ -74,6 +92,8 @@ def load_market_poll(*, game_key: str = "delta_force") -> dict[str, Any] | None:
         "provider": str(payload.get("provider") or ""),
         "item_count": int(payload.get("item_count") or 0),
         "inserted_price_count": int(payload.get("inserted_price_count") or 0),
+        "source_updated_at": str(payload.get("source_updated_at") or ""),
+        "price_signature": str(payload.get("price_signature") or ""),
     }
 
 
@@ -108,6 +128,9 @@ def market_delay_diagnosis(
     elif result == "error":
         reason = "worker_processing_error"
         message = "抓取或儲存行情時發生錯誤；請檢查 dc-bot-market 服務日誌。"
+    elif result == "timestamp_price_conflict":
+        reason = "source_timestamp_price_conflict"
+        message = "偵測到來源價格已改變，但 API 的行情時間沒有更新；為避免錯誤標記新時間，系統暫停使用這批衝突資料，需檢查來源時間欄位。"
     elif result == "duplicate":
         reason = "source_timestamp_unchanged"
         message = "最近抓取成功，但來源提供的行情時間沒有前進；可能是上游快照或時間欄位未更新。"

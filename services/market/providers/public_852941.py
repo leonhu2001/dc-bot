@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
@@ -21,20 +21,31 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 
 
 def _parse_source_time(payload: dict) -> datetime:
-    raw = str(
-        payload.get("latest_market_time")
-        or payload.get("snapshot_group_time")
-        or ""
-    ).strip()
-    if not raw:
-        raise MarketSourceUnavailable("852941 source did not provide a market timestamp")
+    """Use the freshest *valid upstream market timestamp*, not fetch time.
 
-    try:
-        local = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TAIPEI)
-    except ValueError as exc:
-        raise MarketSourceUnavailable("852941 source returned an invalid market timestamp") from exc
-    return local.astimezone(timezone.utc)
-
+    /api/last_updated may expose both the latest market row and the latest
+    grouped snapshot. Either can lag the other. Picking only the first field
+    can freeze downstream persistence despite a newer snapshot being present.
+    """
+    candidates: list[datetime] = []
+    for key in ("latest_market_time", "snapshot_group_time"):
+        raw = str(payload.get(key) or "").strip()
+        if not raw:
+            continue
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=TAIPEI)
+        candidates.append(parsed.astimezone(timezone.utc))
+    if not candidates:
+        raise MarketSourceUnavailable("852941 source did not provide a valid market timestamp")
+    latest = max(candidates)
+    # Never accept a future timestamp as proof that the market is up to date.
+    if latest > datetime.now(timezone.utc) + timedelta(minutes=15):
+        raise MarketSourceUnavailable("852941 source market timestamp is in the future")
+    return latest
 
 def _display_name(source_item_id: str, category: str, tier: int | None) -> str:
     """Keep the source's real ammunition identity whenever it has one.
@@ -172,6 +183,8 @@ class Public852941Provider:
         headers = {
             "Accept": "application/json",
             "Accept-Language": "zh-TW,zh;q=0.9",
+            "Cache-Control": "no-cache, no-store, max-age=0",
+            "Pragma": "no-cache",
             "User-Agent": "MowanEntertainment-MarketReader/1.0 (+read-only public market data)",
         }
         async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:

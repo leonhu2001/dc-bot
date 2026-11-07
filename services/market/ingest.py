@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from datetime import datetime
+from hashlib import sha256
 
 from services.market.providers.base import MarketPriceProvider, normalize_source_snapshot
 from services.market.scope import market_item_enabled
@@ -14,6 +16,8 @@ class MarketIngestResult:
     item_count: int
     inserted_price_count: int
     duplicate_snapshot: bool
+    source_updated_at: datetime | None = None
+    price_signature: str = ""
 
 
 async def ingest_market_snapshot(
@@ -35,6 +39,10 @@ async def ingest_market_snapshot(
         if market_item_enabled(snapshot.game_key, item.tier)
     )
     snapshot = replace(snapshot, items=tracked_items)
+    # The digest detects dashboard price changes that reuse a frozen timestamp.
+    # It is diagnostic only: never relabel stale upstream prices as fresh.
+    price_rows = sorted((item.source_item_id, item.price) for item in tracked_items)
+    signature = sha256(repr(price_rows).encode("utf-8")).hexdigest()[:24]
     inserted = repository.store_snapshot(snapshot)
 
     return MarketIngestResult(
@@ -43,4 +51,6 @@ async def ingest_market_snapshot(
         item_count=len(snapshot.items),
         inserted_price_count=inserted,
         duplicate_snapshot=(inserted == 0),
+        source_updated_at=snapshot.source_updated_at,
+        price_signature=signature,
     )

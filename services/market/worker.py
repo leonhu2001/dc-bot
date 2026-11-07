@@ -33,6 +33,8 @@ class MarketCycleResult:
     inserted_price_count: int = 0
     alert_trigger_count: int = 0
     message: str = ""
+    source_updated_at: datetime | None = None
+    price_signature: str = ""
 
 
 def _game_keys() -> tuple[str, ...]:
@@ -159,6 +161,8 @@ async def run_market_cycle(
                     inserted_price_count=ingest_result.inserted_price_count,
                     alert_trigger_count=alert_trigger_count,
                     message=ingest_result.source_name,
+                    source_updated_at=ingest_result.source_updated_at,
+                    price_signature=ingest_result.price_signature,
                 )
             )
     return tuple(results)
@@ -188,6 +192,8 @@ async def run_worker(
                 status=result.status,
                 provider=type(provider).__name__,
                 inserted_price_count=result.inserted_price_count,
+                source_updated_at=result.source_updated_at,
+                price_signature=result.price_signature,
             )
             logger.info(
                 "market cycle game=%s status=%s inserted=%s alert_triggers=%s source_or_error=%s",
