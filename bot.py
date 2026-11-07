@@ -2746,6 +2746,15 @@ async def register_core_persistent_views_once() -> None:
 async def _bot_setup_hook() -> None:
     await register_core_persistent_views_once()
 
+    # Custom-order tickets share a persistent button across old and new panels.
+    # Register it before READY and before optional extension loading. In the
+    # previous startup path this happened only inside SetupCommands.__init__,
+    # after slow on_ready maintenance, leaving the old button unhandled.
+    from services.custom_order_quick_entry import install_custom_order_quick_entry
+
+    install_custom_order_quick_entry(bot)
+    print("[persistent-views] custom-order button registered before READY", flush=True)
+
     # Register public quick-order controls before READY; otherwise their
     # registration waits for potentially slow on_ready startup/recovery.
     # Installers are idempotent when SetupCommands runs later.

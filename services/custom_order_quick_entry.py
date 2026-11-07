@@ -611,6 +611,32 @@ class CustomOrderQuickEntryView(discord.ui.View):
     def __init__(self) -> None:
         super().__init__(timeout=None)
 
+    async def on_error(
+        self,
+        interaction: discord.Interaction,
+        error: Exception,
+        item: discord.ui.Item,
+    ) -> None:
+        # Old public panels reuse this persistent custom_id. A callback error
+        # must be actionable and visible rather than a silent Discord timeout.
+        print(
+            f"[custom-order-quick] button failed "
+            f"user_id={getattr(interaction.user, 'id', None)} "
+            f"channel_id={getattr(interaction, 'channel_id', None)} "
+            f"exception={type(error).__name__} "
+            f"http_status={getattr(error, 'status', None)} "
+            f"discord_code={getattr(error, 'code', None)}",
+            flush=True,
+        )
+        message = "自訂單按鈕處理失敗，請稍後再試；若持續發生請通知客服。"
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
+        except (discord.HTTPException, discord.InteractionResponded):
+            pass
+
     @discord.ui.button(
         label="提出自訂需求",
         emoji="✨",
