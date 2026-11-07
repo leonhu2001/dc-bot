@@ -135,7 +135,10 @@ def test_boss_ticket_is_preserved_if_order_panel_creation_fails(monkeypatch, cap
     ticket = asyncio.run(run())
     assert ticket is guild.ticket
     assert ticket.delete.await_count == 0
-    assert any("票口會保留" in msg[1].get("content", "") for msg in ticket.sent)
+    assert any(
+        "票口會保留" in str(msg[1].get("content") or (msg[0][0] if msg[0] else ""))
+        for msg in ticket.sent
+    )
     assert "票口已保留" in interaction.edit_original_response.await_args.kwargs["content"]
     logs = capsys.readouterr().out
     assert "stage=send_self_service_panel" in logs
