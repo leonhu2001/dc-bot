@@ -144,6 +144,7 @@ def get_specified_staff_entries_for_rule(guild: discord.Guild, rule) -> list[dic
             "id": str(member.id),
             "label": _truncate_select_text(getattr(member, "display_name", None) or getattr(member, "name", None) or str(member.id)),
             "description": _truncate_select_text(role_label),
+            "role_key": display_role_key,
             "role_order": allowed_role_keys.index(display_role_key) if display_role_key in allowed_role_keys else 999,
         })
 
@@ -244,6 +245,34 @@ class SelfServiceSpecifiedStaffDropdown(discord.ui.Select):
                 ephemeral=True,
             )
             return
+
+        from services.order_rules import (
+            ONE_COMPANION_ONE_GUARD_RULE_KEYS,
+            ORDER_RULES,
+            calculate_price,
+        )
+        if view.rule_key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+            role_by_id = {
+                entry["id"]: entry.get("role_key")
+                for entry in view.entries
+            }
+            roles = [role_by_id.get(staff_id) for staff_id in current_ids]
+            if any(role is None for role in roles):
+                await interaction.response.send_message(
+                    "指定人員身分已變動，請重新開啟指定名單。",
+                    ephemeral=True,
+                )
+                return
+            try:
+                rule = ORDER_RULES[view.rule_key]
+                calculate_price(
+                    rule,
+                    quantity=max(1, int(rule.min_quantity)),
+                    specified_roles=roles,
+                )
+            except (ValueError, KeyError) as exc:
+                await interaction.response.send_message(str(exc), ephemeral=True)
+                return
 
         view.selected_ids = current_ids
         await view.save_selection_and_refresh_panel(interaction)

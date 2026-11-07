@@ -166,7 +166,7 @@ def build_self_service_panel_embed(
                 else "可指定的品項才會開放指定成員；2 小時以上免指定費。\n"
             )
             + (
-                "一陪一護可指定一位具端遊資格的護航或陪玩，其他人員照常接單。\n"
+                "一陪一護最多可指定兩位具端遊資格的人員；指定滿兩位時，至少一位須為護航。\n"
                 if str(data.get("order_rule_key") or "") in {
                     "basic_one_companion_one_guard_secret",
                     "basic_one_companion_one_guard_topsecret",

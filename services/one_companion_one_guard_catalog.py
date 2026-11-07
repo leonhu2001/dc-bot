@@ -82,7 +82,7 @@ def _install_rules() -> None:
             min_quantity=1,
             max_quantity=24,
             allow_specify=True,
-            max_specified_count=1,
+            max_specified_count=2,
             specify_fee_default=100,
             specify_fee_by_role={role: 100 for role in ALL_RECEIVER_ROLES},
             specify_free_min_units=2,

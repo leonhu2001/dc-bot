@@ -515,10 +515,14 @@ def calculate_price(
         raise ValueError(f"{rule.label} 不開放指定")
 
     if rule.key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
-        if len(specified_roles) > 1:
-            raise ValueError("一陪一護最多只能指定 1 位人員")
+        if len(specified_roles) > 2:
+            raise ValueError("一陪一護最多只能指定 2 位人員")
         if any(role not in ALL_RECEIVER_ROLES for role in specified_roles):
             raise ValueError("一陪一護只可指定符合資格的護航或陪玩")
+        if len(specified_roles) == 2 and not any(
+            role in PROTECTOR_ROLES for role in specified_roles
+        ):
+            raise ValueError("一陪一護指定 2 位時，至少需要 1 位護航")
 
     if rule.max_specified_count is not None and len(specified_roles) > rule.max_specified_count:
         raise ValueError(f"{rule.label} 最多只能指定 {rule.max_specified_count} 位")
@@ -1825,7 +1829,7 @@ class EffectiveOrderRules(dict):
                     required_staff_count=base.required_staff_count,
                     min_protector_count=base.min_protector_count,
                     allow_specify=True,
-                    max_specified_count=1,
+                    max_specified_count=2,
                     specify_fee_default=100,
                     specify_fee_by_role={role: 100 for role in ALL_RECEIVER_ROLES},
                     specify_fee_by_game_role={},

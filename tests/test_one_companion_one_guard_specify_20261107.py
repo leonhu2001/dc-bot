@@ -29,10 +29,10 @@ from web.app.services.checkout_preview import _choose_role_key
         ("basic_one_companion_one_guard_topsecret", 770),
     ],
 )
-def test_one_guard_both_difficulties_can_designate_exactly_one_eligible_staff(rule_key, base_price):
+def test_one_guard_both_difficulties_allow_two_specified_staff(rule_key, base_price):
     rule = get_rule(rule_key)
     assert rule.allow_specify is True
-    assert rule.max_specified_count == 1
+    assert rule.max_specified_count == 2
     assert rule.required_staff_count == 2
     assert rule.min_protector_count == 1
     for receiver in ("top_protector", "female_protector", "male_protector", "male_companion", "female_companion"):
@@ -46,8 +46,30 @@ def test_one_guard_both_difficulties_can_designate_exactly_one_eligible_staff(ru
         assert two_hours.specify_fee == 0
         assert two_hours.total_amount == base_price * 2
 
-    with pytest.raises(ValueError, match="最多只能指定 1 位人員"):
-        calculate_price(rule, quantity=1, specified_roles=["male_companion", "female_protector"])
+    # Specified guard + companion, or even two guards, fill both allowed seats.
+    for roles in (
+        ["male_companion", "female_protector"],
+        ["top_protector", "male_protector"],
+    ):
+        one_hour = calculate_price(rule, quantity=1, specified_roles=roles)
+        assert one_hour.required_staff_count == 2
+        assert one_hour.base_amount == base_price
+        assert one_hour.specify_fee == 200
+        assert one_hour.total_amount == base_price + 200
+        long_order = calculate_price(rule, quantity=4, specified_roles=roles)
+        assert long_order.specify_fee == 0
+        assert long_order.total_amount == base_price * 4
+
+    with pytest.raises(ValueError, match="至少需要 1 位護航"):
+        calculate_price(
+            rule, quantity=1,
+            specified_roles=["male_companion", "female_companion"],
+        )
+    with pytest.raises(ValueError, match="最多只能指定 2 位人員"):
+        calculate_price(
+            rule, quantity=1,
+            specified_roles=["male_companion", "female_protector", "top_protector"],
+        )
 
 
 @pytest.mark.parametrize("rule_key", sorted(ONE_COMPANION_ONE_GUARD_RULE_KEYS))
@@ -118,7 +140,7 @@ def test_old_manager_override_does_not_turn_designation_off(tmp_path, monkeypatc
     base = get_base_rule(key)
     payload = rule_to_override_payload(base)
     payload["allow_specify"] = False
-    payload["max_specified_count"] = 2
+    payload["max_specified_count"] = 1
     payload["specify_fee_default"] = 0
     payload["specify_fee_by_role"] = {}
 
@@ -134,11 +156,15 @@ def test_old_manager_override_does_not_turn_designation_off(tmp_path, monkeypatc
     try:
         effective = ORDER_RULES[key]
         assert effective.allow_specify is True
-        assert effective.max_specified_count == 1
+        assert effective.max_specified_count == 2
         for role in ("male_companion", "female_protector"):
             assert calculate_price(
                 effective, quantity=1, specified_roles=[role]
             ).specify_fee == 100
+        assert calculate_price(
+            effective, quantity=1,
+            specified_roles=["male_companion", "female_protector"],
+        ).specify_fee == 200
     finally:
         invalidate_rule_override_cache()
 
@@ -147,3 +173,15 @@ def test_one_guard_catalog_remains_desktop_only():
     details = get_order_item_details_for_group("delta_desktop_basic", "一陪一護")
     assert {item["rule_key"] for item in details} == ONE_COMPANION_ONE_GUARD_RULE_KEYS
     assert get_order_item_details_for_group("delta_mobile_basic", "一陪一護") == []
+
+
+def test_two_specified_staff_ui_contract_keeps_guard_slot_and_both_choices():
+    from pathlib import Path
+
+    picker = Path("services/self_service_selection_runtime.py").read_text(encoding="utf-8")
+    ui = Path("services/self_service_ui_runtime.py").read_text(encoding="utf-8")
+    assert '"role_key": display_role_key' in picker
+    assert "if view.rule_key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:" in picker
+    assert "specified_roles=roles" in picker
+    assert "最多可指定兩位" in ui
+    assert "至少一位須為護航" in ui
