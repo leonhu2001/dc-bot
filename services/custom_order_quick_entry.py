@@ -265,6 +265,32 @@ def _custom_order_intro_text(
     return "\n".join(lines)
 
 
+def _split_custom_order_intro_text(text: str, *, limit: int = 1800) -> list[str]:
+    """Preserve all requirements while keeping each Discord message under 2,000 chars.
+
+    The form allows multiple 1,000-character fields; a single intro message
+    cannot safely contain all fields, especially with VIP notes appended.
+    """
+    if limit <= 0 or limit > 1900:
+        raise ValueError("訊息分段長度無效")
+    remaining = str(text)
+    if not remaining:
+        return [""]
+    chunks: list[str] = []
+    while len(remaining) > limit:
+        # Prefer a paragraph/field boundary, but preserve every character.
+        boundary = remaining.rfind("\n", 0, limit + 1)
+        if boundary < limit // 2:
+            boundary = limit
+        else:
+            boundary += 1
+        chunks.append(remaining[:boundary])
+        remaining = remaining[boundary:]
+    if remaining:
+        chunks.append(remaining)
+    return chunks
+
+
 def _intro_text_from_embed(
     embed: discord.Embed,
     *,
@@ -384,6 +410,7 @@ async def _create_custom_order_request_ticket(
         )
 
     ticket: discord.TextChannel | None = None
+    stage = "create_channel"
     try:
         ticket = await guild.create_text_channel(
             name=build_ticket_channel_name("自訂單", member),
@@ -398,7 +425,19 @@ async def _create_custom_order_request_ticket(
             ),
         )
 
+        stage = "prepare_intro"
         support_mention = support_role.mention if support_role is not None else "客服"
+        try:
+            customer_notes = format_customer_notes_for_ticket(member.id)
+        except Exception as notes_exc:
+            # A malformed legacy VIP note must not cancel the owner's ticket.
+            print(
+                f"[custom-order-quick] notes unavailable customer_id={member.id} "
+                f"error={type(notes_exc).__name__}",
+                flush=True,
+            )
+            customer_notes = "會員備註暫時無法顯示，請客服至會員資料查看。"
+
         intro_text = _custom_order_intro_text(
             support_mention=support_mention,
             member_mention=member.mention,
@@ -408,8 +447,12 @@ async def _create_custom_order_request_ticket(
             gameplay_rules=gameplay_rules,
             goal_plan=goal_plan,
             extra_request=extra_request,
-            customer_notes=format_customer_notes_for_ticket(member.id),
+            customer_notes=customer_notes,
         )
+        intro_chunks = _split_custom_order_intro_text(intro_text)
+        intro_text = intro_chunks[0]
+
+        stage = "send_intro"
         await ticket.send(
             content=intro_text,
             view=_order_control_view(interaction.client),
@@ -419,7 +462,13 @@ async def _create_custom_order_request_ticket(
                 everyone=False,
             ),
         )
+        for followup_text in intro_chunks[1:]:
+            await ticket.send(
+                content=followup_text,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
 
+        stage = "send_self_service_panel"
         await _send_custom_order_self_service_panel(
             ticket,
             customer_id=member.id,
@@ -429,12 +478,33 @@ async def _create_custom_order_request_ticket(
             goal_plan=goal_plan,
             extra_request=extra_request,
         )
-    except (discord.Forbidden, discord.HTTPException, RuntimeError) as exc:
+    except Exception as exc:
+        # Ticket creation is a committed user action. Never silently delete a
+        # newly created channel because a later message or UI panel fails.
+        print(
+            f"[custom-order-quick] setup failed stage={stage} "
+            f"customer_id={member.id} ticket_id={getattr(ticket, 'id', None)} "
+            f"exception={type(exc).__name__} "
+            f"http_status={getattr(exc, 'status', None)} "
+            f"discord_code={getattr(exc, 'code', None)}",
+            flush=True,
+        )
         if ticket is not None:
             try:
-                await ticket.delete(reason="自訂單需求建立失敗，自動清理")
+                await ticket.send(
+                    "⚠️ 自訂單票口已建立，但部分下單資訊初始化失敗。"
+                    "票口會保留，請客服協助確認需求並重新載入下單面板。",
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
             except (discord.Forbidden, discord.HTTPException):
                 pass
+            await interaction.edit_original_response(
+                content=(
+                    f"自訂單票口已保留：{ticket.mention}\n"
+                    "部分下單面板初始化失敗，已通知客服協助處理；請勿重複開票。"
+                )
+            )
+            return ticket
         await interaction.edit_original_response(
             content=f"建立自訂單客服中心失敗：{type(exc).__name__}。請通知客服。"
         )
