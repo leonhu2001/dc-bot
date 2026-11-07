@@ -368,7 +368,11 @@ class SelfServiceOrderDetailSelect(discord.ui.Select):
                     for detail in details[:25]
                 ]
                 disabled = len(details) == 1 and bool(selected_value)
-                placeholder = "請選擇具體規格"
+                placeholder = (
+                    "選擇陪玩人數（1～4 位）"
+                    if category == "custom" and selected_group == "自訂"
+                    else "請選擇具體規格"
+                )
 
         super().__init__(
             placeholder=placeholder,

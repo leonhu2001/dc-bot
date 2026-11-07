@@ -183,6 +183,7 @@ def _seed_custom_order_self_service(
         apply_self_service_category_selection,
         apply_self_service_detail_selection,
         apply_self_service_item_group_selection,
+        sync_custom_order_headcount_detail,
     )
 
     count = max(1, min(4, int(companion_count or 1)))
@@ -197,7 +198,7 @@ def _seed_custom_order_self_service(
 
     data["customer_id"] = int(customer_id)
     data["custom_order_request"] = True
-    data["custom_order_companion_count"] = int(data.get("player_count") or count)
+    sync_custom_order_headcount_detail(data)
 
     if game_or_service:
         data["custom_order_game_or_service"] = str(game_or_service).strip()
@@ -223,7 +224,8 @@ def _build_custom_order_self_service_embed(
     embed.title = "自助下單｜自訂單"
     embed.description = (
         f"下單用戶：<@{int(customer_id)}>\n\n"
-        "陪玩人數可在 **1～4 位**之間調整；時數／數量也可在此修改。\n"
+        f"目前陪玩人數：**{int(data.get('player_count') or 1)} 位**。\n"
+        "第三欄負責選擇 1～4 位陪玩，規格統一顯示「自訂」；時數也可修改。\n"
         "自訂單指定免費，所有服務收費以客服填寫價格為準；再依折扣計算應付金額。\n"
         "客服使用「客服填價格」完成報價，確認後再送出等待接單。\n"
         "上方文字需求保留遊戲、玩法與目標，這張面板負責正式訂單規格。"
@@ -761,16 +763,25 @@ async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> Non
         has_controls = False
         has_self_service = False
         intro_message: discord.Message | None = None
+        self_service_message: discord.Message | None = None
+        setup_warning_message: discord.Message | None = None
         try:
             async for message in channel.history(limit=50):
                 if bot.user is not None and message.author.id != bot.user.id:
                     continue
                 has_controls = has_controls or _message_has_order_controls(message)
-                has_self_service = has_self_service or _message_has_self_service_panel(message)
+                if _message_has_self_service_panel(message):
+                    has_self_service = True
+                    if self_service_message is None:
+                        self_service_message = message
                 if intro_message is None and _message_has_custom_order_intro_embed(message):
                     intro_message = message
-                if has_controls and has_self_service and intro_message is not None:
-                    break
+                if (
+                    setup_warning_message is None
+                    and "自訂單票口已建立，但部分下單資訊初始化失敗"
+                    in str(getattr(message, "content", "") or "")
+                ):
+                    setup_warning_message = message
         except (discord.Forbidden, discord.HTTPException):
             continue
 
@@ -798,6 +809,53 @@ async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> Non
             except (discord.Forbidden, discord.HTTPException):
                 pass
 
+        panel_ready = False
+        if has_self_service and self_service_message is not None:
+            try:
+                # Reconcile legacy players_1 selector with current player_count,
+                # preserving the staff-entered quote and existing discounts.
+                data = _seed_custom_order_self_service(
+                    channel.id,
+                    customer_id=customer_id,
+                    companion_count=companion_count,
+                )
+                from services import self_service_ui_runtime as ui
+
+                original_embed = (
+                    self_service_message.embeds[0]
+                    if getattr(self_service_message, "embeds", None)
+                    else None
+                )
+                needs_refresh = bool(
+                    original_embed is None
+                    or not any(
+                        str(field.name) == "第三欄｜規格"
+                        and str(field.value) == "自訂"
+                        for field in getattr(original_embed, "fields", ())
+                    )
+                    or setup_warning_message is not None
+                )
+                if needs_refresh:
+                    await self_service_message.edit(
+                        embed=_build_custom_order_self_service_embed(
+                            customer_id, data, channel.guild
+                        ),
+                        view=ui.SelfServiceOrderView(
+                            customer_id=customer_id,
+                            channel_id=channel.id,
+                            selected_category=CUSTOM_ORDER_CATEGORY,
+                        ),
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                    repaired_panels += 1
+                panel_ready = True
+            except Exception as exc:
+                print(
+                    f"[custom-order-quick] existing panel refresh failed "
+                    f"channel={channel.id} error={type(exc).__name__}",
+                    flush=True,
+                )
+
         if not has_self_service:
             try:
                 await _send_custom_order_self_service_panel(
@@ -805,11 +863,29 @@ async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> Non
                     customer_id=customer_id,
                     companion_count=companion_count,
                 )
+                has_self_service = True
+                panel_ready = True
                 repaired_panels += 1
-            except (discord.Forbidden, discord.HTTPException, RuntimeError) as exc:
+            except Exception as exc:
                 print(
                     f"[custom-order-quick] self-service panel repair failed "
                     f"channel={channel.id}: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+        if panel_ready and setup_warning_message is not None:
+            try:
+                await setup_warning_message.edit(
+                    content=(
+                        "✅ 自訂單下單面板已恢復，可以繼續確認陪玩人數、"
+                        "由客服填寫價格後再送出；先前的初始化警告已解除。"
+                    ),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+            except (discord.Forbidden, discord.HTTPException) as exc:
+                print(
+                    f"[custom-order-quick] warning clearance failed "
+                    f"channel={channel.id} error={type(exc).__name__}",
                     flush=True,
                 )
 

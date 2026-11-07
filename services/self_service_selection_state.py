@@ -92,6 +92,34 @@ def _reset_player_count_for_selected_rule(data: dict[str, Any]) -> None:
         data.pop("player_count", None)
 
 
+def sync_custom_order_headcount_detail(data: dict[str, Any]) -> bool:
+    """Use player_count as the single source of truth for custom-order headcount.
+
+    Older ticket panels can preserve players_1 even after their staff count was
+    changed to two or more. The selector value must follow the actual count;
+    the embed renders the third field as the generic custom specification.
+    No priced or discount state is cleared by this compatibility migration.
+    """
+    if str(data.get("order_rule_key") or "") != "custom_custom_order":
+        return False
+    raw_count = data.get("player_count") or data.get("custom_order_companion_count") or 1
+    try:
+        count = int(raw_count)
+    except (ValueError, TypeError):
+        count = 1
+    count = max(1, min(4, count))
+    expected = f"players_{count}"
+    changed = any((
+        data.get("player_count") != count,
+        str(data.get("item_detail_value") or "") != expected,
+        data.get("custom_order_companion_count") != count,
+    ))
+    data["player_count"] = count
+    data["item_detail_value"] = expected
+    data["custom_order_companion_count"] = count
+    return changed
+
+
 def apply_self_service_category_selection(data: dict[str, Any], category: str) -> None:
     data["category"] = category
     for key in (
@@ -122,6 +150,7 @@ def apply_self_service_detail_selection(data: dict[str, Any], detail: dict[str, 
         _reset_player_count_for_selected_rule(data)
 
     data["quantity"] = int(detail.get("min_quantity") or 1)
+    sync_custom_order_headcount_detail(data)
     data.pop("specified_staff_ids", None)
     data["companion_preference"] = "不指定陪玩/打手"
 

@@ -245,7 +245,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "自訂",
             "details": [
-                {"label": f"陪玩{count}名", "value": f"players_{count}", "rule_key": "custom_custom_order", "player_count": count, "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24}
+                {"label": f"{count} 位陪玩", "value": f"players_{count}", "rule_key": "custom_custom_order", "player_count": count, "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24}
                 for count in range(1, 5)
             ],
         },

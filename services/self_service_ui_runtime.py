@@ -43,6 +43,7 @@ from services.staff_internal_ammo_dump_policy import (
     is_internal_ammo_dump_rule,
     require_ammo_dump_named_selection,
 )
+from services.self_service_selection_state import sync_custom_order_headcount_detail
 from services.self_service_selection_runtime import (
     SelfServicePointBenefitView,
     SelfServiceSpecifiedStaffDropdownView,
@@ -125,6 +126,7 @@ class SelfServicePlayerCountModal(discord.ui.Modal, title="填寫陪玩人數"):
             return
 
         data["player_count"] = value
+        sync_custom_order_headcount_detail(data)
         data.pop("payment_method", None)
         remember_order_data(self.channel_id, data)
 
@@ -141,6 +143,7 @@ def build_self_service_panel_embed(
     data: dict,
     guild: discord.Guild | None = None,
 ) -> discord.Embed:
+    sync_custom_order_headcount_detail(data)
     category = data.get("category")
     category_label = ORDER_CATEGORY_LABELS.get(category, "尚未選擇")
     item_group = str(data.get("item_group") or "尚未選擇")
@@ -150,7 +153,11 @@ def build_self_service_panel_embed(
         data.get("item_group"),
         data.get("item_detail_value"),
     )
-    detail_label = str((detail or {}).get("label") or "尚未選擇")
+    detail_label = (
+        "自訂"
+        if str(data.get("order_rule_key") or "") == "custom_custom_order"
+        else str((detail or {}).get("label") or "尚未選擇")
+    )
 
     quantity = _to_int(data.get("quantity"), 1) or 1
     quantity_unit = get_self_service_quantity_unit(data.get("item"), data) if data.get("item") else "單"
@@ -603,6 +610,7 @@ class SelfServiceOrderView(discord.ui.View):
         self.channel_id = channel_id
 
         data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        sync_custom_order_headcount_detail(data)
         category = selected_category or data.get("category")
         selected_item = data.get("item")
         selected_quantity = _to_int(data.get("quantity"), 1) or 1
