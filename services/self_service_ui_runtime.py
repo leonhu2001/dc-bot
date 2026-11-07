@@ -165,6 +165,14 @@ def build_self_service_panel_embed(
                 if data.get("order_rule_key") == "custom_custom_order"
                 else "可指定的品項才會開放指定成員；2 小時以上免指定費。\n"
             )
+            + (
+                "一陪一護只可指定一位具端遊資格的男陪／女陪，護衛另外接單。\n"
+                if str(data.get("order_rule_key") or "") in {
+                    "basic_one_companion_one_guard_secret",
+                    "basic_one_companion_one_guard_topsecret",
+                }
+                else ""
+            )
             + "送出後先進入等待接單，人數滿後才開放付款。"
         ),
         color=discord.Color.purple(),

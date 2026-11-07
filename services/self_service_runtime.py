@@ -414,7 +414,24 @@ async def _resolve_specified_roles_for_price(
         if member is None:
             raise ValueError(f"找不到指定人員：{staff_id}")
 
-        role_key = _role_key_for_member(rule, member)
+        from services.order_rules import (
+            ONE_COMPANION_ONE_GUARD_RULE_KEYS,
+            one_guard_specifiable_companion_role,
+        )
+
+        if str(getattr(rule, "key", "") or "") in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+            member_role_ids = {
+                str(role.id)
+                for role in getattr(member, "roles", [])
+                if getattr(role, "id", None) is not None
+            }
+            role_key = one_guard_specifiable_companion_role(rule, member_role_ids)
+            if role_key is None:
+                raise ValueError(
+                    f"{member.mention} 不符合一陪一護可指定的端遊男陪／女陪資格，或同時具有護衛身分。"
+                )
+        else:
+            role_key = _role_key_for_member(rule, member)
 
         if role_key is None:
             raise ValueError(f"{member.mention} 的職位不符合這張單的可指定 / 可接條件。")

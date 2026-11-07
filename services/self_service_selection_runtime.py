@@ -99,7 +99,13 @@ def _truncate_select_text(value: str, limit: int = 100) -> str:
 
 
 def get_specified_staff_entries_for_rule(guild: discord.Guild, rule) -> list[dict]:
-    from services.order_rules import ALL_ROLE_IDS, ALL_ROLE_LABELS, get_allowed_role_keys
+    from services.order_rules import (
+        ALL_ROLE_IDS,
+        ALL_ROLE_LABELS,
+        ONE_COMPANION_ONE_GUARD_RULE_KEYS,
+        get_allowed_role_keys,
+        one_guard_specifiable_companion_role,
+    )
 
     entries = []
     allowed_role_keys = list(get_allowed_role_keys(rule))
@@ -123,7 +129,12 @@ def get_specified_staff_entries_for_rule(guild: discord.Guild, rule) -> list[dic
         if not matched_role_keys:
             continue
 
-        display_role_key = _role_key_for_member(rule, member) or matched_role_keys[0]
+        if str(getattr(rule, "key", "") or "") in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+            display_role_key = one_guard_specifiable_companion_role(rule, member_role_ids)
+            if display_role_key is None:
+                continue
+        else:
+            display_role_key = _role_key_for_member(rule, member) or matched_role_keys[0]
         role_label = (
             SPECIFIED_STAFF_ROLE_LABELS.get(display_role_key)
             or ALL_ROLE_LABELS.get(display_role_key, display_role_key)

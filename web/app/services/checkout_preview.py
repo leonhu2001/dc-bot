@@ -26,6 +26,7 @@ from services.order_rules import (
     ALL_ROLE_IDS,
     ALL_ROLE_LABELS,
     ORDER_RULES,
+    ONE_COMPANION_ONE_GUARD_RULE_KEYS,
     ROLE_IDS,
     calculate_price,
     get_allowed_role_ids,
@@ -33,6 +34,7 @@ from services.order_rules import (
     get_required_game_role_ids,
     get_required_game_role_keys,
     get_required_staff_count,
+    one_guard_specifiable_companion_role,
     role_ids_match_requirements,
 )
 
@@ -699,6 +701,9 @@ def _choose_role_key(
         get_required_game_role_ids(rule),
     ):
         return None
+
+    if str(getattr(rule, "key", "") or "") in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+        return one_guard_specifiable_companion_role(rule, role_ids)
 
     matched = [
         role_key

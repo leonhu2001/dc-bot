@@ -99,6 +99,35 @@ COMPANION_ROLES: tuple[RoleKey, ...] = (
 )
 
 ALL_RECEIVER_ROLES: tuple[RoleKey, ...] = PROTECTOR_ROLES + COMPANION_ROLES
+
+# These two desktop Delta products designate one companion slot only. A member
+# with a protector role must not appear as a companion in the specify picker.
+ONE_COMPANION_ONE_GUARD_RULE_KEYS = frozenset({
+    "basic_one_companion_one_guard_secret",
+    "basic_one_companion_one_guard_topsecret",
+})
+
+
+def one_guard_specifiable_companion_role(
+    rule: "OrderRule",
+    member_role_ids: set[str] | list[str] | tuple[str, ...],
+) -> str | None:
+    """Return the sole companion designate role for an eligible desktop member."""
+    if str(getattr(rule, "key", "") or "") not in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+        return None
+    role_ids = {str(value) for value in member_role_ids}
+    if any(str(ROLE_IDS[role]) in role_ids for role in PROTECTOR_ROLES):
+        return None
+    if not any(str(ALL_ROLE_IDS[role]) in role_ids for role in COMPANION_ROLES):
+        return None
+    if not role_ids_match_requirements(
+        role_ids, get_allowed_role_ids(rule), get_required_game_role_ids(rule)
+    ):
+        return None
+    return next(
+        (str(role) for role in COMPANION_ROLES if str(ROLE_IDS[role]) in role_ids),
+        None,
+    )
 AW_COLLISION_RECEIVER_ROLES: tuple[RoleKey, ...] = ("aw_collision_receiver",)
 HALFCOIN_RECEIVER_ROLES: tuple[RoleKey, ...] = ("halfcoin_receiver",)
 # 新增幣號商品時沿用此共享職位，不建立另一組接單角色。
@@ -494,6 +523,12 @@ def calculate_price(
 
     if len(specified_roles) > required_staff:
         raise ValueError("指定人數不能超過需要接單人數")
+
+    if rule.key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+        if len(specified_roles) > 1:
+            raise ValueError("一陪一護只能指定 1 位陪玩")
+        if any(role not in COMPANION_ROLES for role in specified_roles):
+            raise ValueError("一陪一護僅可指定男陪或女陪，不可指定護衛")
 
     allowed_specify_roles = set(rule.allowed_roles) | set(rule.allowed_game_roles)
 
@@ -1783,6 +1818,23 @@ class EffectiveOrderRules(dict):
                     price_multiply_player_count=base.price_multiply_player_count,
                     player_count_prices=dict(base.player_count_prices),
                     max_specified_count=base.max_specified_count,
+                )
+            if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+                # An old manager override may still say allow_specify=False.
+                # The approved companion-only designation policy is canonical.
+                rule = replace(
+                    rule,
+                    allowed_roles=base.allowed_roles,
+                    required_game_roles=base.required_game_roles,
+                    required_staff_count=base.required_staff_count,
+                    min_protector_count=base.min_protector_count,
+                    allow_specify=True,
+                    max_specified_count=1,
+                    specify_fee_default=100,
+                    specify_fee_by_role={role: 100 for role in COMPANION_ROLES},
+                    specify_fee_by_game_role={},
+                    specify_free_min_units=2,
+                    specify_free_basis="quantity",
                 )
             if key in SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS:
                 rule = replace(
