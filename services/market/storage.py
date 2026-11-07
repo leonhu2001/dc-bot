@@ -316,7 +316,7 @@ class MarketRepository:
             select(MarketPrice.source_updated_at, MarketPrice.price)
             .where(MarketPrice.item_id == int(item_id))
             .order_by(MarketPrice.source_updated_at.desc())
-            .limit(max(1, min(int(limit), 2000)))
+            .limit(max(1, min(int(limit), 5000)))
         )
         with self.SessionLocal() as db:
             rows = db.execute(stmt).all()

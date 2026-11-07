@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from services.market.ingest import ingest_market_snapshot
 from services.market.personalization import MarketPersonalizationRepository
+from services.market.poll_diagnostics import record_market_poll
 from services.market.provider_registry import build_configured_provider, configured_provider_name
 from services.market.providers.base import MarketPriceProvider, MarketSourceUnavailable
 from services.market.push import MarketPushRepository
@@ -180,6 +181,14 @@ async def run_worker(
             game_keys=game_keys,
         )
         for result in results:
+            # Even duplicate or failed fetches must be visible to the website.
+            # The historical price DB only records distinct source timestamps.
+            record_market_poll(
+                game_key=result.game_key,
+                status=result.status,
+                provider=type(provider).__name__,
+                inserted_price_count=result.inserted_price_count,
+            )
             logger.info(
                 "market cycle game=%s status=%s inserted=%s alert_triggers=%s source_or_error=%s",
                 result.game_key,

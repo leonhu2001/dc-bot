@@ -18,7 +18,7 @@ def test_market_item_detail_uses_real_history_maturity_rules():
     assert "data-market-average-7d" in template
     assert "data-market-range-7d" in template
     assert "data-market-coverage" in template
-    assert "history?limit=1000" in template
+    assert "history?limit=5000" in template
     assert "data-market-restock-card" in template
     assert "Web Push 已正式啟用" not in template
 

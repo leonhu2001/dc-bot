@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from services.market.analytics import build_market_analytics
 from services.market.event_detector import MarketEventSignal
 from services.market.event_signal_cache import get_cached_market_event_signal
+from services.market.poll_diagnostics import load_market_poll, market_delay_diagnosis
 from services.market.restock_prediction import (
     ItemRestockPrediction,
     get_cached_item_restock_predictions,
@@ -304,7 +305,14 @@ def get_public_market_snapshot(
         losers=losers,
         market_event=market_event,
         next_restock_item=_next_restock_item(items),
-        message="行情更新延遲，提醒暫停。" if stale else "",
+        message=(
+            market_delay_diagnosis(
+                source_updated_at=updated_at,
+                now=now,
+                poll=load_market_poll(game_key=clean_game_key),
+            )["message"]
+            if stale else ""
+        ),
     )
 
 

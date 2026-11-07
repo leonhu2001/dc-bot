@@ -4,6 +4,7 @@ set -Eeuo pipefail
 APP="${APP_DIR:-/opt/dc-bot}"
 BOT_SERVICE="${BOT_SERVICE:-dc-bot.service}"
 WEB_SERVICE="${WEB_SERVICE:-dc-bot-dashboard.service}"
+MARKET_SERVICE="${MARKET_SERVICE:-dc-bot-market.service}"
 WEB_UNIT_PATH="${WEB_UNIT_PATH:-/etc/systemd/system/$WEB_SERVICE}"
 NGINX_CONFIG_SOURCE="$APP/nginx_dc_bot_dashboard.conf"
 NGINX_CONFIG_PATH="${NGINX_CONFIG_PATH:-}"
@@ -201,6 +202,16 @@ restart_services() {
     # 兩個 unit 放在同一個 systemd transaction，避免先等 Bot 完整重啟後
     # 才開始重啟 Web。HTTP readiness 交給後面的 smoke check，不再固定 sleep 3 秒。
     systemctl restart "$BOT_SERVICE" "$WEB_SERVICE"
+
+    # PartOf propagates restarts but does not start an inactive child service.
+    # Explicitly bring back the optional, enabled market worker on deployment,
+    # otherwise the public chart can stay frozen while Web and Bot look healthy.
+    if systemctl is-enabled --quiet "$MARKET_SERVICE" 2>/dev/null; then
+        systemctl restart "$MARKET_SERVICE"
+        echo "Market worker restarted: $MARKET_SERVICE"
+    else
+        echo "NOTICE: market worker is not enabled; automatic price polling may be unavailable"
+    fi
 
     finished_at="$(date +%s%3N)"
     elapsed_ms=$((finished_at - started_at))

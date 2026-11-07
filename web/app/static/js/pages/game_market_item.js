@@ -129,134 +129,316 @@
         );
     };
 
-    const filterPoints = (hours) => {
-        if (!allPoints.length) return [];
-        const newest = allPoints[allPoints.length - 1].at.getTime();
-        const cutoff = newest - (hours * HOUR);
-        const filtered = allPoints.filter((point) => point.at.getTime() >= cutoff);
-        return filtered.length ? filtered : allPoints.slice(-1);
+    const tooltip = root.querySelector("[data-market-chart-tooltip]");
+    const navigator = root.querySelector("[data-market-navigator]");
+    const navWindow = root.querySelector("[data-market-nav-window]");
+    const navHandles = Array.from(root.querySelectorAll("[data-market-nav-handle]"));
+    const chartKpis = {
+        last: root.querySelector("[data-market-chart-last]"),
+        low: root.querySelector("[data-market-chart-low]"),
+        high: root.querySelector("[data-market-chart-high]"),
+        average: root.querySelector("[data-market-chart-avg]"),
+        count: root.querySelector("[data-market-chart-count]"),
+    };
+    let selectedStart = null;
+    let selectedEnd = null;
+    let drag = null;
+    const NAV_MINUTES = 15;
+
+    const limitTo = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+    const marketExtent = () => {
+        const first = allPoints[0]?.at.getTime() || 0;
+        const last = allPoints[allPoints.length - 1]?.at.getTime() || first;
+        return { first, last, span: Math.max(1, last - first) };
     };
 
-    const renderChart = (hours) => {
-        const points = filterPoints(hours);
+    const renderNavigator = () => {
+        if (!navigator || !navWindow || !allPoints.length) return;
+        const { first, span } = marketExtent();
+        const prices = allPoints.map((point) => point.price);
+        const low = Math.min(...prices);
+        const priceSpan = Math.max(1, Math.max(...prices) - low);
+        const xFor = (point) => ((point.at.getTime() - first) / span) * 1000;
+        const yFor = (point) => 60 - ((point.price - low) / priceSpan) * 45;
+        const every = Math.max(1, Math.ceil(allPoints.length / 1300));
+        const plotted = allPoints.filter((_point, i) => i % every === 0 || i === allPoints.length - 1);
+        const line = plotted.map((point) => xFor(point).toFixed(2) + "," + yFor(point).toFixed(2)).join(" ");
+        let svg = navigator.querySelector("svg");
+        if (!svg) {
+            svg = makeSvgNode("svg", { viewBox: "0 0 1000 74", preserveAspectRatio: "none", "aria-hidden": "true" });
+            navigator.insertBefore(svg, navWindow);
+        }
+        svg.replaceChildren();
+        svg.appendChild(makeSvgNode("polygon", {
+            points: "0,74 " + line.replace(/,/g, ",") + " 1000,74",
+            class: "market-item-chart-nav-area",
+        }));
+        svg.appendChild(makeSvgNode("polyline", { points: line, class: "market-item-chart-nav-line" }));
+        const left = limitTo(((selectedStart - first) / span) * 100, 0, 100);
+        const right = limitTo(((selectedEnd - first) / span) * 100, 0, 100);
+        navWindow.style.left = left + "%";
+        navWindow.style.width = Math.max(0, right - left) + "%";
+        for (const handle of navHandles) {
+            const isStart = handle.dataset.marketNavHandle === "start";
+            handle.setAttribute("aria-valuemin", "0");
+            handle.setAttribute("aria-valuemax", "100");
+            handle.setAttribute("aria-valuenow", String(Math.round(isStart ? left : right)));
+            handle.setAttribute("aria-valuetext", formatFullTime(new Date(isStart ? selectedStart : selectedEnd)));
+        }
+    };
+
+    const renderChartSelection = () => {
+        if (!allPoints.length || selectedStart === null || selectedEnd === null) return;
+        renderNavigator();
+        const points = allPoints.filter((point) => {
+            const at = point.at.getTime();
+            return at >= selectedStart && at <= selectedEnd;
+        });
         if (!points.length) {
-            setEmpty("目前沒有可繪製的歷史價格。");
+            setEmpty("所選區間沒有價格紀錄，可拖曳下方範圍選擇其他時間。");
             return;
         }
+        if (empty) empty.hidden = true;
+        if (tooltip) tooltip.hidden = true;
 
-        const width = 1000;
-        const height = 320;
-        const padX = 54;
-        const padY = 30;
+        const width = 1000, height = 340, left = 70, right = 26, top = 26, bottom = 52;
+        const drawWidth = width - left - right, drawHeight = height - top - bottom;
         const prices = points.map((point) => point.price);
-        let minPrice = Math.min(...prices);
-        let maxPrice = Math.max(...prices);
+        const low = Math.min(...prices), high = Math.max(...prices);
         const average = prices.reduce((sum, value) => sum + value, 0) / prices.length;
-
-        if (minPrice === maxPrice) {
-            const padding = Math.max(1, Math.round(minPrice * 0.03));
-            minPrice -= padding;
-            maxPrice += padding;
-        }
-
-        const firstTime = points[0].at.getTime();
-        const lastTime = points[points.length - 1].at.getTime();
-        const timeSpan = Math.max(1, lastTime - firstTime);
-        const priceSpan = Math.max(1, maxPrice - minPrice);
-
-        const xFor = (at) => padX + ((at.getTime() - firstTime) / timeSpan) * (width - padX * 2);
-        const yFor = (price) => height - padY - ((price - minPrice) / priceSpan) * (height - padY * 2);
-
+        const padding = Math.max(1, (high - low) * 0.12);
+        const minPrice = low - padding, maxPrice = high + padding;
+        const ySpan = Math.max(1, maxPrice - minPrice);
+        const timeSpan = Math.max(1, selectedEnd - selectedStart);
+        const xFor = (point) => left + ((point.at.getTime() - selectedStart) / timeSpan) * drawWidth;
+        const yFor = (price) => top + ((maxPrice - price) / ySpan) * drawHeight;
         const svg = makeSvgNode("svg", {
-            viewBox: `0 0 ${width} ${height}`,
+            viewBox: "0 0 " + width + " " + height,
             role: "img",
-            "aria-label": `價格走勢，共 ${points.length} 個資料點`,
+            "aria-label": "互動價格走勢；滑鼠懸停或點按即可查看單點時間與價格",
             preserveAspectRatio: "none",
         });
 
-        for (let index = 0; index <= 4; index += 1) {
-            const y = padY + ((height - padY * 2) / 4) * index;
+        for (let i = 0; i <= 4; i += 1) {
+            const y = top + drawHeight * i / 4;
             svg.appendChild(makeSvgNode("line", {
-                x1: padX,
-                x2: width - padX,
-                y1: y,
-                y2: y,
+                x1: left, x2: width - right, y1: y, y2: y,
                 class: "market-item-chart-grid-line",
             }));
+            const label = makeSvgNode("text", {
+                x: left - 11, y: y + 5, "text-anchor": "end",
+                class: "market-item-chart-axis-label",
+            });
+            label.textContent = String(Math.round(maxPrice - ySpan * i / 4));
+            svg.appendChild(label);
+        }
+        for (let i = 0; i <= 5; i += 1) {
+            const stamp = selectedStart + timeSpan * i / 5;
+            const x = left + drawWidth * i / 5;
+            const label = makeSvgNode("text", {
+                x: x, y: height - 14, "text-anchor": "middle",
+                class: "market-item-chart-axis-label market-item-chart-time-label",
+            });
+            label.textContent = formatTime(new Date(stamp));
+            svg.appendChild(label);
         }
 
-        const averageLine = makeSvgNode("line", {
-            x1: padX,
-            x2: width - padX,
-            y1: yFor(average),
-            y2: yFor(average),
+        const avgLine = makeSvgNode("line", {
+            x1: left, x2: width - right, y1: yFor(average), y2: yFor(average),
             class: "market-item-chart-average-line",
         });
-        svg.appendChild(averageLine);
-
-        const highLabel = makeSvgNode("text", {
-            x: width - padX,
-            y: padY - 8,
-            "text-anchor": "end",
-            class: "market-item-chart-axis-label",
+        svg.appendChild(avgLine);
+        const averageText = makeSvgNode("text", {
+            x: width - right - 3, y: Math.max(15, yFor(average) - 6),
+            "text-anchor": "end", class: "market-item-chart-average-label",
         });
-        highLabel.textContent = formatPrice(Math.max(...prices));
-        svg.appendChild(highLabel);
+        averageText.textContent = "均 " + formatPrice(average);
+        svg.appendChild(averageText);
 
-        const lowLabel = makeSvgNode("text", {
-            x: width - padX,
-            y: height - 8,
-            "text-anchor": "end",
-            class: "market-item-chart-axis-label",
-        });
-        lowLabel.textContent = formatPrice(Math.min(...prices));
-        svg.appendChild(lowLabel);
-
-        if (points.length === 1) {
-            svg.appendChild(makeSvgNode("circle", {
-                cx: width / 2,
-                cy: yFor(points[0].price),
-                r: 5,
-                class: "market-item-chart-point",
+        const stride = Math.max(1, Math.ceil(points.length / 1500));
+        const plotted = points.filter((_point, i) => i % stride === 0 || i === points.length - 1);
+        const line = plotted.map((point) => xFor(point).toFixed(2) + "," + yFor(point.price).toFixed(2)).join(" ");
+        if (points.length > 1) {
+            svg.appendChild(makeSvgNode("polygon", {
+                points: xFor(plotted[0]).toFixed(2) + "," + (height - bottom) +
+                    " " + line + " " + xFor(plotted[plotted.length - 1]).toFixed(2) + "," + (height - bottom),
+                class: "market-item-chart-area",
             }));
-        } else {
-            const polylinePoints = points
-                .map((point) => `${xFor(point.at).toFixed(2)},${yFor(point.price).toFixed(2)}`)
-                .join(" ");
             svg.appendChild(makeSvgNode("polyline", {
-                points: polylinePoints,
-                class: "market-item-chart-line",
+                points: line, class: "market-item-chart-line",
             }));
         }
+        if (points.length <= 100) {
+            for (const point of points) {
+                svg.appendChild(makeSvgNode("circle", {
+                    cx: xFor(point), cy: yFor(point.price), r: 2.8,
+                    class: "market-item-chart-point",
+                }));
+            }
+        }
+        const marker = makeSvgNode("line", {
+            x1: 0, x2: 0, y1: top, y2: height - bottom,
+            class: "market-item-chart-cursor",
+        });
+        const dot = makeSvgNode("circle", {
+            cx: 0, cy: 0, r: 6, class: "market-item-chart-active-point",
+        });
+        marker.style.display = "none";
+        dot.style.display = "none";
+        svg.append(marker, dot);
 
         stage.querySelectorAll("svg").forEach((node) => node.remove());
-        if (empty) empty.hidden = true;
         stage.appendChild(svg);
 
-        const availableHours = Math.max(0, (lastTime - firstTime) / HOUR);
-        if (chartStatus) {
-            const requestedLabel = hours === 24 ? "24H" : hours === 168 ? "7D" : "30D";
-            chartStatus.textContent = availableHours + 0.1 < hours
-                ? `${requestedLabel} 視圖 · 目前實際累積 ${describeCoverage(coverageHours())}`
-                : `${requestedLabel} 視圖 · 魔丸自有台服歷史`;
-        }
+        const nearestPoint = (x) => {
+            let lowIndex = 0, highIndex = points.length - 1;
+            while (lowIndex < highIndex) {
+                const mid = Math.floor((lowIndex + highIndex) / 2);
+                if (xFor(points[mid]) < x) lowIndex = mid + 1;
+                else highIndex = mid;
+            }
+            const after = lowIndex, before = Math.max(0, after - 1);
+            return Math.abs(xFor(points[before]) - x) < Math.abs(xFor(points[after]) - x)
+                ? points[before] : points[after];
+        };
+        const focusPoint = (event) => {
+            const rect = svg.getBoundingClientRect();
+            if (!rect.width) return;
+            const unitX = ((event.clientX - rect.left) / rect.width) * width;
+            if (unitX < left || unitX > width - right) {
+                if (tooltip) tooltip.hidden = true;
+                marker.style.display = "none";
+                dot.style.display = "none";
+                return;
+            }
+            const point = nearestPoint(unitX);
+            const x = xFor(point), y = yFor(point.price);
+            marker.setAttribute("x1", x);
+            marker.setAttribute("x2", x);
+            dot.setAttribute("cx", x);
+            dot.setAttribute("cy", y);
+            marker.style.display = "";
+            dot.style.display = "";
+            if (tooltip) {
+                tooltip.hidden = false;
+                tooltip.textContent = formatFullTime(point.at) + "　｜　單顆價格 " + formatPrice(point.price);
+                tooltip.style.left = limitTo((x / width) * 100, 20, 80) + "%";
+                tooltip.style.top = limitTo((y / height) * 100, 20, 84) + "%";
+            }
+        };
+        svg.addEventListener("pointermove", focusPoint);
+        svg.addEventListener("pointerdown", focusPoint);
+        svg.addEventListener("pointerleave", (event) => {
+            if (event.pointerType === "mouse") {
+                if (tooltip) tooltip.hidden = true;
+                marker.style.display = "none";
+                dot.style.display = "none";
+            }
+        });
 
-        if (foot) {
-            foot.textContent = [
-                `${formatTime(points[0].at)} → ${formatTime(points[points.length - 1].at)}`,
-                `低 ${formatPrice(Math.min(...prices))}`,
-                `高 ${formatPrice(Math.max(...prices))}`,
-                `均 ${formatPrice(average)}`,
-                `${points.length} 筆`,
-            ].join(" · ");
+        setText(chartKpis.last, formatPrice(points[points.length - 1].price));
+        setText(chartKpis.low, formatPrice(low));
+        setText(chartKpis.high, formatPrice(high));
+        setText(chartKpis.average, formatPrice(average));
+        setText(chartKpis.count, points.length + " 筆");
+        const hours = (selectedEnd - selectedStart) / HOUR;
+        if (chartStatus) {
+            chartStatus.textContent = "已選範圍 " + formatTime(new Date(selectedStart)) +
+                " 至 " + formatTime(new Date(selectedEnd)) +
+                " · " + describeCoverage(hours) +
+                " · 目前保留 " + describeCoverage(coverageHours()) + " 歷史";
         }
+        if (foot) {
+            foot.textContent = "區間最低 " + formatPrice(low) + "　｜　最高 " +
+                formatPrice(high) + "　｜　均價 " + formatPrice(average) +
+                "　｜　資料點 " + points.length + " 筆";
+        }
+    };
+
+    const renderChart = (hours) => {
+        if (!allPoints.length) return setEmpty("目前沒有可繪製的歷史價格。");
+        const { first, last } = marketExtent();
+        const duration = hours <= 0 ? last - first : hours * HOUR;
+        selectedEnd = last;
+        selectedStart = Math.max(first, last - duration);
+        renderChartSelection();
     };
 
     const activateRange = (button) => {
         rangeButtons.forEach((candidate) => candidate.classList.toggle("is-active", candidate === button));
-        const hours = Number.parseInt(button.dataset.marketRange || "168", 10);
-        renderChart(Number.isFinite(hours) ? hours : 168);
+        const hours = Number.parseInt(button.dataset.marketRange || "0", 10);
+        renderChart(Number.isFinite(hours) ? hours : 12);
     };
+
+    const onNavigatorKey = (event) => {
+        if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+        if (!allPoints.length) return;
+        event.preventDefault();
+        const { first, last, span } = marketExtent();
+        const minimum = Math.min(span, Math.max(NAV_MINUTES * 60000, span * 0.01));
+        const step = Math.max(60000, span / 80);
+        const direction = event.key === "ArrowRight" ? 1 : -1;
+        if (event.currentTarget.dataset.marketNavHandle === "start") {
+            selectedStart = limitTo(selectedStart + direction * step, first, selectedEnd - minimum);
+        } else {
+            selectedEnd = limitTo(selectedEnd + direction * step, selectedStart + minimum, last);
+        }
+        rangeButtons.forEach((button) => button.classList.remove("is-active"));
+        renderChartSelection();
+    };
+
+    if (navigator) {
+        const beginDrag = (event) => {
+            if (!allPoints.length) return;
+            if (event.button !== undefined && event.button !== 0) return;
+            const rect = navigator.getBoundingClientRect();
+            if (!rect.width) return;
+            const { first, last, span } = marketExtent();
+            const handle = event.target.closest("[data-market-nav-handle]");
+            const inWindow = event.target.closest("[data-market-nav-window]");
+            const mode = handle ? handle.dataset.marketNavHandle : inWindow ? "move" : "jump";
+            drag = { mode, pointer: event.pointerId, x: event.clientX,
+                start: selectedStart, end: selectedEnd, rectWidth: rect.width, first, last, span };
+            if (mode === "jump") {
+                const center = first + limitTo((event.clientX - rect.left) / rect.width, 0, 1) * span;
+                const duration = selectedEnd - selectedStart;
+                selectedStart = limitTo(center - duration / 2, first, last - duration);
+                selectedEnd = selectedStart + duration;
+                drag.mode = "move";
+                drag.start = selectedStart;
+                drag.end = selectedEnd;
+            }
+            navigator.setPointerCapture(event.pointerId);
+            event.preventDefault();
+            renderChartSelection();
+        };
+        const updateDrag = (event) => {
+            if (!drag || drag.pointer !== event.pointerId) return;
+            const delta = ((event.clientX - drag.x) / drag.rectWidth) * drag.span;
+            const minimum = Math.min(drag.span, Math.max(NAV_MINUTES * 60000, drag.span * 0.01));
+            if (drag.mode === "start") {
+                selectedStart = limitTo(drag.start + delta, drag.first, drag.end - minimum);
+            } else if (drag.mode === "end") {
+                selectedEnd = limitTo(drag.end + delta, drag.start + minimum, drag.last);
+            } else {
+                const duration = drag.end - drag.start;
+                selectedStart = limitTo(drag.start + delta, drag.first, drag.last - duration);
+                selectedEnd = selectedStart + duration;
+            }
+            rangeButtons.forEach((button) => button.classList.remove("is-active"));
+            renderChartSelection();
+        };
+        const endDrag = (event) => {
+            if (!drag || drag.pointer !== event.pointerId) return;
+            drag = null;
+            try { navigator.releasePointerCapture(event.pointerId); } catch (_error) {}
+        };
+        navigator.addEventListener("pointerdown", beginDrag);
+        navigator.addEventListener("pointermove", updateDrag);
+        navigator.addEventListener("pointerup", endDrag);
+        navigator.addEventListener("pointercancel", endDrag);
+        navHandles.forEach((handle) => handle.addEventListener("keydown", onNavigatorKey));
+    }
 
     const renderCompareEmpty = (message) => {
         if (!compareList) return;

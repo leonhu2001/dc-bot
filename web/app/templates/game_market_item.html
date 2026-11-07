@@ -2,9 +2,9 @@
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/pages/game_tools.css?v=20261030-2">
-<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261031-2">
+<link rel="stylesheet" href="/static/css/pages/game_market_item.css?v=20261107-3">
 <link rel="stylesheet" href="/static/css/pages/game_market_item_focus.css?v=20261101-1">
-<script src="/static/js/pages/game_market_item.js?v=20261031-2" defer></script>
+<script src="/static/js/pages/game_market_item.js?v=20261107-3" defer></script>
 <script src="/static/js/pages/game_market_item_focus.js?v=20261101-1" defer></script>
 {% endblock %}
 
@@ -167,7 +167,7 @@
     <section
         class="market-item-chart-panel"
         data-market-chart
-        data-history-url="/games/{{ game.slug }}/market/api/items/{{ item.source_item_id|urlencode }}/history?limit=1000"
+        data-history-url="/games/{{ game.slug }}/market/api/items/{{ item.source_item_id|urlencode }}/history?limit=5000"
     >
         <div class="market-item-chart-head">
             <div>
@@ -176,15 +176,33 @@
                 <small data-market-chart-status>讀取價格歷史中…</small>
             </div>
             <div class="market-item-chart-range" aria-label="走勢時間範圍">
+                <button type="button" data-market-range="12" class="is-active">12H</button>
                 <button type="button" data-market-range="24">24H</button>
-                <button type="button" data-market-range="168" class="is-active">7D</button>
+                <button type="button" data-market-range="72">72H</button>
+                <button type="button" data-market-range="168">7D</button>
                 <button type="button" data-market-range="720">30D</button>
+                <button type="button" data-market-range="0">全部</button>
             </div>
         </div>
 
+        <div class="market-item-chart-kpis" data-market-chart-kpis aria-live="off">
+            <span>最新 <strong data-market-chart-last>—</strong></span>
+            <span>最低 <strong data-market-chart-low>—</strong></span>
+            <span>最高 <strong data-market-chart-high>—</strong></span>
+            <span>均價 <strong data-market-chart-avg>—</strong></span>
+            <span>樣本 <strong data-market-chart-count>—</strong></span>
+        </div>
         <div class="market-item-chart-stage" data-market-chart-stage>
             <div class="market-item-chart-empty" data-market-chart-empty>正在讀取歷史價格…</div>
+            <div class="market-item-chart-tooltip" data-market-chart-tooltip hidden></div>
         </div>
+        <div class="market-item-chart-navigator" data-market-navigator aria-label="拖曳底部縮覽圖的把手，可自訂走勢時間區間">
+            <div class="market-item-chart-nav-window" data-market-nav-window>
+                <span class="market-item-chart-nav-handle" data-market-nav-handle="start" role="slider" tabindex="0" aria-label="調整區間開始時間"></span>
+                <span class="market-item-chart-nav-handle" data-market-nav-handle="end" role="slider" tabindex="0" aria-label="調整區間結束時間"></span>
+            </div>
+        </div>
+        <p class="market-item-chart-tip">滑鼠移到線上或手機點按，查看時間與價格。拖曳下方左右把手縮放區間，拖曳中間移動區間。</p>
         <div class="market-item-chart-foot" data-market-chart-foot></div>
     </section>
 </section>

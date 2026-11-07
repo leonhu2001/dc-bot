@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 
 from services.market.provider_registry import configured_provider_name
+from services.market.poll_diagnostics import load_market_poll, market_delay_diagnosis
 from services.market.push_dispatcher import get_web_push_config
 from services.market.restock_delivery import MarketRestockDelivery, MarketRestockForecast
 from services.market.restock_prediction import get_cached_item_restock_predictions
@@ -35,6 +36,9 @@ class MarketHealthStatus:
     restock_dm_retry: int = 0
     restock_dm_failed: int = 0
     message: str = ""
+    last_poll_at: datetime | None = None
+    poll_age_seconds: int | None = None
+    delay_reason: str = ""
 
     def as_dict(self) -> dict[str, object]:
         updated_at = self.latest_source_updated_at
@@ -61,6 +65,9 @@ class MarketHealthStatus:
                 "failed": self.restock_dm_failed,
             },
             "message": self.message,
+            "last_poll_at": self.last_poll_at.isoformat() if self.last_poll_at else None,
+            "poll_age_seconds": self.poll_age_seconds,
+            "delay_reason": self.delay_reason,
         }
 
 
@@ -243,6 +250,14 @@ def check_market_health(
     current = _as_utc(now or datetime.now(timezone.utc))
     age_seconds = max(0, int((current - latest_at).total_seconds()))
     is_stale = age_seconds > stale_seconds
+    diagnosis = (
+        market_delay_diagnosis(
+            source_updated_at=latest_at,
+            now=current,
+            poll=load_market_poll(game_key=game_key),
+        )
+        if is_stale else {}
+    )
     restock = _restock_health(repository, game_key)
 
     return MarketHealthStatus(
@@ -268,9 +283,8 @@ def check_market_health(
         restock_dm_sent=int(restock["restock_dm_sent"] or 0),
         restock_dm_retry=int(restock["restock_dm_retry"] or 0),
         restock_dm_failed=int(restock["restock_dm_failed"] or 0),
-        message=(
-            f"latest market snapshot is {age_seconds}s old"
-            if is_stale
-            else ""
-        ),
+        message=str(diagnosis.get("message") or ""),
+        last_poll_at=diagnosis.get("last_poll_at"),
+        poll_age_seconds=diagnosis.get("poll_age_seconds"),
+        delay_reason=str(diagnosis.get("reason") or ""),
     )
