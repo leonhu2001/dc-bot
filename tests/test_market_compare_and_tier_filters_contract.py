@@ -35,7 +35,7 @@ def test_market_item_same_caliber_comparison_uses_read_only_market_api():
     assert "data-market-current-category" in template
     assert "data-market-current-item-key" in template
     assert "同口徑比較" in template
-    assert "game_market_item.js?v=20261031-2" in template
+    assert "game_market_item.js?v=20261107-3" in template
     assert "game_market_item.css?v=20261031-2" in template
 
     assert "const loadComparison = async ()" in script

@@ -88,3 +88,21 @@ def test_market_health_and_web_page_report_delay_cause():
         assert marker in health
     assert "record_market_poll" in worker
     assert "market_delay_diagnosis" in snapshot
+
+
+def test_interactive_chart_javascript_has_valid_syntax_when_node_available():
+    import shutil
+    import subprocess
+    import pytest
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is unavailable")
+    script = ROOT / "web/app/static/js/pages/game_market_item.js"
+    result = subprocess.run(
+        [node, "--check", str(script)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
