@@ -568,3 +568,5 @@
     .market-item-chart-kpis { gap: 8px 12px; }
     .market-item-chart-range { justify-content: flex-start; }
 }
+
+.market-item-chart-navigator + .market-item-chart-range { margin-top: 16px; justify-content: center; }
