@@ -54,7 +54,10 @@ def render_self_service_financial_breakdown_fields(
     if rate < 100 or percent_off:
         embed.add_field(
             name="百分比折扣",
-            value=f"折後 {_format_percent_value(rate)}%\n-{_format_plain_amount(percent_off)}",
+            value=(
+                f"折後 {_format_percent_value(rate)}%\n-{_format_plain_amount(percent_off)}"
+                "\n共同分攤，折後金額計入分潤基準"
+            ),
             inline=True,
         )
     if fixed:
@@ -62,7 +65,7 @@ def render_self_service_financial_breakdown_fields(
         text = f"-{_format_plain_amount(fixed)}"
         if reason:
             text += f"\n{reason}"
-        text += "\n店內吸收，不影響打手分潤"
+        text += "\n共同分攤，折後金額計入分潤基準"
         embed.add_field(name="固定折扣", value=text, inline=True)
     if point_cash:
         embed.add_field(

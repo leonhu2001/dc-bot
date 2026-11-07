@@ -160,8 +160,12 @@ def build_self_service_panel_embed(
         description=(
             f"下單用戶：<@{customer_id}>\n\n"
             "請依序選擇：類別 → 訂單項目 → 具體規格 → 單數。\n"
-            "可指定的品項才會開放指定成員；2 小時以上免指定費。\n"
-            "送出後先進入等待接單，人數滿後才開放付款。"
+            + (
+                "自訂單指定不加價，所有服務價格由客服填寫。\n"
+                if data.get("order_rule_key") == "custom_custom_order"
+                else "可指定的品項才會開放指定成員；2 小時以上免指定費。\n"
+            )
+            + "送出後先進入等待接單，人數滿後才開放付款。"
         ),
         color=discord.Color.purple(),
     )
@@ -388,7 +392,7 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
         if discount_percent_text:
             adjustment_note.append(
                 "客服百分比：折後 "
-                f"{_format_percent_value(discount_percent)}%"
+                f"{_format_percent_value(discount_percent)}%（共同分攤）"
             )
         else:
             adjustment_note.append(
@@ -398,7 +402,7 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
         if coupon_amount > 0:
             adjustment_note.append(
                 f"固定折扣：-{_format_plain_amount(coupon_amount)}"
-                "（店內吸收，不影響打手分潤）"
+                "（共同分攤，折後金額計入分潤基準）"
             )
 
         await interaction.followup.send(

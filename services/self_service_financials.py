@@ -359,13 +359,14 @@ def _quote_preview_lines_for_self_service(
             detail_parts.append(
                 f"首小時免費 -{_format_plain_amount(adjustment['point_free_first_hour_amount'])}"
             )
-        if getattr(price, "free_specify_fee", False):
+        if getattr(price, "free_specify_fee", False) and rule.key != "custom_custom_order":
             detail_parts.append("2 小時以上免指定費")
         if adjustment["manual_discount_amount"] > 0:
             reason = adjustment["manual_discount_reason"] or "未填原因"
             detail_parts.append(
                 f"百分比折扣｜折後 {_format_percent_value(adjustment['manual_discount_percent'])}%"
-                f" -{_format_plain_amount(adjustment['manual_discount_amount'])}（{reason}）"
+                f" -{_format_plain_amount(adjustment['manual_discount_amount'])}"
+                f"（{reason}，共同分攤，折後金額計入分潤基準）"
             )
         detail_parts.append(f"打手分潤基準 {_format_plain_amount(adjustment['payout_base_amount'])}")
         if is_internal_ammo_dump_rule(rule):
@@ -385,7 +386,7 @@ def _quote_preview_lines_for_self_service(
             reason = adjustment["cash_coupon_reason"] or "未填原因"
             detail_parts.append(
                 f"固定折扣 -{_format_plain_amount(adjustment['cash_coupon_amount'])}"
-                f"（{reason}，店內吸收，不影響打手分潤）"
+                f"（{reason}，共同分攤，折後金額計入分潤基準）"
             )
         if adjustment.get("benefit_discount_amount", 0) > 0:
             detail_parts.append(
@@ -472,8 +473,15 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
         return calculate_aw_collision_financials(price_result, data)
 
     manual_price = get_self_service_staff_price(data)
-    specify_before = max(0, int(getattr(price_result, "specify_fee", 0) or 0))
-    staff_adjust = int(getattr(price_result, "staff_adjustment_amount", 0) or 0)
+    # The VIP custom-order quote is the only chargeable base. Even persisted
+    # legacy price results may not add a specify fee to a staff-entered price.
+    is_custom_order = str(getattr(rule, "key", "") or "") == "custom_custom_order"
+    specify_before = (
+        0 if is_custom_order else max(0, int(getattr(price_result, "specify_fee", 0) or 0))
+    )
+    staff_adjust = (
+        0 if is_custom_order else int(getattr(price_result, "staff_adjustment_amount", 0) or 0)
+    )
     if is_self_service_staff_price_required(rule):
         service_original = max(0, int(manual_price or 0))
     else:

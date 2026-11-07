@@ -201,3 +201,71 @@ def test_multi_seat_point_service_reward_is_funded_once_per_selected_seat(monkey
     assert result["customer_pay_amount"] == 900
     assert result["payout_base_amount"] == 1200
     assert result["store_absorbed_amount"] == 300
+
+
+def test_custom_manual_quote_with_percent_and_fixed_discount_is_shared(monkeypatch):
+    from services.order_discounts import allocate_store_absorbed_fixed_discount
+    from services.order_rules import ORDER_RULES, calculate_price
+
+    monkeypatch.setattr(
+        financials,
+        "allocate_store_absorbed_fixed_discount",
+        allocate_store_absorbed_fixed_discount,
+    )
+    monkeypatch.setattr(
+        financials,
+        "_resolve_self_service_discount_rate",
+        lambda rule, data: (90.0, "客服優惠", "manual", "普通魔丸"),
+    )
+    monkeypatch.setattr(financials, "get_selected_order_point_benefit", lambda data, rule: None)
+    monkeypatch.setattr(financials, "calculate_one_seat_service_bonus_value", lambda **kwargs: 0)
+
+    rule = ORDER_RULES["custom_custom_order"]
+    price = calculate_price(
+        rule,
+        quantity=1,
+        player_count=2,
+        specified_roles=[rule.allowed_roles[0], rule.allowed_roles[0]],
+    )
+    assert price.total_amount == 0
+    data = {
+        "quantity": 1,
+        "player_count": 2,
+        "manual_staff_amount": 2000,
+        "manual_discount_mode": "pay_rate",
+        "manual_discount_percent": 90,
+        "manual_discount_percent_override": True,
+        "fixed_discount_amount": 150,
+        "cash_coupon_amount": 150,
+    }
+    result = financials.calculate_self_service_financials(rule, price, data)
+
+    assert result["manual_price_missing"] is False
+    assert result["service_original_amount"] == 2000
+    assert result["rule_original_amount"] == 2000
+    assert result["manual_discount_amount"] == 200
+    assert result["fixed_discount_amount"] == 150
+    assert result["specified_fee_before_waiver"] == 0
+    assert result["effective_specify_fee"] == 0
+    assert result["point_waived_specify_fee"] == 0
+    assert result["customer_pay_amount"] == 1650
+    assert result["payout_base_amount"] == 1650
+    assert result["store_absorbed_amount"] == 0
+
+
+def test_custom_manual_quote_without_staff_price_remains_pending(monkeypatch):
+    from services.order_rules import ORDER_RULES, calculate_price
+
+    monkeypatch.setattr(financials, "get_selected_order_point_benefit", lambda data, rule: None)
+    monkeypatch.setattr(financials, "calculate_one_seat_service_bonus_value", lambda **kwargs: 0)
+    rule = ORDER_RULES["custom_custom_order"]
+    price = calculate_price(rule, quantity=1, player_count=1, specified_roles=[rule.allowed_roles[0]])
+    result = financials.calculate_self_service_financials(
+        rule,
+        price,
+        {"quantity": 1, "player_count": 1},
+    )
+    assert result["manual_price_missing"] is True
+    assert result["customer_pay_amount"] == 0
+    assert result["payout_base_amount"] == 0
+    assert result["effective_specify_fee"] == 0

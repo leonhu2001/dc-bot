@@ -55,7 +55,7 @@ def build_custom_order_entry_embed() -> discord.Embed:
         title="✨ VIP 自訂單｜快速下單",
         description=(
             "先選擇 **1～4 位陪玩**，再填寫遊戲／服務、玩法／規則、方案／目標與其他需求。\n"
-            "客服確認內容與價格後再正式送單。"
+            "客服確認內容與價格後再正式送單。指定不另收費，價格以客服填寫為準。"
         ),
         color=discord.Color.purple(),
     )
@@ -224,7 +224,8 @@ def _build_custom_order_self_service_embed(
     embed.description = (
         f"下單用戶：<@{int(customer_id)}>\n\n"
         "陪玩人數可在 **1～4 位**之間調整；時數／數量也可在此修改。\n"
-        "自訂單由客服使用「客服填價格」完成報價，確認後再送出等待接單。\n"
+        "自訂單指定免費，所有服務收費以客服填寫價格為準；再依折扣計算應付金額。\n"
+        "客服使用「客服填價格」完成報價，確認後再送出等待接單。\n"
         "上方文字需求保留遊戲、玩法與目標，這張面板負責正式訂單規格。"
     )
     return embed

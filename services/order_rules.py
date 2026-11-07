@@ -335,7 +335,24 @@ def build_rule_with_override(
             value = str(value or "").strip()
         changes[key] = value
 
-    return replace(base_rule, **changes)
+    rule = replace(base_rule, **changes)
+    # VIP custom order has one price source: the customer-service quote.
+    # Old manager overrides must never revive specify fees or other surcharges.
+    if str(base_rule.key) == "custom_custom_order":
+        rule = replace(
+            rule,
+            pricing_type="manual",
+            price=0,
+            price_multiply_player_count=False,
+            player_count_prices={},
+            specify_fee_default=0,
+            specify_fee_by_role={},
+            specify_fee_by_game_role={},
+            specify_free_min_units=None,
+            staff_adjustments={},
+            staff_adjustment_labels={},
+        )
+    return rule
 
 
 def build_custom_rule(
@@ -455,7 +472,7 @@ def calculate_price(
             details=(f"AW代撞｜{aw_plan['short_label']}｜{aw_plan['rate_text']}T/發",),
         )
 
-    if rule.pricing_type == "manual":
+    if rule.pricing_type == "manual" or rule.key == "custom_custom_order":
         base_amount = 0
     else:
         if rule.player_count_prices:
@@ -485,7 +502,11 @@ def calculate_price(
             raise ValueError(f"{ALL_ROLE_LABELS.get(role, role)} 不能接 {rule.label}")
 
     free_specify_fee = False
-    if specified_roles and rule.specify_free_min_units is not None:
+    if (
+        rule.key != "custom_custom_order"
+        and specified_roles
+        and rule.specify_free_min_units is not None
+    ):
         if rule.specify_free_basis == "quantity_x_player_count":
             free_basis_value = qty * players
         else:
@@ -493,7 +514,7 @@ def calculate_price(
         free_specify_fee = free_basis_value >= int(rule.specify_free_min_units)
 
     specify_fee = 0
-    if specified_roles and not free_specify_fee:
+    if specified_roles and not free_specify_fee and rule.key != "custom_custom_order":
         specify_fee_map = {
             **(rule.specify_fee_by_role or {}),
             **(rule.specify_fee_by_game_role or {}),
@@ -505,6 +526,8 @@ def calculate_price(
     details: list[str] = []
 
     for adjustment_key in staff_adjustments or ():
+        if rule.key == "custom_custom_order":
+            raise ValueError("自訂單由客服填價，不支援額外加減價")
         if adjustment_key not in rule.staff_adjustments:
             raise ValueError(f"{rule.label} 不支援這個加減價選項：{adjustment_key}")
         amount = int(rule.staff_adjustments[adjustment_key])
@@ -1429,10 +1452,9 @@ _add(OrderRule(
     max_quantity=24,
     allow_specify=True,
     max_specified_count=4,
-    specify_fee_default=100,
-    specify_fee_by_role=_all_receiver_fee(100),
-    specify_free_min_units=2,
-    specify_free_basis="quantity",
+    specify_fee_default=0,
+    specify_fee_by_role={},
+    specify_free_min_units=None,
     player_count_enabled=True,
     min_player_count=1,
     max_player_count=4,
@@ -1609,7 +1631,9 @@ def validate_rule_definition(key: str, rule: OrderRule) -> None:
                 and int(rule.specify_fee_default or 0) <= 0
             )
         ]
-        if missing_fee_roles:
+        # The VIP custom order explicitly permits free designation for every
+        # eligible role; its whole charge comes from the staff-entered quote.
+        if missing_fee_roles and key != "custom_custom_order":
             raise RuntimeError(
                 f"{key}: specify fee missing for roles {missing_fee_roles}"
             )
