@@ -615,6 +615,33 @@ async def delete_dispatch_claim_panel_for_order(
             print(f"[credentials] 取消票口撤回失敗 channel_id={order_channel_id}: {exc}")
 
     if order_channel_id in SELF_SERVICE_ORDER_SELECTIONS:
+        # A paid order can be cancelled after VIP/points were credited.
+        # Reverse those rewards before deleting the ticket-state evidence.
+        if data.get("reward_counted") and not data.get("reward_cancel_reconciled"):
+            from services.rewards import (
+                reverse_cancelled_order_rewards,
+                get_customer_reward_data,
+                ensure_reward_member_benefits,
+                fetch_member_safely,
+            )
+            summary = reverse_cancelled_order_rewards(data)
+            if summary:
+                customer_id = int(summary["customer_id"])
+                if (
+                    not summary.get("reset_preserved")
+                    and summary.get("old_level") != summary.get("new_level")
+                ):
+                    member = await fetch_member_safely(guild, customer_id)
+                    await ensure_reward_member_benefits(
+                        guild, member, get_customer_reward_data(customer_id)
+                    )
+                print(
+                    f"[vip-cancel] discord ticket={order_channel_id} "
+                    f"customer={customer_id} reversed={summary['old_amount']}T",
+                    flush=True,
+                )
+            save_bot_data()
+
         SELF_SERVICE_ORDER_SELECTIONS.pop(order_channel_id, None)
         delete_order_row_from_db(order_channel_id)
         save_bot_data()

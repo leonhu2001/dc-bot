@@ -64,6 +64,7 @@ def claim_pending_events(
                 w.item,
                 w.quantity,
                 w.amount,
+                w.status,
                 w.customer_discord_id,
                 w.customer_display_name
             FROM sync_events e
@@ -95,6 +96,24 @@ def claim_pending_events(
 
         conn.commit()
         return [dict(row) for row in rows]
+
+
+def load_cancelled_order_refs(
+    *, db_file: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    """Discover cancelled Web orders with ticket IDs; never change finances here."""
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT id AS order_id, ticket_channel_id, customer_discord_id
+            FROM web_orders
+            WHERE LOWER(TRIM(COALESCE(status, ''))) IN ('cancelled', 'canceled')
+              AND ticket_channel_id IS NOT NULL
+            ORDER BY id DESC
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def get_assignments(
@@ -344,6 +363,7 @@ def fetch_order_created_retry_events(
                 w.item,
                 w.quantity,
                 w.amount,
+                w.status,
                 w.customer_discord_id,
                 w.customer_display_name
             FROM sync_events e

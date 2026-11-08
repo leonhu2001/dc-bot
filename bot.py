@@ -84,6 +84,7 @@ from services.rewards import (
     get_current_reward_points,
     correct_customer_reward_amount,
     sync_reward_counted_order_amount,
+    reverse_cancelled_order_rewards,
     get_customer_reward_data,
     build_member_info_embed,
     get_customer_notes,
@@ -179,6 +180,7 @@ from services.vip_voice_runtime import (
 
 from services.web_sync.event_store import (
     claim_pending_events as _web_sync_fetch_pending_events,
+    load_cancelled_order_refs as _web_sync_load_cancelled_order_refs,
     fetch_order_created_retry_events as _web_order_created_fetch_retry_events,
     get_assignments as _web_sync_get_assignments,
     load_order_created_bundle as _web_order_created_load_bundle,
@@ -4568,6 +4570,7 @@ async def _process_web_order_amount_correction_event(event: dict) -> None:
 
         ticket_channel_id = _to_int(event.get("ticket_channel_id"), None)
         new_amount = max(0, int(event.get("amount") or 0))
+        order_status = str(event.get("status") or "").strip().lower()
 
         # Website-only orders may be edited before the Discord ticket/state exists.
         # Their latest amount will be read when the bot seeds the order later.
@@ -4590,13 +4593,20 @@ async def _process_web_order_amount_correction_event(event: dict) -> None:
             )
             return
 
-        reward_result = sync_reward_counted_order_amount(
-            order_data,
-            new_amount,
-        )
+        old_order_amount = max(0, int(order_data.get("amount") or 0))
+        if order_status in {"cancelled", "canceled"}:
+            reward_result = reverse_cancelled_order_rewards(order_data)
+            order_data["status"] = "cancelled"
+            order_data["closed"] = True
+        else:
+            reward_result = sync_reward_counted_order_amount(
+                order_data,
+                new_amount,
+            )
 
-        # Keep bot.db / monthly VIP spend / statistics aligned with the web order.
+        # Persist order and VIP state before acknowledging the event.
         remember_order_data(int(ticket_channel_id), order_data)
+        save_bot_data()
 
         if (
             reward_result
@@ -4635,6 +4645,7 @@ async def _process_web_order_amount_correction_event(event: dict) -> None:
                 "[amount-sync] "
                 f"event_id={event_id} ticket={ticket_channel_id} "
                 f"order amount {old_order_amount}->{new_amount}; "
+                f"status={order_status or 'unknown'} "
                 "reward not previously counted",
                 flush=True,
             )
@@ -4649,6 +4660,66 @@ async def _process_web_order_amount_correction_event(event: dict) -> None:
             f"[amount-sync] event_id={event_id} failed: {type(exc).__name__}: {exc}",
             flush=True,
         )
+
+
+async def _repair_existing_cancelled_web_vip_rewards() -> int:
+    """Repair already-cancelled paid orders that older sync events missed.
+
+    Only apply to a matching ticket with a recorded reward, and persist the
+    per-order reversal marker to prevent double deductions after restart.
+    Never estimate VIP spend from Web order price alone.
+    """
+    repaired = 0
+    for row in _web_sync_load_cancelled_order_refs():
+        ticket_id = _to_int(row.get("ticket_channel_id"), None)
+        if ticket_id is None:
+            continue
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(ticket_id)
+        if not isinstance(data, dict) or not data.get("reward_counted"):
+            continue
+        if data.get("reward_cancel_reconciled"):
+            continue
+        order_customer = _to_int(row.get("customer_discord_id"), None)
+        saved_customer = _to_int(data.get("customer_id"), None)
+        if order_customer is None or order_customer != saved_customer:
+            print(
+                f"[vip-cancel-repair] customer mismatch "
+                f"order_id={row.get('order_id')} ticket={ticket_id}",
+                flush=True,
+            )
+            continue
+        try:
+            summary = reverse_cancelled_order_rewards(data)
+            data["status"] = "cancelled"
+            data["closed"] = True
+            remember_order_data(ticket_id, data)
+            save_bot_data()
+            if summary:
+                repaired += 1
+                print(
+                    f"[vip-cancel-repair] order_id={row.get('order_id')} "
+                    f"ticket={ticket_id} customer={saved_customer} "
+                    f"vip -{summary['old_amount']}T, "
+                    f"wallet_points_spend -{summary['reversed_wallet_spend']}T",
+                    flush=True,
+                )
+                if (
+                    not summary.get("reset_preserved")
+                    and summary.get("old_level") != summary.get("new_level")
+                ):
+                    guild = bot.get_guild(GUILD_ID)
+                    if guild:
+                        member = await fetch_member_safely(guild, saved_customer)
+                        await ensure_reward_member_benefits(
+                            guild, member, get_customer_reward_data(saved_customer)
+                        )
+        except Exception as exc:
+            print(
+                f"[vip-cancel-repair] failed order_id={row.get('order_id')} "
+                f"ticket={ticket_id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+    return repaired
 
 
 async def process_one_web_sync_event(
@@ -4974,8 +5045,16 @@ async def web_sync_event_worker() -> None:
         flush=True,
     )
 
+    next_cancel_reconcile_at = 0.0
     while not bot.is_closed():
         try:
+            # Reconcile legacy cancellations once at boot and every 5 minutes.
+            # This also catches DC-initiated cancellations with no web sync row.
+            now_mono = asyncio.get_running_loop().time()
+            if now_mono >= next_cancel_reconcile_at:
+                next_cancel_reconcile_at = now_mono + 300
+                await _repair_existing_cancelled_web_vip_rewards()
+
             events = (
                 _web_sync_fetch_pending_events(
                     limit=10

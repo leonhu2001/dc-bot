@@ -303,6 +303,95 @@ def correct_customer_reward_amount(
     }
 
 
+def reverse_cancelled_order_rewards(
+    order_data: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Undo only rewards proven to have been awarded by this cancelled order.
+
+    Preserve original order prices for audit. Never reverse VIP top-up principal
+    for wallet payments, and never charge back an unrecorded/unpaid order.
+    The persisted per-order marker makes retries and startup reconciliation safe.
+    """
+    if not isinstance(order_data, dict):
+        raise ValueError("order_data 必須是 dict。")
+    if bool(order_data.get("reward_cancel_reconciled")):
+        return None
+    if not bool(order_data.get("reward_counted")):
+        return None
+
+    customer_id = _to_int(order_data.get("customer_id"), None)
+    if customer_id is None:
+        raise ValueError("已計入 VIP 的取消訂單缺少顧客 ID，需人工查核。")
+    if (
+        not bool(order_data.get("reward_excluded"))
+        and order_data.get("reward_amount") is None
+    ):
+        raise ValueError("歷史取消訂單缺少 VIP 入帳金額，不可盲目扣除。")
+
+    amount = (
+        0
+        if order_data.get("reward_excluded")
+        else max(0, int(_to_int(order_data.get("reward_amount"), 0) or 0))
+    )
+    wallet_amount = (
+        max(0, int(_to_int(order_data.get("wallet_point_amount"), 0) or 0))
+        if order_data.get("wallet_points_counted")
+        else 0
+    )
+    customer = get_customer_reward_data(int(customer_id))
+    before_total = max(0, int(customer.get("total_spent", 0) or 0))
+    if amount > before_total:
+        raise ValueError("取消單 VIP 入帳高於會員總累積，需人工查核以防重扣。")
+    before_wallet = max(0, int(customer.get("wallet_point_spend_total", 0) or 0))
+    if wallet_amount > before_wallet:
+        raise ValueError("取消單錢包點數入帳高於累積消費，需人工查核。")
+    old_points = get_current_reward_points(customer)
+    old_level = get_effective_member_level(customer)
+
+    if amount:
+        correct_customer_reward_amount(int(customer_id), amount, 0)
+
+    if wallet_amount:
+        after_wallet = before_wallet - wallet_amount
+        customer["wallet_point_spend_total"] = after_wallet
+        # Recompute the entire wallet bucket, rather than subtracting the
+        # originally awarded points (later small orders can cross thresholds).
+        point_delta = (
+            calculate_reward_points(after_wallet)
+            - calculate_reward_points(before_wallet)
+        )
+        customer["point_adjustment"] = (
+            int(customer.get("point_adjustment", 0) or 0) + point_delta
+        )
+        customer["points"] = get_current_reward_points(customer)
+
+    customer["order_count"] = max(0, int(customer.get("order_count", 0) or 0) - 1)
+    customer["points"] = get_current_reward_points(customer)
+    order_data["reward_cancel_reconciled"] = True
+    order_data["reward_cancel_reconciled_at"] = get_taipei_now_iso()
+    order_data["reward_cancel_reversed_vip"] = amount
+    order_data["reward_cancel_reversed_wallet_spend"] = wallet_amount
+    order_data["reward_amount"] = 0
+    if wallet_amount:
+        order_data["wallet_point_amount"] = 0
+        order_data["wallet_points_awarded"] = 0
+    # Keep reward_counted=True and the original receipt amount: rerunning the
+    # worker must not re-credit this cancelled order or alter financial history.
+    return {
+        "customer_id": int(customer_id),
+        "old_amount": amount,
+        "new_amount": 0,
+        "old_total_spent": before_total,
+        "new_total_spent": int(customer.get("total_spent", 0) or 0),
+        "old_points": old_points,
+        "new_points": int(customer["points"]),
+        "old_level": str(old_level.get("name") or "普通魔丸"),
+        "new_level": str(get_effective_member_level(customer).get("name") or "普通魔丸"),
+        "reset_preserved": bool(has_active_vip_progress_reset(customer)),
+        "reversed_wallet_spend": wallet_amount,
+    }
+
+
 def sync_reward_counted_order_amount(
     order_data: dict[str, Any],
     new_amount: int,
