@@ -18,6 +18,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Direct invocation from scripts/ makes scripts the first import root; without
+# the repository root, importing core.vip_levels fails only during --apply.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 ORDER_NO = "MO20261108003"
 CUSTOMER_ID = "519543572194656316"
 TICKET_ID = "1568952422544711726"
