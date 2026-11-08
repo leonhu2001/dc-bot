@@ -19,6 +19,9 @@ from services.order_rules import get_rule
 ROOT = Path(__file__).resolve().parents[1]
 DATABASE = ROOT / "web_dashboard.db"
 SUPPORTED_GAMES = frozenset({"lol", "apex", "valorant", "steam"})
+ACTIVE_TICKET_STATUSES = frozenset({
+    "pending_cs_dispatch", "waiting_acceptance", "accepted_pending_pay", "active",
+})
 TERMINAL_STATUSES = frozenset({"closed", "cancelled", "canceled", "stored"})
 FOOTER_PREFIX = "SIMPLE-HOURLY-TIMER:"
 
@@ -101,7 +104,20 @@ def _authorized_staff(db: sqlite3.Connection, order_id: int, user_id: int) -> bo
         "WHERE order_id=? AND is_active=1",
         (int(order_id),),
     ).fetchall()
-    return str(user_id) in {str(row[0]) for row in rows}
+    if str(user_id) in {str(row[0]) for row in rows}:
+        return True
+    # Web orders may be claimed before payment finalizes assignments.
+    has_claim_table = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' "
+        "AND name='order_acceptance_claims'"
+    ).fetchone()
+    if not has_claim_table:
+        return False
+    return db.execute(
+        "SELECT 1 FROM order_acceptance_claims "
+        "WHERE order_id=? AND staff_discord_id=? AND is_active=1 LIMIT 1",
+        (int(order_id), str(user_id)),
+    ).fetchone() is not None
 
 
 def change_clock(channel_id: int, user_id: int, action: str, *, now: float | None = None) -> dict:
@@ -119,7 +135,7 @@ def change_clock(channel_id: int, user_id: int, action: str, *, now: float | Non
         ).fetchone()
         if row is None:
             raise ValueError("找不到這張訂單的計時器。")
-        if str(row["order_status"]).lower() != "active":
+        if str(row["order_status"]).lower() not in ACTIVE_TICKET_STATUSES:
             raise ValueError("訂單目前不是進行中，無法操作計時。")
         if not _authorized_staff(db, int(row["order_id"]), user_id):
             raise PermissionError("只有這張訂單目前的接單陪玩可以操作計時器。")
@@ -228,7 +244,9 @@ def _eligible_orders() -> list[dict]:
     with _connect() as db:
         orders = db.execute(
             "SELECT id, ticket_channel_id, order_rule_key, rule_snapshot_json "
-            "FROM web_orders WHERE status='active' AND ticket_channel_id IS NOT NULL "
+            "FROM web_orders WHERE status IN "
+            "('pending_cs_dispatch','waiting_acceptance','accepted_pending_pay','active') "
+            "AND ticket_channel_id IS NOT NULL "
             "AND ticket_channel_id!='' ORDER BY id DESC LIMIT 200"
         ).fetchall()
     return [
