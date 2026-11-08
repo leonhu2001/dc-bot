@@ -12,7 +12,7 @@ from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[1]
 _REPAIR_KEY = "20261108:owner-authorized-purge-MO20261108003-v1"
-_CUSTOMER_ID = 519545372194656316
+_CUSTOMER_ID = 519543572194656316
 
 
 async def sync_repaired_member_tier(bot, guild_id: int) -> None:

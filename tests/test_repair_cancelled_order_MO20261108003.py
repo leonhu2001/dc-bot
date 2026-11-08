@@ -28,14 +28,14 @@ def setup_dbs(root):
         CREATE TABLE order_assignments (id INTEGER PRIMARY KEY, order_id INTEGER);
         CREATE TABLE sync_events (id INTEGER PRIMARY KEY, order_id INTEGER);
         INSERT INTO web_orders VALUES
-          (3, 'MO20261108003', 'cancelled', '519545372194656316',
+          (3, 'MO20261108003', 'cancelled', '519543572194656316',
           '1568952422544711726', '轉帳', 3750),
-          (6, 'MO20261108006', 'active', '519545372194656316',
+          (6, 'MO20261108006', 'active', '519543572194656316',
           '1568963971048935614', '轉帳', 3000);
         INSERT INTO payment_reviews VALUES
-          (2, 'order', '3', '519545372194656316',
+          (2, 'order', '3', '519543572194656316',
           '1568952422544711726', 'PAY-20261108-0002'),
-          (3, 'order', '6', '519545372194656316',
+          (3, 'order', '6', '519543572194656316',
           '1568963971048935614', 'PAY-20261108-0003');
         INSERT INTO order_assignments VALUES (3, 3), (6, 6);
         INSERT INTO sync_events VALUES (3, 3), (6, 6);
