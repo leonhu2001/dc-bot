@@ -243,7 +243,11 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                 })
                 continue
 
-            previous_performance = previous_month_performance(db, worker_id, now=now)
+            previous_performance = previous_month_performance(
+                db,
+                worker_id,
+                now=now or order.closed_at or order.created_at,
+            )
             previous_bonus = (not legacy) and previous_performance >= WORKER_PREVIOUS_MONTH_SALARY_THRESHOLD
             stream_override = stream_override_map.get(worker_id)
             streamed = _effective_stream_bonus(
