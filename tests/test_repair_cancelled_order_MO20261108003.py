@@ -270,3 +270,26 @@ def test_unrecognized_related_tables_all_reported_and_nothing_deleted(tmp_path, 
             "SELECT total_spent FROM customers WHERE customer_id=?",
             (int(CUSTOMER_ID),),
         ).fetchone()[0] == 6750
+
+
+def test_direct_script_apply_finds_project_core_from_non_project_cwd(tmp_path):
+    """Regression: CLI dry-run passed but --apply failed importing core.vip_levels."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    setup_dbs(tmp_path)
+    script = Path(__file__).resolve().parents[1] / "scripts" / "repair_cancelled_order_MO20261108003.py"
+    environment = dict(os.environ, MW_ORDER_REPAIR_MAINTENANCE="1")
+    environment.pop("PYTHONPATH", None)
+    result = subprocess.run(
+        [sys.executable, str(script), "--root", str(tmp_path), "--apply"],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert '"state": "applied"' in result.stdout
