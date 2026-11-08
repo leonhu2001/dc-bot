@@ -250,7 +250,7 @@ def _register_order(order: dict) -> bool:
             "SELECT timer_message_id FROM simple_order_timers WHERE order_id=?",
             (int(order["id"]),),
         ).fetchone()
-    return bool(row and not row[0])
+    return bool(row and str(row[0] or "") in {"", "0"})
 
 
 def _set_message_id(order_id: int, message_id: int) -> None:
@@ -262,9 +262,24 @@ def _set_message_id(order_id: int, message_id: int) -> None:
         )
 
 
-def _finish_non_active() -> None:
+def _finish_non_active() -> list[tuple[int, str]]:
+    """Pause stored orders; freeze completed/cancelled orders without deleting time."""
     now = time.time()
     with _connect() as db:
+        db.execute(
+            "UPDATE simple_order_timers SET "
+            "elapsed_seconds=elapsed_seconds + MAX(0, ? - COALESCE(running_since, ?)), "
+            "state='paused', running_since=NULL, updated_at=? "
+            "WHERE state='running' AND order_id IN "
+            "(SELECT id FROM web_orders WHERE status='stored')",
+            (now, now, now),
+        )
+        ended = db.execute(
+            "SELECT t.order_id, t.ticket_channel_id FROM simple_order_timers t "
+            "LEFT JOIN web_orders o ON o.id=t.order_id "
+            "WHERE t.state!='finished' AND "
+            "(o.id IS NULL OR o.status IN ('closed','cancelled','canceled'))"
+        ).fetchall()
         db.execute(
             "UPDATE simple_order_timers SET "
             "elapsed_seconds=elapsed_seconds + CASE WHEN state='running' "
@@ -273,9 +288,10 @@ def _finish_non_active() -> None:
             "WHERE state!='finished' AND order_id IN "
             "(SELECT t.order_id FROM simple_order_timers t "
             "LEFT JOIN web_orders o ON o.id=t.order_id "
-            "WHERE o.id IS NULL OR o.status IN ('closed','cancelled','canceled','stored'))",
+            "WHERE o.id IS NULL OR o.status IN ('closed','cancelled','canceled'))",
             (now, now, now),
         )
+        return [(int(r[0]), str(r[1])) for r in ended]
 
 
 async def _channel(bot: discord.Client, channel_id: str):
@@ -310,7 +326,19 @@ async def sync_once(bot: discord.Client) -> None:
     ensure_tables()
     if not DATABASE.exists():
         return
-    _finish_non_active()
+    finished = _finish_non_active()
+    for order_id, ticket_id in finished:
+        session = _session(ticket_id)
+        if not session or not session.get("timer_message_id"):
+            continue
+        channel = await _channel(bot, ticket_id)
+        if not isinstance(channel, discord.TextChannel):
+            continue
+        try:
+            msg = await channel.fetch_message(int(session["timer_message_id"]))
+            await msg.edit(embed=timer_embed(session), view=SimpleHourlyTimerView("finished"))
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError):
+            pass
     for order in _eligible_orders():
         order_id = int(order["id"])
         needs_message = _register_order(order)
