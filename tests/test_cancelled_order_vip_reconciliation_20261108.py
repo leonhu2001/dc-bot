@@ -91,6 +91,23 @@ def test_cancelled_order_wallet_point_threshold_rollback_uses_cumulative_bucket(
     assert member["points"] == 41
 
 
+def test_excluded_non_wallet_order_does_not_subtract_completions_never_credited(reward_store):
+    user_id = 500010
+    member = rewards.get_customer_reward_data(user_id)
+    member.update({"total_spent": 3200, "order_count": 2})
+    order = {
+        "customer_id": user_id, "amount": 450, "item": "幣號",
+        "payment_method": "轉帳",
+        "reward_counted": True, "reward_excluded": True,
+        "reward_amount": 0,
+    }
+    summary = rewards.reverse_cancelled_order_rewards(order)
+    assert summary is not None
+    assert member["total_spent"] == 3200
+    assert member["order_count"] == 2
+    assert rewards.reverse_cancelled_order_rewards(order) is None
+
+
 def test_cancelled_order_missing_evidence_must_not_guess(reward_store):
     member = rewards.get_customer_reward_data(500005)
     member.update({"total_spent": 2000, "order_count": 2})
@@ -154,3 +171,89 @@ def test_all_cancellation_routes_and_legacy_repair_are_wired():
     assert "await _repair_existing_cancelled_web_vip_rewards()" in bot
     assert "reverse_cancelled_order_rewards(data)" in discord
     assert 'order_data["reward_cancel_reconciled"]' not in bot  # shared idempotency only
+
+
+def test_cancellation_event_worker_reverses_paid_reward_and_persists_before_ack(reward_store):
+    import asyncio
+
+    from services.order_cancel_vip_reconciliation import process_cancel_aware_amount_event
+
+    member = rewards.get_customer_reward_data(500015)
+    member.update({"total_spent": 6000, "order_count": 2})
+    order = {
+        "customer_id": 500015, "amount": 3750,
+        "reward_counted": True, "reward_excluded": False,
+        "reward_amount": 3750,
+    }
+    state = {333: order}
+    progress = []
+    event = {
+        "event_id": 200, "retry_count": 0, "payload_json": "{}",
+        "ticket_channel_id": "333", "status": "cancelled",
+        "amount": 3750,
+    }
+
+    def done(event_id):
+        assert order["reward_cancel_reconciled"] is True
+        assert progress[-1] == "saved"
+        progress.append(("done", event_id))
+
+    def failed(*args):
+        raise AssertionError(f"unexpected reconciliation failure: {args}")
+
+    async def process():
+        await process_cancel_aware_amount_event(
+            event,
+            apply_wallet_adjustment=lambda *_: None,
+            order_selections=state,
+            remember_order=lambda *_: progress.append("remembered"),
+            save_data=lambda: progress.append("saved"),
+            mark_done=done,
+            mark_failed=failed,
+            guild=None,
+        )
+
+    asyncio.run(process())
+    assert member["total_spent"] == 2250
+    assert member["order_count"] == 1
+    assert order["amount"] == 3750
+    assert order["status"] == "cancelled"
+    assert progress[-1] == ("done", 200)
+
+    asyncio.run(process())
+    assert member["total_spent"] == 2250
+    assert member["order_count"] == 1
+
+
+def test_legacy_cancelled_web_order_uses_saved_reward_evidence_only(reward_store):
+    import asyncio
+
+    from services.order_cancel_vip_reconciliation import repair_existing_cancelled_web_vip_rewards
+
+    member = rewards.get_customer_reward_data(500016)
+    member.update({"total_spent": 3750, "order_count": 1})
+    order = {
+        "customer_id": 500016, "reward_counted": True,
+        "reward_excluded": False, "reward_amount": 3750,
+        "amount": 3750,
+    }
+    rows = [
+        {"order_id": 1, "ticket_channel_id": "1001", "customer_discord_id": "500016"},
+        {"order_id": 2, "ticket_channel_id": "1002", "customer_discord_id": "500016"},
+    ]
+    saved = []
+    async def repair():
+        return await repair_existing_cancelled_web_vip_rewards(
+            order_selections={1001: order, 1002: {"customer_id": 500016, "amount": 500}},
+            remember_order=lambda *_: saved.append(True),
+            save_data=lambda: None,
+            guild=None,
+            load_refs=lambda: rows,
+        )
+
+    assert asyncio.run(repair()) == 1
+    assert member["total_spent"] == 0
+    assert member["order_count"] == 0
+    assert asyncio.run(repair()) == 0
+    assert member["total_spent"] == 0
+    assert saved == [True]

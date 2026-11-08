@@ -365,7 +365,16 @@ def reverse_cancelled_order_rewards(
         )
         customer["points"] = get_current_reward_points(customer)
 
-    customer["order_count"] = max(0, int(customer.get("order_count", 0) or 0) - 1)
+    # Old non-wallet orders excluded by product category were marked counted
+    # without incrementing completed order count. Wallet orders did increment it.
+    item = str(order_data.get("item") or "").strip()
+    is_wallet_order = str(order_data.get("payment_method") or "").strip() == WALLET_PAYMENT_METHOD
+    count_was_incremented = is_wallet_order or (
+        item not in NO_VIP_REWARD_ITEMS
+        and item not in VIP_PROGRESS_EXCLUDED_ITEMS
+    )
+    if count_was_incremented:
+        customer["order_count"] = max(0, int(customer.get("order_count", 0) or 0) - 1)
     customer["points"] = get_current_reward_points(customer)
     order_data["reward_cancel_reconciled"] = True
     order_data["reward_cancel_reconciled_at"] = get_taipei_now_iso()
