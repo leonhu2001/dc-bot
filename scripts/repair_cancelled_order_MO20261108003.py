@@ -42,7 +42,7 @@ ORDER_CHILD_TABLES = frozenset({
     "order_review_messages", "order_financial_snapshots", "loyalty_order_events",
     "order_settlement_history", "order_credentials", "order_credential_logs",
     # Order-scoped notification plan: unique order_id, not a financial ledger.
-    "smart_dispatch_notifications",
+    "smart_dispatch_notifications", "simple_order_timers",
 })
 PROTECTED_LEDGER_TABLES = frozenset({
     "wallet_transactions", "customer_wallets", "admin_audit_logs",
