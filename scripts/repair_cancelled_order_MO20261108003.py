@@ -37,6 +37,8 @@ ORDER_CHILD_TABLES = frozenset({
     "order_reports", "order_report_reminders", "order_report_reviews",
     "order_review_messages", "order_financial_snapshots", "loyalty_order_events",
     "order_settlement_history", "order_credentials", "order_credential_logs",
+    # Order-scoped notification plan: unique order_id, not a financial ledger.
+    "smart_dispatch_notifications",
 })
 PROTECTED_LEDGER_TABLES = frozenset({
     "wallet_transactions", "customer_wallets", "admin_audit_logs",
@@ -231,7 +233,8 @@ def inspect_target(conn: sqlite3.Connection) -> dict:
     # protected ledger/audit. Unknown references fail closed instead of leaving
     # dangling business data, and can be reviewed before changing this script.
     children: dict[str, int] = {}
-    for table in web_tables:
+    unexpected_children: dict[str, int] = {}
+    for table in sorted(web_tables):
         if table in {"web_orders", "sqlite_sequence"}:
             continue
         columns = _columns(conn, "main", table)
@@ -242,9 +245,16 @@ def inspect_target(conn: sqlite3.Connection) -> dict:
             (order_id,),
         ).fetchone()[0])
         if count and table not in ORDER_CHILD_TABLES:
-            _fail(f"未列入安全清單的關聯資料表 {table} 有 {count} 筆，不能直接刪除")
-        if count:
+            unexpected_children[table] = count
+        elif count:
             children[table] = count
+    # Report every unknown reference together so no repeated deploy/stop cycles
+    # are needed. Never auto-whitelist unrelated or financial records.
+    if unexpected_children:
+        details = "、".join(
+            f"{table}={count} 筆" for table, count in unexpected_children.items()
+        )
+        _fail(f"未列入安全清單的關聯資料表：{details}；不能直接刪除")
 
     if "customer_benefit_coupons" in web_tables:
         cols = _columns(conn, "main", "customer_benefit_coupons")

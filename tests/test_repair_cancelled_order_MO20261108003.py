@@ -27,6 +27,13 @@ def setup_dbs(root):
         );
         CREATE TABLE order_assignments (id INTEGER PRIMARY KEY, order_id INTEGER);
         CREATE TABLE sync_events (id INTEGER PRIMARY KEY, order_id INTEGER);
+        CREATE TABLE smart_dispatch_notifications (
+          id INTEGER PRIMARY KEY,
+          order_id INTEGER NOT NULL UNIQUE,
+          dispatch_channel_id TEXT NOT NULL,
+          dispatch_message_id TEXT NOT NULL,
+          stage INTEGER NOT NULL DEFAULT 0
+        );
         INSERT INTO web_orders VALUES
           (3, 'MO20261108003', 'cancelled', '519543572194656316',
           '1568952422544711726', '轉帳', 3750),
@@ -39,6 +46,9 @@ def setup_dbs(root):
           '1568963971048935614', 'PAY-20261108-0003');
         INSERT INTO order_assignments VALUES (3, 3), (6, 6);
         INSERT INTO sync_events VALUES (3, 3), (6, 6);
+        INSERT INTO smart_dispatch_notifications VALUES
+          (3, 3, 'dispatch-room-3', 'dispatch-msg-3', 2),
+          (6, 6, 'dispatch-room-6', 'dispatch-msg-6', 1);
         """)
     with sqlite3.connect(root / "bot.db") as conn:
         conn.executescript("""
@@ -92,12 +102,13 @@ def test_target_repair_removes_only_cancelled_order_and_reverses_vip_once(tmp_pa
     assert dry["vip_after"] == 3000
     assert dry["points_after"] == 30
     assert dry["reviews"] == ["PAY-20261108-0002"]
+    assert dry["child_rows"]["smart_dispatch_notifications"] == 1
 
     monkeypatch.setenv("MW_ORDER_REPAIR_MAINTENANCE", "1")
     result = execute(root=tmp_path, apply=True)
     assert result["state"] == "applied"
     assert result["payment_reviews_deleted"] == 1
-    assert result["web_children_deleted"] == 2
+    assert result["web_children_deleted"] == 3
 
     with sqlite3.connect(tmp_path / "web_dashboard.db") as conn:
         assert conn.execute("SELECT bot_order_no FROM web_orders").fetchall() == [
@@ -108,6 +119,9 @@ def test_target_repair_removes_only_cancelled_order_and_reverses_vip_once(tmp_pa
         ]
         assert conn.execute("SELECT order_id FROM order_assignments").fetchall() == [(6,)]
         assert conn.execute("SELECT order_id FROM sync_events").fetchall() == [(6,)]
+        assert conn.execute(
+            "SELECT order_id, dispatch_message_id FROM smart_dispatch_notifications"
+        ).fetchall() == [(6, "dispatch-msg-6")]
         assert conn.execute("SELECT COUNT(*) FROM one_time_data_repairs").fetchone()[0] == 1
 
     with sqlite3.connect(tmp_path / "bot.db") as conn:
@@ -228,3 +242,31 @@ def test_discord_role_sync_is_guarded_by_one_time_repair_marker(tmp_path, monkey
     apply.assert_awaited_once()
     assert apply.await_args.args[0] is fake_guild
     assert apply.await_args.args[1] is member
+
+
+def test_unrecognized_related_tables_all_reported_and_nothing_deleted(tmp_path, monkeypatch):
+    setup_dbs(tmp_path)
+    with sqlite3.connect(tmp_path / "web_dashboard.db") as conn:
+        conn.executescript(
+            """
+            CREATE TABLE unexpected_special_a (id INTEGER PRIMARY KEY, order_id INTEGER);
+            CREATE TABLE unexpected_special_b (id INTEGER PRIMARY KEY, order_id INTEGER);
+            INSERT INTO unexpected_special_a VALUES (1, 3);
+            INSERT INTO unexpected_special_b VALUES (1, 3);
+            """
+        )
+    monkeypatch.setenv("MW_ORDER_REPAIR_MAINTENANCE", "1")
+    with pytest.raises(RuntimeError, match="未列入安全清單") as exc:
+        execute(root=tmp_path, apply=True)
+    message = str(exc.value)
+    assert "unexpected_special_a=1 筆" in message
+    assert "unexpected_special_b=1 筆" in message
+    with sqlite3.connect(tmp_path / "web_dashboard.db") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM web_orders").fetchone()[0] == 2
+        assert conn.execute("SELECT COUNT(*) FROM smart_dispatch_notifications").fetchone()[0] == 2
+        assert conn.execute("SELECT COUNT(*) FROM payment_reviews").fetchone()[0] == 2
+    with sqlite3.connect(tmp_path / "bot.db") as conn:
+        assert conn.execute(
+            "SELECT total_spent FROM customers WHERE customer_id=?",
+            (int(CUSTOMER_ID),),
+        ).fetchone()[0] == 6750
