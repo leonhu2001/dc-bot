@@ -131,7 +131,8 @@ def _rate_from_persisted_note(note: Any) -> float | None:
         rate += 0.03
     if "直播2%" in text:
         rate += 0.02
-    if "前月已結算薪資達5000T 2%" in text:
+    if ("前月已結算薪資達5000T 2%" in text
+            or "前月業績達5000T 2%" in text):
         rate += 0.02
 
     rate = min(0.87, rate)

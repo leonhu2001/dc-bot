@@ -971,6 +971,18 @@ def _check_payouts(
             worker_payouts=worker_payouts,
             cs_payouts=cs_payouts,
         )
+        # Approved reports freeze bonus-bearing payouts. Never offer the
+        # base-only one-click repair for those rows, even if all are unpaid.
+        if _table_exists(web, "order_reports"):
+            report_state = web.execute(
+                "SELECT status FROM order_reports WHERE order_id=? "
+                "ORDER BY id DESC LIMIT 1", (order_id,)
+            ).fetchone()
+            if report_state and _normalize(report_state["status"]).lower() == "approved":
+                repair_block_reason = (
+                    "報單已核准，可能含前月業績2%、掛名、直播或綁店加成，"
+                    "禁止基礎重算覆蓋，請核對原報單及稽核。"
+                )
         repair_action = (
             "recalculate_unpaid_payouts"
             if repair_block_reason is None
