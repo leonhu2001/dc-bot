@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
 from shared.db import SessionLocal
@@ -545,6 +545,32 @@ def _validate_recalculate_unpaid_payouts(
         )
 
     worker_rows, cs_rows = _load_payout_rows(db, int(order.id))
+    # Approved reports can carry named, streamed, performance and binding
+    # bonuses; recalculate_order_payouts() discards them. An older unsafe
+    # repair might already have wiped the note, so check the report too.
+    if inspect(db.connection()).has_table("order_reports"):
+        approved_report = db.execute(
+            text(
+                "SELECT 1 FROM order_reports WHERE order_id=:order_id "
+                "AND status='approved' LIMIT 1"
+            ),
+            {"order_id": int(order.id)},
+        ).first()
+        if approved_report is not None:
+            raise ValueError(
+                "已核准報單不得用基本分潤公式重算；請核對原始薪資和加成紀錄。"
+            )
+    if any(
+        any(
+            marker in str(row.note or "")
+            for marker in (
+                "前月業績", "前月已結算薪資", "直播2%",
+                "綁店3%", "手動指定分潤",
+            )
+        )
+        for row in worker_rows
+    ):
+        raise ValueError("此單已有薪資加成或人工分潤，禁止基本公式覆寫。")
     if not _all_rows_unpaid_and_clear([*worker_rows, *cs_rows]):
         raise ValueError(
             "這張訂單已有 paid、void、未知狀態或 paid_at 資料，"
