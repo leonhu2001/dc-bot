@@ -148,8 +148,9 @@ def test_cancelled_web_state_and_amount_worker_have_status_for_safe_reversal(tmp
 def test_all_cancellation_routes_and_legacy_repair_are_wired():
     bot = Path("bot.py").read_text(encoding="utf-8")
     discord = Path("services/order_dispatch_runtime.py").read_text(encoding="utf-8")
-    assert "order_status in {\"cancelled\", \"canceled\"}" in bot
-    assert "reverse_cancelled_order_rewards(order_data)" in bot
+    service = Path("services/order_cancel_vip_reconciliation.py").read_text(encoding="utf-8")
+    assert "order_status in {\"cancelled\", \"canceled\"}" in service
+    assert "reverse_cancelled_order_rewards(order_data)" in service
     assert "await _repair_existing_cancelled_web_vip_rewards()" in bot
     assert "reverse_cancelled_order_rewards(data)" in discord
     assert 'order_data["reward_cancel_reconciled"]' not in bot  # shared idempotency only

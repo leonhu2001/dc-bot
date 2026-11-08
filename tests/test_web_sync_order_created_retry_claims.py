@@ -16,6 +16,7 @@ def _setup_db(path):
                 item TEXT,
                 quantity INTEGER,
                 amount INTEGER,
+                status TEXT NOT NULL DEFAULT 'active',
                 customer_discord_id TEXT,
                 customer_display_name TEXT
             );
