@@ -120,6 +120,9 @@ def test_anonymity_survives_acceptance_refresh_and_web_dispatch_contract():
     refresh = (ROOT / "services/acceptance/dispatch_refresh.py").read_text(encoding="utf-8")
     web_router = (ROOT / "web/app/routers/dispatch.py").read_text(encoding="utf-8")
     web_template = (ROOT / "web/app/templates/dispatch.html").read_text(encoding="utf-8")
+    web_state = (ROOT / "web/app/routers/dispatch_state.py").read_text(encoding="utf-8")
+    assert "o.price_snapshot_json" in web_state
+    assert "customer_name_is_anonymous_in_snapshot" in web_state
     assert '"anonymous_customer_name": data.get("anonymous_customer_name") is True' in dispatch
     assert 'web_price_data.get("anonymous_customer_name") is True' in refresh
     assert "customer_name_is_anonymous_in_snapshot" in web_router

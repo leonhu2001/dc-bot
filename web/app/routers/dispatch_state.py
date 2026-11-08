@@ -6,6 +6,10 @@ import time
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from services.order_customer_anonymity import (
+    customer_name_is_anonymous_in_snapshot,
+    public_customer_display_name,
+)
 from services.dispatch_presence import (
     RECENT_ONLINE_TIMEOUT_SECONDS,
     count_online_dispatch_workers,
@@ -72,6 +76,7 @@ def _dispatch_order_rows() -> list[dict]:
                 o.dispatch_message_id,
                 o.customer_display_name,
                 o.customer_discord_id,
+                o.price_snapshot_json,
                 o.category,
                 o.item,
                 o.quantity,
@@ -154,10 +159,15 @@ def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
                 "bot_order_no": row["bot_order_no"],
                 "ticket_channel_id": row["ticket_channel_id"],
                 "dispatch_message_id": row["dispatch_message_id"],
-                "customer": (
-                    row["customer_display_name"]
-                    or row["customer_discord_id"]
-                    or ""
+                "customer": public_customer_display_name(
+                    str(
+                        row["customer_display_name"]
+                        or row["customer_discord_id"]
+                        or ""
+                    ),
+                    anonymous=customer_name_is_anonymous_in_snapshot(
+                        row.get("price_snapshot_json")
+                    ),
                 ),
                 "category": row["category"] or "",
                 "item": row["item"] or "",
