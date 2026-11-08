@@ -2766,6 +2766,8 @@ async def _bot_setup_hook() -> None:
     from services.quick_order_v2 import install_quick_order_v2
     from services.quick_order_v2_select_display import install_quick_order_v2_select_display
 
+    from services.simple_order_timer import install_simple_order_timer
+    install_simple_order_timer(bot)
     install_vip_timer_self_service()
     install_quick_order_v2_fixes(bot)
     install_quick_order_v2_production(bot)
@@ -2815,6 +2817,10 @@ async def on_ready():
     ensure_wallet_tables()
     ensure_support_call_tables()
     ensure_smart_dispatch_tables()
+    # Display-only hourly clocks for LOL/APEX/VALORANT/Steam. Does not
+    # participate in VIP timers, billing, or the payout worker.
+    from services.simple_order_timer import ensure_simple_order_timer_worker_started
+    ensure_simple_order_timer_worker_started(bot)
     ensure_web_support_tables()
 
     ensure_payment_review_worker_started(bot)
