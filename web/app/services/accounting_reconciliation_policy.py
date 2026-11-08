@@ -131,7 +131,7 @@ def _rate_from_persisted_note(note: Any) -> float | None:
         rate += 0.03
     if "直播2%" in text:
         rate += 0.02
-    if "前月已結算薪資達5000T 2%" in text:
+    if "前月業績達5000T 2%" in text or "前月已結算薪資達5000T 2%" in text:
         rate += 0.02
 
     rate = min(0.87, rate)
@@ -392,6 +392,15 @@ def build_accounting_policy_view(
             if _should_suppress_amount_mismatch(item, states[order_id]):
                 suppressed.append(item)
             else:
+                # An approved bonus order must not use the legacy base-rate
+                # calculator as an automatic repair baseline.
+                if states[order_id].get("new_policy"):
+                    item = dict(item)
+                    item["repair_action"] = None
+                    item["repairable"] = False
+                    item["repair_block_reason"] = (
+                        "新版分潤含前月業績、直播與綁店加成；禁止使用基礎公式自動覆寫。"
+                    )
                 kept.append(item)
     finally:
         conn.close()
