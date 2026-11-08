@@ -191,3 +191,40 @@ def test_already_reversed_vip_does_not_deduct_again(tmp_path, monkeypatch):
     result = execute(root=tmp_path, apply=True)
     assert result["vip_before"] == 3000
     assert result["completed_before"] == result["completed_after"] == 1
+
+
+
+def test_discord_role_sync_is_guarded_by_one_time_repair_marker(tmp_path, monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from services import one_time_order_purge_vip_role_sync as role_sync
+    from services import rewards
+
+    monkeypatch.setattr(role_sync, "_REPO", tmp_path)
+    fake_guild = object()
+    bot = SimpleNamespace(get_guild=lambda guild_id: fake_guild)
+    member = object()
+    fetch = AsyncMock(return_value=member)
+    apply = AsyncMock(return_value=[])
+    monkeypatch.setattr(rewards, "fetch_member_safely", fetch)
+    monkeypatch.setattr(rewards, "ensure_reward_member_benefits", apply)
+
+    # Before an authorized repair there is no marker and no role change.
+    asyncio.run(role_sync.sync_repaired_member_tier(bot, 123))
+    apply.assert_not_awaited()
+
+    setup_dbs(tmp_path)
+    monkeypatch.setenv("MW_ORDER_REPAIR_MAINTENANCE", "1")
+    execute(root=tmp_path, apply=True)
+    with sqlite3.connect(tmp_path / "web_dashboard.db") as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM one_time_data_repairs"
+        ).fetchone()[0] == 1
+
+    rewards.configure_reward_storage({})
+    rewards.get_customer_reward_data(int(CUSTOMER_ID))["total_spent"] = 3000
+    asyncio.run(role_sync.sync_repaired_member_tier(bot, 123))
+    apply.assert_awaited_once()
+    assert apply.await_args.args[0] is fake_guild
+    assert apply.await_args.args[1] is member

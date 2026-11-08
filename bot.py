@@ -2781,6 +2781,13 @@ bot.setup_hook = _bot_setup_hook
 
 @bot.event
 async def on_ready():
+    # After an explicit owner-authorized offline VIP repair, correct the
+    # customer's Discord tier too. No action unless the repair marker exists.
+    if not getattr(bot, "_one_time_order_purge_role_checked", False):
+        bot._one_time_order_purge_role_checked = True
+        from services.one_time_order_purge_vip_role_sync import sync_repaired_member_tier
+        bot.loop.create_task(sync_repaired_member_tier(bot, GUILD_ID))
+
     # zYao 3C3B2R3 persistent CS view v1
     if not getattr(
         bot,
