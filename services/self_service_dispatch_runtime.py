@@ -296,6 +296,9 @@ async def _create_waiting_acceptance_order_once(
             str(item)
             for item in (specified_staff_ids or [])
         ],
+        # Persist explicitly so dispatch refresh and Web continue hiding the
+        # public name after a bot restart without altering private identity.
+        "anonymous_customer_name": data.get("anonymous_customer_name") is True,
     }
 
     price_snapshot_json = json.dumps(
@@ -581,6 +584,7 @@ async def _create_waiting_acceptance_order_once(
         raise RuntimeError("接單規則／價格快照寫入失敗。") from exc
 
     ORDER_CLAIMS[dispatch_message.id] = {
+        "anonymous_customer_name": data.get("anonymous_customer_name") is True,
         "companion": set(),
         "booster": set(),
         "locked": False,

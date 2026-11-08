@@ -6,6 +6,10 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from shared.db import SessionLocal
+from services.order_customer_anonymity import (
+    customer_name_is_anonymous_in_snapshot,
+    public_customer_display_name,
+)
 from services.dispatch_presence import (
     count_online_dispatch_workers,
     get_online_dispatch_support_ids,
@@ -135,6 +139,12 @@ async def dispatch_dashboard(
                 db,
                 order,
                 user=user if user_can_claim else None,
+            )
+            order.dispatch_customer_display_name = public_customer_display_name(
+                str(getattr(order, "customer_display_name", None) or "未記錄"),
+                anonymous=customer_name_is_anonymous_in_snapshot(
+                    getattr(order, "price_snapshot_json", None)
+                ),
             )
         claimable_orders, non_claimable_orders = partition_dispatch_orders(orders)
         orders = [*claimable_orders, *non_claimable_orders]

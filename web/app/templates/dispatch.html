@@ -35,7 +35,7 @@
         </div>
 
         <div class="dispatch-meta">
-            <div class="dispatch-meta-item"><span>老闆</span><strong>{{ order.customer_display_name or "未記錄" }}</strong></div>
+            <div class="dispatch-meta-item"><span>老闆</span><strong>{{ order.dispatch_customer_display_name or "未記錄" }}</strong></div>
             <div class="dispatch-meta-item"><span>服務內容</span><strong>{{ order.dispatch_service_text or ((order.quantity|string) ~ " 單") }}</strong></div>
             <div class="dispatch-meta-item"><span>金額</span><strong>{{ final_price }}T</strong></div>
             <div class="dispatch-meta-item"><span>付款方式</span><strong>{{ order.payment_method or "未記錄" }}</strong></div>

@@ -442,6 +442,21 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
         required=False,
         max_length=800,
     )
+    anonymous_name = discord.ui.Label(
+        text="老闆名稱是否匿名",
+        description="公開派單與接單大廳隱藏名稱，客服內部仍可查詢。",
+        component=discord.ui.Select(
+            custom_id="self_service_order_anonymous_customer",
+            placeholder="選擇是否匿名老闆名稱",
+            options=[
+                discord.SelectOption(label="不匿名（顯示老闆名稱）", value="no"),
+                discord.SelectOption(label="匿名（顯示匿名老闆）", value="yes"),
+            ],
+            min_values=1,
+            max_values=1,
+            required=True,
+        ),
+    )
 
     def __init__(
         self,
@@ -478,6 +493,14 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
         elif self.ammo_named_selection is not None:
             await interaction.response.send_message("商品已變更，請重新按送出訂單。", ephemeral=True)
             return
+        anonymous_values = list(self.anonymous_name.component.values)
+        if len(anonymous_values) != 1 or anonymous_values[0] not in {"yes", "no"}:
+            await interaction.response.send_message(
+                "請選擇是否匿名老闆名稱，才能送出訂單。",
+                ephemeral=True,
+            )
+            return
+        data["anonymous_customer_name"] = anonymous_values[0] == "yes"
         note_text = str(self.note.value or "").strip()
 
         if note_text:
@@ -596,7 +619,8 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
             interaction,
             self.customer_id,
             "送出等待接單",
-            note_text or "無備註",
+            f"{note_text or '無備註'}｜老闆名稱："
+            f"{'匿名' if data.get('anonymous_customer_name') else '不匿名'}",
         )
 
         await interaction.followup.send(response_text, ephemeral=True)

@@ -296,6 +296,13 @@ async def refresh_acceptance_dispatch_from_web_order(
         if value is not None:
             data[key] = value
 
+    # Web order snapshots are the durable source for the public name choice.
+    # Do not let a reused ticket's previous anonymity flag leak into a new order.
+    data["anonymous_customer_name"] = (
+        web_price_data.get("anonymous_customer_name") is True
+    )
+    claim_data["anonymous_customer_name"] = data["anonymous_customer_name"]
+
     if data.get("website_finance_settled"):
         for unsafe_key in (
             "point_benefit_key",

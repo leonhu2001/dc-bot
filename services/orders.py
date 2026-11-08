@@ -1062,8 +1062,21 @@ def build_self_service_order_embed(
         status_text = "已付款｜服務進行中"
         color = discord.Color.green()
 
-    ticket_text = getattr(source_channel, "mention", None) or "未紀錄"
-    customer_text = _resolve_guild_customer_display_name(source_channel, customer_mention)
+    from services.order_customer_anonymity import (
+        customer_name_is_anonymous,
+        public_customer_display_name,
+    )
+
+    anonymous = customer_name_is_anonymous(source_data)
+    ticket_text = (
+        "請在接單後聯繫客服取得票口"
+        if anonymous
+        else getattr(source_channel, "mention", None) or "未紀錄"
+    )
+    customer_text = public_customer_display_name(
+        _resolve_guild_customer_display_name(source_channel, customer_mention),
+        anonymous=anonymous,
+    )
     service_context = _service_display_context(
         source_data,
         item=item,
