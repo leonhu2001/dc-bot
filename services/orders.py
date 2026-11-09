@@ -232,7 +232,15 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
     "apex": [
         {"label": group_label, "details": [
             {"label": "NG", "value": "ng", "rule_key": f"{rule_prefix}_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-            {"label": "積分", "value": "ranked", "rule_key": f"{rule_prefix}_ranked", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "積分（白金以下）", "value": "ranked", "rule_key": f"{rule_prefix}_ranked", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            *[
+                {"label": f"積分（{tier_label}）", "value": f"ranked_tier_{tier_key}", "rule_key": f"{rule_prefix}_ranked_tier_{tier_key}", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24}
+                for tier_key, tier_label in (
+                    ("diamond", "鑽石"),
+                    ("master", "大師"),
+                    ("predator", "頂獵"),
+                )
+            ],
         ]}
         for group_label, rule_prefix in (
             ("娛樂陪", "apex_entertain"),
