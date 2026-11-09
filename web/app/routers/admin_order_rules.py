@@ -384,21 +384,34 @@ def _payload_from_form_base(payload: dict, form) -> dict:
     payload["service_bonus_buy"] = None
     payload["service_bonus_gift"] = 0
 
-    payload["allowed_roles"] = [
-        str(item)
-        for item in form.getlist("allowed_roles")
-        if str(item).strip()
-    ]
-    payload["allowed_game_roles"] = [
-        str(item)
-        for item in form.getlist("allowed_game_roles")
-        if str(item).strip()
-    ]
-    payload["required_game_roles"] = [
-        str(item)
-        for item in form.getlist("required_game_roles")
-        if str(item).strip()
-    ]
+    # The admin checkbox widget exposes only supported selectable roles. Some
+    # system products still use additional role keys that have no checkbox.
+    # Keep those hidden keys when editing unrelated fields (price, description,
+    # VIP settings), otherwise the form silently removes a staff qualification.
+    supported = {
+        "allowed_roles": set(),
+        "allowed_game_roles": set(),
+        "required_game_roles": set(),
+    }
+    for group in QUALIFICATION_GROUPS:
+        for option in group["options"]:
+            supported[option["field"]].add(str(option["key"]))
+    for group in GAME_IDENTITY_GROUPS:
+        for option in group["options"]:
+            supported["required_game_roles"].add(str(option["key"]))
+
+    for field_name, visible_keys in supported.items():
+        selected = [
+            str(item).strip()
+            for item in form.getlist(field_name)
+            if str(item).strip() and str(item).strip() in visible_keys
+        ]
+        hidden = [
+            str(item)
+            for item in (payload.get(field_name) or [])
+            if str(item) not in visible_keys
+        ]
+        payload[field_name] = list(dict.fromkeys(selected + hidden))
 
     return payload
 
