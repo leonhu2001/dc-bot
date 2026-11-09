@@ -48,13 +48,17 @@ def _performance(db: sqlite3.Connection, worker_id: str) -> int:
         tips = db.execute(
             """
             SELECT COALESCE(SUM(t.amount),0)
-            FROM worker_tips t JOIN web_orders o ON o.id=t.order_id
-            WHERE CAST(t.worker_discord_id AS TEXT)=? AND o.status='closed'
+            FROM worker_tips t LEFT JOIN web_orders o ON o.id=t.order_id
+            WHERE CAST(t.worker_discord_id AS TEXT)=? AND (t.order_id IS NULL OR o.status='closed')
               AND t.payment_status='paid' AND COALESCE(t.amount,0)>0
-              AND COALESCE(NULLIF(o.closed_at,''),NULLIF(o.updated_at,''),
-                           NULLIF(o.created_at,''))>=?
-              AND COALESCE(NULLIF(o.closed_at,''),NULLIF(o.updated_at,''),
-                           NULLIF(o.created_at,''))<?
+              AND datetime(CASE WHEN t.order_id IS NULL
+                       THEN COALESCE(NULLIF(t.paid_at,''), NULLIF(t.created_at,''))
+                       ELSE COALESCE(NULLIF(o.closed_at,''),NULLIF(o.updated_at,''),
+                           NULLIF(o.created_at,'')) END)>=?
+              AND datetime(CASE WHEN t.order_id IS NULL
+                       THEN COALESCE(NULLIF(t.paid_at,''), NULLIF(t.created_at,''))
+                       ELSE COALESCE(NULLIF(o.closed_at,''),NULLIF(o.updated_at,''),
+                           NULLIF(o.created_at,'')) END)<?
             """, (worker_id, OCT_START, NOV_START)
         ).fetchone()[0]
     return max(0, int(wages or 0) + int(tips or 0))
