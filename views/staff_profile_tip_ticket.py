@@ -20,8 +20,35 @@ def profile_tip_ids(channel: discord.abc.GuildChannel | None) -> tuple[int, int]
     return int(customer), int(staff)
 
 
+async def prompt_profile_tip_close(interaction: discord.Interaction) -> None:
+    channel = interaction.channel
+    if not isinstance(channel, discord.TextChannel):
+        await interaction.response.send_message("只能在雞腿票口關閉。", ephemeral=True)
+        return
+    ids = profile_tip_ids(channel)
+    if ids is None:
+        await interaction.response.send_message("這不是有效的雞腿票口。", ephemeral=True)
+        return
+    from core.permissions import is_customer_staff
+    if (interaction.user.id != ids[0] and not (
+        isinstance(interaction.user, discord.Member)
+        and is_customer_staff(interaction.user)
+    )):
+        await interaction.response.send_message(
+            "只有開票老闆或客服可以關閉此票口。", ephemeral=True,
+        )
+        return
+    from views.review import ConfirmCloseTicketView
+    await interaction.response.send_message(
+        "確定要關閉這張雞腿票口嗎？關閉前會封存完整聊天紀錄。"
+        "如有待審核雞腿款項，系統會阻止關閉。",
+        view=ConfirmCloseTicketView(customer_id=ids[0]),
+        ephemeral=True,
+    )
+
+
 class WorkerTipProfileCloseView(discord.ui.View):
-    """Persistent, owner/staff-only ticket close action with second confirmation."""
+    """Persistent close action; archive/delete only after confirmation."""
 
     def __init__(self):
         super().__init__(timeout=None)
@@ -32,30 +59,7 @@ class WorkerTipProfileCloseView(discord.ui.View):
         custom_id="worker_tip_profile_close",
     )
     async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
-        channel = interaction.channel
-        if not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message("只能在雞腿票口關閉。", ephemeral=True)
-            return
-        ids = profile_tip_ids(channel)
-        if ids is None:
-            await interaction.response.send_message("這不是有效的雞腿票口。", ephemeral=True)
-            return
-        from core.permissions import is_customer_staff
-        if (interaction.user.id != ids[0] and not (
-            isinstance(interaction.user, discord.Member)
-            and is_customer_staff(interaction.user)
-        )):
-            await interaction.response.send_message(
-                "只有開票老闆或客服可以關閉此票口。", ephemeral=True,
-            )
-            return
-        from views.review import ConfirmCloseTicketView
-        await interaction.response.send_message(
-            "確定要關閉這張雞腿票口嗎？關閉前會封存完整聊天紀錄。"
-            "如有待審核雞腿款項，系統會阻止關閉。",
-            view=ConfirmCloseTicketView(customer_id=ids[0]),
-            ephemeral=True,
-        )
+        await prompt_profile_tip_close(interaction)
 
 
 class WorkerTipProfileTicketView(discord.ui.View):
@@ -77,9 +81,7 @@ class WorkerTipProfileCloseButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        close = WorkerTipProfileCloseView()
-        button = close.children[0]
-        await close.close(interaction, button)
+        await prompt_profile_tip_close(interaction)
 
 
 async def send_profile_tip_completion(channel: discord.TextChannel, tip_row) -> None:
