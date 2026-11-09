@@ -98,6 +98,7 @@ async def send_profile_tip_completion(channel: discord.TextChannel, tip_row) -> 
             "✅ **雞腿已完成**\n"
             f"老闆：<@{verified['customer_discord_id']}>\n"
             f"指定陪玩：<@{verified['worker_discord_id']}>\n"
+            f"雞腿編號：TIP-{tip_id}\n"
             f"雞腿：**{int(verified['amount']):,}T**\n"
             "此筆已列入指定陪玩的薪資明細（待發放），100% 歸陪玩。\n\n"
             "可以繼續加雞腿，或點下方按鈕關閉票口。"
@@ -214,3 +215,76 @@ async def create_staff_profile_tip_ticket(
         mention_roles_in_intro=False,
         order_log_status="名片加雞腿票口",
     )
+
+
+async def repair_open_profile_tip_tickets(bot: discord.Client, category_id: int) -> dict:
+    """Idempotent restart repair for previously created profile tip tickets."""
+    from services.worker_tips import list_paid_profile_tips
+
+    report = {"tickets": 0, "staff_access": 0, "buttons": 0, "completion": 0}
+    for guild in bot.guilds:
+        for channel in guild.text_channels:
+            if channel.category_id != int(category_id):
+                continue
+            ids = profile_tip_ids(channel)
+            if ids is None:
+                continue
+            customer_id, staff_id = ids
+            report["tickets"] += 1
+            try:
+                worker = guild.get_member(staff_id)
+                if worker is None:
+                    try:
+                        worker = await guild.fetch_member(staff_id)
+                    except (discord.HTTPException, discord.NotFound, discord.Forbidden):
+                        worker = None
+                if worker is not None:
+                    overwrite = channel.overwrites_for(worker)
+                    if overwrite.view_channel is not True:
+                        await channel.set_permissions(
+                            worker, view_channel=True,
+                            send_messages=True, read_message_history=True,
+                            attach_files=True,
+                            reason="Restore staff access to selected profile-tip ticket",
+                        )
+                        report["staff_access"] += 1
+
+                intro = None
+                async for message in channel.history(limit=60, oldest_first=True):
+                    if (message.author.id == bot.user.id
+                            and "**名片加雞腿**" in str(message.content or "")):
+                        intro = message
+                        break
+                if intro is not None:
+                    has_close = any(
+                        str(getattr(component, "custom_id", "")) in (
+                            "worker_tip_profile_ticket_close",
+                            "worker_tip_profile_close",
+                        )
+                        for row in intro.components for component in getattr(row, "children", ())
+                    )
+                    if not has_close:
+                        await intro.edit(view=WorkerTipProfileTicketView())
+                        report["buttons"] += 1
+
+                paid_tips = list_paid_profile_tips(channel.id)
+                if not paid_tips:
+                    continue
+                recent = []
+                async for message in channel.history(limit=120):
+                    if message.author.id == bot.user.id:
+                        recent.append(str(message.content or ""))
+                for tip in paid_tips:
+                    marker = f"雞腿編號：TIP-{int(tip['id'])}"
+                    if any(marker in message for message in recent):
+                        continue
+                    await send_profile_tip_completion(channel, tip)
+                    recent.append(marker)
+                    report["completion"] += 1
+            except (discord.HTTPException, OSError, ValueError, RuntimeError) as exc:
+                print(
+                    f"[profile-tip-repair] channel={channel.id} "
+                    f"failed: {type(exc).__name__}: {exc}", flush=True,
+                )
+    print(f"[profile-tip-repair] {report}", flush=True)
+    return report
