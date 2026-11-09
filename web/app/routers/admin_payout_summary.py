@@ -693,11 +693,19 @@ def update_summary_payout_status(
                     payout_paid_at = {paid_at_sql},
                     updated_at = datetime('now', '+8 hours')
                 WHERE payment_status = 'paid'
-                  AND order_id IN (
-                    SELECT w.id FROM web_orders w WHERE {order_filter}
+                  AND (
+                    order_id IN (
+                      SELECT w.id FROM web_orders w WHERE {order_filter}
+                    )
+                    OR (
+                      order_id IS NULL
+                      AND ( ? = '' OR substr(
+                        COALESCE(NULLIF(paid_at,''),NULLIF(created_at,'')),1,7
+                      ) = ? )
+                    )
                   )
                 """,
-                [target_status, *params],
+                [target_status, *params, month or "", month or ""],
             )
 
         if role in {"all", "", "customer_service", "客服"}:
@@ -793,11 +801,19 @@ def update_summary_person_payout_status(
                     updated_at = datetime('now', '+8 hours')
                 WHERE payment_status = 'paid'
                   AND worker_discord_id = ?
-                  AND order_id IN (
-                    SELECT w.id FROM web_orders w WHERE {order_filter}
+                  AND (
+                    order_id IN (
+                      SELECT w.id FROM web_orders w WHERE {order_filter}
+                    )
+                    OR (
+                      order_id IS NULL
+                      AND ( ? = '' OR substr(
+                        COALESCE(NULLIF(paid_at,''),NULLIF(created_at,'')),1,7
+                      ) = ? )
+                    )
                   )
                 """,
-                params_worker,
+                [*params_worker, month or "", month or ""],
             )
 
         if update_customer_service:
