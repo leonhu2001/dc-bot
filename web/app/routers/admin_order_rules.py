@@ -37,6 +37,7 @@ from services.order_rules import (
     OrderRule,
     OWNER_APPROVED_20261110_GAME_PRICE_KEYS,
     OWNER_APPROVED_GAME_PRICE_REVISION,
+    ADMIN_MANAGED_PLAYER_COUNT_PRICE_REVISION,
     SOURCE_AUTHORITY_RULE_KEYS,
     SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS,
     ONE_COMPANION_ONE_GUARD_RULE_KEYS,
@@ -379,6 +380,22 @@ def _payload_from_form_base(payload: dict, form) -> dict:
     for field in BOOL_FIELDS:
         payload[field] = field in form
 
+    # Per-seat merchandise (e.g. Black Tide 1-4 people) is not priced by
+    # multiplying the single price input. Give every seat tier a real editable
+    # field so an approved change affects checkout instead of metadata only.
+    seat_prices = payload.get("player_count_prices") or {}
+    if seat_prices:
+        updated_prices = {}
+        for count, old_price in seat_prices.items():
+            field = f"player_count_price_{int(count)}"
+            value = form.get(field)
+            updated_prices[int(count)] = (
+                _parse_int(value, field=field)
+                if value is not None
+                else int(old_price)
+            )
+        payload["player_count_prices"] = updated_prices
+
     # 舊的同單買幾送幾已全面停用。欄位只保留歷史 payload 相容，
     # 後台任何新建/修改都強制清空，避免舊 override 將活動復活。
     payload["service_bonus_buy"] = None
@@ -463,7 +480,7 @@ def _validate_admin_system_owned_fields(rule_key: str, payload: dict) -> None:
             "catalog_group_label", "allowed_roles", "allowed_game_roles",
             "required_game_roles", "required_roles", "required_staff_count",
             "player_count_enabled", "min_player_count", "max_player_count",
-            "price_multiply_player_count", "player_count_prices",
+            "price_multiply_player_count",
             "max_specified_count",
         ))
     if key in SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS:
@@ -559,7 +576,12 @@ def _rule_row(key: str) -> dict:
             getattr(rule, "catalog_group_label", "") or ""
         ),
         "label": rule.label,
-        "price": int(rule.price or 0),
+        "price": int(
+            (getattr(rule, "player_count_prices", None) or {}).get(
+                int(getattr(rule, "min_player_count", 1) or 1),
+                rule.price or 0,
+            )
+        ),
         "pricing_type": rule.pricing_type,
         "unit_label": rule.unit_label,
         "required_staff_count": rule.required_staff_count,
@@ -690,6 +712,10 @@ async def _render(
             ),
             "selected_uses_owner_poster_price": (
                 selected_key in OWNER_APPROVED_20261110_GAME_PRICE_KEYS
+            ),
+            "selected_uses_seat_price_table": bool(
+                selected_rule is not None
+                and getattr(selected_rule, "player_count_prices", None)
             ),
             "selected_status": selected_status,
             "selected_is_active": bool(selected_status.get("is_active", True)),
@@ -924,6 +950,10 @@ async def admin_order_rule_publish(
             # overrides created before the approved Nov 10 poster prices.
             published_payload["_owner_price_revision"] = (
                 OWNER_APPROVED_GAME_PRICE_REVISION
+            )
+        if published_payload.get("player_count_prices"):
+            published_payload["_admin_seat_price_revision"] = (
+                ADMIN_MANAGED_PLAYER_COUNT_PRICE_REVISION
             )
 
         result = publish_rule_override(
