@@ -647,8 +647,8 @@ _add_delta_tech_rule(category="delta_mobile_basic", key="basic_mobile_tech_topse
 
 # 舊雙陪 key 只保留歷史訂單／舊快照回查；新下單不再引用。
 for category, key, label, price, game_roles in [
-    ("delta_desktop_basic", "basic_tech_secret_double", "技術陪〈端遊〉｜機密雙陪", 850, DELTA_DESKTOP_GAME_ROLE),
-    ("delta_desktop_basic", "basic_tech_topsecret_double", "技術陪〈端遊〉｜絕密雙陪", 950, DELTA_DESKTOP_GAME_ROLE),
+    ("delta_desktop_basic", "basic_tech_secret_double", "技術陪〈端遊〉｜機密雙陪", 750, DELTA_DESKTOP_GAME_ROLE),
+    ("delta_desktop_basic", "basic_tech_topsecret_double", "技術陪〈端遊〉｜絕密雙陪", 850, DELTA_DESKTOP_GAME_ROLE),
     ("delta_mobile_basic", "basic_mobile_tech_secret_double", "技術陪〈手遊〉｜機密雙陪", 760, DELTA_MOBILE_GAME_ROLE),
     ("delta_mobile_basic", "basic_mobile_tech_topsecret_double", "技術陪〈手遊〉｜絕密雙陪", 840, DELTA_MOBILE_GAME_ROLE),
 ]:
@@ -726,7 +726,7 @@ for category, prefix, display, game_roles in [
         ("male_double", "男雙陪", ("male_companion",)),
     ):
         _add(OrderRule(
-            category, f"{prefix}_{suffix}", f"{display}｜{text}", "hourly", desktop_prices[2], "H",
+            category, f"{prefix}_{suffix}", f"{display}｜{text}", "hourly", 600, "H",
             allowed_roles=roles,
             required_game_roles=game_roles,
             required_staff_count=2,
