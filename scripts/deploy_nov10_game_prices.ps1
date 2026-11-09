@@ -4,11 +4,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ReleaseRef = "feat/nov10-lol-apex-steam-pricing-remove-public-price-button"
+$ReleaseRef = "fix/admin-order-rules-verified-edit-20261110"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $RepoRoot
 
-Write-Host "=== SAFE NOV 10 LOL / APEX / STEAM DEPLOY ===" -ForegroundColor Yellow
+Write-Host "=== SAFE GAME PRICES + ADMIN ORDER RULES DEPLOY ===" -ForegroundColor Yellow
 
 if (git status --porcelain) {
     git status --short
@@ -71,5 +71,5 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "DEPLOY COMPLETED - LOL / APEX / STEAM prices synced, button removed." -ForegroundColor Green
+Write-Host "DEPLOY COMPLETED - game prices and admin order rules verified; Delta price list preserved." -ForegroundColor Green
 Write-Host "Commit: $Target" -ForegroundColor Cyan
