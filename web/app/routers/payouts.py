@@ -15,6 +15,9 @@ from web.app.services.payout_report_gate import (
     payout_financial_state,
     payout_status_label,
 )
+from web.app.services.worker_tip_salary_sql import (
+    tip_earning_date_expr, tip_month_filter,
+)
 
 
 router = APIRouter(tags=["payouts"])
@@ -97,6 +100,7 @@ def normalize_my_payout_status(status: str | None) -> str:
 
 
 def get_my_payout_month_options() -> list[dict]:
+    ensure_worker_tip_table()
     ensure_internal_transfer_tables(my_payout_db_path())
     conn = sqlite3.connect(my_payout_db_path())
     conn.row_factory = sqlite3.Row
@@ -116,6 +120,10 @@ def get_my_payout_month_options() -> list[dict]:
                 UNION ALL
                 SELECT substr(effective_at, 1, 7) AS month_value
                 FROM employee_payroll_adjustments
+                UNION ALL
+                SELECT substr(COALESCE(NULLIF(paid_at,''),NULLIF(created_at,'')),1,7)
+                FROM worker_tips
+                WHERE order_id IS NULL AND payment_status='paid'
             )
             WHERE month_value GLOB '????-??'
             ORDER BY month_value DESC
@@ -284,6 +292,7 @@ def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all
         month_sql = f" AND substr({my_payout_order_date_expr('w')}, 1, 7) = ? "
         month_params.append(month)
 
+    tip_month_sql, tip_month_params = tip_month_filter(month)
     conn = sqlite3.connect(my_payout_db_path())
     conn.row_factory = sqlite3.Row
 
@@ -336,22 +345,24 @@ def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all
                 COALESCE(NULLIF(p.worker_display_name, ''), p.worker_discord_id) AS display_name,
                 p.amount AS amount,
                 p.payout_status AS payout_status,
-                COALESCE(w.bot_order_no, 'WEB-' || w.id) AS order_no,
-                w.category,
-                w.item,
-                COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
-                {my_payout_order_date_expr('w')} AS closed_at
+                COALESCE(NULLIF(w.bot_order_no,''), 'TIP-' || p.id) AS order_no,
+                COALESCE(w.category, '雞腿') AS category,
+                COALESCE(w.item, '名片加雞腿') AS item,
+                COALESCE(NULLIF(w.customer_display_name, ''),
+                         NULLIF(p.customer_display_name, ''),
+                         NULLIF(p.customer_discord_id, ''), '未紀錄') AS customer_name,
+                {tip_earning_date_expr()} AS closed_at
             FROM worker_tips p
-            JOIN web_orders w ON w.id = p.order_id
-            WHERE w.status = 'closed'
+            LEFT JOIN web_orders w ON w.id = p.order_id
+            WHERE (w.status = 'closed' OR p.order_id IS NULL)
               AND p.payment_status = 'paid'
               AND CAST(p.worker_discord_id AS TEXT) = ?
               AND COALESCE(p.amount, 0) > 0
               {payout_status_sql}
-              {month_sql}
+              {tip_month_sql}
             ORDER BY closed_at DESC, p.id DESC
             """,
-            [discord_id, *payout_status_params, *month_params],
+            [discord_id, *payout_status_params, *tip_month_params],
         ).fetchall()
 
         for row in tip_rows:
