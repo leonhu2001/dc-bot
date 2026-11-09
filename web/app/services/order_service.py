@@ -566,10 +566,14 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
 
     from services.one_companion_one_guard_payout import (
         calculate_one_companion_one_guard_order_payout,
+        resolve_one_guard_unit_price,
     )
 
     payout_result = calculate_one_companion_one_guard_order_payout(
         rule_key=getattr(order, "order_rule_key", None),
+        unit_price=resolve_one_guard_unit_price(
+            order.order_rule_key, order.rule_snapshot_json,
+        ),
         total_amount=payout_base_amount,
         worker_roles=[
             (assignment.worker_discord_id, assignment.role_type)
