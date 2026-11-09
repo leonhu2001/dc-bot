@@ -151,7 +151,7 @@ def audit(db: sqlite3.Connection) -> dict:
             })
     return {
         "month": "2026-11", "threshold": 5000, "bonus_rate": 0.02,
-        "eligible_workers": len(performance_cache),
+        "eligible_workers": sum(value >= 5000 for value in performance_cache.values()),
         "provable_unpaid_missing_total": sum(
             int(item["provable_missing"] or 0) for item in items
             if item["bonus_status"] == "missing_bonus"
