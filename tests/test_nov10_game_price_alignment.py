@@ -88,6 +88,43 @@ def test_all_discord_game_catalogs_use_same_prices_as_web():
             assert row["price"] == ORDER_RULES[row["rule_key"]].price
 
 
+
+def test_live_deploy_rank_guard_accounts_for_lol_entertain_aram():
+    """Mirror exact live deploy contract (the previous count guard rejected 8 rows)."""
+    for game, prefixes, tiers in (
+        (
+            "valorant",
+            ("valorant_entertain", "valorant_ascendant", "valorant_immortal", "valorant_radiant"),
+            ("diamond", "ascendant", "immortal", "radiant"),
+        ),
+        (
+            "lol",
+            ("lol_entertain", "lol_master", "lol_grandmaster", "lol_elite"),
+            ("emerald", "diamond", "master", "grandmaster", "challenger"),
+        ),
+    ):
+        for prefix in prefixes:
+            web_group = next(
+                g for g in get_grouped_order_catalog(game) if g["key"] == prefix
+            )
+            discord_rows = get_order_item_details_for_group(
+                game, web_group["label"].split("｜")[-1]
+            )
+            expected_web_keys = {f"{prefix}_ng", f"{prefix}_ranked"} | {
+                f"{prefix}_ranked_tier_{tier}" for tier in tiers
+            }
+            if game == "lol" and prefix == "lol_entertain":
+                expected_web_keys.add(f"{prefix}_aram")
+            expected_discord_keys = set(expected_web_keys)
+            if game == "lol":
+                expected_discord_keys.add(f"{prefix}_aram")
+            assert {row["rule_key"] for row in web_group["variants"]} == expected_web_keys
+            assert {row["rule_key"] for row in discord_rows} == expected_discord_keys
+            if prefix == "lol_entertain":
+                assert len(web_group["variants"]) == 8
+
+
+
 def test_apex_ranked_tiers_have_correct_per_player_hourly_prices_and_shared_rewards():
     for prefix, base in (
         ("apex_entertain", 350), ("apex_diamond", 400),
