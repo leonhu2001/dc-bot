@@ -98,7 +98,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             "label": "油鍋單",
             "details": [
                 {"label": "火箭燃油", "value": "fuel", "rule_key": "basic_oil_fuel", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "GTI衛星通訊天線", "value": "satellite", "rule_key": "basic_oil_satellite", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "GTI衛星通信天線", "value": "satellite", "rule_key": "basic_oil_satellite", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "全包", "value": "all", "rule_key": "basic_oil_all", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
