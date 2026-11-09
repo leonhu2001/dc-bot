@@ -6,14 +6,14 @@ from web.app.services.order_groups import get_grouped_order_catalog
 
 
 ACTIVE_APEX_PRICES = {
-    "apex_entertain_ng": 300,
+    "apex_entertain_ng": 320,
     "apex_entertain_ranked": 350,
-    "apex_diamond_ng": 400,
-    "apex_diamond_ranked": 450,
-    "apex_master_ng": 480,
-    "apex_master_ranked": 530,
-    "apex_predator_ng": 580,
-    "apex_predator_ranked": 630,
+    "apex_diamond_ng": 380,
+    "apex_diamond_ranked": 400,
+    "apex_master_ng": 400,
+    "apex_master_ranked": 450,
+    "apex_predator_ng": 500,
+    "apex_predator_ranked": 550,
 }
 
 
@@ -37,15 +37,15 @@ def test_apex_new_pricing_is_fixed_per_person_per_hour():
         assert rule.loyalty_benefits_enabled is rule_key.startswith("apex_entertain_")
 
 
-def test_apex_double_predator_ranked_two_hours_costs_2520():
+def test_apex_double_predator_ranked_two_hours_costs_2200():
     result = calculate_price(
         ORDER_RULES["apex_predator_ranked"],
         quantity=2,
         player_count=2,
     )
-    assert result.base_amount == 2520
+    assert result.base_amount == 2200
     assert result.specify_fee == 0
-    assert result.total_amount == 2520
+    assert result.total_amount == 2200
     assert result.required_staff_count == 2
 
 
@@ -59,9 +59,9 @@ def test_apex_specify_fee_is_100_each_and_free_from_two_hours():
         player_count=2,
         specified_roles=specified,
     )
-    assert one_hour.base_amount == 800
+    assert one_hour.base_amount == 760
     assert one_hour.specify_fee == 200
-    assert one_hour.total_amount == 1000
+    assert one_hour.total_amount == 960
     assert one_hour.free_specify_fee is False
 
     two_hours = calculate_price(
@@ -70,9 +70,9 @@ def test_apex_specify_fee_is_100_each_and_free_from_two_hours():
         player_count=2,
         specified_roles=specified,
     )
-    assert two_hours.base_amount == 1600
+    assert two_hours.base_amount == 1520
     assert two_hours.specify_fee == 0
-    assert two_hours.total_amount == 1600
+    assert two_hours.total_amount == 1520
     assert two_hours.free_specify_fee is True
 
 
@@ -87,7 +87,7 @@ def test_apex_loyalty_only_applies_to_entertainment_at_ten_percent():
     assert loyalty_policy_for_rule("apex_predator_ranked") is None
 
 
-def test_apex_web_catalog_no_longer_asks_for_customer_rank():
+def test_apex_web_catalog_exposes_new_ranked_price_tiers():
     groups = {
         group["key"]: group
         for group in get_grouped_order_catalog("apex")
@@ -104,11 +104,18 @@ def test_apex_web_catalog_no_longer_asks_for_customer_rank():
         assert [variant["rule_key"] for variant in group["variants"]] == [
             f"{rule_prefix}_ng",
             f"{rule_prefix}_ranked",
+            f"{rule_prefix}_ranked_tier_diamond",
+            f"{rule_prefix}_ranked_tier_master",
+            f"{rule_prefix}_ranked_tier_predator",
         ]
         assert [variant["label"] for variant in group["variants"]] == [
             "NG",
-            "積分",
+            "積分（白金以下）",
+            "積分（鑽石）",
+            "積分（大師）",
+            "積分（頂獵）",
         ]
+        assert "每往上一階" in group["description"]
         assert all(not variant["customer_adjustments"] for variant in group["variants"])
         assert "老闆目前段位" not in group["description"]
         assert "買 5 送 1" not in group["description"]
@@ -120,7 +127,7 @@ def test_apex_web_catalog_no_longer_asks_for_customer_rank():
             assert "回饋" not in group["description"]
 
 
-def test_apex_discord_catalog_separates_mode_from_shared_player_count():
+def test_apex_discord_catalog_includes_ranked_tiers_with_separate_player_count():
     for group_label, rule_prefix in (
         ("娛樂陪", "apex_entertain"),
         ("鑽石陪", "apex_diamond"),
@@ -128,15 +135,41 @@ def test_apex_discord_catalog_separates_mode_from_shared_player_count():
         ("頂獵陪", "apex_predator"),
     ):
         details = get_order_item_details_for_group("apex", group_label)
-        assert [item["label"] for item in details] == ["NG", "積分"]
+        assert [item["label"] for item in details] == [
+            "NG", "積分（白金以下）", "積分（鑽石）", "積分（大師）", "積分（頂獵）",
+        ]
         assert [item["rule_key"] for item in details] == [
             f"{rule_prefix}_ng",
             f"{rule_prefix}_ranked",
+            f"{rule_prefix}_ranked_tier_diamond",
+            f"{rule_prefix}_ranked_tier_master",
+            f"{rule_prefix}_ranked_tier_predator",
         ]
         assert all("player_count" not in item for item in details)
         assert get_rule_player_count_bounds(ORDER_RULES[f"{rule_prefix}_ng"]) == (1, 2, 1, True)
-        assert all("白金" not in item["label"] for item in details)
-        assert all("鑽石以下" not in item["label"] for item in details)
+
+
+
+def test_apex_ranked_adds_50_per_tier_per_worker_per_hour():
+    base_by_prefix = {
+        "apex_entertain": 350,
+        "apex_diamond": 400,
+        "apex_master": 450,
+        "apex_predator": 550,
+    }
+    for prefix, base_price in base_by_prefix.items():
+        for tier, steps in (("diamond", 1), ("master", 2), ("predator", 3)):
+            rule_key = f"{prefix}_ranked_tier_{tier}"
+            rule = ORDER_RULES[rule_key]
+            assert rule.price == base_price + 50 * steps
+            assert rule.pricing_type == "hourly"
+            assert rule.max_player_count == 2
+            assert rule.specify_free_min_units == 2
+            amount = calculate_price(rule, quantity=2, player_count=2)
+            assert amount.base_amount == (base_price + 50 * steps) * 4
+            assert amount.total_amount == amount.base_amount
+            assert rule.loyalty_benefits_enabled == (prefix == "apex_entertain")
+
 
 
 def test_apex_legacy_customer_rank_rules_stay_available_for_old_orders():

@@ -7,12 +7,12 @@ from discord.ext import commands
 
 from services import quick_order_v2 as quick
 from services.quick_order_v2_assets import public_order_panel_image_url
+from services.quick_order_v2_price_lists import add_price_list_control
 from services.quick_order_v2_panel_images import (
     cleanup_legacy_artwork_messages,
     panel_image_filename,
     panel_image_url,
 )
-from services.quick_order_v2_price_lists import add_price_list_control
 from services.quick_order_v2_select_display import (
     LEGACY_RESELECT_FLAG,
     apply_quick_order_select_display,
@@ -144,6 +144,8 @@ def _public_view_for_channel(channel_id: int) -> discord.ui.View:
                     row=0,
                 )
             )
+        # Delta still uses the existing price-list selector until its artwork
+        # is approved. Only the four finished games lose the public button.
         return add_price_list_control(view, channel_id)
 
     if channel_id == int(quick.QUICK_ORDER_V2_CHANNELS["vip_timer"]):
@@ -154,7 +156,7 @@ def _public_view_for_channel(channel_id: int) -> discord.ui.View:
         category=category,
         source_channel_id=channel_id,
     )
-    return add_price_list_control(view, channel_id)
+    return view
 
 
 async def _clean_ensure_panel(bot: commands.Bot, channel_id: int) -> None:

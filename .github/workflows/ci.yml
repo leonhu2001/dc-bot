@@ -11,6 +11,7 @@ on:
       - release/payment-qr-tips-bonus-no-price-20261110
       - fix/profile-tip-ticket-close-ledger-and-nov-bonus-20261110
       - fix/verified-nov-bonus-accounting-alerts-20261110
+      - feat/nov10-lol-apex-steam-pricing-remove-public-price-button
   workflow_dispatch:
 
 permissions:
@@ -80,6 +81,7 @@ jobs:
           bash -n scripts/deploy_main.sh
           bash -n scripts/deploy_payment_bonus.sh
           bash -n scripts/deploy_verified_nov_bonus_accounting_20261110.sh
+          bash -n scripts/deploy_nov10_game_prices.sh
 
       - name: Validate deploy PowerShell
         shell: pwsh
@@ -103,6 +105,21 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile(
             (Resolve-Path "scripts/deploy_payment_bonus.ps1"),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
+      - name: Validate Nov 10 game-price PowerShell
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "scripts/deploy_nov10_game_prices.ps1"),
             [ref]$tokens,
             [ref]$errors
           ) | Out-Null

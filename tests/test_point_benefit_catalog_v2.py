@@ -143,11 +143,11 @@ def test_black_tide_and_steam_use_explicit_one_to_four_price_tables():
     steam = ORDER_RULES["steam_play"]
     assert get_player_count_price_table(black_entertain) == {1: 320, 2: 600, 3: 900, 4: 1200}
     assert get_player_count_price_table(black_tech) == {1: 400, 2: 760, 3: 1140, 4: 1520}
-    assert get_player_count_price_table(steam) == {1: 320, 2: 640, 3: 960, 4: 1280}
+    assert get_player_count_price_table(steam) == {1: 350, 2: 700, 3: 1050, 4: 1400}
 
     assert [calculate_price(black_entertain, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [320, 600, 900, 1200]
     assert [calculate_price(black_tech, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [400, 760, 1140, 1520]
-    assert [calculate_price(steam, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [320, 640, 960, 1280]
+    assert [calculate_price(steam, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [350, 700, 1050, 1400]
 
     for rule in (black_entertain, black_tech):
         assert rule.required_staff_count == "player_count"
@@ -171,17 +171,17 @@ def test_black_tide_legacy_fixed_seat_keys_are_removed_from_active_rules():
 
 def test_game_catalog_third_field_contains_mode_only_and_count_is_rule_bound():
     valorant = _group("valorant", "超凡陪")
-    assert [item["label"] for item in valorant["details"]] == ["NG", "RK"]
-    assert [item["quantity_unit"] for item in valorant["details"]] == ["小時", "局"]
+    assert [item["label"] for item in valorant["details"]] == ["NG", "積分（白金以下）", "積分（鑽石）", "積分（超凡）", "積分（神話）", "積分（輻能）"]
+    assert [item["quantity_unit"] for item in valorant["details"]] == ["小時", "局", "局", "局", "局", "局"]
     assert all("player_count" not in item for item in valorant["details"])
 
     lol = _group("lol", "大師陪")
-    assert [item["label"] for item in lol["details"]] == ["NG", "RK", "AR"]
-    assert [item["quantity_unit"] for item in lol["details"]] == ["小時", "局", "小時"]
+    assert [item["label"] for item in lol["details"]] == ["NG", "積分（白金以下）", "積分（翡翠）", "積分（鑽石）", "積分（大師）", "積分（宗師）", "積分（菁英）", "AR"]
+    assert [item["quantity_unit"] for item in lol["details"]] == ["小時", "局", "局", "局", "局", "局", "局", "小時"]
     assert all("player_count" not in item for item in lol["details"])
 
     apex = _group("apex", "大師陪")
-    assert [item["label"] for item in apex["details"]] == ["NG", "積分"]
+    assert [item["label"] for item in apex["details"]] == ["NG", "積分（白金以下）", "積分（鑽石）", "積分（大師）", "積分（頂獵）"]
     assert all("player_count" not in item for item in apex["details"])
 
     assert get_rule_player_count_bounds(ORDER_RULES["valorant_ascendant_ng"]) == (1, 4, 1, True)
