@@ -1248,10 +1248,10 @@ def _add_game_service_rule(
     ))
 
 
-_add_game_service_rule(category="valorant", key="valorant_entertain_ng", label="特戰英豪｜娛樂陪｜NG", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=VALORANT_GAME_ROLE, loyalty_benefits_enabled=True)
-_add_game_service_rule(category="valorant", key="valorant_entertain_ranked", label="特戰英豪｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, required_game_roles=VALORANT_GAME_ROLE, loyalty_benefits_enabled=True)
+_add_game_service_rule(category="valorant", key="valorant_entertain_ng", label="特戰英豪｜娛樂陪｜NG", pricing_type="hourly", price=350, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=VALORANT_GAME_ROLE, loyalty_benefits_enabled=True)
+_add_game_service_rule(category="valorant", key="valorant_entertain_ranked", label="特戰英豪｜娛樂陪｜積分", pricing_type="game", price=280, unit_label="局", allowed_service_roles=COMPANION_ROLES, required_game_roles=VALORANT_GAME_ROLE, loyalty_benefits_enabled=True)
 _add_game_service_rule(category="valorant", key="valorant_ascendant_ng", label="特戰英豪｜超凡陪｜NG", pricing_type="hourly", price=330, unit_label="H", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
-_add_game_service_rule(category="valorant", key="valorant_ascendant_ranked", label="特戰英豪｜超凡陪｜積分", pricing_type="game", price=290, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_ascendant_ranked", label="特戰英豪｜超凡陪｜積分", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
 _add_game_service_rule(category="valorant", key="valorant_immortal_ng", label="特戰英豪｜神話陪｜NG", pricing_type="hourly", price=350, unit_label="H", allowed_game_roles=("valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
 _add_game_service_rule(category="valorant", key="valorant_immortal_ranked", label="特戰英豪｜神話陪｜積分", pricing_type="game", price=330, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
 _add_game_service_rule(category="valorant", key="valorant_radiant_ng", label="特戰英豪｜輻能陪｜NG", pricing_type="hourly", price=380, unit_label="H", allowed_game_roles=("valorant_radiant",), required_game_roles=VALORANT_GAME_ROLE)
@@ -1265,7 +1265,41 @@ _add_game_service_rule(category="lol", key="lol_master_ranked", label="英雄聯
 _add_game_service_rule(category="lol", key="lol_grandmaster_ng", label="英雄聯盟｜宗師陪｜NG", pricing_type="hourly", price=390, unit_label="H", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
 _add_game_service_rule(category="lol", key="lol_grandmaster_ranked", label="英雄聯盟｜宗師陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
 _add_game_service_rule(category="lol", key="lol_elite_ng", label="英雄聯盟｜菁英陪｜NG", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
-_add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯盟｜菁英陪｜積分", pricing_type="game", price=450, unit_label="局", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯盟｜菁英陪｜積分", pricing_type="game", price=430, unit_label="局", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
+
+
+# 正式價目表的「每往上一階 +50T」指老闆積分的大段位，不是陪玩資格。
+# 白金以下維持各服務原價；僅積分單依所在段位加價，每人每局計費。
+# 保留舊 ranked key 代表「白金以下」，避免破壞既有訂單與券。
+_RANKED_CUSTOMER_TIERS = {
+    "valorant": (
+        ("diamond", "鑽石", 1),
+        ("ascendant", "超凡", 2),
+        ("immortal", "神話", 3),
+        ("radiant", "輻能", 4),
+    ),
+    "lol": (
+        ("emerald", "翡翠", 1),
+        ("diamond", "鑽石", 2),
+        ("master", "大師", 3),
+        ("grandmaster", "宗師", 4),
+        ("challenger", "菁英", 5),
+    ),
+}
+for _game, _tiers in _RANKED_CUSTOMER_TIERS.items():
+    for _ranked_prefix in (
+        ("valorant_entertain", "valorant_ascendant", "valorant_immortal", "valorant_radiant")
+        if _game == "valorant" else
+        ("lol_entertain", "lol_master", "lol_grandmaster", "lol_elite")
+    ):
+        _original = ORDER_RULES[f"{_ranked_prefix}_ranked"]
+        for _tier_key, _tier_label, _tier_steps in _tiers:
+            _add(replace(
+                _original,
+                key=f"{_ranked_prefix}_ranked_tier_{_tier_key}",
+                label=f"{_original.label}｜老闆{_tier_label}段位",
+                price=_original.price + 50 * _tier_steps,
+            ))
 
 
 # LoL 技術陪 ARAM：直接沿用該階級 NG 小時價。
@@ -1752,10 +1786,24 @@ SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS = COIN_WASH_AW_ORDER_RULE_KEYS
 # and games retain existing manager behavior.
 OWNER_APPROVED_20261110_GAME_PRICE_KEYS = frozenset({
     "steam_play",
+    "valorant_entertain_ng", "valorant_entertain_ranked",
+    "valorant_ascendant_ng", "valorant_ascendant_ranked",
+    "valorant_immortal_ng", "valorant_immortal_ranked",
+    "valorant_radiant_ng", "valorant_radiant_ranked",
     "lol_entertain_aram", "lol_entertain_ng", "lol_entertain_ranked",
     "lol_master_ng", "lol_master_ranked", "lol_master_aram",
     "lol_grandmaster_ng", "lol_grandmaster_ranked", "lol_grandmaster_aram",
     "lol_elite_ng", "lol_elite_ranked", "lol_elite_aram",
+    *(
+        f"{prefix}_ranked_tier_{tier}"
+        for prefix in ("valorant_entertain", "valorant_ascendant", "valorant_immortal", "valorant_radiant")
+        for tier in ("diamond", "ascendant", "immortal", "radiant")
+    ),
+    *(
+        f"{prefix}_ranked_tier_{tier}"
+        for prefix in ("lol_entertain", "lol_master", "lol_grandmaster", "lol_elite")
+        for tier in ("emerald", "diamond", "master", "grandmaster", "challenger")
+    ),
     *(
         f"{prefix}_{mode}"
         for prefix in ("apex_entertain", "apex_diamond", "apex_master", "apex_predator")
