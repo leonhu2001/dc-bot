@@ -98,3 +98,7 @@ assets/order_panels/**/*.png
 web/app/static/order_panels/*.png
 web/app/static/order_panels/pricelists/*.png
 web/app/static/order_panels/**/*.png
+
+# Private payment QR assets are provisioned to the VPS separately.
+web/app/static/images/payment/cathay_qr.jpg
+web/app/static/images/payment/jkopay_qr.jpg
