@@ -23,6 +23,8 @@ from services.order_rules import (
     ORDER_RULES,
     OWNER_APPROVED_20261110_GAME_PRICE_KEYS,
     OWNER_APPROVED_GAME_PRICE_REVISION,
+    ADMIN_MANAGED_PLAYER_COUNT_PRICE_REVISION,
+    calculate_price,
     get_base_rule,
     invalidate_rule_override_cache,
     preview_rule_override,
@@ -183,6 +185,77 @@ def test_poster_price_old_override_is_ignored_but_new_manager_publish_works(
     )
     invalidate_rule_override_cache()
     assert ORDER_RULES[key].price == default
+
+
+
+def test_black_tide_per_seat_checkout_price_edit_is_real_and_rollback_safe(
+    tmp_path, monkeypatch
+):
+    db = tmp_path / "web_dashboard.db"
+    ensure_order_rule_store(db)
+    monkeypatch.setattr(order_rule_store, "default_db_path", lambda: db)
+    monkeypatch.setattr(admin, "write_sqlite_audit_log", lambda **kwargs: None)
+    key = "basic_black_tide_entertain"
+    base = get_base_rule(key)
+    assert base.player_count_prices == {1: 320, 2: 600, 3: 900, 4: 1200}
+
+    legacy_payload = rule_to_override_payload(base)
+    legacy_payload["player_count_prices"] = {1: 1, 2: 1, 3: 1, 4: 1}
+    old = publish_rule_override(
+        rule_key=key, payload=legacy_payload,
+        actor_discord_id="1", actor_display_name="preposter", db_file=db,
+    )
+    invalidate_rule_override_cache()
+    assert ORDER_RULES[key].player_count_prices == base.player_count_prices
+
+    form_values = list(_form_from_rule(ORDER_RULES[key]).multi_items())
+    assert all(not key_name.startswith("player_count_price_") for key_name, _ in form_values)
+    # Browser submits separate per-seat inputs on this editor.
+    form_values.extend([
+        ("player_count_price_1", "320"),
+        ("player_count_price_2", "660"),
+        ("player_count_price_3", "900"),
+        ("player_count_price_4", "1200"),
+    ])
+    payload = admin._payload_from_form(key, FormData(form_values))
+    assert payload["player_count_prices"][2] == 660
+    assert preview_rule_override(key, payload).player_count_prices[2] == 660
+
+    response = asyncio.run(admin.admin_order_rule_publish(
+        SimpleNamespace(session={"user": {
+            "id": "123", "display_name": "總管", "is_manager": True,
+        }}),
+        rule_key=key, payload_json=json.dumps(payload),
+        expected_active_version=old["version"],
+    ))
+    assert response.status_code == 303
+    invalidate_rule_override_cache()
+    assert ORDER_RULES[key].player_count_prices[2] == 660
+    assert calculate_price(ORDER_RULES[key], quantity=1, player_count=2).base_amount == 660
+    applied = get_active_override(key, db_file=db)
+    assert applied["payload"]["_admin_seat_price_revision"] == (
+        ADMIN_MANAGED_PLAYER_COUNT_PRICE_REVISION
+    )
+
+    # Old versions still cannot revive stale per-seat pricing.
+    rollback_rule_override(
+        rule_key=key, target_version=old["version"],
+        actor_discord_id="123", actor_display_name="總管",
+        expected_active_version=applied["version"], db_file=db,
+    )
+    invalidate_rule_override_cache()
+    assert ORDER_RULES[key].player_count_prices == base.player_count_prices
+
+
+def test_admin_seat_price_template_discloses_real_unit_prices():
+    from pathlib import Path
+    template = (
+        Path(__file__).resolve().parents[1]
+        / "web/app/templates/admin_order_rules.html"
+    ).read_text(encoding="utf-8")
+    assert "player_count_price_{{ count }}" in template
+    assert "依陪玩人數定價" in template
+    assert "非上面的參考售價" in template
 
 
 @pytest.mark.parametrize("key,new_price", [
