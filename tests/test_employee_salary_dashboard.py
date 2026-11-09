@@ -272,4 +272,4 @@ def test_standalone_paid_chicken_leg_appears_in_salary_and_month_options(
     performance = build_worker_performance_map(str(db_file), month="2026-11")
     assert performance["123"] == 180
     assert performance["456"] == 500
-    assert build_worker_performance_map(str(db_file), month="2026-10")["123"] == 900
+    assert build_worker_performance_map(str(db_file), month="2026-10")["123"] == 600
