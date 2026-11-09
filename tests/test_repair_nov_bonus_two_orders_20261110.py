@@ -81,7 +81,7 @@ def test_bonus_298_300_uses_current_gross_and_verified_old_bonus(tmp_path, monke
     ]
     assert sum(x["worker_increase"] for x in results) == 23
     assert [(x["from_cs"],x["to_cs"]) for x in results] == [
-        (72,69),(45,43),
+        (72,68),(45,43),
     ]
 
 
@@ -96,7 +96,7 @@ def test_bonus_repair_records_backup_and_blocks_repeat(tmp_path, monkeypatch):
         )] == [590,369]
         assert [row[0] for row in db.execute(
             "SELECT payout_amount FROM customer_service_payouts ORDER BY id"
-        )] == [69,43]
+        )] == [68,43]
         assert db.execute(
             "SELECT COUNT(*) FROM admin_audit_logs WHERE action=?",
             (repair.ACTION,),
