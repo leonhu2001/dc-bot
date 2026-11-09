@@ -89,6 +89,9 @@ def _install_rules() -> None:
             specify_free_basis="quantity",
             min_protector_count=1,
             required_game_roles=game_roles,
+            note=("護航保證：機密每小時內8殺"
+                  if key.endswith("_secret") and not key.endswith("_topsecret")
+                  else "護航保證：絕密每小時內7殺"),
             catalog_group_label=GROUP_LABEL,
         )
         validate_rule_definition(key, rule)
