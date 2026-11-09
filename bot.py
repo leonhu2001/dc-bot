@@ -877,23 +877,6 @@ vip_group = app_commands.Group(name="vip", description="VIP / 會員管理")
 
 # ========= 工具函式 =========
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 configure_ticket_identity(
     recruit_applicant_role_id=RECRUIT_APPLICANT_ROLE_ID,
 )
