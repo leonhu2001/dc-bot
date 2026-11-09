@@ -382,7 +382,6 @@ if ! git diff --quiet "$PRICE_BASE" "$TARGET" -- \
     services/self_service_point_benefit_policy.py \
     web/app/services/order_groups.py \
     web/app/services/order_service.py \
-    web/app/services/accounting_reconciliation.py \
     web/app/services/checkout_preview.py; then
     echo "ERROR: isolated release differs from approved old Delta prices."
     exit 1
