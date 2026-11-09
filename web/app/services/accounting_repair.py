@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
 from shared.db import SessionLocal
@@ -508,6 +508,21 @@ def _validate_recalculate_unpaid_payouts(
     db: Session,
     order: WebOrder,
 ) -> None:
+    # Once a report is approved, payout rows contain frozen named/stream/
+    # previous-month/store-binding bonuses. Generic base recalculation must
+    # never overwrite those historical amounts (even while still unpaid).
+    if inspect(db.connection()).has_table("order_reports"):
+        approved = db.execute(
+            text("SELECT status FROM order_reports "
+                 "WHERE order_id=:order_id ORDER BY id DESC LIMIT 1"),
+            {"order_id": int(order.id)},
+        ).scalar()
+        if _normalize(approved).lower() == "approved":
+            raise ValueError(
+                "報單已核准，分潤包含歷史加成；禁止使用基礎分潤自動重算。"
+                "請按原報單、稽核記錄及備份核對修復。"
+            )
+
     status = _normalize(order.status).lower()
     if status not in {"active", "stored", "closed"}:
         raise ValueError(
