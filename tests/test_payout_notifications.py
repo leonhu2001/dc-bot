@@ -77,7 +77,9 @@ def test_salary_notification_is_compact_and_links_employee_center(tmp_path, monk
                 worker_display_name TEXT,
                 amount INTEGER,
                 payment_status TEXT,
-                payout_status TEXT
+                payout_status TEXT,
+                paid_at TEXT,
+                created_at TEXT
             );
 
             CREATE TABLE customer_service_payouts (
