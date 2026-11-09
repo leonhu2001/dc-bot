@@ -171,13 +171,13 @@ def test_black_tide_legacy_fixed_seat_keys_are_removed_from_active_rules():
 
 def test_game_catalog_third_field_contains_mode_only_and_count_is_rule_bound():
     valorant = _group("valorant", "超凡陪")
-    assert [item["label"] for item in valorant["details"]] == ["NG", "RK"]
-    assert [item["quantity_unit"] for item in valorant["details"]] == ["小時", "局"]
+    assert [item["label"] for item in valorant["details"]] == ["NG", "積分（白金以下）", "積分（鑽石）", "積分（超凡）", "積分（神話）", "積分（輻能）"]
+    assert [item["quantity_unit"] for item in valorant["details"]] == ["小時", "局", "局", "局", "局", "局"]
     assert all("player_count" not in item for item in valorant["details"])
 
     lol = _group("lol", "大師陪")
-    assert [item["label"] for item in lol["details"]] == ["NG", "RK", "AR"]
-    assert [item["quantity_unit"] for item in lol["details"]] == ["小時", "局", "小時"]
+    assert [item["label"] for item in lol["details"]] == ["NG", "積分（白金以下）", "積分（翡翠）", "積分（鑽石）", "積分（大師）", "積分（宗師）", "積分（菁英）", "AR"]
+    assert [item["quantity_unit"] for item in lol["details"]] == ["小時", "局", "局", "局", "局", "局", "局", "小時"]
     assert all("player_count" not in item for item in lol["details"])
 
     apex = _group("apex", "大師陪")
