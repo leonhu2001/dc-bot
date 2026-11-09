@@ -195,7 +195,7 @@ async def create_staff_profile_tip_ticket(
         interaction=interaction,
         category_id=customer_category_id,
         channel_name=f"雞腿-{member.id}",
-        allowed_roles=[customer_role],
+        allowed_roles=[customer_role, staff_member],
         intro_message=(
             f"🍗 **名片加雞腿**\n"
             f"老闆：{member.mention}\n"
@@ -205,7 +205,6 @@ async def create_staff_profile_tip_ticket(
             "街口／銀行轉帳須附付款截圖，客服確認後入帳。"
         ),
         view=WorkerTipProfileTicketView(),
-        allowed_members=[staff_member],
         topic=(
             f"profile_tip_customer_id={member.id};"
             f"profile_tip_staff_id={staff_id_text}"
