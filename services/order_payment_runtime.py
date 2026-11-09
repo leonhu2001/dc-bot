@@ -432,16 +432,25 @@ async def finalize_accepted_pending_payment(
         if isinstance(payment_channel, discord.TextChannel) and payment_message_id is not None:
             try:
                 payment_message = await payment_channel.fetch_message(payment_message_id)
-                await payment_message.edit(
-                    embed=submitted_embed,
-                    view=PaymentMethodView(
-                        customer_id=customer_id,
-                        channel_id=channel_id,
-                        submitted=True,
-                        selected_method=str(payment_method),
-                    ),
-                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-                )
+                from services.payment_qr import attach_payment_qr
+                qr_file = attach_payment_qr(submitted_embed, str(payment_method))
+                try:
+                    await payment_message.edit(
+                        embed=submitted_embed,
+                        view=PaymentMethodView(
+                            customer_id=customer_id,
+                            channel_id=channel_id,
+                            submitted=True,
+                            selected_method=str(payment_method),
+                        ),
+                        attachments=[qr_file] if qr_file is not None else [],
+                        allowed_mentions=discord.AllowedMentions(
+                            users=True, roles=False, everyone=False,
+                        ),
+                    )
+                finally:
+                    if qr_file is not None:
+                        qr_file.close()
             except discord.HTTPException:
                 pass
 

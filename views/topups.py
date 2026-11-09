@@ -103,10 +103,25 @@ class TopupPaymentMethodView(discord.ui.View):
             )
             return
 
-        await interaction.response.edit_message(
-            embed=_build_topup_embed(order),
-            view=TopupOrderView(int(order["id"]), payment_method),
-        )
+        from services.payment_qr import attach_payment_qr, payment_qr_missing
+
+        embed = _build_topup_embed(order)
+        qr_file = attach_payment_qr(embed, payment_method)
+        if payment_qr_missing(payment_method):
+            embed.add_field(
+                name="QR Code 未載入",
+                value="付款帳號文字仍可使用，請客服確認付款圖檔。",
+                inline=False,
+            )
+        try:
+            await interaction.response.edit_message(
+                embed=embed,
+                view=TopupOrderView(int(order["id"]), payment_method),
+                attachments=[qr_file] if qr_file is not None else [],
+            )
+        finally:
+            if qr_file is not None:
+                qr_file.close()
 
     @discord.ui.select(
         placeholder="選擇付款方式",

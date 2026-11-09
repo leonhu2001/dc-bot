@@ -171,6 +171,7 @@ async def ensure_acceptance_payment_panel(
         selected_method=selected_method,
     )
 
+    from services.payment_qr import attach_payment_qr
     content = f"<@{customer_id}> 接單人數已滿，請選擇付款方式。"
     payment_message: discord.Message | None = None
     action = "sent"
@@ -187,16 +188,20 @@ async def ensure_acceptance_payment_panel(
                 existing_message = await existing_channel.fetch_message(
                     existing_message_id
                 )
-                await existing_message.edit(
-                    content=content,
-                    embed=payment_embed,
-                    view=payment_view,
-                    allowed_mentions=discord.AllowedMentions(
-                        users=True,
-                        roles=False,
-                        everyone=False,
-                    ),
-                )
+                qr_file = attach_payment_qr(payment_embed, selected_method)
+                try:
+                    await existing_message.edit(
+                        content=content,
+                        embed=payment_embed,
+                        view=payment_view,
+                        attachments=[qr_file] if qr_file is not None else [],
+                        allowed_mentions=discord.AllowedMentions(
+                            users=True, roles=False, everyone=False,
+                        ),
+                    )
+                finally:
+                    if qr_file is not None:
+                        qr_file.close()
                 payment_message = existing_message
                 action = "restored"
             except (
@@ -207,16 +212,20 @@ async def ensure_acceptance_payment_panel(
                 payment_message = None
 
     if payment_message is None:
-        payment_message = await ticket_channel.send(
-            content=content,
-            embed=payment_embed,
-            view=payment_view,
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False,
-            ),
-        )
+        qr_file = attach_payment_qr(payment_embed, selected_method)
+        try:
+            payment_message = await ticket_channel.send(
+                content=content,
+                embed=payment_embed,
+                view=payment_view,
+                file=qr_file,
+                allowed_mentions=discord.AllowedMentions(
+                    users=True, roles=False, everyone=False,
+                ),
+            )
+        finally:
+            if qr_file is not None:
+                qr_file.close()
         action = "sent"
 
     data["payment_channel_id"] = int(payment_message.channel.id)

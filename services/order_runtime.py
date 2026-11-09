@@ -947,7 +947,23 @@ class PaymentMethodSelect(discord.ui.Select):
                     inline=False,
                 )
 
-            await interaction.response.edit_message(embed=payment_embed, view=self.view)
+            from services.payment_qr import attach_payment_qr, payment_qr_missing
+            qr_file = attach_payment_qr(payment_embed, selected_method)
+            if payment_qr_missing(selected_method):
+                payment_embed.add_field(
+                    name="QR Code 未載入",
+                    value="付款帳號文字仍可使用，請客服檢查付款 QR 圖檔。",
+                    inline=False,
+                )
+            try:
+                await interaction.response.edit_message(
+                    embed=payment_embed,
+                    view=self.view,
+                    attachments=[qr_file] if qr_file is not None else [],
+                )
+            finally:
+                if qr_file is not None:
+                    qr_file.close()
         else:
             await interaction.response.defer()
 

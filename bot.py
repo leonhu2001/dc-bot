@@ -15,6 +15,7 @@ import io
 import asyncio
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from functools import partial
 
 from core.time_utils import (
     get_taipei_now,
@@ -406,6 +407,11 @@ from views.staff_profiles import (
     StaffProfilePanelView,
     refresh_staff_profile_panels_for_order,
     configure_staff_profile_order_ticket_creator,
+    configure_staff_profile_tip_ticket_creator,
+)
+from views.staff_profile_tip_ticket import (
+    WorkerTipProfileStartView,
+    create_staff_profile_tip_ticket as _create_profile_tip_ticket,
 )
 
 from views.support import (
@@ -871,23 +877,6 @@ vip_group = app_commands.Group(name="vip", description="VIP / 會員管理")
 
 # ========= 工具函式 =========
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 configure_ticket_identity(
     recruit_applicant_role_id=RECRUIT_APPLICANT_ROLE_ID,
 )
@@ -910,11 +899,6 @@ configure_web_support_bridge(
     channel_id=WEB_SUPPORT_CHANNEL_ID,
     customer_service_role_id=CUSTOMER_ROLE_ID,
 )
-
-
-
-
-
 
 async def create_private_channel(
     interaction: discord.Interaction,
@@ -1213,13 +1197,6 @@ BACKUP_DIR = Path(__file__).parent / "backups"
 CLOSED_ORDER_KEEP_DAYS = 0  # 已結單資料永久保留，不再自動刪除
 CANCELLED_ORDER_KEEP_DAYS = 60  # 只清理超過 60 天的取消單暫存
 
-
-
-
-
-
-
-
 async def daily_backup_loop():
     await bot.wait_until_ready()
     while not bot.is_closed():
@@ -1438,15 +1415,6 @@ def cleanup_old_closed_orders() -> None:
 # 4. 降階後把 vip_progress_base_total_spent 設為當下累積消費，下一級進度從降階後重新開始。
 
 VIP_DOWNGRADE_FIRST_CHECK_MONTH = "2026-06"  # 第一次檢查 2026/05 消費；不檢查 2026/04。
-
-
-
-
-
-
-
-
-
 
 configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS, data_file=DATA_FILE)
 configure_lottery_storage(DB_FILE, init_database)
@@ -1955,6 +1923,16 @@ configure_staff_profile_order_ticket_creator(
 )
 
 
+configure_staff_profile_tip_ticket_creator(
+    partial(
+        _create_profile_tip_ticket,
+        create_private_channel=create_private_channel,
+        customer_role_id=CUSTOMER_ROLE_ID,
+        customer_category_id=CUSTOMER_CATEGORY_ID,
+    )
+)
+
+
 # ========= 主面板 / 下單入口 View 設定 =========
 
 configure_panel_views(
@@ -2378,11 +2356,6 @@ async def vip_create_voice(interaction: discord.Interaction, user_id: str):
         "Panel 已建立並綁定，房主不需要先進入建立入口。",
         ephemeral=True,
     )
-
-
-
-
-
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -2859,6 +2832,10 @@ async def on_ready():
     ):
         bot._welcome_history_refresh_running = True
         bot.loop.create_task(_refresh_welcome_history_background())
+
+    if not getattr(bot, "_worker_tip_profile_start_registered", False):
+        bot.add_view(WorkerTipProfileStartView())
+        bot._worker_tip_profile_start_registered = True
 
     if not getattr(bot, "_worker_tip_confirm_views_registered", False):
         restored_worker_tip_views = 0

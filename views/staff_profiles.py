@@ -11,6 +11,42 @@ import discord
 # 真正建立票口的邏輯由 bot.py 注入，
 # 避免 views.staff_profiles 直接 import bot.py 造成 circular import。
 _STAFF_PROFILE_ORDER_TICKET_CREATOR = None
+_STAFF_PROFILE_TIP_TICKET_CREATOR = None
+
+
+def configure_staff_profile_tip_ticket_creator(creator) -> None:
+    global _STAFF_PROFILE_TIP_TICKET_CREATOR
+    _STAFF_PROFILE_TIP_TICKET_CREATOR = creator
+
+
+async def _open_staff_profile_tip_ticket(
+    interaction: discord.Interaction, staff_id: int | str,
+) -> None:
+    creator = _STAFF_PROFILE_TIP_TICKET_CREATOR
+    if creator is None:
+        await interaction.response.send_message(
+            "名片加雞腿功能尚未初始化，請通知客服。", ephemeral=True,
+        )
+        return
+    try:
+        await creator(interaction=interaction, staff_id=str(staff_id))
+    except ValueError as exc:
+        message = str(exc)
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+    except Exception as exc:
+        print(
+            f"[profile-tip] open failed staff_id={staff_id}: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        message = "建立私密雞腿票口失敗，請稍後再試或通知客服。"
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+
 
 
 def configure_staff_profile_order_ticket_creator(creator) -> None:
@@ -1305,6 +1341,18 @@ class StaffProfilePanelView(discord.ui.View):
         reviews_button.callback = self.reviews_callback
         self.add_item(reviews_button)
 
+        tip_button = discord.ui.Button(
+            label="🍗 加雞腿",
+            style=discord.ButtonStyle.success,
+            custom_id=f"staff_profile_tip:{self.staff_id}",
+            row=1,
+        )
+        tip_button.callback = self.tip_callback
+        self.add_item(tip_button)
+
+    async def tip_callback(self, interaction: discord.Interaction):
+        await _open_staff_profile_tip_ticket(interaction, self.staff_id)
+
     async def favorite_callback(self, interaction: discord.Interaction):
         profile = get_staff_profile(self.staff_id)
 
@@ -1627,6 +1675,15 @@ class CustomerFavoriteActionsView(discord.ui.View):
         order_button.callback = self.order_request_callback
         self.add_item(order_button)
 
+        tip_button = discord.ui.Button(
+            label="🍗 加雞腿",
+            style=discord.ButtonStyle.success,
+            custom_id=f"favorite_profile_tip:{self.staff_id}",
+            row=1,
+        )
+        tip_button.callback = self.tip_callback
+        self.add_item(tip_button)
+
         remove_button = discord.ui.Button(
             label="取消收藏",
             style=discord.ButtonStyle.danger,
@@ -1650,6 +1707,11 @@ class CustomerFavoriteActionsView(discord.ui.View):
             await interaction.response.send_message("這不是你的收藏操作。", ephemeral=True)
             return False
         return True
+
+    async def tip_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+        await _open_staff_profile_tip_ticket(interaction, self.staff_id)
 
     async def summary_callback(self, interaction: discord.Interaction):
         if not await self._check_owner(interaction):
@@ -2171,6 +2233,15 @@ class PublicStaffProfileActionsView(discord.ui.View):
         order_button.callback = self.order_request_callback
         self.add_item(order_button)
 
+        tip_button = discord.ui.Button(
+            label="🍗 加雞腿",
+            style=discord.ButtonStyle.success,
+            custom_id=f"public_profile_tip:{self.staff_id}",
+            row=1,
+        )
+        tip_button.callback = self.tip_callback
+        self.add_item(tip_button)
+
         back_button = discord.ui.Button(
             label="返回瀏覽",
             style=discord.ButtonStyle.secondary,
@@ -2185,6 +2256,11 @@ class PublicStaffProfileActionsView(discord.ui.View):
             await interaction.response.send_message("這不是你的瀏覽操作。", ephemeral=True)
             return False
         return True
+
+    async def tip_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+        await _open_staff_profile_tip_ticket(interaction, self.staff_id)
 
     async def summary_callback(self, interaction: discord.Interaction):
         if not await self._check_owner(interaction):
