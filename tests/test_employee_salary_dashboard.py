@@ -39,7 +39,11 @@ def _create_salary_db(path):
                 worker_display_name TEXT,
                 amount INTEGER,
                 payment_status TEXT,
-                payout_status TEXT
+                payout_status TEXT,
+                customer_discord_id TEXT,
+                customer_display_name TEXT,
+                paid_at TEXT,
+                created_at TEXT
             );
 
             CREATE TABLE customer_service_payouts (
@@ -228,3 +232,94 @@ def test_employee_salary_pending_report_is_locked(tmp_path, monkeypatch):
     assert service_item["status_label"] == "報單待審核"
     assert ledger["summary"]["pending"] == 50
     assert ledger["summary"]["locked"] == 300
+
+def test_standalone_paid_chicken_leg_appears_in_salary_and_month_options(
+    tmp_path, monkeypatch
+):
+    from web.app.services.worker_performance import build_worker_performance_map
+
+    db_file = tmp_path / "salary.db"
+    _create_salary_db(db_file)
+    with sqlite3.connect(db_file) as conn:
+        conn.executemany(
+            """
+            INSERT INTO worker_tips (
+                id, order_id, worker_discord_id, worker_display_name,
+                customer_discord_id, customer_display_name, amount,
+                payment_status, payout_status, paid_at, created_at
+            ) VALUES (?, NULL, ?, '測試陪玩', '999', '名片老闆',
+                      ?, ?, 'unpaid', ?, '2026-11-09 12:00:00')
+            """,
+            [
+                (11, "123", 180, "paid", "2026-11-09 12:10:00"),
+                (12, "123", 999, "pending_review", None),
+                (13, "456", 500, "paid", "2026-11-09 12:10:00"),
+            ],
+        )
+    monkeypatch.setattr(payouts, "my_payout_db_path", lambda: str(db_file))
+    monkeypatch.setattr(payouts, "_taipei_current_month", lambda: "2026-11")
+    ledger = payouts.build_employee_salary_ledger("123")
+    tips = [item for item in ledger["items"] if item["category_key"] == "tip"]
+    assert len(tips) == 3  # 2 attached to completed orders, 1 independent
+    standalone = next(item for item in tips if item["order_no"] == "TIP-11")
+    assert standalone["amount"] == 180
+    assert standalone["customer_name"] == "名片老闆"
+    assert standalone["status_label"] == "待發放"
+    assert ledger["categories"]["tip"]["total"] == 330
+    assert ledger["summary"]["pending"] == 230
+    assert any(o["value"] == "2026-11" for o in payouts.get_my_payout_month_options())
+
+    performance = build_worker_performance_map(str(db_file), month="2026-11")
+    assert performance["123"] == 180
+    assert performance["456"] == 500
+    assert build_worker_performance_map(str(db_file), month="2026-10")["123"] == 600
+
+
+def test_standalone_tip_is_disbursable_from_admin_salary_summary(tmp_path, monkeypatch):
+    from web.app.routers import admin_payout_summary as admin
+
+    db_file = tmp_path / "salary.db"
+    _create_salary_db(db_file)
+    with sqlite3.connect(db_file) as conn:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS web_staff_members(
+                discord_id TEXT PRIMARY KEY,
+                is_customer_service INTEGER DEFAULT 0,
+                is_worker INTEGER DEFAULT 0,
+                is_companion INTEGER DEFAULT 0
+            )"""
+        )
+        conn.execute(
+            """
+            INSERT INTO worker_tips(
+                id, order_id, worker_discord_id, worker_display_name,
+                customer_discord_id, customer_display_name, amount,
+                payment_status, payout_status, paid_at, created_at
+            ) VALUES (
+                11, NULL, '123', '測試陪玩',
+                '999', '名片老闆', 180, 'paid', 'unpaid',
+                '2026-11-09 12:10:00', '2026-11-09 12:00:00'
+            )
+            """
+        )
+    monkeypatch.setattr(admin, "db_path", lambda: str(db_file))
+    people, totals = admin.fetch_rows("2026-11", "worker", "", "unpaid")
+    worker = next(person for person in people if person["discord_id"] == "123")
+    assert worker["unpaid_total"] == 180
+    assert totals["unpaid_total"] == 180
+    assert any(x["value"] == "2026-11" for x in admin.get_summary_month_options())
+
+    admin.update_summary_person_payout_status(
+        "2026-11", "worker", "123", "paid"
+    )
+    with sqlite3.connect(db_file) as conn:
+        assert conn.execute(
+            "SELECT payout_status FROM worker_tips WHERE id=11"
+        ).fetchone()[0] == "paid"
+    monkeypatch.setattr(payouts, "my_payout_db_path", lambda: str(db_file))
+    unpaid, paid, totals = payouts.build_my_payout_rows("123", month="2026-11")
+    assert totals["paid_total"] == 180
+    assert any(
+        item["order_no"] == "TIP-11"
+        for person in paid for item in person["items"]
+    )

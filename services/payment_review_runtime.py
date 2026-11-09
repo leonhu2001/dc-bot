@@ -462,6 +462,11 @@ async def _apply_tip_approval(bot: discord.Client, row: dict) -> None:
     )
 
     await _notify_worker_tip_paid(bot, channel, tip_row)
+    from views.staff_profile_tip_ticket import (
+        profile_tip_ids, send_profile_tip_completion,
+    )
+    if profile_tip_ids(channel) is not None:
+        await send_profile_tip_completion(channel, tip_row)
 
     target = _target_bot_module()
     if target is not None and hasattr(target, "send_order_log"):
@@ -482,10 +487,11 @@ async def _apply_tip_approval(bot: discord.Client, row: dict) -> None:
         except Exception:
             pass
 
-    await refresh_post_close_panel(
-        channel,
-        str(tip_row["customer_discord_id"] or ""),
-    )
+    from views.staff_profile_tip_ticket import profile_tip_ids
+    if profile_tip_ids(channel) is None:
+        await refresh_post_close_panel(
+            channel, str(tip_row["customer_discord_id"] or ""),
+        )
     mark_payment_review_applied(int(row["id"]))
 
 
@@ -517,10 +523,11 @@ async def _apply_tip_rejection(bot: discord.Client, row: dict) -> None:
         ),
     )
 
-    await refresh_post_close_panel(
-        channel,
-        str(tip_row["customer_discord_id"] or ""),
-    )
+    from views.staff_profile_tip_ticket import profile_tip_ids
+    if profile_tip_ids(channel) is None:
+        await refresh_post_close_panel(
+            channel, str(tip_row["customer_discord_id"] or ""),
+        )
     mark_payment_review_rejection_applied(int(row["id"]))
 
 

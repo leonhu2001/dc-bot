@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from web.app.services.discord_service import send_direct_message
+from web.app.services.tip_payout_sql import TIP_ELIGIBLE_SQL, tip_month_filter
 
 
 _WORKER_ROLES = {"worker", "護航 / 陪玩", "worker_payout", "護航 / 陪玩分潤"}
@@ -118,21 +119,22 @@ def _fetch_details(*, db_file: str | Path, person_id: str, month: str, role: str
                 data["worker_total"] += int(row["amount"] or 0)
                 data["worker_count"] += 1
 
+            tip_month_sql, tip_month_params = tip_month_filter(month)
             rows = conn.execute(
                 f"""
                 SELECT COALESCE(NULLIF(p.worker_display_name, ''), p.worker_discord_id) AS display_name,
                        COALESCE(p.amount, 0) AS amount
                 FROM worker_tips p
-                JOIN web_orders w ON w.id = p.order_id
-                WHERE w.status = 'closed'
+                LEFT JOIN web_orders w ON w.id = p.order_id
+                WHERE {TIP_ELIGIBLE_SQL}
                   AND p.payment_status = 'paid'
                   AND CAST(p.worker_discord_id AS TEXT) = ?
                   AND p.payout_status = 'paid'
                   AND COALESCE(p.amount, 0) > 0
-                  {month_sql}
+                  {tip_month_sql}
                 ORDER BY p.id ASC
                 """,
-                [person_id, *month_params],
+                [person_id, *tip_month_params],
             ).fetchall()
             for row in rows:
                 if data["display_name"] == person_id:

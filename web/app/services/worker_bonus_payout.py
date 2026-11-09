@@ -96,13 +96,17 @@ def previous_month_performance(db, worker_discord_id: str, *, now: datetime | No
                 """
                 SELECT COALESCE(SUM(t.amount), 0)
                 FROM worker_tips t
-                JOIN web_orders w ON w.id = t.order_id
+                LEFT JOIN web_orders w ON w.id = t.order_id
                 WHERE CAST(t.worker_discord_id AS TEXT) = :worker_id
-                  AND w.status = 'closed'
+                  AND (t.order_id IS NULL OR w.status = 'closed')
                   AND t.payment_status = 'paid'
                   AND COALESCE(t.amount, 0) > 0
-                  AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) >= :start_at
-                  AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) < :end_at
+                  AND datetime(CASE WHEN t.order_id IS NULL
+                   THEN COALESCE(NULLIF(t.paid_at,''),NULLIF(t.created_at,''))
+                   ELSE COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) END) >= datetime(:start_at)
+                  AND datetime(CASE WHEN t.order_id IS NULL
+                   THEN COALESCE(NULLIF(t.paid_at,''),NULLIF(t.created_at,''))
+                   ELSE COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) END) < datetime(:end_at)
                 """
             ),
             {

@@ -5,6 +5,11 @@ import io
 import sqlite3
 from pathlib import Path
 
+from web.app.services.tip_payout_sql import (
+    TIP_CATEGORY_SQL, TIP_CUSTOMER_SQL, TIP_DATE_SQL,
+    TIP_ELIGIBLE_SQL, TIP_ITEM_SQL, TIP_ORDER_NO_SQL, tip_month_filter,
+)
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -369,6 +374,7 @@ def fetch_rows(
                     item=row["item"],
                 )
 
+            tip_month_sql, tip_params = tip_month_filter(month)
             tip_rows = conn.execute(
                 f"""
                 SELECT
@@ -376,22 +382,22 @@ def fetch_rows(
                     p.worker_display_name AS display_name,
                     p.amount AS amount,
                     p.payout_status AS payout_status,
-                    w.bot_order_no,
+                    {TIP_ORDER_NO_SQL} AS bot_order_no,
                     w.id AS web_order_id,
-                    w.category,
-                    w.item,
-                    COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
-                    {payout_order_date_expr('w')} AS closed_at
+                    {TIP_CATEGORY_SQL} AS category,
+                    {TIP_ITEM_SQL} AS item,
+                    {TIP_CUSTOMER_SQL} AS customer_name,
+                    {TIP_DATE_SQL} AS closed_at
                 FROM worker_tips p
-                JOIN web_orders w ON w.id = p.order_id
-                WHERE w.status = 'closed'
+                LEFT JOIN web_orders w ON w.id = p.order_id
+                WHERE {TIP_ELIGIBLE_SQL}
                   AND p.payment_status = 'paid'
                   AND COALESCE(p.amount, 0) > 0
                   {payout_status_sql}
-                  {month_sql}
+                  {tip_month_sql}
                 ORDER BY p.id DESC
                 """,
-                [*payout_status_params, *params],
+                [*payout_status_params, *tip_params],
             ).fetchall()
             for row in tip_rows:
                 add_person(
@@ -599,6 +605,10 @@ def get_summary_month_options() -> list[dict]:
                 UNION ALL
                 SELECT substr(effective_at, 1, 7) AS month_value
                 FROM employee_payroll_adjustments
+                UNION ALL
+                SELECT substr(COALESCE(NULLIF(p.paid_at,''), NULLIF(p.created_at,'')),1,7)
+                FROM worker_tips p
+                WHERE p.order_id IS NULL AND p.payment_status='paid'
             )
             WHERE month_value GLOB '????-??'
             ORDER BY month_value DESC
@@ -683,11 +693,19 @@ def update_summary_payout_status(
                     payout_paid_at = {paid_at_sql},
                     updated_at = datetime('now', '+8 hours')
                 WHERE payment_status = 'paid'
-                  AND order_id IN (
-                    SELECT w.id FROM web_orders w WHERE {order_filter}
+                  AND (
+                    order_id IN (
+                      SELECT w.id FROM web_orders w WHERE {order_filter}
+                    )
+                    OR (
+                      order_id IS NULL
+                      AND ( ? = '' OR substr(
+                        COALESCE(NULLIF(paid_at,''),NULLIF(created_at,'')),1,7
+                      ) = ? )
+                    )
                   )
                 """,
-                [target_status, *params],
+                [target_status, *params, month or "", month or ""],
             )
 
         if role in {"all", "", "customer_service", "客服"}:
@@ -783,11 +801,19 @@ def update_summary_person_payout_status(
                     updated_at = datetime('now', '+8 hours')
                 WHERE payment_status = 'paid'
                   AND worker_discord_id = ?
-                  AND order_id IN (
-                    SELECT w.id FROM web_orders w WHERE {order_filter}
+                  AND (
+                    order_id IN (
+                      SELECT w.id FROM web_orders w WHERE {order_filter}
+                    )
+                    OR (
+                      order_id IS NULL
+                      AND ( ? = '' OR substr(
+                        COALESCE(NULLIF(paid_at,''),NULLIF(created_at,'')),1,7
+                      ) = ? )
+                    )
                   )
                 """,
-                params_worker,
+                [*params_worker, month or "", month or ""],
             )
 
         if update_customer_service:

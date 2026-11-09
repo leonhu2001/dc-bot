@@ -5,6 +5,11 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from web.app.services.tip_payout_sql import (
+    TIP_CATEGORY_SQL, TIP_CUSTOMER_SQL, TIP_DATE_SQL,
+    TIP_ELIGIBLE_SQL, TIP_ITEM_SQL, TIP_ORDER_NO_SQL, tip_month_filter,
+)
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -116,6 +121,10 @@ def get_my_payout_month_options() -> list[dict]:
                 UNION ALL
                 SELECT substr(effective_at, 1, 7) AS month_value
                 FROM employee_payroll_adjustments
+                UNION ALL
+                SELECT substr(COALESCE(NULLIF(p.paid_at, ''), NULLIF(p.created_at, '')),1,7)
+                FROM worker_tips p
+                WHERE p.order_id IS NULL AND p.payment_status='paid'
             )
             WHERE month_value GLOB '????-??'
             ORDER BY month_value DESC
@@ -329,6 +338,7 @@ def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all
                 amount=row["amount"],
             )
 
+        tip_month_sql, tip_month_params = tip_month_filter(month)
         tip_rows = conn.execute(
             f"""
             SELECT
@@ -336,22 +346,22 @@ def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all
                 COALESCE(NULLIF(p.worker_display_name, ''), p.worker_discord_id) AS display_name,
                 p.amount AS amount,
                 p.payout_status AS payout_status,
-                COALESCE(w.bot_order_no, 'WEB-' || w.id) AS order_no,
-                w.category,
-                w.item,
-                COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
-                {my_payout_order_date_expr('w')} AS closed_at
+                {TIP_ORDER_NO_SQL} AS order_no,
+                {TIP_CATEGORY_SQL} AS category,
+                {TIP_ITEM_SQL} AS item,
+                {TIP_CUSTOMER_SQL} AS customer_name,
+                {TIP_DATE_SQL} AS closed_at
             FROM worker_tips p
-            JOIN web_orders w ON w.id = p.order_id
-            WHERE w.status = 'closed'
+            LEFT JOIN web_orders w ON w.id = p.order_id
+            WHERE {TIP_ELIGIBLE_SQL}
               AND p.payment_status = 'paid'
               AND CAST(p.worker_discord_id AS TEXT) = ?
               AND COALESCE(p.amount, 0) > 0
               {payout_status_sql}
-              {month_sql}
+              {tip_month_sql}
             ORDER BY closed_at DESC, p.id DESC
             """,
-            [discord_id, *payout_status_params, *month_params],
+            [discord_id, *payout_status_params, *tip_month_params],
         ).fetchall()
 
         for row in tip_rows:
