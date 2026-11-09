@@ -46,17 +46,17 @@ def test_lol_grandmaster_ng_dynamic_points_round_per_seat_before_multiplying() -
     small = _benefit("tech_triple_service_small")
     large = _benefit("tech_triple_service_large")
 
-    assert calculate_service_bonus_point_cost(rule=rule, benefit=small, player_count=3) == 270
-    assert calculate_service_bonus_point_cost(rule=rule, benefit=large, player_count=3) == 510
+    assert calculate_service_bonus_point_cost(rule=rule, benefit=small, player_count=3) == 300
+    assert calculate_service_bonus_point_cost(rule=rule, benefit=large, player_count=3) == 540
 
     single_small = _benefit("tech_single_service_small")
     single_large = _benefit("tech_single_service_large")
-    assert calculate_service_bonus_point_cost(rule=rule, benefit=single_small, player_count=1) == 90
-    assert calculate_service_bonus_point_cost(rule=rule, benefit=single_large, player_count=1) == 170
+    assert calculate_service_bonus_point_cost(rule=rule, benefit=single_small, player_count=1) == 100
+    assert calculate_service_bonus_point_cost(rule=rule, benefit=single_large, player_count=1) == 180
 
-    # Important: 360 / 2 * 0.9 = 162 -> 170 per person, THEN x3 = 510.
+    # Important: 390 / 2 * 0.9 = 175.5 -> 180 per person, THEN x3 = 540.
     # Rounding only after multiplying all seats would incorrectly produce 490.
-    assert calculate_service_bonus_point_cost(rule=rule, benefit=large, player_count=3) != 490
+    assert calculate_service_bonus_point_cost(rule=rule, benefit=large, player_count=3) != 530
 
 
 def test_lol_elite_ranked_dynamic_points_match_confirmed_examples() -> None:
@@ -66,22 +66,22 @@ def test_lol_elite_ranked_dynamic_points_match_confirmed_examples() -> None:
         rule=rule,
         benefit=_benefit("tech_single_service_small"),
         player_count=1,
-    ) == 200
+    ) == 230
     assert calculate_service_bonus_point_cost(
         rule=rule,
         benefit=_benefit("tech_single_service_large"),
         player_count=1,
-    ) == 360
+    ) == 410
     assert calculate_service_bonus_point_cost(
         rule=rule,
         benefit=_benefit("tech_double_service_small"),
         player_count=2,
-    ) == 400
+    ) == 460
     assert calculate_service_bonus_point_cost(
         rule=rule,
         benefit=_benefit("tech_double_service_large"),
         player_count=2,
-    ) == 720
+    ) == 820
 
 
 def test_dynamic_catalog_is_enabled_for_lol_valorant_and_apex() -> None:
@@ -150,11 +150,11 @@ def test_discord_financial_runtime_funds_three_seats_once_not_twice() -> None:
         },
     )
 
-    # Purchased service is 360 x 3 = 1080. +1H adds the same 1080 salary value
-    # across the three workers. It must not stay at one-seat 360 or double-multiply
-    # to 3240 through stacked runtime wrappers.
-    assert result["point_service_value"] == 1080
-    assert result["store_absorbed_amount"] == 1080
+    # Purchased service is 390 x 3 = 1170. +1H adds the same 1170 salary value
+    # across the three workers. It must not stay at one-seat 390 or double-multiply
+    # to 3510 through stacked runtime wrappers.
+    assert result["point_service_value"] == 1170
+    assert result["store_absorbed_amount"] == 1170
     assert "3 位陪玩同步加贈" in result["service_bonus_text"]
 
 
@@ -185,13 +185,13 @@ def test_discord_payment_recomputes_dynamic_cost_and_ignores_stored_snapshot(mon
     info = redemption._get_pending_order_point_benefit_info(data)
 
     assert info is not None
-    assert info["cost"] == 510
-    assert data["point_benefit_cost"] == 510
+    assert info["cost"] == 540
+    assert data["point_benefit_cost"] == 540
 
     data["point_benefit_cost"] = 99999
     info = redemption._get_pending_order_point_benefit_info(data)
     assert info is not None
-    assert info["cost"] == 510
+    assert info["cost"] == 540
 
 
 def test_discord_payment_rejects_dynamic_service_reward_for_wrong_seat_count(monkeypatch) -> None:
