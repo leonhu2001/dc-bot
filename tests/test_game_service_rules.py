@@ -206,7 +206,7 @@ def test_same_order_buy_get_is_disabled_and_loyalty_is_entertainment_only():
     ).service_quantity == 8
 
     lol = ORDER_RULES["lol_entertain_aram"]
-    assert lol.price == 300
+    assert lol.price == 350
     assert lol.unit_label == "H"
     assert lol.loyalty_benefits_enabled is True
     assert calculate_price(lol, quantity=8, player_count=1).service_quantity == 8
