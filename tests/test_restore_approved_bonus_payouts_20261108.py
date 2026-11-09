@@ -54,12 +54,24 @@ def _prepare(tmp_path):
             "0.05,10,'base')"
         )
         before = {
-            "worker_payouts": [{"id": 8, "final_payout": 164}],
-            "customer_service_payouts": [{"id": 3, "payout_amount": 8}],
+            "worker_payouts": [{
+                "id": 8, "worker_discord_id": "staff-a",
+                "final_payout": 164, "payout_status": "unpaid", "paid_at": None,
+            }],
+            "customer_service_payouts": [{
+                "id": 3, "customer_service_discord_id": "cs",
+                "payout_amount": 8, "payout_status": "unpaid", "paid_at": None,
+            }],
         }
         after = {
-            "worker_payouts": [{"id": 8, "final_payout": 160}],
-            "customer_service_payouts": [{"id": 3, "payout_amount": 10}],
+            "worker_payouts": [{
+                "id": 8, "worker_discord_id": "staff-a",
+                "final_payout": 160, "payout_status": "unpaid", "paid_at": None,
+            }],
+            "customer_service_payouts": [{
+                "id": 3, "customer_service_discord_id": "cs",
+                "payout_amount": 10, "payout_status": "unpaid", "paid_at": None,
+            }],
         }
         db.execute(
             "INSERT INTO admin_audit_logs VALUES (1, 'owner', "
