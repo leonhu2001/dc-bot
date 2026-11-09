@@ -406,12 +406,15 @@ def _payload_from_form_base(payload: dict, form) -> dict:
             for item in form.getlist(field_name)
             if str(item).strip() and str(item).strip() in visible_keys
         ]
-        hidden = [
-            str(item)
-            for item in (payload.get(field_name) or [])
-            if str(item) not in visible_keys
-        ]
-        payload[field_name] = list(dict.fromkeys(selected + hidden))
+        original = [str(item) for item in (payload.get(field_name) or [])]
+        old_visible = [item for item in original if item in visible_keys]
+        if set(selected) == set(old_visible):
+            # Preserve exact original order on a no-op edit. Staff assignment
+            # and rule audit diffs should not churn for hidden qualifications.
+            payload[field_name] = list(original)
+        else:
+            hidden = [item for item in original if item not in visible_keys]
+            payload[field_name] = list(dict.fromkeys(selected + hidden))
 
     return payload
 
