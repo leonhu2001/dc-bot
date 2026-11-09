@@ -10,6 +10,7 @@ on:
       - feat/payment-qr-profile-tips-isolated-20261109
       - release/payment-qr-tips-bonus-no-price-20261110
       - fix/profile-tip-ticket-close-ledger-and-nov-bonus-20261110
+      - fix/verified-nov-bonus-accounting-alerts-20261110
   workflow_dispatch:
 
 permissions:
