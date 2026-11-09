@@ -64,9 +64,13 @@ def test_all_discord_game_catalogs_use_same_prices_as_web():
             item for item in get_grouped_order_catalog(category)
             if item["key"] == group
         )
-        assert {row["rule_key"] for row in discord_rows} == {
-            row["rule_key"] for row in web_group["variants"]
-        }
+        discord_keys = {row["rule_key"] for row in discord_rows}
+        web_keys = {row["rule_key"] for row in web_group["variants"]}
+        assert web_keys.issubset(discord_keys)
+        # Existing LoL technical ARAM services still work on Discord, while
+        # the approved poster/Web cards display only NG and ranked.
+        extra = discord_keys - web_keys
+        assert extra == ({f"{group}_aram"} if category == "lol" and group != "lol_entertain" else set())
         for row in web_group["variants"]:
             assert row["price"] == ORDER_RULES[row["rule_key"]].price
 
