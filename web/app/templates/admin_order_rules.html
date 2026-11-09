@@ -340,6 +340,19 @@
             >
                 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
+                {% if selected_has_system_owned_fields or selected_uses_owner_poster_price %}
+                <div class="rule-inline-note">
+                    {% if selected_has_system_owned_fields %}
+                    <span>系統保護</span>
+                    <strong>部分人數、身份與指定費規則由程式控管；若修改被保護欄位，預覽會明確提示，避免發布成功卻不生效。</strong>
+                    {% endif %}
+                    {% if selected_uses_owner_poster_price %}
+                    <span>最新價目表</span>
+                    <strong>舊覆寫不會蓋掉公告價格；總管在此重新預覽並發布的新價格會同步套用至 Web 與 DC Bot。</strong>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <section class="rule-editor-section">
                     <div class="rule-section-heading">
                         <div><h3>基本資訊</h3><p class="muted-text">顧客看得到的名稱、分類、價格與計價單位。</p></div>
