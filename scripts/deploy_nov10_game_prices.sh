@@ -70,6 +70,7 @@ while IFS= read -r file; do
         tests/test_quick_order_v2_patch_ownership.py|\
         tests/test_point_benefit_catalog_v2.py|\
         tests/test_loyalty_companion_fix_20261029.py|\
+        tests/test_loyalty_companion_count.py|\
         tests/test_dynamic_game_point_benefits.py|\
         tests/test_companion_count_finish_20261028.py|\
         tests/test_apex_pricing_20261012.py|\
