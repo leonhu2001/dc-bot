@@ -48,16 +48,16 @@ def test_delta_desktop_price_list_has_ten_order_types_in_owner_requested_order()
 def test_delta_desktop_price_list_prices_and_rules_match_approved_copy() -> None:
     plans = price_lists.DELTA_DESKTOP_PRICE_LISTS
     expected = {
-        "entertainment": ("320T / H", "600T / H", "10 小時", "1 小時券", "+100T", "不保撤"),
-        "one_guard": ("720T / H", "770T / H", "8 殺", "6 殺", "+100T"),
+        "entertainment": ("350T / H", "650T / H", "10 小時", "1 小時券", "+100T", "不保撤"),
+        "one_guard": ("800T / H", "850T / H", "8 殺", "7 殺", "+100T"),
         "black_tide": ("320T / H", "300T / H", "400T / H", "380T / H", "30 分鐘券"),
         "sweet": ("520T / H", "1314T / H", "專屬暱稱", "管理層", "+100T"),
-        "trial": ("450T", "777W", "900T", "1688W", "金級以上", "打手選圖"),
-        "technical": ("400T / H", "750T / H", "450T / H", "850T / H", "666W", "800W", "+100T"),
+        "trial": ("500T", "850W", "不卡底", "1000T", "1888W", "金級以上", "打手選圖"),
+        "technical": ("450T / H", "850T / H", "500T / H", "950T / H", "777W", "850W", "+100T"),
         "babel_technical": ("1000T / H", "800W", "500W + 2 沙保", "4 沙保", "+100T", "2H 以上免指定費"),
         "teaching": ("500T / H", "3H 起標", "地圖理解", "復盤"),
-        "oil": ("2600T", "2000W", "1800T", "1500W", "4000T", "3500W", "航天基地", "撞場"),
-        "bet": ("800T", "800W", "1200T", "1000W", "1500T", "1200W", "打手選圖"),
+        "oil": ("3000T", "2000W", "2000T", "1500W", "4500T", "3500W", "航天基地", "撞場"),
+        "bet": ("1300T", "800W", "1800T", "1000W", "2400T", "1200W", "打手選圖"),
     }
     assert set(plans) == set(expected)
     for key, terms in expected.items():
@@ -82,7 +82,7 @@ def test_delta_desktop_babel_is_separate_and_black_tide_is_not_tagged_desktop() 
     assert "1000T / H" in babel
     for term in ("800W", "500W + 2 沙保", "4 沙保", "每人 +100T", "2H 以上免指定費"):
         assert term in babel
-    for term in ("400T / H", "750T / H", "450T / H", "850T / H", "機密", "絕密"):
+    for term in ("450T / H", "850T / H", "500T / H", "950T / H", "機密", "絕密"):
         assert term in technical
     assert black_tide.startswith("**黑潮爆破**")
     assert "（端遊）" not in black_tide
