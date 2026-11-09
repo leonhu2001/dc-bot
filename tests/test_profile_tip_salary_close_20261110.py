@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -11,17 +12,16 @@ from views import staff_profile_tip_ticket as tip_view
 from web.app.routers import admin_payout_summary as admin
 
 
-@pytest.mark.asyncio
-async def test_profile_tip_receipt_has_paid_amount_and_close_button(monkeypatch):
+def test_profile_tip_receipt_has_paid_amount_and_close_button(monkeypatch):
     monkeypatch.setattr(tip_view, "profile_tip_ticket_ids", lambda _: (123, 456))
     channel = SimpleNamespace(send=AsyncMock())
-    await tip_view.send_profile_tip_paid_panel(channel, {
+    asyncio.run(tip_view.send_profile_tip_paid_panel(channel, {
         "payment_status": "paid",
         "customer_discord_id": "123",
         "worker_discord_id": "456",
         "amount": 200,
         "payment_method": "我的錢包",
-    })
+    }))
     channel.send.assert_awaited_once()
     kwargs = channel.send.await_args.kwargs
     assert isinstance(kwargs["view"], tip_view.WorkerTipProfileCloseView)
@@ -30,8 +30,7 @@ async def test_profile_tip_receipt_has_paid_amount_and_close_button(monkeypatch)
     assert "已列入薪資明細" in channel.send.await_args.args[0]
 
 
-@pytest.mark.asyncio
-async def test_profile_tip_close_requires_double_confirmation(monkeypatch):
+def test_profile_tip_close_requires_double_confirmation(monkeypatch):
     class FakeChannel:
         topic = "profile_tip_customer_id=123;profile_tip_staff_id=456"
 
@@ -40,7 +39,7 @@ async def test_profile_tip_close_requires_double_confirmation(monkeypatch):
     interaction = SimpleNamespace(
         channel=FakeChannel(), user=SimpleNamespace(id=123), response=response,
     )
-    await tip_view.request_profile_tip_close(interaction)
+    asyncio.run(tip_view.request_profile_tip_close(interaction))
     response.send_message.assert_awaited_once()
     kwargs = response.send_message.await_args.kwargs
     assert kwargs["ephemeral"] is True
@@ -49,8 +48,7 @@ async def test_profile_tip_close_requires_double_confirmation(monkeypatch):
     assert isinstance(kwargs["view"], ConfirmCloseTicketView)
 
 
-@pytest.mark.asyncio
-async def test_profile_tip_creation_grants_chosen_worker_explicit_access(monkeypatch):
+def test_profile_tip_creation_grants_chosen_worker_explicit_access(monkeypatch):
     class FakeMember:
         def __init__(self, user_id):
             self.id = user_id
@@ -67,11 +65,11 @@ async def test_profile_tip_creation_grants_chosen_worker_explicit_access(monkeyp
         get_role=lambda rid: support if rid == 99 else None,
     )
     channel_creator = AsyncMock()
-    await tip_view.create_staff_profile_tip_ticket(
+    asyncio.run(tip_view.create_staff_profile_tip_ticket(
         interaction=SimpleNamespace(guild=guild, user=customer),
         staff_id="456", create_private_channel=channel_creator,
         customer_role_id=99, customer_category_id=77,
-    )
+    ))
     channel_creator.assert_awaited_once()
     args = channel_creator.await_args.kwargs
     assert args["allowed_roles"] == [support, staff]
