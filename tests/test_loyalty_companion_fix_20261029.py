@@ -30,10 +30,10 @@ def _rule(key: str, *, price: int, max_players: int = 4):
 @pytest.mark.parametrize(
     ("rule_key", "base_price", "players", "expected"),
     [
-        ("basic_entertain_single", 320, 1, 320),
-        ("basic_entertain_single", 320, 2, 300),
-        ("basic_entertain_female_single", 320, 2, 300),
-        ("basic_entertain_male_single", 320, 2, 300),
+        ("basic_entertain_single", 350, 1, 350),
+        ("basic_entertain_single", 350, 2, 325),
+        ("basic_entertain_female_single", 350, 2, 325),
+        ("basic_entertain_male_single", 350, 2, 325),
         ("basic_mobile_entertain_single", 320, 2, 300),
         ("basic_mobile_entertain_female_single", 320, 2, 300),
         ("basic_mobile_entertain_male_single", 320, 2, 300),
@@ -57,13 +57,13 @@ def test_loyalty_reward_uses_selected_tier_per_companion_share(
     ) == expected
 
 
-def test_double_companion_half_hour_is_150():
+def test_double_companion_half_hour_uses_new_650t_rate():
     coupon = {"benefit_kind": "extra_hours", "benefit_units": 0.5}
     assert calculate_for_rule(
-        _rule("basic_entertain_single", price=320, max_players=2),
+        _rule("basic_entertain_single", price=350, max_players=2),
         player_count=2,
         coupon=coupon,
-    ) == 150
+    ) == 162
 
 
 def test_linear_multi_seat_price_keeps_one_companion_share():
