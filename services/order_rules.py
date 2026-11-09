@@ -1781,9 +1781,12 @@ SOURCE_AUTHORITY_RULE_KEYS = frozenset(
 # commercial fields but cannot broaden who may claim these system products.
 SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS = COIN_WASH_AW_ORDER_RULE_KEYS
 
-# The owner's 2026-11-10 public image prices take precedence over stale manager
-# overrides. Only these built-in game prices are frozen; all other rule settings
-# and games retain existing manager behavior.
+# The owner's 2026-11-10 images are the defaults. Overrides published
+# BEFORE this release must not resurrect old price lists. New manager publishes
+# carry an explicit revision marker, so the admin price editor and rollback work
+# while historical overrides without that marker still fall back to new prices.
+OWNER_APPROVED_GAME_PRICE_REVISION = "owner-poster-20261110-admin-v1"
+ADMIN_MANAGED_PLAYER_COUNT_PRICE_REVISION = "admin-seat-prices-v1"
 OWNER_APPROVED_20261110_GAME_PRICE_KEYS = frozenset({
     "steam_play",
     "valorant_entertain_ng", "valorant_entertain_ranked",
@@ -1913,7 +1916,14 @@ class EffectiveOrderRules(dict):
                     min_player_count=base.min_player_count,
                     max_player_count=base.max_player_count,
                     price_multiply_player_count=base.price_multiply_player_count,
-                    player_count_prices=dict(base.player_count_prices),
+                    player_count_prices=(
+                        dict(rule.player_count_prices)
+                        if str(
+                            (item.get("payload") or {}).get("_admin_seat_price_revision")
+                            or ""
+                        ) == ADMIN_MANAGED_PLAYER_COUNT_PRICE_REVISION
+                        else dict(base.player_count_prices)
+                    ),
                     max_specified_count=base.max_specified_count,
                 )
             if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
@@ -1947,7 +1957,13 @@ class EffectiveOrderRules(dict):
                     point_benefits_allowed=base.point_benefits_allowed,
                     loyalty_benefits_enabled=base.loyalty_benefits_enabled,
                 )
-            if key in OWNER_APPROVED_20261110_GAME_PRICE_KEYS:
+            if (
+                key in OWNER_APPROVED_20261110_GAME_PRICE_KEYS
+                and str((item.get("payload") or {}).get("_owner_price_revision") or "")
+                != OWNER_APPROVED_GAME_PRICE_REVISION
+            ):
+                # Old dashboard price overrides were written before the new
+                # posters. Keep their non-price fields but not the stale price.
                 rule = replace(rule, price=base.price)
             if SWEET_COMPANION_ROLE_KEY in tuple(base.required_roles):
                 rule = replace(rule, required_roles=base.required_roles)
@@ -2074,6 +2090,9 @@ __all__ = [
     "ROLE_LABELS",
     "SOURCE_AUTHORITY_RULE_KEYS",
     "SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS",
+    "OWNER_APPROVED_GAME_PRICE_REVISION",
+    "ADMIN_MANAGED_PLAYER_COUNT_PRICE_REVISION",
+    "OWNER_APPROVED_20261110_GAME_PRICE_KEYS",
     "RoleKey",
     "OrderRule",
     "calculate_price",
