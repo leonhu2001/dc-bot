@@ -59,6 +59,9 @@ def _create_schema(path):
                 payment_method TEXT NOT NULL DEFAULT 'test',
                 payment_status TEXT NOT NULL DEFAULT 'paid',
                 payout_status TEXT NOT NULL DEFAULT 'unpaid',
+                customer_discord_id TEXT,
+                customer_display_name TEXT,
+                paid_at TEXT,
                 created_at TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL DEFAULT ''
             );
