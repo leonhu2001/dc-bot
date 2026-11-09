@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - feat/payment-qr-profile-tips-isolated-20261109
+      - release/payment-qr-tips-bonus-no-price-20261110
   workflow_dispatch:
 
 permissions:
