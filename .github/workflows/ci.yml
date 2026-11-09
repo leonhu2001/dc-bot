@@ -76,6 +76,7 @@ jobs:
       - name: Validate deploy shell
         run: |
           bash -n scripts/deploy_main.sh
+          bash -n scripts/deploy_payment_bonus.sh
 
       - name: Validate deploy PowerShell
         shell: pwsh
@@ -84,6 +85,21 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile(
             (Resolve-Path "scripts/deploy_main.ps1"),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
+      - name: Validate isolated release PowerShell
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "scripts/deploy_payment_bonus.ps1"),
             [ref]$tokens,
             [ref]$errors
           ) | Out-Null
