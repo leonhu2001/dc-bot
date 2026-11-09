@@ -334,3 +334,21 @@ def get_pending_worker_tip_confirmations() -> list[dict]:
         return [dict(row) for row in rows]
     finally:
         conn.close()
+
+
+def list_paid_profile_tips(ticket_channel_id: int | str) -> list[dict]:
+    """Read-only recovery list; closing a ticket never creates a tip payment."""
+    ensure_worker_tip_tables()
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """SELECT * FROM worker_tips
+               WHERE order_id IS NULL
+                 AND ticket_channel_id=?
+                 AND payment_status='paid'
+               ORDER BY id""",
+            (str(ticket_channel_id),),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
