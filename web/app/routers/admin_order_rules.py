@@ -682,6 +682,15 @@ async def _render(
             "selected_key": selected_key,
             "selected_rule": selected_rule,
             "selected_base": selected_base,
+            "selected_has_system_owned_fields": bool(
+                selected_key in SOURCE_AUTHORITY_RULE_KEYS
+                or selected_key in SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS
+                or selected_key in ONE_COMPANION_ONE_GUARD_RULE_KEYS
+                or selected_key == "custom_custom_order"
+            ),
+            "selected_uses_owner_poster_price": (
+                selected_key in OWNER_APPROVED_20261110_GAME_PRICE_KEYS
+            ),
             "selected_status": selected_status,
             "selected_is_active": bool(selected_status.get("is_active", True)),
             "payload": preview_payload or effective_payload,
