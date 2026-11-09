@@ -991,7 +991,7 @@ for (
         allow_specify=False,
     ))
 
-for key, label, price in [
+for key, label, price, note in [
     ("basic_oil_fuel", "油鍋單｜火箭燃油", 2800, "保底 2000W；限定航天基地；撤離時帶出即結單；過保底未出貨，下場改以撞場交貨。"),
     ("basic_oil_satellite", "油鍋單｜GTI衛星通訊天線", 2000, "保底 1500W；限定航天基地；撤離時帶出即結單；過保底未出貨，下場改以撞場交貨。"),
     ("basic_oil_all", "油鍋單｜全包", 4500, "保底 3500W；限定航天基地；撤離時帶出即結單；過保底未出貨，下場改以撞場交貨。"),
