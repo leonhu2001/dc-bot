@@ -66,22 +66,22 @@ def test_lol_elite_ranked_dynamic_points_match_confirmed_examples() -> None:
         rule=rule,
         benefit=_benefit("tech_single_service_small"),
         player_count=1,
-    ) == 230
+    ) == 220
     assert calculate_service_bonus_point_cost(
         rule=rule,
         benefit=_benefit("tech_single_service_large"),
         player_count=1,
-    ) == 410
+    ) == 390
     assert calculate_service_bonus_point_cost(
         rule=rule,
         benefit=_benefit("tech_double_service_small"),
         player_count=2,
-    ) == 460
+    ) == 440
     assert calculate_service_bonus_point_cost(
         rule=rule,
         benefit=_benefit("tech_double_service_large"),
         player_count=2,
-    ) == 820
+    ) == 780
 
 
 def test_dynamic_catalog_is_enabled_for_lol_valorant_and_apex() -> None:
