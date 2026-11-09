@@ -32,8 +32,6 @@ def check_order_point_benefit_allowed(
     if rule_key.startswith("basic_trial_"):
         return False, "體驗單不適用折扣與點數福利。"
 
-    # Legacy non-selectable probe used only to open the combined point/member
-    # picker. Actual point choices are checked individually below.
     if str(spec.get("key") or "") == "discount_20":
         return True, ""
 
