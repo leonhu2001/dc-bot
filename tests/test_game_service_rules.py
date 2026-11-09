@@ -747,10 +747,10 @@ def test_storefront_business_values_are_direct_rules():
         "basic_oil_all": ("fixed", 4000, "單"),
         "steam_play": ("hourly", 350, "H"),
 
-        "valorant_entertain_ng": ("hourly", 300, "H"),
-        "valorant_entertain_ranked": ("game", 250, "局"),
+        "valorant_entertain_ng": ("hourly", 350, "H"),
+        "valorant_entertain_ranked": ("game", 280, "局"),
         "valorant_ascendant_ng": ("hourly", 330, "H"),
-        "valorant_ascendant_ranked": ("game", 290, "局"),
+        "valorant_ascendant_ranked": ("game", 300, "局"),
         "valorant_immortal_ng": ("hourly", 350, "H"),
         "valorant_immortal_ranked": ("game", 330, "局"),
         "valorant_radiant_ng": ("hourly", 380, "H"),
@@ -764,7 +764,7 @@ def test_storefront_business_values_are_direct_rules():
         "lol_grandmaster_ng": ("hourly", 390, "H"),
         "lol_grandmaster_ranked": ("game", 350, "局"),
         "lol_elite_ng": ("hourly", 400, "H"),
-        "lol_elite_ranked": ("game", 450, "局"),
+        "lol_elite_ranked": ("game", 430, "局"),
 
         "apex_entertain_platinum": ("hourly", 300, "H"),
         "apex_entertain_platinum_ranked": ("hourly", 350, "H"),
