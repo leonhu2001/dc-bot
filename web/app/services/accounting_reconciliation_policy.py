@@ -161,9 +161,31 @@ def _is_verified_nov_bonus_repair(conn: sqlite3.Connection, order_id: int) -> bo
             "FROM worker_payouts WHERE order_id=?",
             (int(order_id),),
         ).fetchall()
-        if len(worker_rows) != 1:
+        # Several approved orders contain more than one worker. The 2% audit
+        # targets exactly one ID; all other rows must still match their own
+        # documented rate (or the original unannotated base 80%).
+        if not 1 <= len(worker_rows) <= 4:
             return False
-        worker = worker_rows[0]
+        matches = [
+            row for row in worker_rows
+            if str(row["worker_discord_id"]) == spec["worker_id"]
+        ]
+        if len(matches) != 1:
+            return False
+        worker = matches[0]
+        for other in worker_rows:
+            if other is worker:
+                continue
+            other_note = _normalize(other["note"])
+            other_rate = _rate_from_persisted_note(other_note)
+            if other_rate is None and not other_note:
+                other_rate = 0.80
+            if (other_rate is None
+                    or not _money_equal(
+                        other["final_payout"],
+                        round(_as_float(other["gross_share"]) * other_rate),
+                    )):
+                return False
         note = _normalize(worker["note"])
         rate = _rate_from_persisted_note(note)
         if (str(worker["worker_discord_id"]) != spec["worker_id"]
@@ -282,7 +304,8 @@ def _policy_consistency_for_order(
     # Legacy snapshot flags can predate the independently audited 2% payout
     # correction. Only verified audit+ledger evidence permits the newer bonus
     # calculation for these two orders.
-    new_policy = (not legacy) or _is_verified_nov_bonus_repair(conn, order_id)
+    verified_bonus_order = _is_verified_nov_bonus_repair(conn, order_id)
+    new_policy = (not legacy) or verified_bonus_order
     if not new_policy:
         return {
             "new_policy": False,
@@ -316,6 +339,15 @@ def _policy_consistency_for_order(
     total_worker = 0
     for row in worker_rows:
         rate = _rate_from_persisted_note(row["note"])
+        if (rate is None
+                and verified_bonus_order
+                and _normalize(row["note"]) == ""
+                and str(row["worker_discord_id"]) !=
+                    _VERIFIED_NOV_BONUS_REPAIRS[int(order_id)]["worker_id"]):
+            # The pre-repair base calculation sometimes cleared other
+            # workers' ordinary 80% notes. It may be inferred ONLY after
+            # verifying every worker, the target 2% row and its audit.
+            rate = 0.80
         if rate is None:
             worker_consistent = False
             break
