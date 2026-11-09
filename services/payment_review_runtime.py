@@ -20,6 +20,7 @@ from services.payment_reviews import (
     mark_payment_review_apply_error,
     mark_payment_review_rejection_applied,
 )
+from services.payment_qr_assets import payment_qr_edit_kwargs
 from services.worker_tips import (
     mark_worker_tip_cancelled,
     mark_worker_tip_paid,
@@ -375,6 +376,7 @@ async def _apply_order_rejection(bot: discord.Client, row: dict) -> None:
                 message = await payment_channel.fetch_message(int(payment_message_id))
                 await message.edit(
                     embed=payment_embed,
+                    **payment_qr_edit_kwargs(payment_method),
                     view=target.PaymentMethodView(
                         customer_id=customer_id,
                         channel_id=channel.id,

@@ -408,6 +408,11 @@ from views.staff_profiles import (
     StaffProfilePanelView,
     refresh_staff_profile_panels_for_order,
     configure_staff_profile_order_ticket_creator,
+    configure_staff_profile_tip_ticket_creator,
+)
+from services.profile_tip_ticket_runtime import (
+    configure_profile_tip_ticket_runtime, create_staff_profile_tip_ticket,
+    register_existing_profile_tip_views,
 )
 
 from views.support import (
@@ -524,7 +529,6 @@ from cogs.reward_redeem_commands import (
     RewardRedeemView,
 )
 
-
 # ========= 讀取 .env =========
 
 env_path = Path(__file__).parent / ".env"
@@ -534,7 +538,6 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 
 if TOKEN is None:
     raise RuntimeError("讀不到 DISCORD_TOKEN，請確認 .env 檔案在 bot.py 同一個資料夾")
-
 
 # ========= 固定 ID =========
 
@@ -669,7 +672,6 @@ VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = list(dict.fromkeys([
     1507204925766242425,
 ]))
 
-
 # 可看見創建後陪玩 / VIP 語音房，但不可連接的身分組 ID
 VOICE_VIEW_ONLY_ROLE_IDS = [
 ]
@@ -687,11 +689,9 @@ TEMP_PUBLIC_VOICE_CHANNEL_IDS = set()
 # voice_channel_id -> {owner_id, panel_channel_id, room_type, locked, hidden}
 TEMP_VOICE_CONTROL_PANELS = {}
 
-
 # ========= 外部設定檔覆蓋 =========
 # config.json 讀取邏輯已搬到 core/config.py。
 # 這裡只保留「把設定套用到預設值」的區塊，降低 bot.py 負擔。
-
 
 # 伺服器 / 類別
 GUILD_ID = _config_int("GUILD_ID", GUILD_ID)
@@ -787,7 +787,6 @@ configure_voice_helpers(
     temp_voice_control_panels=TEMP_VOICE_CONTROL_PANELS,
 )
 
-
 def refresh_hidden_vip_runtime_ids() -> list[int]:
     """把環境固定名單 + bot.db 可管理名單同步到 runtime 與語音入口權限模組。"""
     global HIDDEN_VIP_USER_IDS
@@ -807,7 +806,6 @@ def refresh_hidden_vip_runtime_ids() -> list[int]:
     set_hidden_vip_user_ids(HIDDEN_VIP_USER_IDS)
     set_vip_voice_hidden_user_ids(HIDDEN_VIP_USER_IDS)
     return list(HIDDEN_VIP_USER_IDS)
-
 
 configure_rewards(
     member_levels=MEMBER_LEVELS,
@@ -870,36 +868,16 @@ configure_vip_voice_runtime(
 order_group = app_commands.Group(name="order", description="訂單管理")
 vip_group = app_commands.Group(name="vip", description="VIP / 會員管理")
 
-
 # ========= 工具函式 =========
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 configure_ticket_identity(
     recruit_applicant_role_id=RECRUIT_APPLICANT_ROLE_ID,
 )
 
-
 configure_support_views(
     complaint_receive_channel_id=COMPLAINT_RECEIVE_CHANNEL_ID,
     remove_recruit_applicant_role=remove_recruit_applicant_role,
 )
-
 
 configure_support_call_views(
     customer_service_role_id=CUSTOMER_ROLE_ID,
@@ -907,16 +885,10 @@ configure_support_call_views(
     send_order_log_callback=send_order_log,
 )
 
-
 configure_web_support_bridge(
     channel_id=WEB_SUPPORT_CHANNEL_ID,
     customer_service_role_id=CUSTOMER_ROLE_ID,
 )
-
-
-
-
-
 
 async def create_private_channel(
     interaction: discord.Interaction,
@@ -1047,7 +1019,6 @@ async def create_private_channel(
     except discord.HTTPException:
         pass
 
-
 # ========= 評價 Modal / 按鈕 =========
 # Review modal/button views moved to views/review.py
 
@@ -1171,8 +1142,6 @@ def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) 
     except Exception as exc:
         print(f"[web-sync] 結單同步網站失敗 ticket_channel_id={ticket_channel_id}: {exc}")
 
-
-
 # ========= 訂單收據 / 結單 / 取消 lifecycle 已移至 services/order_lifecycle_runtime.py =========
 
 # ========= 自助下單資料 =========
@@ -1215,13 +1184,6 @@ BACKUP_DIR = Path(__file__).parent / "backups"
 CLOSED_ORDER_KEEP_DAYS = 0  # 已結單資料永久保留，不再自動刪除
 CANCELLED_ORDER_KEEP_DAYS = 60  # 只清理超過 60 天的取消單暫存
 
-
-
-
-
-
-
-
 async def daily_backup_loop():
     await bot.wait_until_ready()
     while not bot.is_closed():
@@ -1232,7 +1194,6 @@ async def daily_backup_loop():
         except Exception as e:
             print(f"每日備份 bot.db 失敗：{e}")
         await asyncio.sleep(3600)
-
 
 async def check_stored_order_reminders_once(guild: discord.Guild | None = None) -> None:
     guild = guild or bot.get_guild(GUILD_ID)
@@ -1294,7 +1255,6 @@ async def check_stored_order_reminders_once(guild: discord.Guild | None = None) 
     if changed:
         save_bot_data()
 
-
 async def vip_downgrade_loop():
     await bot.wait_until_ready()
     while not bot.is_closed():
@@ -1304,7 +1264,6 @@ async def vip_downgrade_loop():
             print(f"VIP 自動降階檢查失敗：{e}")
         await asyncio.sleep(21600)
 
-
 async def stored_order_reminder_loop():
     await bot.wait_until_ready()
     while not bot.is_closed():
@@ -1313,9 +1272,6 @@ async def stored_order_reminder_loop():
         except Exception as e:
             print(f"存單提醒檢查失敗：{e}")
         await asyncio.sleep(21600)
-
-
-
 
 def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | None":
     data = ORDER_CLAIMS.get(message_id)
@@ -1358,7 +1314,6 @@ def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | N
         locked=bool(data.get("locked", False)),
         status=str(data.get("status", "active")),
     )
-
 
 def cleanup_old_closed_orders() -> None:
     """
@@ -1430,7 +1385,6 @@ def cleanup_old_closed_orders() -> None:
             f"{CANCELLED_ORDER_KEEP_DAYS} 天的取消單暫存資料。"
         )
 
-
 # ========= SQLite 相容修正版：正式支援 relational bot.db =========
 # 這段會覆蓋上方舊的 JSON blob 版 init / save / load。
 # 用途：
@@ -1440,15 +1394,6 @@ def cleanup_old_closed_orders() -> None:
 # 4. 降階後把 vip_progress_base_total_spent 設為當下累積消費，下一級進度從降階後重新開始。
 
 VIP_DOWNGRADE_FIRST_CHECK_MONTH = "2026-06"  # 第一次檢查 2026/05 消費；不檢查 2026/04。
-
-
-
-
-
-
-
-
-
 
 configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS, data_file=DATA_FILE)
 configure_lottery_storage(DB_FILE, init_database)
@@ -1472,7 +1417,6 @@ configure_reward_order_context(SELF_SERVICE_ORDER_SELECTIONS, save_bot_data)
 
 _raw_remember_claim_data = remember_claim_data
 
-
 def _is_final_dispatch_claim_status(data: dict | None) -> bool:
     if not isinstance(data, dict):
         return False
@@ -1480,7 +1424,6 @@ def _is_final_dispatch_claim_status(data: dict | None) -> bool:
     status = str(data.get("status") or "").lower().strip()
 
     return bool(data.get("closed")) or status in {"closed", "cancelled", "canceled"}
-
 
 def remember_claim_data(message_id: int, data: dict) -> None:
     """保存派單 claim；closed/cancelled 不再持久化，避免重啟恢復舊接單面板。"""
@@ -1498,8 +1441,6 @@ def remember_claim_data(message_id: int, data: dict) -> None:
 
     _raw_remember_claim_data(message_id, data)
 
-
-
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
     guild = guild or bot.get_guild(GUILD_ID)
 
@@ -1511,8 +1452,6 @@ async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: b
         send_log_func=send_order_log,
     )
 
-
-
 load_bot_data()
 refresh_hidden_vip_runtime_ids()
 cleanup_old_closed_orders()
@@ -1522,19 +1461,14 @@ COMPANION_PREFERENCE_OPTIONS = [
     "指定陪玩/打手",
 ]
 
-
-
-
 # ========= 顧客錢包系統 =========
 
 def ensure_wallet_tables() -> None:
     """Compatibility adapter: wallet schema ownership lives in wallet_service."""
     _wallet_ensure_tables(DB_FILE)
 
-
 def get_wallet_balance(customer_id) -> int:
     return _wallet_get_balance(customer_id, DB_FILE)
-
 
 async def process_worker_tip_wallet_payment(
     *,
@@ -1562,7 +1496,6 @@ async def process_worker_tip_wallet_payment(
         note=f"雞腿給 {worker_name or worker_id}（100% 給指定成員）",
         allow_negative=False,
     )
-
 
 async def log_worker_tip_event(*, event: str, interaction: discord.Interaction, tip: dict) -> None:
     guild = interaction.guild
@@ -1596,15 +1529,12 @@ async def log_worker_tip_event(*, event: str, interaction: discord.Interaction, 
         color=color_map.get(str(event), discord.Color.gold()),
     )
 
-
 configure_worker_tip_callbacks(
     wallet_handler=process_worker_tip_wallet_payment,
     log_handler=log_worker_tip_event,
 )
 
-
 # 錢包資訊 / 流水 Embed 已搬到 cogs/wallet_commands.py
-
 
 class StaffOrderOperationSelect(discord.ui.Select):
     def __init__(self):
@@ -1649,7 +1579,6 @@ class StaffOrderOperationSelect(discord.ui.Select):
         STAFF_ORDER_OPERATION_SELECTIONS[(interaction.channel.id, interaction.user.id)] = self.values[0]
 
         await interaction.response.defer()
-
 
 class StaffOrderOperationView(discord.ui.View):
     def __init__(self):
@@ -1741,15 +1670,12 @@ class StaffOrderOperationView(discord.ui.View):
                 ephemeral=True
             )
 
-
-
 register_order_operation_panel_listener(
     bot,
     SELF_SERVICE_ORDER_SELECTIONS,
     is_customer_staff,
     StaffOrderOperationView,
 )
-
 
 class OrderControlView(discord.ui.View):
     def __init__(self):
@@ -1849,7 +1775,6 @@ class OrderControlView(discord.ui.View):
             )
         )
 
-# profile_direct_order_ticket_creator_v1
 async def create_staff_profile_order_ticket(
     *,
     interaction: discord.Interaction,
@@ -1951,13 +1876,16 @@ async def create_staff_profile_order_ticket(
         ),
     )
 
-
 configure_staff_profile_order_ticket_creator(
     create_staff_profile_order_ticket
 )
 
+configure_profile_tip_ticket_runtime(
+    customer_category_id=CUSTOMER_CATEGORY_ID, customer_role_id=CUSTOMER_ROLE_ID,
+    create_channel=create_private_channel, safe_channel_name=safe_channel_name,
+)
 
-# ========= 主面板 / 下單入口 View 設定 =========
+configure_staff_profile_tip_ticket_creator(create_staff_profile_tip_ticket)
 
 configure_panel_views(
     customer_category_id=CUSTOMER_CATEGORY_ID,
@@ -1973,7 +1901,6 @@ configure_panel_views(
     order_control_view_factory=OrderControlView,
     recruit_control_view_factory=RecruitControlView,
 )
-
 
 async def refresh_main_service_panel() -> bool:
     if not (
@@ -2020,8 +1947,6 @@ async def refresh_main_service_panel() -> bool:
         flush=True,
     )
     return True
-
-
 
 async def refresh_welcome_history() -> bool:
     if not WELCOME_CHANNEL_ID:
@@ -2090,7 +2015,6 @@ async def refresh_welcome_history() -> bool:
     )
     return True
 
-
 async def _refresh_welcome_history_background() -> None:
     try:
         if await refresh_welcome_history():
@@ -2104,11 +2028,7 @@ async def _refresh_welcome_history_background() -> None:
     finally:
         bot._welcome_history_refresh_running = False
 
-
 # ========= Bot 事件 =========
-
-
-
 
 @vip_group.command(
     name="hidden_add",
@@ -2157,7 +2077,6 @@ async def vip_hidden_add(interaction: discord.Interaction, member: discord.Membe
         f"不需要公開 VIP 身分組，也會被系統視為有效 VIP{lobby_warning or '。'}",
         ephemeral=True,
     )
-
 
 @vip_group.command(
     name="hidden_remove",
@@ -2224,7 +2143,6 @@ async def vip_hidden_remove(interaction: discord.Interaction, member: discord.Me
         ephemeral=True,
     )
 
-
 @vip_group.command(
     name="hidden_list",
     description="管理員查看目前 Hidden VIP 白名單",
@@ -2274,7 +2192,6 @@ async def vip_hidden_list(interaction: discord.Interaction):
         ephemeral=True,
         allowed_mentions=discord.AllowedMentions.none(),
     )
-
 
 @vip_group.command(
     name="create_voice",
@@ -2381,11 +2298,6 @@ async def vip_create_voice(interaction: discord.Interaction, user_id: str):
         ephemeral=True,
     )
 
-
-
-
-
-
 @bot.event
 async def on_member_join(member: discord.Member):
     role = member.guild.get_role(NEW_MEMBER_ROLE_ID)
@@ -2420,7 +2332,6 @@ async def on_member_join(member: discord.Member):
         )
     )
 
-
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member):
     had_vip = member_has_vip_voice_role(before)
@@ -2435,7 +2346,6 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             verify_delay_seconds=3,
         )
 
-
 @bot.event
 async def on_member_remove(member: discord.Member):
     await delete_vip_voice_room_for_owner(
@@ -2443,7 +2353,6 @@ async def on_member_remove(member: discord.Member):
         member.id,
         reason="VIP member left the server",
     )
-
 
 @bot.event
 async def on_guild_channel_delete(channel: discord.abc.GuildChannel):
@@ -2456,7 +2365,6 @@ async def on_guild_channel_delete(channel: discord.abc.GuildChannel):
             TEMP_VIP_VOICE_CHANNEL_IDS.discard(channel.id)
             await delete_voice_control_panel(channel.guild, channel.id)
             delete_vip_voice_room_record(channel_id=channel.id)
-
 
 @bot.event
 async def on_voice_state_update(
@@ -2744,7 +2652,6 @@ async def register_core_persistent_views_once() -> None:
     bot._core_persistent_views_registered = True
     print("[persistent-views] core views registered", flush=True)
 
-
 async def _bot_setup_hook() -> None:
     await register_core_persistent_views_once()
 
@@ -2775,11 +2682,9 @@ async def _bot_setup_hook() -> None:
     install_quick_order_v2_select_display(bot)
     print("[persistent-views] quick-order controls registered before READY", flush=True)
 
-
 # discord.py calls setup_hook before READY. Registering persistent views here
 # prevents old ticket controls from depending on slow/failing on_ready work.
 bot.setup_hook = _bot_setup_hook
-
 
 @bot.event
 async def on_ready():
@@ -2942,6 +2847,14 @@ async def on_ready():
         bot._staff_profile_views_registered = True
         if restored_profile_views:
             print(f"Restored staff profile views: {restored_profile_views}")
+
+    if not getattr(bot, "_profile_tip_ticket_views_registered", False):
+        count = register_existing_profile_tip_views(
+            bot, customer_category_id=CUSTOMER_CATEGORY_ID
+        )
+        bot._profile_tip_ticket_views_registered = True
+        if count:
+            print(f"Restored profile tip ticket entry views: {count}")
 
     restored_dispatch_views = 0
     for message_id in list(ORDER_CLAIMS.keys()):
@@ -3128,9 +3041,7 @@ async def on_ready():
     except Exception as exc:
         print(f"[VIP] failed to refresh existing VIP whitelist permissions: {exc}")
 
-
 # ========= Slash 指令 =========
-
 
 # 成員收藏 / 個人牆瀏覽 slash 指令已搬到 cogs/staff_profile_commands.py
 
@@ -3309,28 +3220,21 @@ async def fix_acceptance_payment_panel(
             ephemeral=True,
         )
 
-
-
 # 個人牆建立 / 同步 slash 指令已搬到 cogs/staff_profile_commands.py
 
-
 # 點數兌換面板 / slash 指令已搬到 cogs/reward_redeem_commands.py
-
 
 # ========= 點數抽獎系統 =========
 
 # 抽獎 slash 指令已搬到 cogs/lottery_commands.py
 
-
 # 會員點數 / 補登 slash 指令已搬到 cogs/reward_commands.py
-
 
 VIP_LEVEL_NAME_TO_INDEX = {level["name"]: index for index, level in enumerate(MEMBER_LEVELS)}
 VIP_LEVEL_CHOICES = [
     app_commands.Choice(name=level["name"], value=level["name"])
     for level in MEMBER_LEVELS
 ]
-
 
 @bot.tree.command(
     name="set_customer_level",
@@ -3401,21 +3305,15 @@ async def set_customer_level(
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-
-
 def _require_customer_staff_or_manager(interaction: discord.Interaction) -> bool:
     return (
         isinstance(interaction.user, discord.Member)
         and (is_customer_staff(interaction.user) or has_role(interaction.user, MANAGER_ROLE_ID) or interaction.user.guild_permissions.administrator)
     )
 
-
-
 # 錢包 slash 指令已搬到 cogs/wallet_commands.py
 
-
 # 營運統計 / VIP 降階查詢 slash 指令已搬到 cogs/stats_commands.py
-
 
 @bot.tree.command(
     name="order_search",
@@ -3504,11 +3402,9 @@ async def order_search(
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-
 # ========= 訂單修正 / 刪除指令 =========
 
 ORDER_MAINTENANCE_BACKUP_PREFIX = "manual_order_maintenance"
-
 
 def adjust_customer_totals_for_order(customer_id: int | None, amount_delta: int, order_delta: int) -> dict | None:
     """手動修單時同步 customers 記憶體資料；amount_delta 可正可負。"""
@@ -3525,7 +3421,6 @@ def adjust_customer_totals_for_order(customer_id: int | None, amount_delta: int,
         data["last_manual_fixed_at"] = get_taipei_now_iso()
     CUSTOMER_REWARDS[parsed_customer_id] = data
     return data
-
 
 async def refresh_customer_benefits_after_manual_fix(guild: discord.Guild | None, customer_ids: list[int | None]) -> list[str]:
     if guild is None:
@@ -3547,7 +3442,6 @@ async def refresh_customer_benefits_after_manual_fix(guild: discord.Guild | None
             notices.extend([f"<@{customer_id}>：{notice}" for notice in benefit_notices])
     return notices
 
-
 def backup_database_for_manual_order_fix() -> str | None:
     if not DB_FILE.exists():
         return None
@@ -3559,7 +3453,6 @@ def backup_database_for_manual_order_fix() -> str | None:
     except OSError as e:
         print(f"建立手動修單備份失敗：{e}")
         return None
-
 
 async def delete_dispatch_message_for_order(guild: discord.Guild | None, data: dict) -> bool:
     if guild is None:
@@ -3589,7 +3482,6 @@ async def delete_dispatch_message_for_order(guild: discord.Guild | None, data: d
     except (asyncio.TimeoutError, discord.NotFound, discord.Forbidden, discord.HTTPException):
         return False
 
-
 def build_order_maintenance_result_embed(title: str, description: str, data: dict | None = None) -> discord.Embed:
     embed = discord.Embed(
         title=title,
@@ -3604,9 +3496,6 @@ def build_order_maintenance_result_embed(title: str, description: str, data: dic
         embed.add_field(name="金額", value=format_t_amount(get_order_amount_for_maintenance(data)), inline=True)
         embed.add_field(name="狀態", value=str(data.get("status") or ("closed" if data.get("closed") else "active")), inline=True)
     return embed
-
-
-
 
 def sync_web_order_cancelled_from_bot(
     ticket_channel_id,
@@ -3732,9 +3621,6 @@ def sync_web_order_cancelled_from_bot(
             f"ticket_channel_id={ticket_channel_id}: {exc}"
         )
 
-
-
-
 def sync_web_order_deleted_from_bot(ticket_channel_id, dispatch_message_id=None, note: str | None = None) -> None:
     """DC bot 刪除訂單後，從網站資料庫直接刪除對應 web_order。"""
     try:
@@ -3756,7 +3642,6 @@ def sync_web_order_deleted_from_bot(ticket_channel_id, dispatch_message_id=None,
             f"ticket_channel_id={ticket_channel_id} "
             f"dispatch_message_id={dispatch_message_id}: {exc}"
         )
-
 
 @bot.tree.command(
     name="delete_order",
@@ -3884,7 +3769,6 @@ async def delete_order(
         )
         raise
 
-
 @bot.tree.command(
     name="fix_order_amount",
     description="客服修正訂單金額，可同步調整會員累積",
@@ -3965,7 +3849,6 @@ async def fix_order_amount(
         color=discord.Color.orange(),
     )
 
-
 @bot.tree.command(
     name="fix_order_customer",
     description="客服修正訂單顧客，可同步搬移會員累積",
@@ -4045,8 +3928,6 @@ async def fix_order_customer(
         ],
         color=discord.Color.orange(),
     )
-
-
 
 @bot.tree.command(
     name="resend_dispatch",
@@ -4375,11 +4256,7 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
         ephemeral=True,
     )
 
-
-
-
 WEB_SYNC_EVENT_TASK = None
-
 
 def _apply_web_order_wallet_amount_adjustment(
     event: dict,
@@ -4521,7 +4398,6 @@ def _apply_web_order_wallet_amount_adjustment(
 
     return tx
 
-
 async def _process_web_wallet_reconciliation_event(event: dict) -> None:
     event_id = int(event["event_id"])
     retry_count = int(event.get("retry_count") or 0)
@@ -4562,7 +4438,6 @@ async def _process_web_wallet_reconciliation_event(event: dict) -> None:
             flush=True,
         )
 
-
 async def _process_web_order_amount_correction_event(event: dict) -> None:
     from services.order_cancel_vip_reconciliation import process_cancel_aware_amount_event
     await process_cancel_aware_amount_event(
@@ -4586,7 +4461,6 @@ async def _repair_existing_cancelled_web_vip_rewards() -> int:
         guild=bot.get_guild(GUILD_ID),
         load_refs=_web_sync_load_cancelled_order_refs,
     )
-
 
 async def process_one_web_sync_event(
     event: dict,
@@ -4754,7 +4628,6 @@ async def _refresh_existing_web_sync_dispatch(event: dict) -> None:
         ),
     )
 
-
 async def repair_active_web_sync_dispatch_panels_once(
     *,
     limit: int = 100,
@@ -4854,7 +4727,6 @@ async def repair_active_web_sync_dispatch_panels_once(
 
     return repaired
 
-
 async def _process_existing_web_sync_event(event: dict) -> None:
     event_id = int(event["event_id"])
     retry_count = int(event.get("retry_count") or 0)
@@ -4900,8 +4772,6 @@ async def _process_existing_web_sync_event(event: dict) -> None:
     except Exception as exc:
         _web_sync_mark_event_failed(event_id, str(exc), retry_count)
         print(f"處理網站同步事件失敗 event_id={event_id}：{exc}")
-
-
 
 async def web_sync_event_worker() -> None:
     await bot.wait_until_ready()
@@ -4983,8 +4853,6 @@ async def web_sync_event_worker() -> None:
 
         await asyncio.sleep(5)
 
-
-
 def ensure_web_sync_event_worker_started() -> None:
     global WEB_SYNC_EVENT_TASK
 
@@ -4994,11 +4862,9 @@ def ensure_web_sync_event_worker_started() -> None:
     WEB_SYNC_EVENT_TASK = bot.loop.create_task(web_sync_event_worker())
     print("[web-sync] 背景同步事件處理器已啟動")
 
-
 # ========= 資料庫健康檢查指令 =========
 
 # /audit_data 已搬到 cogs/audit_commands.py
-
 
 # ========= 存單管理面板 =========
 
@@ -5104,7 +4970,6 @@ async def update_stored_order_note_and_panel(
         allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
     )
 
-
 class StoredOrderNoteModal(discord.ui.Modal, title="修改存單備註"):
     reason = discord.ui.TextInput(
         label="存單原因",
@@ -5171,7 +5036,6 @@ class StoredOrderNoteModal(discord.ui.Modal, title="修改存單備註"):
         )
         await interaction.followup.send("已更新存單備註。", ephemeral=True)
 
-
 class StoredOrderSelect(discord.ui.Select):
     def __init__(self, records: list[tuple[int, dict]], selected_channel_id: int | None = None):
         options = []
@@ -5218,7 +5082,6 @@ class StoredOrderSelect(discord.ui.Select):
         view.refresh_items()
         embed = view.build_embed(interaction.guild)
         await interaction.response.edit_message(embed=embed, view=view)
-
 
 class StoredOrderCancelConfirmView(discord.ui.View):
     def __init__(self, order_channel_id: int):
@@ -5279,7 +5142,6 @@ class StoredOrderCancelConfirmView(discord.ui.View):
     async def keep_stored(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(content="已保留存單。", view=None)
 
-
 class StoredOrderManageView(discord.ui.View):
     def __init__(self, records: list[tuple[int, dict]]):
         super().__init__(timeout=300)
@@ -5318,7 +5180,6 @@ class StoredOrderManageView(discord.ui.View):
         self.records = get_stored_order_records(25)
         self.refresh_items()
         await interaction.response.edit_message(embed=self.build_embed(interaction.guild), view=self)
-
 
 class StoredOrderResumeButton(discord.ui.Button):
     def __init__(self):
@@ -5359,7 +5220,6 @@ class StoredOrderResumeButton(discord.ui.Button):
         )
         await interaction.followup.send("已恢復存單。", ephemeral=True)
 
-
 class StoredOrderEditNoteButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label="修改備註", style=discord.ButtonStyle.primary, custom_id="stored_order_edit_note_button", row=1)
@@ -5373,7 +5233,6 @@ class StoredOrderEditNoteButton(discord.ui.Button):
             await interaction.response.send_message("請先選擇要修改的存單。", ephemeral=True)
             return
         await interaction.response.send_modal(StoredOrderNoteModal(view.selected_channel_id, view))
-
 
 class StoredOrderCancelButton(discord.ui.Button):
     def __init__(self):
@@ -5393,7 +5252,6 @@ class StoredOrderCancelButton(discord.ui.Button):
             ephemeral=True,
         )
 
-
 class StoredOrderRefreshButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label="重新整理", style=discord.ButtonStyle.secondary, custom_id="stored_order_refresh_button", row=1)
@@ -5407,7 +5265,6 @@ class StoredOrderRefreshButton(discord.ui.Button):
             await interaction.response.send_message("存單面板狀態異常，請重新使用 /stored_orders。", ephemeral=True)
             return
         await view.refresh_message(interaction)
-
 
 @bot.tree.command(
     name="stored_orders",
@@ -5431,8 +5288,6 @@ async def stored_orders(interaction: discord.Interaction, limit: int = 25):
         allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
     )
 
-
-
 @bot.tree.command(
     name="check_stored_orders",
     description="客服手動檢查是否有超過 3/7 天的存單提醒",
@@ -5448,9 +5303,7 @@ async def check_stored_orders(interaction: discord.Interaction):
     await check_stored_order_reminders_once(interaction.guild)
     await interaction.followup.send("已檢查存單提醒，若有逾期存單會發到機器人日誌。", ephemeral=True)
 
-
 # 顧客備註 slash 指令已搬到 cogs/customer_commands.py
-
 
 @bot.tree.command(
     name="delete_dispatch_panel",
@@ -5540,7 +5393,6 @@ async def delete_dispatch_panel(
         color=discord.Color.red()
     )
 
-
 def _sync_dispatch_claims_to_web_from_bot(dispatch_message_id, claim_data, guild):
     """Discord 派單訊息按接單/取消接單後，同步寫回網站資料庫。"""
     try:
@@ -5568,7 +5420,6 @@ def _sync_dispatch_claims_to_web_from_bot(dispatch_message_id, claim_data, guild
     except Exception as exc:
         print(f"[web-sync] Discord 接單同步網站失敗 dispatch_message_id={dispatch_message_id}: {exc}")
 
-
 # 註冊 bot.py 裡的 top-level slash 指令群組
 try:
     bot.tree.add_command(order_group)
@@ -5578,7 +5429,6 @@ try:
     bot.tree.add_command(vip_group)
 except app_commands.CommandAlreadyRegistered:
     pass
-
 
 configure_acceptance_runtime_explicit(
     dispatch_channel_id=DISPATCH_CHANNEL_ID,

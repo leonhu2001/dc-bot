@@ -4,6 +4,7 @@ import discord
 
 from services.order_product_status import install_discord_catalog_guards
 from services.rewards import format_t_amount
+from services.payment_qr_assets import apply_payment_qr_embed
 
 
 # bot.py imports services.orders before services.order_flow. Installing here lets
@@ -78,4 +79,4 @@ def build_payment_method_embed(
     if payable_amount is not None and payable_amount > 0 and payment_info:
         embed.add_field(name="付款資訊", value=f"```text\n{payment_info}\n```", inline=False)
 
-    return embed
+    return apply_payment_qr_embed(embed, payment_method)

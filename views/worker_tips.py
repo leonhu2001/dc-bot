@@ -6,6 +6,7 @@ import discord
 
 from core.permissions import is_customer_staff
 from services.order_flow import get_payment_method_info
+from services.payment_qr_assets import payment_qr_send_kwargs
 from services.worker_tips import (
     create_worker_tip,
     get_worker_tip,
@@ -133,11 +134,13 @@ class WorkerTipAmountEditModal(discord.ui.Modal, title="修改雞腿金額"):
         ticket_channel_id: int,
         target: dict,
         amount: int,
+        standalone: bool = False,
     ):
         super().__init__(timeout=300)
         self.customer_id = int(customer_id)
         self.ticket_channel_id = int(ticket_channel_id)
         self.target = dict(target)
+        self.standalone = bool(standalone)
         self.amount_input = discord.ui.TextInput(
             label="雞腿金額",
             default=str(int(amount)),
@@ -175,6 +178,7 @@ class WorkerTipAmountEditModal(discord.ui.Modal, title="修改雞腿金額"):
                 ticket_channel_id=self.ticket_channel_id,
                 target=self.target,
                 amount=amount,
+                standalone=self.standalone,
             ),
         )
 
@@ -188,11 +192,15 @@ class WorkerTipAmountModal(discord.ui.Modal, title="🍗 加雞腿"):
         max_length=9,
     )
 
-    def __init__(self, *, customer_id: int, ticket_channel_id: int, target: dict):
+    def __init__(
+        self, *, customer_id: int, ticket_channel_id: int,
+        target: dict, standalone: bool = False,
+    ):
         super().__init__(timeout=300)
         self.customer_id = int(customer_id)
         self.ticket_channel_id = int(ticket_channel_id)
         self.target = dict(target)
+        self.standalone = bool(standalone)
 
     async def on_submit(self, interaction: discord.Interaction):
         if interaction.user.id != self.customer_id:
@@ -211,17 +219,20 @@ class WorkerTipAmountModal(discord.ui.Modal, title="🍗 加雞腿"):
             return
 
         amount = int(raw)
-        await interaction.response.edit_message(
-            content=_worker_tip_preview_text(
-                target=self.target,
-                amount=amount,
-            ),
+        response = (
+            interaction.response.send_message if self.standalone
+            else interaction.response.edit_message
+        )
+        await response(
+            content=_worker_tip_preview_text(target=self.target, amount=amount),
             view=WorkerTipPaymentMethodView(
                 customer_id=self.customer_id,
                 ticket_channel_id=self.ticket_channel_id,
                 target=self.target,
                 amount=amount,
+                standalone=self.standalone,
             ),
+            **({"ephemeral": True} if self.standalone else {}),
         )
 
 
@@ -291,11 +302,15 @@ class WorkerTipMemberMenuView(discord.ui.View):
 
 
 class WorkerTipPaymentMethodSelect(discord.ui.Select):
-    def __init__(self, *, customer_id: int, ticket_channel_id: int, target: dict, amount: int):
+    def __init__(
+        self, *, customer_id: int, ticket_channel_id: int,
+        target: dict, amount: int, standalone: bool = False,
+    ):
         self.customer_id = int(customer_id)
         self.ticket_channel_id = int(ticket_channel_id)
         self.target = dict(target)
         self.amount = int(amount)
+        self.standalone = bool(standalone)
         self.processed = False
 
         super().__init__(
@@ -324,11 +339,25 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             return
 
         payment_method = str(self.values[0])
-        order, _targets = _review_targets(channel.id)
-
-        if order is None:
-            await interaction.response.send_message("找不到這張已結單訂單資料，暫時無法加雞腿。", ephemeral=True)
-            return
+        if self.standalone:
+            parts = {
+                part.split("=", 1)[0]: part.split("=", 1)[1]
+                for part in str(channel.topic or "").split(";") if "=" in part
+            }
+            if (parts.get("tip_customer_id") != str(self.customer_id)
+                    or parts.get("tip_staff_id") != str(self.target.get("staff_id"))):
+                await interaction.response.send_message(
+                    "這不是有效的名片雞腿專用票口，付款已取消。", ephemeral=True
+                )
+                return
+            order = None
+        else:
+            order, _targets = _review_targets(channel.id)
+            if order is None:
+                await interaction.response.send_message(
+                    "找不到這張已結單訂單資料，暫時無法加雞腿。", ephemeral=True
+                )
+                return
 
         self.processed = True
         await interaction.response.defer(ephemeral=True)
@@ -348,6 +377,7 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             amount=self.amount,
             payment_method=payment_method,
             payment_status=("pending" if payment_method == "我的錢包" else "pending_review"),
+            source="staff_profile" if self.standalone else "discord",
         )
 
         if payment_method == "我的錢包":
@@ -361,7 +391,10 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
                 )
                 return
 
-            base_order_no = str(order["bot_order_no"] or f"WEB-{order['id']}")
+            base_order_no = (
+                str(order["bot_order_no"] or f"WEB-{order['id']}")
+                if order is not None else f"PROFILE-{channel.id}"
+            )
             wallet_reference = f"{base_order_no}:TIP-{tip_id}"
 
             try:
@@ -401,7 +434,8 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             )
             await _notify_worker_tip_paid(interaction, tip_row)
             await _log_worker_tip("paid", interaction=interaction, tip_row=tip_row)
-            await _refresh_post_close(channel, self.customer_id)
+            if not self.standalone:
+                await _refresh_post_close(channel, self.customer_id)
 
             try:
                 await interaction.delete_original_response()
@@ -453,6 +487,7 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
                 roles=False,
                 everyone=False,
             ),
+            **payment_qr_send_kwargs(payment_method),
         )
         set_worker_tip_confirmation_message(tip_id, review_message.id)
 
@@ -471,7 +506,8 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             ),
             view=None,
         )
-        await _refresh_post_close(channel, self.customer_id)
+        if not self.standalone:
+            await _refresh_post_close(channel, self.customer_id)
 
 
 class WorkerTipPaymentMethodView(discord.ui.View):
@@ -482,18 +518,21 @@ class WorkerTipPaymentMethodView(discord.ui.View):
         ticket_channel_id: int,
         target: dict,
         amount: int,
+        standalone: bool = False,
     ):
         super().__init__(timeout=600)
         self.customer_id = int(customer_id)
         self.ticket_channel_id = int(ticket_channel_id)
         self.target = dict(target)
         self.amount = int(amount)
+        self.standalone = bool(standalone)
         self.add_item(
             WorkerTipPaymentMethodSelect(
                 customer_id=self.customer_id,
                 ticket_channel_id=self.ticket_channel_id,
                 target=self.target,
                 amount=self.amount,
+                standalone=self.standalone,
             )
         )
 
@@ -521,6 +560,7 @@ class WorkerTipPaymentMethodView(discord.ui.View):
                 ticket_channel_id=self.ticket_channel_id,
                 target=self.target,
                 amount=self.amount,
+                standalone=self.standalone,
             )
         )
 

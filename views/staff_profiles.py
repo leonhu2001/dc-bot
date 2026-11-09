@@ -13,6 +13,51 @@ import discord
 _STAFF_PROFILE_ORDER_TICKET_CREATOR = None
 
 
+_STAFF_PROFILE_TIP_TICKET_CREATOR = None
+
+
+def configure_staff_profile_tip_ticket_creator(creator) -> None:
+    global _STAFF_PROFILE_TIP_TICKET_CREATOR
+    _STAFF_PROFILE_TIP_TICKET_CREATOR = creator
+
+
+async def _open_staff_profile_tip_ticket(
+    interaction: discord.Interaction,
+    staff_id: int | str,
+) -> None:
+    creator = _STAFF_PROFILE_TIP_TICKET_CREATOR
+    if creator is None:
+        await interaction.response.send_message(
+            "名片加雞腿功能尚未完成初始化，請通知客服。", ephemeral=True
+        )
+        return
+    if str(interaction.user.id) == str(staff_id):
+        await interaction.response.send_message(
+            "不能透過自己的個人牆給自己加雞腿。", ephemeral=True
+        )
+        return
+    try:
+        await creator(interaction=interaction, staff_id=str(staff_id))
+    except ValueError as exc:
+        if interaction.response.is_done():
+            await interaction.followup.send(str(exc), ephemeral=True)
+        else:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+    except Exception as exc:
+        print(
+            f"[staff-profile-tip] private ticket failed for {staff_id}: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        if interaction.response.is_done():
+            await interaction.followup.send(
+                "建立雞腿專用票口失敗，請通知客服。", ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                "建立雞腿專用票口失敗，請通知客服。", ephemeral=True
+            )
+
+
 def configure_staff_profile_order_ticket_creator(creator) -> None:
     global _STAFF_PROFILE_ORDER_TICKET_CREATOR
     _STAFF_PROFILE_ORDER_TICKET_CREATOR = creator
@@ -1305,6 +1350,23 @@ class StaffProfilePanelView(discord.ui.View):
         reviews_button.callback = self.reviews_callback
         self.add_item(reviews_button)
 
+        tip_button = discord.ui.Button(
+            label="🍗 加雞腿",
+            style=discord.ButtonStyle.success,
+            custom_id=f"staff_profile_tip:{self.staff_id}",
+            row=0,
+        )
+        tip_button.callback = self.tip_callback
+        self.add_item(tip_button)
+
+    async def tip_callback(self, interaction: discord.Interaction):
+        if get_staff_profile(self.staff_id) is None:
+            await interaction.response.send_message(
+                "找不到這位成員的個人牆資料。", ephemeral=True
+            )
+            return
+        await _open_staff_profile_tip_ticket(interaction, self.staff_id)
+
     async def favorite_callback(self, interaction: discord.Interaction):
         profile = get_staff_profile(self.staff_id)
 
@@ -1627,6 +1689,13 @@ class CustomerFavoriteActionsView(discord.ui.View):
         order_button.callback = self.order_request_callback
         self.add_item(order_button)
 
+        tip_button = discord.ui.Button(
+            label="🍗 加雞腿", style=discord.ButtonStyle.success,
+            custom_id=f"favorite_tip:{self.staff_id}", row=2,
+        )
+        tip_button.callback = self.tip_callback
+        self.add_item(tip_button)
+
         remove_button = discord.ui.Button(
             label="取消收藏",
             style=discord.ButtonStyle.danger,
@@ -1676,6 +1745,11 @@ class CustomerFavoriteActionsView(discord.ui.View):
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
         )
+
+    async def tip_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+        await _open_staff_profile_tip_ticket(interaction, self.staff_id)
 
     async def order_request_callback(self, interaction: discord.Interaction):
         if not await self._check_owner(interaction):
@@ -2171,6 +2245,13 @@ class PublicStaffProfileActionsView(discord.ui.View):
         order_button.callback = self.order_request_callback
         self.add_item(order_button)
 
+        tip_button = discord.ui.Button(
+            label="🍗 加雞腿", style=discord.ButtonStyle.success,
+            custom_id=f"public_profile_tip:{self.staff_id}", row=1,
+        )
+        tip_button.callback = self.tip_callback
+        self.add_item(tip_button)
+
         back_button = discord.ui.Button(
             label="返回瀏覽",
             style=discord.ButtonStyle.secondary,
@@ -2212,6 +2293,17 @@ class PublicStaffProfileActionsView(discord.ui.View):
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
         )
+
+    async def tip_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+        profile = get_public_staff_profile(self.staff_id)
+        if profile is None:
+            await interaction.response.send_message(
+                "這位成員目前沒有公開個人牆。", ephemeral=True
+            )
+            return
+        await _open_staff_profile_tip_ticket(interaction, self.staff_id)
 
     async def order_request_callback(self, interaction: discord.Interaction):
         if not await self._check_owner(interaction):

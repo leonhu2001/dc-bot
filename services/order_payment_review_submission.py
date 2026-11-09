@@ -5,6 +5,7 @@ from typing import Callable
 import discord
 
 from services.order_payment_policy import requires_external_payment_review
+from services.payment_qr_assets import payment_qr_edit_kwargs
 
 
 async def submit_external_payment_review_if_needed(
@@ -139,6 +140,7 @@ async def submit_external_payment_review_if_needed(
             payment_message = await payment_channel.fetch_message(payment_message_id)
             await payment_message.edit(
                 embed=pending_embed,
+                **payment_qr_edit_kwargs(payment_method),
                 view=payment_method_view(
                     customer_id=customer_id,
                     channel_id=channel_id,

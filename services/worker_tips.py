@@ -99,6 +99,7 @@ def create_worker_tip(
     amount: int,
     payment_method: str,
     payment_status: str = "pending",
+    source: str = "discord",
 ) -> int:
     ensure_worker_tip_tables()
 
@@ -140,7 +141,7 @@ def create_worker_tip(
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'discord', ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?, ?, ?)
             """,
             (
                 order_id,
@@ -154,6 +155,7 @@ def create_worker_tip(
                 amount,
                 str(payment_method),
                 str(payment_status),
+                str(source or "discord"),
                 now,
                 now,
             ),
