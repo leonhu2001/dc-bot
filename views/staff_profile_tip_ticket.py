@@ -93,11 +93,11 @@ async def send_profile_tip_completion(channel: discord.TextChannel, tip_row) -> 
         return
     await channel.send(
         (
-            "✅ **雞腿已完成**\\n"
-            f"老闆：<@{verified['customer_discord_id']}>\\n"
-            f"指定陪玩：<@{verified['worker_discord_id']}>\\n"
-            f"雞腿：**{int(verified['amount']):,}T**\\n"
-            "此筆已列入指定陪玩的薪資明細（待發放），100% 歸陪玩。\\n\\n"
+            "✅ **雞腿已完成**\n"
+            f"老闆：<@{verified['customer_discord_id']}>\n"
+            f"指定陪玩：<@{verified['worker_discord_id']}>\n"
+            f"雞腿：**{int(verified['amount']):,}T**\n"
+            "此筆已列入指定陪玩的薪資明細（待發放），100% 歸陪玩。\n\n"
             "可以繼續加雞腿，或點下方按鈕關閉票口。"
         ),
         view=WorkerTipProfileCloseView(),
