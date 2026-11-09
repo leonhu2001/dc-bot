@@ -476,6 +476,9 @@ def _valorant_price_list(interaction: discord.Interaction) -> str:
 {_aligned_code_block((("NG", "每人 380T / H"), ("積分（白金以下）", "每人 370T / 局")))}
 積分段位加價：鑽石 +50T、超凡 +100T、神話 +150T、輻能 +200T（每人每局）。
 
+🛡️ **技術陪賠付規則**
+超凡／神話／輻能陪 2 位以上，若該局未獲勝或未進前三，將補打一把（由客服確認）。
+
 {_GAME_PRICE_SECTION_DIVIDER}
 
 🎁 **娛樂陪累積回饋**
@@ -486,9 +489,6 @@ def _valorant_price_list(interaction: discord.Interaction) -> str:
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 或 2局以上免指定費**
-
-🛡️ **技術陪賠付規則**
-超凡／神話／輻能陪 2 位以上，若該局未獲勝或未進前三，將補打一把（由客服確認）。
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
