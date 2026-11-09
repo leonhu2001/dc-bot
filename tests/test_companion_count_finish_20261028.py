@@ -261,10 +261,10 @@ def test_entertainment_gender_variants_share_loyalty_progress_family() -> None:
 
 def test_latest_approved_game_prices_are_direct_source_values() -> None:
     expected = {
-        "valorant_entertain_ng": 300,
-        "valorant_entertain_ranked": 250,
+        "valorant_entertain_ng": 350,
+        "valorant_entertain_ranked": 280,
         "valorant_ascendant_ng": 330,
-        "valorant_ascendant_ranked": 290,
+        "valorant_ascendant_ranked": 300,
         "valorant_immortal_ng": 350,
         "valorant_immortal_ranked": 330,
         "valorant_radiant_ng": 380,
@@ -274,7 +274,7 @@ def test_latest_approved_game_prices_are_direct_source_values() -> None:
         "lol_grandmaster_ng": 390,
         "lol_grandmaster_ranked": 350,
         "lol_elite_ng": 400,
-        "lol_elite_ranked": 450,
+        "lol_elite_ranked": 430,
         "apex_entertain_ng": 320,
         "apex_entertain_ranked": 350,
         "apex_diamond_ng": 380,
