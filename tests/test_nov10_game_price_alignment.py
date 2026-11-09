@@ -123,7 +123,7 @@ def test_prices_in_discord_copy_match_new_poster():
     valorant = _valorant_price_list(interaction)
     assert all(token in valorant for token in ("350T / H", "280T / 局", "330T / H", "300T / 局", "370T / 局", "+50T"))
     assert all(token in lol for token in (
-        "350T / H", "280T / 局", "380T / H", "390T / H", "450T / 局",
+        "350T / H", "280T / 局", "380T / H", "390T / H", "430T / 局",
         "15 局", "10 小時", "3H 起標",
     ))
     assert all(token in apex for token in (
