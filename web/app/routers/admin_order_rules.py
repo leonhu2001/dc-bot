@@ -35,6 +35,11 @@ from services.order_rules import (
     ORDER_RULES,
     ROLE_LABELS,
     OrderRule,
+    OWNER_APPROVED_20261110_GAME_PRICE_KEYS,
+    OWNER_APPROVED_GAME_PRICE_REVISION,
+    SOURCE_AUTHORITY_RULE_KEYS,
+    SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS,
+    ONE_COMPANION_ONE_GUARD_RULE_KEYS,
     build_custom_rule,
     get_base_rule,
     invalidate_rule_override_cache,
@@ -427,13 +432,68 @@ def _apply_fun_free_specify_policy(category: str, payload: dict) -> dict:
     return payload
 
 
+def _validate_admin_system_owned_fields(rule_key: str, payload: dict) -> None:
+    """Reject UI edits to fields that runtime deliberately forces back to code.
+
+    A previous preview could say 'publish successful' for a field that the
+    effective Bot/Web rule silently discarded. Show an actionable error instead.
+    """
+    key = str(rule_key)
+    base = get_base_rule(key)
+    base_values = rule_to_override_payload(base)
+    owned = set()
+    if key in SOURCE_AUTHORITY_RULE_KEYS:
+        owned.update((
+            "catalog_group_label", "allowed_roles", "allowed_game_roles",
+            "required_game_roles", "required_roles", "required_staff_count",
+            "player_count_enabled", "min_player_count", "max_player_count",
+            "price_multiply_player_count", "player_count_prices",
+            "max_specified_count",
+        ))
+    if key in SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS:
+        owned.update((
+            "allowed_roles", "allowed_game_roles", "required_game_roles",
+            "required_roles", "allow_specify", "max_specified_count",
+            "specify_fee_default", "vip_discount_allowed",
+            "point_benefits_allowed", "loyalty_benefits_enabled",
+        ))
+    if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+        owned.update((
+            "allowed_roles", "required_game_roles", "required_staff_count",
+            "min_protector_count", "allow_specify", "max_specified_count",
+            "specify_fee_default", "specify_fee_by_role",
+            "specify_fee_by_game_role", "specify_free_min_units",
+            "specify_free_basis",
+        ))
+    if key == "custom_custom_order":
+        owned.update((
+            "pricing_type", "price", "price_multiply_player_count",
+            "player_count_prices", "specify_fee_default",
+            "specify_fee_by_role", "specify_fee_by_game_role",
+            "specify_free_min_units", "staff_adjustments",
+            "staff_adjustment_labels",
+        ))
+    mismatches = sorted(
+        name for name in owned
+        if payload.get(name, base_values.get(name)) != base_values.get(name)
+    )
+    if mismatches:
+        raise ValueError(
+            "這個商品的以下欄位由系統規則控管，不能從後台修改："
+            + "、".join(mismatches)
+            + "。其他欄位（包括可變更的售價）仍可正常發布。"
+        )
+
+
 def _payload_from_form(rule_key: str, form) -> dict:
     current = ORDER_RULES[str(rule_key)]
     payload = _payload_from_form_base(
         _payload_with_presentation(str(rule_key), current),
         form,
     )
-    return _apply_fun_free_specify_policy(str(current.category), payload)
+    payload = _apply_fun_free_specify_policy(str(current.category), payload)
+    _validate_admin_system_owned_fields(rule_key, payload)
+    return payload
 
 
 def _new_product_payload(category: str, form) -> dict:
@@ -826,6 +886,7 @@ async def admin_order_rule_publish(
         if not isinstance(payload, dict):
             raise ValueError("規則預覽資料格式錯誤。")
 
+        _validate_admin_system_owned_fields(rule_key, payload)
         rule = preview_rule_override(rule_key, payload)
         before_payload = _payload_with_presentation(
             rule_key,
@@ -833,6 +894,12 @@ async def admin_order_rule_publish(
         )
         published_payload = rule_to_override_payload(rule)
         published_payload["intro"] = str(payload.get("intro") or "").strip()
+        if rule_key in OWNER_APPROVED_20261110_GAME_PRICE_KEYS:
+            # A fresh manager-confirmed edit is different from legacy
+            # overrides created before the approved Nov 10 poster prices.
+            published_payload["_owner_price_revision"] = (
+                OWNER_APPROVED_GAME_PRICE_REVISION
+            )
 
         result = publish_rule_override(
             rule_key=rule_key,
