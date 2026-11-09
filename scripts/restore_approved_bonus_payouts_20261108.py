@@ -199,9 +199,8 @@ def evaluate(current: sqlite3.Connection, snapshot: sqlite3.Connection, order_id
                         and any(marker in str(old_row.get("note") or "")
                                 for marker in BONUS_MARKERS)):
                     saw_verified_bonus_loss = True
-            if old_amount != now_amount or (
-                    any(old_row[field] != now_row[field] for field in fields)
-                    and table == "worker_payouts"):
+            if old_amount != now_amount or any(
+                    old_row[field] != now_row[field] for field in fields):
                 changes.append({
                     "table": table, "id": row_id, "from": now_amount,
                     "to": old_amount, "fields": fields,
