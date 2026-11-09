@@ -31,7 +31,7 @@ git merge-base --is-ancestor "$BASE" "$TARGET" || {
 }
 
 # Fail closed if the isolated branch ever modifies product prices or promotions.
-if git diff --name-only "$BASE" "$TARGET" | grep -Eq   '^(services/(order_rules|orders|quick_order_v2_price_lists|one_companion_one_guard_payout)\.py|web/app/services/checkout_preview\.py)$'; then
+if git diff --name-only "$BASE" "$TARGET" | grep -Eq   '^(services/(order_rules|orders|quick_order_v2_price_lists|one_companion_one_guard_catalog|one_companion_one_guard_payout)\.py|web/app/services/checkout_preview\.py)$'; then
   echo "BLOCKED: unexpected pricing/catalog changes in feature release"; exit 3
 fi
 for filename in cathay_qr.jpg jkopay_qr.jpg; do
@@ -66,8 +66,8 @@ rollback() {
 trap rollback ERR
 
 echo "=== ISOLATED QR/TIP DEPLOY (NO PRICE CHANGES) ==="
-systemctl stop "$BOT" "$WEB"
 RESTORE_NEEDED=1
+systemctl stop "$BOT" "$WEB"
 git switch --detach "$TARGET"
 "$APP/venv/bin/python" -m compileall -q bot.py services views web/app
 "$APP/venv/bin/python" "$APP/tools/runtime_import_smoke.py"
@@ -89,6 +89,7 @@ for key, old_price in expected.items():
 print("PASS: previous Delta desktop prices remain unchanged")
 PY
 systemctl start "$WEB" "$BOT"
+sleep 3
 for unit in "$WEB" "$BOT"; do
   systemctl is-active --quiet "$unit" || {
     echo "FAIL: $unit not active"; false
