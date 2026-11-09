@@ -206,3 +206,37 @@ def test_restore_rejects_bonus_note_from_different_worker(tmp_path):
             plan = recovery.evaluate(now, old, 306)
     assert plan["state"] == "blocked"
     assert "名單" in plan["reason"]
+
+
+def test_auto_archives_scans_november_and_restores_verified_rows(
+    tmp_path, monkeypatch
+):
+    import shutil
+
+    current, snapshot = _prepare(tmp_path)
+    with sqlite3.connect(current) as db:
+        db.execute("ALTER TABLE web_orders ADD COLUMN closed_at TEXT")
+        db.execute("ALTER TABLE web_orders ADD COLUMN updated_at TEXT")
+        db.execute("ALTER TABLE web_orders ADD COLUMN created_at TEXT")
+        db.execute("UPDATE web_orders SET closed_at='2026-11-04 12:00:00'")
+    archived = tmp_path / "_archive" / "deploy_20261105_before_repair"
+    archived.mkdir(parents=True)
+    shutil.copy2(snapshot, archived / "web_dashboard.db")
+
+    monkeypatch.setattr(recovery, "ROOT", tmp_path)
+    monkeypatch.setenv("MW_ORDER_REPAIR_MAINTENANCE", "1")
+    monkeypatch.setattr(sys, "argv", [
+        "recovery", "--auto-archives", "--all-november", "--apply"
+    ])
+    assert recovery.main() == 0
+    with sqlite3.connect(current) as db:
+        assert db.execute(
+            "SELECT final_payout FROM worker_payouts WHERE order_id=306"
+        ).fetchone()[0] == 164
+        assert db.execute(
+            "SELECT payout_amount FROM customer_service_payouts WHERE order_id=306"
+        ).fetchone()[0] == 8
+        assert db.execute(
+            "SELECT COUNT(*) FROM admin_audit_logs "
+            "WHERE action='restore_approved_bonus_from_verified_backup'"
+        ).fetchone()[0] == 1
