@@ -108,3 +108,89 @@ def test_restore_blocks_any_paid_row_and_does_not_modify_database(tmp_path):
             result = recovery.evaluate(now, old, 306)
     assert result["state"] == "blocked"
     assert "已發放" in result["reason"]
+
+
+def test_restore_matches_recreated_payout_ids_to_their_own_audit(tmp_path):
+    current, snapshot = _prepare(tmp_path)
+    # Base recalculation deletes and re-inserts the payouts, changing PKs.
+    with sqlite3.connect(current) as db:
+        db.execute("UPDATE worker_payouts SET id=18 WHERE id=8")
+        db.execute("UPDATE customer_service_payouts SET id=13 WHERE id=3")
+        before, after = db.execute(
+            "SELECT before_json, after_json FROM admin_audit_logs WHERE id=1"
+        ).fetchone()
+        after = json.loads(after)
+        after["worker_payouts"][0]["id"] = 18
+        after["customer_service_payouts"][0]["id"] = 13
+        db.execute("UPDATE admin_audit_logs SET after_json=? WHERE id=1",
+                   (json.dumps(after),))
+    with recovery._open(current, readonly=True) as now:
+        with recovery._open(snapshot, readonly=True) as old:
+            plan = recovery.evaluate(now, old, 306)
+    assert plan["state"] == "ready"
+    assert {(c["table"], c["id"], c["to"]) for c in plan["changes"]} == {
+        ("worker_payouts", 18, 164),
+        ("customer_service_payouts", 13, 8),
+    }
+
+
+def test_restore_rejects_regenerated_ids_not_present_in_latest_audit(tmp_path):
+    current, snapshot = _prepare(tmp_path)
+    with sqlite3.connect(current) as db:
+        db.execute("UPDATE worker_payouts SET id=18 WHERE id=8")
+    with recovery._open(current, readonly=True) as now:
+        with recovery._open(snapshot, readonly=True) as old:
+            plan = recovery.evaluate(now, old, 306)
+    assert plan["state"] == "blocked"
+    assert "ID" in plan["reason"]
+
+
+def test_november_batch_discovery_only_selects_repaired_closed_orders(tmp_path):
+    current, _ = _prepare(tmp_path)
+    with sqlite3.connect(current) as db:
+        db.execute("ALTER TABLE web_orders ADD COLUMN closed_at TEXT")
+        db.execute("ALTER TABLE web_orders ADD COLUMN updated_at TEXT")
+        db.execute("ALTER TABLE web_orders ADD COLUMN created_at TEXT")
+        db.execute("UPDATE web_orders SET closed_at='2026-11-04 12:00:00'")
+        db.execute("INSERT INTO web_orders "
+                   "(id,bot_order_no,status,closed_at) VALUES "
+                   "(307,'MO20261104007','closed','2026-11-04 13:00:00'),"
+                   "(308,'MO20261030001','closed','2026-10-30 13:00:00')")
+        db.execute("INSERT INTO admin_audit_logs "
+                   "(id,admin_discord_id,action,target_type,target_id,"
+                   "before_json,after_json,created_at) VALUES "
+                   "(2,'owner','accounting_recalculate_unpaid_payouts',"
+                   "'order','308','{}','{}','2026-11-09')")
+        assert recovery.november_repair_order_ids(db) == [306]
+
+
+def test_repeat_recovery_is_rejected_as_duplicate(tmp_path, monkeypatch):
+    current, snapshot = _prepare(tmp_path)
+    monkeypatch.setattr(recovery, "ROOT", tmp_path)
+    monkeypatch.setenv("MW_ORDER_REPAIR_MAINTENANCE", "1")
+    monkeypatch.setattr(sys, "argv", [
+        "recovery", "--snapshot", str(snapshot), "--order-ids", "306", "--apply"
+    ])
+    assert recovery.main() == 0
+    with recovery._open(current, readonly=True) as now:
+        with recovery._open(snapshot, readonly=True) as old:
+            plan = recovery.evaluate(now, old, 306)
+    assert plan["state"] == "blocked"
+    assert "重複" in plan["reason"]
+
+
+def test_restore_rejects_bonus_note_from_different_worker(tmp_path):
+    current, snapshot = _prepare(tmp_path)
+    with sqlite3.connect(current) as db:
+        before, after = db.execute(
+            "SELECT before_json, after_json FROM admin_audit_logs WHERE id=1"
+        ).fetchone()
+        data = json.loads(before)
+        data["worker_payouts"][0]["worker_discord_id"] = "other-staff"
+        db.execute("UPDATE admin_audit_logs SET before_json=? WHERE id=1",
+                   (json.dumps(data),))
+    with recovery._open(current, readonly=True) as now:
+        with recovery._open(snapshot, readonly=True) as old:
+            plan = recovery.evaluate(now, old, 306)
+    assert plan["state"] == "blocked"
+    assert "名單" in plan["reason"]
