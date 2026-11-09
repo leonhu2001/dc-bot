@@ -617,7 +617,7 @@ _add(OrderRule(
     note="保底三選一：800w / 500w + 2 沙色保險 / 4 沙色保險",
 ))
 
-def _add_delta_tech_rule(*, category: str, key: str, label: str, prices: dict[int, int], game_roles: tuple[str, ...]) -> None:
+def _add_delta_tech_rule(*, category: str, key: str, label: str, prices: dict[int, int], game_roles: tuple[str, ...], guarantee_note: str = "") -> None:
     _add(OrderRule(
         category, key, label, "hourly", int(prices[1]), "H",
         allowed_roles=PROTECTOR_ROLES,
@@ -633,18 +633,19 @@ def _add_delta_tech_rule(*, category: str, key: str, label: str, prices: dict[in
         specify_fee_by_role=_protectors_fee(),
         specify_free_min_units=2,
         specify_free_basis="quantity",
+        note=guarantee_note,
     ))
 
 
-_add_delta_tech_rule(category="delta_desktop_basic", key="basic_tech_secret_single", label="技術陪〈端遊〉｜機密", prices={1: 400, 2: 750}, game_roles=DELTA_DESKTOP_GAME_ROLE)
-_add_delta_tech_rule(category="delta_desktop_basic", key="basic_tech_topsecret_single", label="技術陪〈端遊〉｜絕密", prices={1: 450, 2: 850}, game_roles=DELTA_DESKTOP_GAME_ROLE)
+_add_delta_tech_rule(category="delta_desktop_basic", key="basic_tech_secret_single", label="技術陪〈端遊〉｜機密", prices={1: 450, 2: 850}, game_roles=DELTA_DESKTOP_GAME_ROLE, guarantee_note="單護：一小時內 8 殺；雙護：保底 777W；指定打手每人 +100T，2H 以上免指定費。")
+_add_delta_tech_rule(category="delta_desktop_basic", key="basic_tech_topsecret_single", label="技術陪〈端遊〉｜絕密", prices={1: 500, 2: 900}, game_roles=DELTA_DESKTOP_GAME_ROLE, guarantee_note="單護：一小時內 7 殺；雙護：保底 850W；指定打手每人 +100T，2H 以上免指定費。")
 _add_delta_tech_rule(category="delta_mobile_basic", key="basic_mobile_tech_secret_single", label="技術陪〈手遊〉｜機密", prices={1: 380, 2: 760}, game_roles=DELTA_MOBILE_GAME_ROLE)
 _add_delta_tech_rule(category="delta_mobile_basic", key="basic_mobile_tech_topsecret_single", label="技術陪〈手遊〉｜絕密", prices={1: 420, 2: 840}, game_roles=DELTA_MOBILE_GAME_ROLE)
 
 # 舊雙陪 key 只保留歷史訂單／舊快照回查；新下單不再引用。
 for category, key, label, price, game_roles in [
-    ("delta_desktop_basic", "basic_tech_secret_double", "技術陪〈端遊〉｜機密雙陪", 750, DELTA_DESKTOP_GAME_ROLE),
-    ("delta_desktop_basic", "basic_tech_topsecret_double", "技術陪〈端遊〉｜絕密雙陪", 850, DELTA_DESKTOP_GAME_ROLE),
+    ("delta_desktop_basic", "basic_tech_secret_double", "技術陪〈端遊〉｜機密雙陪", 850, DELTA_DESKTOP_GAME_ROLE),
+    ("delta_desktop_basic", "basic_tech_topsecret_double", "技術陪〈端遊〉｜絕密雙陪", 900, DELTA_DESKTOP_GAME_ROLE),
     ("delta_mobile_basic", "basic_mobile_tech_secret_double", "技術陪〈手遊〉｜機密雙陪", 760, DELTA_MOBILE_GAME_ROLE),
     ("delta_mobile_basic", "basic_mobile_tech_topsecret_double", "技術陪〈手遊〉｜絕密雙陪", 840, DELTA_MOBILE_GAME_ROLE),
 ]:
@@ -685,8 +686,10 @@ _add(OrderRule(
 # 已建立訂單仍使用建立當下保存的規則快照，不受影響。
 
 def _add_delta_entertain_rule(*, category: str, key: str, label: str, allowed_roles: tuple[RoleKey, ...], game_roles: tuple[str, ...]) -> None:
+    # Only desktop prices change. Handheld products keep their approved prices.
+    single_price, double_price = ((350, 650) if category == "delta_desktop_basic" else (320, 600))
     _add(OrderRule(
-        category, key, label, "hourly", 320, "H",
+        category, key, label, "hourly", single_price, "H",
         allowed_roles=allowed_roles,
         required_game_roles=game_roles,
         required_staff_count="player_count",
@@ -694,7 +697,7 @@ def _add_delta_entertain_rule(*, category: str, key: str, label: str, allowed_ro
         min_player_count=1,
         max_player_count=2,
         price_multiply_player_count=False,
-        player_count_prices={1: 320, 2: 600},
+        player_count_prices={1: single_price, 2: double_price},
         allow_specify=True,
         max_specified_count=2,
         specify_fee_default=100,
@@ -720,7 +723,8 @@ for category, prefix, display, game_roles in [
         ("male_double", "男雙陪", ("male_companion",)),
     ):
         _add(OrderRule(
-            category, f"{prefix}_{suffix}", f"{display}｜{text}", "hourly", 600, "H",
+            category, f"{prefix}_{suffix}", f"{display}｜{text}", "hourly",
+            650 if category == "delta_desktop_basic" else 600, "H",
             allowed_roles=roles,
             required_game_roles=game_roles,
             required_staff_count=2,
@@ -988,16 +992,26 @@ for (
     ))
 
 for key, label, price in [
-    ("basic_oil_fuel", "油鍋單｜火箭燃油", 2600),
-    ("basic_oil_satellite", "油鍋單｜GTI衛星通訊天線", 1800),
-    ("basic_oil_all", "油鍋單｜全包", 4000),
-    ("basic_bet_1000", "賭約單｜800w", 800),
-    ("basic_bet_1500", "賭約單｜1000w", 1200),
-    ("basic_bet_2500", "賭約單｜1200w", 1500),
-    ("basic_trial_500", "體驗單｜777w", 450),
-    ("basic_trial_1000", "體驗單｜1688w", 900),
+    ("basic_oil_fuel", "油鍋單｜火箭燃油", 2800, "保底 2000W；限定航天基地；撤離時帶出即結單；過保底未出貨，下場改以撞場交貨。"),
+    ("basic_oil_satellite", "油鍋單｜GTI衛星通訊天線", 2000, "保底 1500W；限定航天基地；撤離時帶出即結單；過保底未出貨，下場改以撞場交貨。"),
+    ("basic_oil_all", "油鍋單｜全包", 4500, "保底 3500W；限定航天基地；撤離時帶出即結單；過保底未出貨，下場改以撞場交貨。"),
+    ("basic_bet_1000", "賭約單｜800w", 1300, "單局保底 800W；未達指定金額不結單；打手選圖。"),
+    ("basic_bet_1500", "賭約單｜1000w", 1800, "單局保底 1000W；未達指定金額不結單；打手選圖。"),
+    ("basic_bet_2500", "賭約單｜1200w", 2500, "單局保底 1200W；未達指定金額不結單；打手選圖。"),
+    ("basic_trial_500", "體驗單｜普通｜888w", 500, "普通體驗單，保底 888W；每週限一次；不可折扣、不可參加加碼活動；打手選圖。"),
+    ("basic_trial_1000", "體驗單｜尊爵｜1888w", 1000, "尊爵體驗單，保底 1888W；每月限一次，金級以上每週限一次；不可折扣、不可參加加碼活動；打手選圖。"),
 ]:
-    _add(OrderRule("delta_desktop_basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
+    is_trial = key.startswith("basic_trial_")
+    _add(OrderRule(
+        "delta_desktop_basic", key, label, "fixed", price,
+        allowed_roles=PROTECTOR_ROLES,
+        required_game_roles=DELTA_DESKTOP_GAME_ROLE,
+        required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False,
+        vip_discount_allowed=not is_trial,
+        point_benefits_allowed=not is_trial,
+        loyalty_benefits_enabled=False,
+        note=note,
+    ))
 
 
 # ========= 趣味單 =========
@@ -1718,6 +1732,20 @@ SOURCE_AUTHORITY_RULE_KEYS = frozenset(
 
 # Owner-approved structural qualifications. Manager overrides may change ordinary
 # commercial fields but cannot broaden who may claim these system products.
+# Prices and offer restrictions approved on 2026-11-09 must not be
+# overwritten by stale manager-price overrides on either DC or Web.
+DELTA_DESKTOP_PRICE_AUTHORITY_KEYS = frozenset({
+    "basic_tech_secret_single", "basic_tech_topsecret_single",
+    "basic_tech_secret_double", "basic_tech_topsecret_double",
+    "basic_entertain_single", "basic_entertain_female_single",
+    "basic_entertain_male_single", "basic_entertain_double",
+    "basic_entertain_female_double", "basic_entertain_male_double",
+    "basic_trial_500", "basic_trial_1000",
+    "basic_bet_1000", "basic_bet_1500", "basic_bet_2500",
+    "basic_oil_fuel", "basic_oil_satellite", "basic_oil_all",
+    "basic_one_companion_one_guard_secret", "basic_one_companion_one_guard_topsecret",
+})
+
 SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS = COIN_WASH_AW_ORDER_RULE_KEYS
 
 
@@ -1818,6 +1846,16 @@ class EffectiveOrderRules(dict):
                     price_multiply_player_count=base.price_multiply_player_count,
                     player_count_prices=dict(base.player_count_prices),
                     max_specified_count=base.max_specified_count,
+                )
+            if key in DELTA_DESKTOP_PRICE_AUTHORITY_KEYS:
+                rule = replace(
+                    rule,
+                    price=base.price,
+                    player_count_prices=dict(base.player_count_prices),
+                    note=base.note,
+                    vip_discount_allowed=base.vip_discount_allowed,
+                    point_benefits_allowed=base.point_benefits_allowed,
+                    loyalty_benefits_enabled=base.loyalty_benefits_enabled,
                 )
             if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
                 # An old manager override may still say allow_specify=False.
