@@ -633,6 +633,10 @@ def _add_delta_tech_rule(*, category: str, key: str, label: str, prices: dict[in
         specify_fee_by_role=_protectors_fee(),
         specify_free_min_units=2,
         specify_free_basis="quantity",
+        note={
+            "basic_tech_secret_single": "機密單護：每小時內保證 8 殺；機密雙護：777W 保底",
+            "basic_tech_topsecret_single": "絕密單護：每小時內保證 7 殺；絕密雙護：850W 保底",
+        }.get(key, ""),
     ))
 
 
@@ -702,6 +706,7 @@ def _add_delta_entertain_rule(*, category: str, key: str, label: str, allowed_ro
         specify_free_min_units=2,
         specify_free_basis="quantity",
         loyalty_benefits_enabled=True,
+        note="不保撤、無保底｜累積10小時送1小時券" if category == "delta_desktop_basic" else "",
     ))
 
 
