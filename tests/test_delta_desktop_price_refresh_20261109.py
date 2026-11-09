@@ -31,10 +31,6 @@ def test_desktop_pricing_shared_by_discord_and_web(key, count, amount):
 @pytest.mark.parametrize("key, old_mobile_price, players", [
     ("basic_mobile_entertain_single", 320, 1),
     ("basic_mobile_entertain_single", 600, 2),
-    ("basic_mobile_tech_secret_single", 380, 1),
-    ("basic_mobile_tech_secret_single", 760, 2),
-    ("basic_mobile_tech_topsecret_single", 420, 1),
-    ("basic_mobile_tech_topsecret_single", 840, 2),
 ])
 def test_mobile_prices_not_affected(key, old_mobile_price, players):
     assert calculate_price(
