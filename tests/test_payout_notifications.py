@@ -77,7 +77,9 @@ def test_salary_notification_is_compact_and_links_employee_center(tmp_path, monk
                 worker_display_name TEXT,
                 amount INTEGER,
                 payment_status TEXT,
-                payout_status TEXT
+                payout_status TEXT,
+                paid_at TEXT,
+                created_at TEXT
             );
 
             CREATE TABLE customer_service_payouts (
@@ -116,6 +118,16 @@ def test_salary_notification_is_compact_and_links_employee_center(tmp_path, monk
             ) VALUES (1, 1, '123', '測試陪玩', 100, 'paid', 'paid')
             """
         )
+        conn.execute(
+            """INSERT INTO worker_tips(
+                id, order_id, worker_discord_id, worker_display_name,
+                amount, payment_status, payout_status, paid_at, created_at
+            ) VALUES(
+                2, NULL, '123', '測試陪玩',
+                180, 'paid', 'paid',
+                '2026-10-04 10:00:00', '2026-10-04 09:00:00'
+            )"""
+        )
         conn.commit()
     finally:
         conn.close()
@@ -148,20 +160,20 @@ def test_salary_notification_is_compact_and_links_employee_center(tmp_path, monk
     )
 
     assert result["sent"] is True
-    assert result["total"] == 600
+    assert result["total"] == 780
     assert result["worker_total"] == 500
     assert result["worker_count"] == 1
-    assert result["tip_total"] == 100
-    assert result["tip_count"] == 1
+    assert result["tip_total"] == 280
+    assert result["tip_count"] == 2
     assert result["detail_messages"] == 0
     assert result["employee_center_url"] == "https://mowanentertainment.com/employee"
     assert len(sent) == 1
 
     embed_text = str(sent[0]["embeds"])
-    assert "600T" in embed_text
+    assert "780T" in embed_text
     assert "陪玩／打單收入" in embed_text
     assert "🍗 雞腿" in embed_text
-    assert "1筆" in embed_text
+    assert "2筆" in embed_text
     assert "https://mowanentertainment.com/employee" in embed_text
     assert "MW-1001" not in embed_text
 
