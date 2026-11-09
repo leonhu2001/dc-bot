@@ -682,3 +682,37 @@ def test_recalculate_unpaid_payouts_uses_store_funded_service_exclusion_for_cs()
         assert cs.payout_amount == 10
     finally:
         db.close()
+
+
+def test_approved_bonus_report_is_never_base_recalculated_even_if_unpaid():
+    db = _make_session()
+    try:
+        _seed_order(db, worker_amount=164, cs_amount=8)
+        with db.begin_nested():
+            db.execute(text("""
+                CREATE TABLE order_reports(
+                    id INTEGER PRIMARY KEY,
+                    order_id INTEGER NOT NULL,
+                    status TEXT NOT NULL
+                )
+            """))
+            db.execute(text(
+                "INSERT INTO order_reports(id, order_id, status) "
+                "VALUES (1, 1, 'approved')"
+            ))
+        before_worker = db.scalar(select(WorkerPayout).where(WorkerPayout.order_id == 1))
+        before_cs = db.scalar(
+            select(CustomerServicePayout).where(CustomerServicePayout.order_id == 1)
+        )
+        assert before_worker.final_payout == 164
+        assert before_cs.payout_amount == 8
+        with pytest.raises(ValueError, match="報單已核准"):
+            apply_accounting_repair_in_session(
+                db,
+                order_id=1,
+                action=RECALCULATE_UNPAID_PAYOUTS,
+            )
+        assert before_worker.final_payout == 164
+        assert before_cs.payout_amount == 8
+    finally:
+        db.close()
