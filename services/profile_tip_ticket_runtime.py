@@ -1,12 +1,16 @@
 """Private profile chicken-leg tickets backed by the existing tip ledger."""
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Awaitable
 
 import discord
 
 from views.profile_tip_ticket import WorkerTipProfileStartView
-from views.staff_profiles import get_staff_profile
+from views.staff_profiles import (
+    get_staff_profile, get_staff_profile_panel_rows,
+    refresh_staff_profile_panel_for_staff,
+)
 
 _CUSTOMER_CATEGORY_ID: int | None = None
 _CUSTOMER_ROLE_ID: int | None = None
@@ -107,6 +111,26 @@ async def create_staff_profile_tip_ticket(
     )
 
 
+async def refresh_active_profile_tip_buttons(bot: discord.Client) -> int:
+    """Upgrade existing public cards without unarchiving inactive forum threads."""
+    refreshed = 0
+    for profile in get_staff_profile_panel_rows():
+        staff_id = str(profile.get("staff_discord_id") or "").strip()
+        if not staff_id or not profile.get("panel_message_id"):
+            continue
+        for guild in bot.guilds:
+            try:
+                if await refresh_staff_profile_panel_for_staff(
+                    guild, staff_id, reason="profile_tip_button_upgrade"
+                ):
+                    refreshed += 1
+                    break
+            except Exception as exc:
+                print(f"[staff-profile-tip] panel upgrade {staff_id}: {exc}")
+        await asyncio.sleep(0)
+    return refreshed
+
+
 def register_existing_profile_tip_views(
     bot: discord.Client, *, customer_category_id: int,
 ) -> int:
@@ -135,4 +159,8 @@ def register_existing_profile_tip_views(
                 registered += 1
             except ValueError:
                 pass
+    try:
+        asyncio.get_running_loop().create_task(refresh_active_profile_tip_buttons(bot))
+    except RuntimeError:
+        pass  # UI registration also works in sync test/harness contexts.
     return registered
