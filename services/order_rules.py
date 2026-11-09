@@ -998,7 +998,26 @@ for key, label, price in [
     ("basic_trial_500", "體驗單｜普通850w", 500),
     ("basic_trial_1000", "體驗單｜尊爵1888w", 1000),
 ]:
-    _add(OrderRule("delta_desktop_basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
+    trial = key.startswith("basic_trial_")
+    note = {
+        "basic_trial_500": "普通體驗單｜850W 保底｜不卡底｜每週限一次｜打手選圖｜不適用折扣及加碼",
+        "basic_trial_1000": "尊爵體驗單｜1888W 保底｜每月限一次；金級以上每週一次｜打手選圖｜不適用折扣及加碼",
+        "basic_bet_1000": "賭約單｜800W｜未達指定金額不結單｜絕密｜打手選圖｜不卡底",
+        "basic_bet_1500": "賭約單｜1000W｜未達指定金額不結單｜絕密｜打手選圖｜不卡底",
+        "basic_bet_2500": "賭約單｜1200W｜未達指定金額不結單｜絕密｜打手選圖｜不卡底",
+        "basic_oil_fuel": "航天基地限定｜2000W 保底｜帶出即結單｜未出貨於下場撞場交貨",
+        "basic_oil_satellite": "航天基地限定｜1688W 保底｜帶出即結單｜未出貨於下場撞場交貨",
+        "basic_oil_all": "航天基地限定｜3688W 保底｜帶出即結單｜未出貨於下場撞場交貨",
+    }[key]
+    _add(OrderRule(
+        "delta_desktop_basic", key, label, "fixed", price,
+        allowed_roles=PROTECTOR_ROLES,
+        required_game_roles=DELTA_DESKTOP_GAME_ROLE,
+        required_staff_count=2, min_quantity=1, max_quantity=1,
+        allow_specify=False, note=note,
+        vip_discount_allowed=not trial,
+        point_benefits_allowed=not trial,
+    ))
 
 
 # ========= 趣味單 =========
