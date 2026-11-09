@@ -585,13 +585,13 @@ def test_web_catalog_uses_game_specific_shared_services():
 
 
 def test_delta_desktop_and_mobile_pricing_are_separate():
-    assert ORDER_RULES["basic_entertain_single"].price == 320
+    assert ORDER_RULES["basic_entertain_single"].price == 350
     assert ORDER_RULES["basic_entertain_double"].price == 600
     assert ORDER_RULES["basic_mobile_entertain_single"].price == 320
     assert ORDER_RULES["basic_mobile_entertain_double"].price == 600
 
-    assert ORDER_RULES["basic_tech_secret_single"].price == 400
-    assert ORDER_RULES["basic_tech_topsecret_single"].price == 450
+    assert ORDER_RULES["basic_tech_secret_single"].price == 450
+    assert ORDER_RULES["basic_tech_topsecret_single"].price == 500
     assert ORDER_RULES["basic_mobile_tech_secret_single"].price == 380
     assert ORDER_RULES["basic_mobile_tech_topsecret_single"].price == 420
     assert ORDER_RULES["basic_exbar_tech"].price == 1000
@@ -737,14 +737,14 @@ def test_storefront_business_values_are_direct_rules():
         "basic_sweet_female_double": ("hourly", 1314, "H"),
         "basic_sweet_male_double": ("hourly", 1314, "H"),
         "basic_sweet_double_any": ("hourly", 1314, "H"),
-        "basic_trial_500": ("fixed", 450, "單"),
-        "basic_trial_1000": ("fixed", 900, "單"),
-        "basic_bet_1000": ("fixed", 800, "單"),
-        "basic_bet_1500": ("fixed", 1200, "單"),
-        "basic_bet_2500": ("fixed", 1500, "單"),
-        "basic_oil_fuel": ("fixed", 2600, "單"),
-        "basic_oil_satellite": ("fixed", 1800, "單"),
-        "basic_oil_all": ("fixed", 4000, "單"),
+        "basic_trial_500": ("fixed", 500, "單"),
+        "basic_trial_1000": ("fixed", 1000, "單"),
+        "basic_bet_1000": ("fixed", 1300, "單"),
+        "basic_bet_1500": ("fixed", 1800, "單"),
+        "basic_bet_2500": ("fixed", 2400, "單"),
+        "basic_oil_fuel": ("fixed", 3000, "單"),
+        "basic_oil_satellite": ("fixed", 2000, "單"),
+        "basic_oil_all": ("fixed", 4500, "單"),
         "steam_play": ("hourly", 320, "H"),
 
         "valorant_entertain_ng": ("hourly", 300, "H"),
