@@ -3,6 +3,8 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterable
 
+from web.app.services.tip_payout_sql import TIP_DATE_SQL, TIP_ELIGIBLE_SQL
+
 
 MONTHLY_PERFORMANCE_TARGET = 5000
 
@@ -94,7 +96,7 @@ def build_worker_performance_map(
         tip_rows = []
         if _table_exists(conn, "worker_tips") and _column_exists(conn, "worker_tips", "amount"):
             tip_where = [
-                "w.status = 'closed'",
+                TIP_ELIGIBLE_SQL,
                 "p.payment_status = 'paid'",
                 "COALESCE(p.amount, 0) > 0",
                 "COALESCE(p.worker_discord_id, '') <> ''",
@@ -102,8 +104,7 @@ def build_worker_performance_map(
             tip_params: list[str] = []
             if month:
                 tip_where.append(
-                    "substr(COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), "
-                    "NULLIF(w.created_at, '')), 1, 7) = ?"
+                    f"substr({TIP_DATE_SQL}, 1, 7) = ?"
                 )
                 tip_params.append(month)
             if ids:
@@ -116,7 +117,7 @@ def build_worker_performance_map(
                     CAST(p.worker_discord_id AS TEXT) AS discord_id,
                     COALESCE(p.amount, 0) AS amount
                 FROM worker_tips p
-                JOIN web_orders w ON w.id = p.order_id
+                LEFT JOIN web_orders w ON w.id = p.order_id
                 WHERE {' AND '.join(tip_where)}
                 """,
                 tip_params,
