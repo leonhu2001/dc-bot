@@ -410,7 +410,8 @@ from views.staff_profiles import (
     configure_staff_profile_tip_ticket_creator,
 )
 from views.staff_profile_tip_ticket import (
-    WorkerTipProfileStartView,
+    WorkerTipProfileTicketView,
+    WorkerTipProfileCloseView,
     create_staff_profile_tip_ticket as _create_profile_tip_ticket,
 )
 
@@ -906,6 +907,7 @@ async def create_private_channel(
     channel_name: str,
     allowed_roles: list[discord.Role],
     intro_message: str,
+    allowed_members: list[discord.Member] | None = None,
     view: discord.ui.View | None = None,
     topic: str | None = None,
     pre_message: str | None = None,
@@ -963,6 +965,14 @@ async def create_private_channel(
                 read_message_history=True,
                 attach_files=True
             )
+
+    for allowed_member in allowed_members or []:
+        overwrites[allowed_member] = discord.PermissionOverwrite(
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            attach_files=True,
+        )
 
     channel = await guild.create_text_channel(
         name=channel_name,
@@ -2834,7 +2844,8 @@ async def on_ready():
         bot.loop.create_task(_refresh_welcome_history_background())
 
     if not getattr(bot, "_worker_tip_profile_start_registered", False):
-        bot.add_view(WorkerTipProfileStartView())
+        bot.add_view(WorkerTipProfileTicketView())
+        bot.add_view(WorkerTipProfileCloseView())
         bot._worker_tip_profile_start_registered = True
 
     if not getattr(bot, "_worker_tip_confirm_views_registered", False):
