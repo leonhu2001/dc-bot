@@ -3,9 +3,10 @@
 set -Eeuo pipefail
 
 APP=/opt/dc-bot
-RELEASE_REF=feat/nov10-lol-apex-steam-pricing-remove-public-price-button
+RELEASE_REF=fix/admin-order-rules-verified-edit-20261110
 PREVIOUS_RELEASE=4386dddf1da66adb01d55a5ffdf4df42749912e2
 OPTIONAL_ACCOUNTING_RELEASE=922cfc686f2cfe329db5bdadfb87c64e70e0b13b
+PREVIOUS_POSTER_RELEASE=558fe84f6842a799a375f996a699eb1c4362ab79
 TARGET="${1:-}"
 BOT_SERVICE=dc-bot.service
 WEB_SERVICE=dc-bot-dashboard.service
@@ -17,7 +18,7 @@ fi
 cd "$APP"
 OLD_HEAD="$(git rev-parse HEAD)"
 case "$OLD_HEAD" in
-    "$PREVIOUS_RELEASE"|"$OPTIONAL_ACCOUNTING_RELEASE") ;;
+    "$PREVIOUS_RELEASE"|"$OPTIONAL_ACCOUNTING_RELEASE"|"$PREVIOUS_POSTER_RELEASE") ;;
     *) echo "BLOCKED: Unexpected deployed HEAD $OLD_HEAD"; exit 2 ;;
 esac
 
@@ -66,6 +67,9 @@ while IFS= read -r file; do
         services/loyalty_benefits.py|\
         web/app/services/order_groups.py|\
         web/app/services/accounting_reconciliation_policy.py|\
+        web/app/routers/admin_order_rules.py|\
+        web/app/templates/admin_order_rules.html|\
+        tests/test_admin_order_rules_every_product_20261110.py|\
         tests/test_game_service_rules.py|\
         tests/test_quick_order_v2_patch_ownership.py|\
         tests/test_point_benefit_catalog_v2.py|\
@@ -276,6 +280,38 @@ finally:
 print("PASS: prices, tier totals, Web/Discord options, Delta button preserved and read-only wage check")
 PY
 
+echo "=== READ-ONLY ADMIN ORDER RULES FULL-CATALOG AUDIT ==="
+./venv/bin/python - <<'PY'
+from services.order_rules import ORDER_RULES, preview_rule_override, rule_to_override_payload
+from web.app.routers.admin_order_rules import _is_admin_editable_rule
+from web.app.services.order_groups import get_grouped_order_catalog
+total = 0
+categories = set()
+for key, rule in ORDER_RULES.items():
+    if not _is_admin_editable_rule(key):
+        continue
+    try:
+        preview = preview_rule_override(key, rule_to_override_payload(rule))
+    except Exception as exc:
+        raise SystemExit(f"BLOCKED: admin rule not editable: {key}: {exc}")
+    if preview.key != key or preview.category != rule.category:
+        raise SystemExit(f"BLOCKED: admin rule identity mismatch: {key}")
+    total += 1
+    categories.add(rule.category)
+for game in ("valorant", "lol", "apex", "steam"):
+    web = get_grouped_order_catalog(game)
+    if not web:
+        raise SystemExit(f"BLOCKED: Web missing {game} groups")
+    for group in web:
+        for variant in group["variants"]:
+            key = variant["rule_key"]
+            if key not in ORDER_RULES or variant["price"] != ORDER_RULES[key].price:
+                raise SystemExit(f"BLOCKED: Web rule mismatch: {key}")
+if total < 20 or not {"valorant","lol","apex","steam","farm","custom"}.issubset(categories):
+    raise SystemExit(f"BLOCKED: admin catalog incomplete: {total} {sorted(categories)}")
+print(f"PASS: {total} editable admin rules across {len(categories)} categories; Web rule data is consistent")
+PY
+
 echo "=== RESTART BOT + WEB ==="
 systemctl restart "$BOT_SERVICE" "$WEB_SERVICE"
 for service in "$BOT_SERVICE" "$WEB_SERVICE"; do
@@ -321,15 +357,15 @@ file=Path(sys.argv[1]); file.parent.mkdir(parents=True,exist_ok=True)
 file.write_text(json.dumps({
     "commit":sys.argv[2],
     "previous_commit":sys.argv[3],
-    "branch":"feat/nov10-lol-apex-steam-pricing-remove-public-price-button",
+    "branch":"fix/admin-order-rules-verified-edit-20261110",
     "deployed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    "subject":"Final four game posters, customer ranks and Delta button retained",
+    "subject":"Four game posters plus verified admin order rule editability",
     "status":"success",
 },ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
 PY
 APPLIED=0
 trap - ERR
 echo
-echo "DEPLOY COMPLETED: VALORANT/LoL/APEX/Steam prices updated; Delta price list preserved"
+echo "DEPLOY COMPLETED: prices and admin rules verified; Delta price list preserved"
 echo "Commit: $TARGET"
 echo "Database backup: $BACKUP"
