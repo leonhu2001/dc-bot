@@ -67,6 +67,11 @@ while IFS= read -r file; do
         web/app/services/order_groups.py|\
         web/app/services/accounting_reconciliation_policy.py|\
         tests/test_game_service_rules.py|\
+        tests/test_quick_order_v2_patch_ownership.py|\
+        tests/test_point_benefit_catalog_v2.py|\
+        tests/test_loyalty_companion_fix_20261029.py|\
+        tests/test_dynamic_game_point_benefits.py|\
+        tests/test_companion_count_finish_20261028.py|\
         tests/test_apex_pricing_20261012.py|\
         tests/test_quick_order_v2_price_lists.py|\
         tests/test_quick_order_v2_public_view_policy.py|\
