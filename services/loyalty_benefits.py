@@ -203,6 +203,9 @@ def loyalty_policy_for_rule(rule_key: str) -> dict[str, Any] | None:
 _APEX_ENTERTAINMENT_RULE_KEYS = {
     "apex_entertain_ng",
     "apex_entertain_ranked",
+    "apex_entertain_ranked_tier_diamond",
+    "apex_entertain_ranked_tier_master",
+    "apex_entertain_ranked_tier_predator",
 }
 _LOYALTY_SCOPE_FAMILY_ALIASES = {
     # 同一個遊戲／服務只是陪玩席位數不同，必須共用同一個老闆福利池。
@@ -226,6 +229,9 @@ _LOYALTY_SCOPE_FAMILY_ALIASES = {
     # APEX 娛樂陪 NG / 積分皆為計時制，共用同一個 10H -> 1H 福利池。
     "apex_entertain_ng": "apex_entertain",
     "apex_entertain_ranked": "apex_entertain",
+    "apex_entertain_ranked_tier_diamond": "apex_entertain",
+    "apex_entertain_ranked_tier_master": "apex_entertain",
+    "apex_entertain_ranked_tier_predator": "apex_entertain",
 }
 _LOYALTY_COMPANION_MIGRATION_KEY = "20261011_companion_service_units_v2"
 _LOYALTY_POLICY_V3_MIGRATION_KEY = "20261014_entertainment_only_policy_v3"
