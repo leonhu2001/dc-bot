@@ -900,11 +900,6 @@ configure_web_support_bridge(
     customer_service_role_id=CUSTOMER_ROLE_ID,
 )
 
-
-
-
-
-
 async def create_private_channel(
     interaction: discord.Interaction,
     category_id: int,
@@ -1202,13 +1197,6 @@ BACKUP_DIR = Path(__file__).parent / "backups"
 CLOSED_ORDER_KEEP_DAYS = 0  # 已結單資料永久保留，不再自動刪除
 CANCELLED_ORDER_KEEP_DAYS = 60  # 只清理超過 60 天的取消單暫存
 
-
-
-
-
-
-
-
 async def daily_backup_loop():
     await bot.wait_until_ready()
     while not bot.is_closed():
@@ -1427,15 +1415,6 @@ def cleanup_old_closed_orders() -> None:
 # 4. 降階後把 vip_progress_base_total_spent 設為當下累積消費，下一級進度從降階後重新開始。
 
 VIP_DOWNGRADE_FIRST_CHECK_MONTH = "2026-06"  # 第一次檢查 2026/05 消費；不檢查 2026/04。
-
-
-
-
-
-
-
-
-
 
 configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS, data_file=DATA_FILE)
 configure_lottery_storage(DB_FILE, init_database)
@@ -2377,11 +2356,6 @@ async def vip_create_voice(interaction: discord.Interaction, user_id: str):
         "Panel 已建立並綁定，房主不需要先進入建立入口。",
         ephemeral=True,
     )
-
-
-
-
-
 
 @bot.event
 async def on_member_join(member: discord.Member):
