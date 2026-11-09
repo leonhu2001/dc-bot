@@ -20,7 +20,7 @@ _RULE_SPECS = (
         "delta_desktop_basic",
         "basic_one_companion_one_guard_secret",
         "一陪一護〈端遊〉｜機密",
-        720,
+        800,
         DELTA_DESKTOP_GAME_ROLE,
         "secret",
         "機密",
@@ -29,7 +29,7 @@ _RULE_SPECS = (
         "delta_desktop_basic",
         "basic_one_companion_one_guard_topsecret",
         "一陪一護〈端遊〉｜絕密",
-        770,
+        850,
         DELTA_DESKTOP_GAME_ROLE,
         "topsecret",
         "絕密",
@@ -66,7 +66,7 @@ def _retire_mobile_variant() -> None:
 
 
 def _install_rules() -> None:
-    for category, key, _legacy_label, price, game_roles, _value, detail_label in _RULE_SPECS:
+    for category, key, _legacy_label, price, game_roles, value, detail_label in _RULE_SPECS:
         if key in ORDER_RULES:
             continue
 
@@ -90,6 +90,11 @@ def _install_rules() -> None:
             min_protector_count=1,
             required_game_roles=game_roles,
             catalog_group_label=GROUP_LABEL,
+            note=(
+                "一小時內 8 殺；指定打手每人 +100T，2H 以上免指定費。"
+                if value == "secret"
+                else "一小時內 7 殺；指定打手每人 +100T，2H 以上免指定費。"
+            ),
         )
         validate_rule_definition(key, rule)
         ORDER_RULES[key] = rule
