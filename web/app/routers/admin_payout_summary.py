@@ -12,6 +12,9 @@ from fastapi.templating import Jinja2Templates
 from web.app.services.audit_trail import write_sqlite_audit_log
 from web.app.services.payout_notifications import send_payout_paid_notification
 from web.app.services.payout_report_gate import payout_financial_state, payout_status_label
+from web.app.services.worker_tip_salary_sql import (
+    tip_earning_date_expr, tip_month_filter, tip_salary_order_scope,
+)
 from web.app.services.internal_transfers import (
     ensure_internal_transfer_tables,
     mark_bulk_adjustments,
@@ -369,6 +372,7 @@ def fetch_rows(
                     item=row["item"],
                 )
 
+            tip_month_sql, tip_month_params = tip_month_filter(month)
             tip_rows = conn.execute(
                 f"""
                 SELECT
@@ -376,22 +380,24 @@ def fetch_rows(
                     p.worker_display_name AS display_name,
                     p.amount AS amount,
                     p.payout_status AS payout_status,
-                    w.bot_order_no,
+                    COALESCE(NULLIF(w.bot_order_no,''), 'TIP-' || p.id) AS bot_order_no,
                     w.id AS web_order_id,
-                    w.category,
-                    w.item,
-                    COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
-                    {payout_order_date_expr('w')} AS closed_at
+                    COALESCE(w.category,'雞腿') AS category,
+                    COALESCE(w.item,'名片加雞腿') AS item,
+                    COALESCE(NULLIF(w.customer_display_name,''),
+                             NULLIF(p.customer_display_name,''),
+                             NULLIF(p.customer_discord_id,''),'未紀錄') AS customer_name,
+                    {tip_earning_date_expr()} AS closed_at
                 FROM worker_tips p
-                JOIN web_orders w ON w.id = p.order_id
-                WHERE w.status = 'closed'
+                LEFT JOIN web_orders w ON w.id = p.order_id
+                WHERE (w.status = 'closed' OR p.order_id IS NULL)
                   AND p.payment_status = 'paid'
                   AND COALESCE(p.amount, 0) > 0
                   {payout_status_sql}
-                  {month_sql}
+                  {tip_month_sql}
                 ORDER BY p.id DESC
                 """,
-                [*payout_status_params, *params],
+                [*payout_status_params, *tip_month_params],
             ).fetchall()
             for row in tip_rows:
                 add_person(
@@ -404,7 +410,7 @@ def fetch_rows(
                     filter_status=status,
                     customer_name=row["customer_name"],
                     closed_at=row["closed_at"],
-                    order_no=row["bot_order_no"] or f"WEB-{row['web_order_id']}",
+                    order_no=row["bot_order_no"],
                     category=row["category"],
                     item=row["item"],
                     item_role_label="🍗 雞腿",
@@ -581,6 +587,7 @@ def _audit_payout_state(
     }
 
 def get_summary_month_options() -> list[dict]:
+    ensure_worker_tip_table()
     ensure_internal_transfer_tables(db_path())
     conn = sqlite3.connect(db_path())
     conn.row_factory = sqlite3.Row
@@ -599,6 +606,10 @@ def get_summary_month_options() -> list[dict]:
                 UNION ALL
                 SELECT substr(effective_at, 1, 7) AS month_value
                 FROM employee_payroll_adjustments
+                UNION ALL
+                SELECT substr(COALESCE(NULLIF(paid_at,''), NULLIF(created_at,'')),1,7)
+                FROM worker_tips
+                WHERE order_id IS NULL AND payment_status='paid'
             )
             WHERE month_value GLOB '????-??'
             ORDER BY month_value DESC
