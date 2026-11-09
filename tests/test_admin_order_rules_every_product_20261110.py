@@ -256,6 +256,8 @@ def test_admin_seat_price_template_discloses_real_unit_prices():
     assert "player_count_price_{{ count }}" in template
     assert "依陪玩人數定價" in template
     assert "非上面的參考售價" in template
+    assert "10H → +1小時" in template
+    assert "15局 → +1局" in template
 
 
 @pytest.mark.parametrize("key,new_price", [
