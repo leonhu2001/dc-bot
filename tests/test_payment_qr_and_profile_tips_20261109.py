@@ -57,7 +57,9 @@ def test_staff_profile_surfaces_have_chicken_leg_button():
 
     starter = WorkerTipProfileStartView()
     assert starter.is_persistent()
-    assert [item.custom_id for item in starter.children] == ["worker_tip_profile_start"]
+    assert {item.custom_id for item in starter.children} == {
+        "worker_tip_profile_start", "worker_tip_profile_open_close",
+    }
 
 
 def test_tip_amount_and_payment_views_keep_standalone_flag():
