@@ -411,6 +411,7 @@ from views.staff_profiles import (
 )
 from views.staff_profile_tip_ticket import (
     WorkerTipProfileStartView,
+    WorkerTipProfileCloseView,
     create_staff_profile_tip_ticket as _create_profile_tip_ticket,
 )
 
@@ -2835,6 +2836,7 @@ async def on_ready():
 
     if not getattr(bot, "_worker_tip_profile_start_registered", False):
         bot.add_view(WorkerTipProfileStartView())
+        bot.add_view(WorkerTipProfileCloseView())
         bot._worker_tip_profile_start_registered = True
 
     if not getattr(bot, "_worker_tip_confirm_views_registered", False):
