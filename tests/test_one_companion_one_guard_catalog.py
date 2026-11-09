@@ -19,8 +19,8 @@ MOBILE_TOPSECRET = "basic_mobile_one_companion_one_guard_topsecret"
 
 def test_one_companion_one_guard_prices_and_staffing_are_desktop_only():
     expected = {
-        DESKTOP_SECRET: (720, "delta_desktop_basic", "delta_desktop"),
-        DESKTOP_TOPSECRET: (770, "delta_desktop_basic", "delta_desktop"),
+        DESKTOP_SECRET: (800, "delta_desktop_basic", "delta_desktop"),
+        DESKTOP_TOPSECRET: (900, "delta_desktop_basic", "delta_desktop"),
     }
 
     for key, (price, category, game_role) in expected.items():
