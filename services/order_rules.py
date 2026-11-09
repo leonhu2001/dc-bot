@@ -1179,7 +1179,7 @@ _add(OrderRule(
 # ========= Steam 陪玩 =========
 
 _add(OrderRule(
-    "steam", "steam_play", "Steam遊戲｜娛樂陪", "hourly", 320, "H",
+    "steam", "steam_play", "Steam遊戲｜娛樂陪", "hourly", 350, "H",
     allowed_roles=COMPANION_ROLES,
     allowed_game_roles=(),
     required_game_roles=STEAM_GAME_ROLE,
@@ -1257,20 +1257,20 @@ _add_game_service_rule(category="valorant", key="valorant_immortal_ranked", labe
 _add_game_service_rule(category="valorant", key="valorant_radiant_ng", label="特戰英豪｜輻能陪｜NG", pricing_type="hourly", price=380, unit_label="H", allowed_game_roles=("valorant_radiant",), required_game_roles=VALORANT_GAME_ROLE)
 _add_game_service_rule(category="valorant", key="valorant_radiant_ranked", label="特戰英豪｜輻能陪｜積分", pricing_type="game", price=370, unit_label="局", allowed_game_roles=("valorant_radiant",), required_game_roles=VALORANT_GAME_ROLE)
 
-_add_game_service_rule(category="lol", key="lol_entertain_aram", label="英雄聯盟｜娛樂陪｜ARAM", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE, loyalty_benefits_enabled=True)
-_add_game_service_rule(category="lol", key="lol_entertain_ng", label="英雄聯盟｜娛樂陪｜NG", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE, loyalty_benefits_enabled=True)
-_add_game_service_rule(category="lol", key="lol_entertain_ranked", label="英雄聯盟｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE, loyalty_benefits_enabled=True)
-_add_game_service_rule(category="lol", key="lol_master_ng", label="英雄聯盟｜大師陪｜NG", pricing_type="hourly", price=340, unit_label="H", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_entertain_aram", label="英雄聯盟｜娛樂陪｜ARAM", pricing_type="hourly", price=350, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE, loyalty_benefits_enabled=True)
+_add_game_service_rule(category="lol", key="lol_entertain_ng", label="英雄聯盟｜娛樂陪｜NG", pricing_type="hourly", price=350, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE, loyalty_benefits_enabled=True)
+_add_game_service_rule(category="lol", key="lol_entertain_ranked", label="英雄聯盟｜娛樂陪｜積分", pricing_type="game", price=280, unit_label="局", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE, loyalty_benefits_enabled=True)
+_add_game_service_rule(category="lol", key="lol_master_ng", label="英雄聯盟｜大師陪｜NG", pricing_type="hourly", price=380, unit_label="H", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
 _add_game_service_rule(category="lol", key="lol_master_ranked", label="英雄聯盟｜大師陪｜積分", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
-_add_game_service_rule(category="lol", key="lol_grandmaster_ng", label="英雄聯盟｜宗師陪｜NG", pricing_type="hourly", price=360, unit_label="H", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
-_add_game_service_rule(category="lol", key="lol_grandmaster_ranked", label="英雄聯盟｜宗師陪｜積分", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_grandmaster_ng", label="英雄聯盟｜宗師陪｜NG", pricing_type="hourly", price=390, unit_label="H", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_grandmaster_ranked", label="英雄聯盟｜宗師陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
 _add_game_service_rule(category="lol", key="lol_elite_ng", label="英雄聯盟｜菁英陪｜NG", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
-_add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯盟｜菁英陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯盟｜菁英陪｜積分", pricing_type="game", price=450, unit_label="局", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
 
 
 # LoL 技術陪 ARAM：直接沿用該階級 NG 小時價。
-_add_game_service_rule(category="lol", key="lol_master_aram", label="英雄聯盟｜大師陪｜ARAM", pricing_type="hourly", price=340, unit_label="H", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
-_add_game_service_rule(category="lol", key="lol_grandmaster_aram", label="英雄聯盟｜宗師陪｜ARAM", pricing_type="hourly", price=360, unit_label="H", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_master_aram", label="英雄聯盟｜大師陪｜ARAM", pricing_type="hourly", price=380, unit_label="H", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_grandmaster_aram", label="英雄聯盟｜宗師陪｜ARAM", pricing_type="hourly", price=390, unit_label="H", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
 _add_game_service_rule(category="lol", key="lol_elite_aram", label="英雄聯盟｜菁英陪｜ARAM", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
 
 # 黑潮爆破：價格直接寫在商品規則，不用 runtime price patch。
@@ -1297,7 +1297,7 @@ _add(OrderRule(
 
 
 # ========= APEX Legends 陪玩 =========
-# 新制價格只看「陪玩階級 × 模式」，不再依老闆目前段位調整。
+# NG 只依陪玩階級定價；積分以白金以下為基價，每升一個段位每人每小時 +50T。
 # NG / 積分皆為每人每小時計價；指定每位 +100T，單筆 2H 以上免指定費。
 APEX_GAME_ROLES = ("apex_diamond", "apex_master", "apex_predator")
 
@@ -1348,28 +1348,28 @@ def _add_apex_service_rule(
 
 # 新下單使用的固定價目。所有價格皆為「每人 / H」。
 _APEX_ACTIVE_SERVICE_SPECS = (
-    ("apex_entertain", "娛樂陪", 300, 350, COMPANION_ROLES, ()),
+    ("apex_entertain", "娛樂陪", 320, 350, COMPANION_ROLES, ()),
     (
         "apex_diamond",
         "鑽石陪",
+        380,
         400,
-        450,
         (),
         ("apex_diamond", "apex_master", "apex_predator"),
     ),
     (
         "apex_master",
         "大師陪",
-        480,
-        530,
+        400,
+        450,
         (),
         ("apex_master", "apex_predator"),
     ),
     (
         "apex_predator",
         "頂獵陪",
-        580,
-        630,
+        500,
+        550,
         (),
         ("apex_predator",),
     ),
@@ -1399,6 +1399,33 @@ for (
         allowed_game_roles=_apex_game_roles,
         loyalty_benefits_enabled=(_apex_prefix == "apex_entertain"),
     )
+
+
+# 2026-11-10 公開價目表：APEX 積分白金以下為基價，鑽石/大師/頂獵
+# 每升一階 +50T／人／H。獨立規則鍵讓 Bot 和 Web 透過既有規格選單
+# 完整算出價格，不靠下單後由客服手動加價。
+_APEX_RANKED_TIERS = (
+    ("diamond", "鑽石", 1),
+    ("master", "大師", 2),
+    ("predator", "頂獵", 3),
+)
+for (
+    _apex_prefix,
+    _apex_service_label,
+    _apex_ng_price,
+    _apex_ranked_price,
+    _apex_service_roles,
+    _apex_game_roles,
+) in _APEX_ACTIVE_SERVICE_SPECS:
+    for _tier_key, _tier_label, _tier_steps in _APEX_RANKED_TIERS:
+        _add_apex_service_rule(
+            key=f"{_apex_prefix}_ranked_tier_{_tier_key}",
+            label=f"APEX｜{_apex_service_label}｜積分｜{_tier_label}",
+            price=_apex_ranked_price + 50 * _tier_steps,
+            allowed_service_roles=_apex_service_roles,
+            allowed_game_roles=_apex_game_roles,
+            loyalty_benefits_enabled=(_apex_prefix == "apex_entertain"),
+        )
 
 
 # 舊「依老闆段位」規則保留供歷史訂單、舊存單與舊標籤回查；
@@ -1720,6 +1747,28 @@ SOURCE_AUTHORITY_RULE_KEYS = frozenset(
 # commercial fields but cannot broaden who may claim these system products.
 SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS = COIN_WASH_AW_ORDER_RULE_KEYS
 
+# The owner's 2026-11-10 public image prices take precedence over stale manager
+# overrides. Only these built-in game prices are frozen; all other rule settings
+# and games retain existing manager behavior.
+OWNER_APPROVED_20261110_GAME_PRICE_KEYS = frozenset({
+    "steam_play",
+    "lol_entertain_aram", "lol_entertain_ng", "lol_entertain_ranked",
+    "lol_master_ng", "lol_master_ranked", "lol_master_aram",
+    "lol_grandmaster_ng", "lol_grandmaster_ranked", "lol_grandmaster_aram",
+    "lol_elite_ng", "lol_elite_ranked", "lol_elite_aram",
+    *(
+        f"{prefix}_{mode}"
+        for prefix in ("apex_entertain", "apex_diamond", "apex_master", "apex_predator")
+        for mode in ("ng", "ranked")
+    ),
+    *(
+        f"{prefix}_ranked_tier_{tier}"
+        for prefix in ("apex_entertain", "apex_diamond", "apex_master", "apex_predator")
+        for tier in ("diamond", "master", "predator")
+    ),
+})
+
+
 
 class EffectiveOrderRules(dict):
     """Read-through mapping for code rules + manager-created rules + overrides.
@@ -1850,6 +1899,8 @@ class EffectiveOrderRules(dict):
                     point_benefits_allowed=base.point_benefits_allowed,
                     loyalty_benefits_enabled=base.loyalty_benefits_enabled,
                 )
+            if key in OWNER_APPROVED_20261110_GAME_PRICE_KEYS:
+                rule = replace(rule, price=base.price)
             if SWEET_COMPANION_ROLE_KEY in tuple(base.required_roles):
                 rule = replace(rule, required_roles=base.required_roles)
 
