@@ -44,8 +44,8 @@ def db():
         );
     """)
     for order_id, number, base, gross, old, worker, cs_old, cs in [
-        (298, "MO20261102001", 864, 720, 576, 590, 72, 68),
-        (300, "MO20261103002", 540, 450, 360, 369, 45, 43),
+        (298, "MO20261102001", 1440, 720, 576, 590, 72, 68),
+        (300, "MO20261103002", 900, 450, 360, 369, 45, 43),
     ]:
         conn.execute(
             "INSERT INTO web_orders VALUES(?,?,?,?,?,?,?,?)",
@@ -59,6 +59,10 @@ def db():
             "INSERT INTO worker_payouts VALUES(?,?,?,?,?,?)",
             (order_id, order_id, "1029311167212036116", gross, worker,
              "分潤：基礎80%＋前月業績達5000T 2%｜前月業績 13801T"),
+        )
+        conn.execute(
+            "INSERT INTO worker_payouts VALUES(?,?,?,?,?,?)",
+            (order_id + 1000, order_id, "other_worker", gross, round(gross * 0.80), ""),
         )
         conn.execute(
             "INSERT INTO customer_service_payouts VALUES(?,?,?)",
@@ -95,9 +99,10 @@ def test_audited_2pct_bonus_with_old_legacy_flag_does_not_realert(db, order_id):
 @pytest.mark.parametrize("change", [
     "DELETE FROM admin_audit_logs WHERE target_id='298'",
     "UPDATE admin_audit_logs SET after_json='{}' WHERE target_id='298'",
-    "UPDATE worker_payouts SET final_payout=589 WHERE order_id=298",
-    "UPDATE worker_payouts SET note='' WHERE order_id=298",
-    "UPDATE worker_payouts SET gross_share=719 WHERE order_id=298",
+    "UPDATE worker_payouts SET final_payout=589 WHERE order_id=298 AND worker_discord_id='1029311167212036116'",
+    "UPDATE worker_payouts SET final_payout=575 WHERE order_id=298 AND worker_discord_id='other_worker'",
+    "UPDATE worker_payouts SET note='' WHERE order_id=298 AND worker_discord_id='1029311167212036116'",
+    "UPDATE worker_payouts SET gross_share=719 WHERE order_id=298 AND worker_discord_id='1029311167212036116'",
     "UPDATE customer_service_payouts SET payout_amount=69 WHERE order_id=298",
     "UPDATE web_orders SET bot_order_no='MO-wrong' WHERE id=298",
     "INSERT INTO worker_payout_overrides VALUES(298,'1029311167212036116')",
