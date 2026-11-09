@@ -10,7 +10,7 @@ NGINX_CONFIG_SOURCE="$APP/nginx_dc_bot_dashboard.conf"
 NGINX_CONFIG_PATH="${NGINX_CONFIG_PATH:-}"
 MARKER_PATH="$APP/data/deployed_version.json"
 TARGET="${1:-}"
-RELEASE_REF="release/payment-qr-tips-bonus-no-price-20261110"
+RELEASE_REF="fix/profile-tip-ticket-close-ledger-and-nov-bonus-20261110"
 PRICE_BASE="d637f16412d15bb8bc77229d105c7816b35da06d"
 SERVICE_ACTIVE_ATTEMPTS="${DEPLOY_SERVICE_ACTIVE_ATTEMPTS:-20}"
 SERVICE_ACTIVE_INTERVAL="${DEPLOY_SERVICE_ACTIVE_INTERVAL_SECONDS:-1}"
@@ -182,7 +182,7 @@ path = Path(sys.argv[1])
 payload = {
     "commit": sys.argv[2],
     "previous_commit": sys.argv[3],
-    "branch": "release/payment-qr-tips-bonus-no-price-20261110",
+    "branch": "fix/profile-tip-ticket-close-ledger-and-nov-bonus-20261110",
     "deployed_at": sys.argv[4],
     "subject": sys.argv[5],
     "status": sys.argv[6],
