@@ -77,7 +77,7 @@ GROUP_SPECS = [
         "category": "delta_desktop_basic",
         "label": "技術陪",
         "selector_label": "難度",
-        "description": "三角洲端遊技術陪；難度與陪玩人數分開選擇。",
+        "description": "端遊：機密單護 450T/H（8 殺）、雙護 850T/H（保底 777W）；絕密單護 500T/H（7 殺）、雙護 950T/H（保底 850W）。指定每人 +100T，2H 以上免指定費。",
         "variants": [
             ("basic_tech_secret_single", "機密"),
             ("basic_tech_topsecret_single", "絕密"),
@@ -101,7 +101,7 @@ GROUP_SPECS = [
         "category": "delta_desktop_basic",
         "label": "娛樂陪",
         "selector_label": "陪玩類型",
-        "description": "娛樂陪福利累積 10 個服務小時回饋 1 小時；陪玩類型與陪玩人數分開選擇。",
+        "description": "端遊單陪 350T/H、雙陪 650T/H，不保撤、無保底；娛樂陪累積 10H 送 1H 券，指定每人 +100T，2H 以上免指定費。",
         "variants": [
             ("basic_entertain_single", "不限"),
             ("basic_entertain_female_single", "女陪"),
@@ -114,7 +114,7 @@ GROUP_SPECS = [
         "category": "delta_mobile_basic",
         "label": "娛樂陪",
         "selector_label": "陪玩類型",
-        "description": "娛樂陪福利累積 10 個服務小時回饋 1 小時；陪玩類型與陪玩人數分開選擇，價格與端遊相同。",
+        "description": "手遊價格維持原方案；娛樂陪累積 10H 送 1H 券。陪玩類型與人數分開選擇。",
         "variants": [
             ("basic_mobile_entertain_single", "不限"),
             ("basic_mobile_entertain_female_single", "女陪"),
@@ -139,6 +139,7 @@ GROUP_SPECS = [
         "category": "delta_desktop_basic",
         "label": "油鍋單",
         "selector_label": "方案",
+        "description": "航天基地限定；火箭燃油 3000T 保 2000W、GTI 衛星通信天線 2000T 保 1500W、全包 4500T 保 3500W。撤離帶出結單；超過保底未出貨則下場撞場交貨。",
         "variants": [
             ("basic_oil_fuel", "火箭燃油"),
             ("basic_oil_satellite", "GTI 衛星通訊天線"),
@@ -151,6 +152,7 @@ GROUP_SPECS = [
         "category": "delta_desktop_basic",
         "label": "賭約單",
         "selector_label": "賭約金額",
+        "description": "單局 800W／1300T、1000W／1800T、1200W／2400T；未達指定金額不結單，打手選圖。",
         "variants": [
             ("basic_bet_1000", "800w"),
             ("basic_bet_1500", "1000w"),
@@ -163,9 +165,10 @@ GROUP_SPECS = [
         "category": "delta_desktop_basic",
         "label": "體驗單",
         "selector_label": "方案",
+        "description": "普通 500T 保 850W（不卡底）、每週限一次；尊爵 1000T 保 1888W、每月一次（金級以上每週一次）。不適用折扣或加碼，打手選圖。",
         "variants": [
-            ("basic_trial_500", "777w"),
-            ("basic_trial_1000", "1688w"),
+            ("basic_trial_500", "普通｜保850w（不卡底）"),
+            ("basic_trial_1000", "尊爵｜保1888w"),
         ],
     },
 
