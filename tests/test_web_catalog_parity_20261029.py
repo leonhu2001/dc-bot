@@ -14,9 +14,9 @@ def test_web_fixed_option_labels_match_current_discord_catalog() -> None:
     desktop = {group["key"]: group for group in order_groups.get_grouped_order_catalog("delta_desktop_basic")}
     assert [row["label"] for row in desktop["exbar_gamble"]["variants"]] == ["縱橫", "萬金淚冠", "天圓地方", "測距儀"]
     assert [row["label"] for row in desktop["bet"]["variants"]] == ["800w", "1000w", "1200w"]
-    assert [row["label"] for row in desktop["trial"]["variants"]] == ["777w", "1688w"]
+    assert [row["label"] for row in desktop["trial"]["variants"]] == ["普通｜850w", "尊爵｜1888w"]
     assert [row["label"] for row in order_runtime.get_order_item_details_for_group("delta_desktop_basic", "賭約單")] == ["800w", "1000w", "1200w"]
-    assert [row["label"] for row in order_runtime.get_order_item_details_for_group("delta_desktop_basic", "體驗單")] == ["777w", "1688w"]
+    assert [row["label"] for row in order_runtime.get_order_item_details_for_group("delta_desktop_basic", "體驗單")] == ["普通｜850w", "尊爵｜1888w"]
 
 
 def test_web_loyalty_and_apex_copy_matches_authoritative_rules() -> None:
