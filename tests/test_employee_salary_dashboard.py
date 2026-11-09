@@ -39,7 +39,11 @@ def _create_salary_db(path):
                 worker_display_name TEXT,
                 amount INTEGER,
                 payment_status TEXT,
-                payout_status TEXT
+                payout_status TEXT,
+                customer_discord_id TEXT,
+                customer_display_name TEXT,
+                paid_at TEXT,
+                created_at TEXT
             );
 
             CREATE TABLE customer_service_payouts (
