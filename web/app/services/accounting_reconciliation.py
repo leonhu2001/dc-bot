@@ -775,6 +775,10 @@ def _check_payouts(
         for row in web.execute("PRAGMA table_info(web_orders)").fetchall()
     }
     rule_key_column = "order_rule_key" if "order_rule_key" in web_order_columns else "NULL AS order_rule_key"
+    rule_snapshot_column = (
+        "rule_snapshot_json" if "rule_snapshot_json" in web_order_columns
+        else "NULL AS rule_snapshot_json"
+    )
     orders = web.execute(
         f"""
         SELECT
@@ -785,6 +789,7 @@ def _check_payouts(
             payout_base_amount,
             price_snapshot_json,
             {rule_key_column},
+            {rule_snapshot_column},
             {("customer_pay_amount" if "customer_pay_amount" in web_order_columns else "amount AS customer_pay_amount")},
             payment_method,
             customer_service_discord_id,
@@ -1000,8 +1005,12 @@ def _check_payouts(
         )
         # Reconciliation must use the same business-rule payout policy as Web
         # settlement, or it will wrongly flag/repair 100%-worker orders as 80%.
+        from services.one_companion_one_guard_payout import resolve_one_guard_unit_price
         expected = calculate_one_companion_one_guard_order_payout(
             rule_key=order.get("order_rule_key"),
+            unit_price=resolve_one_guard_unit_price(
+                order.get("order_rule_key"), order.get("rule_snapshot_json")
+            ),
             total_amount=payout_base,
             worker_roles=[(person_id, "booster") for person_id in worker_ids],
             named_bonus_worker_ids=named_bonus_ids,

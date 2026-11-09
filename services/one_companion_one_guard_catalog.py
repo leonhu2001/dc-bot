@@ -20,7 +20,7 @@ _RULE_SPECS = (
         "delta_desktop_basic",
         "basic_one_companion_one_guard_secret",
         "一陪一護〈端遊〉｜機密",
-        720,
+        800,
         DELTA_DESKTOP_GAME_ROLE,
         "secret",
         "機密",
@@ -29,7 +29,7 @@ _RULE_SPECS = (
         "delta_desktop_basic",
         "basic_one_companion_one_guard_topsecret",
         "一陪一護〈端遊〉｜絕密",
-        770,
+        900,
         DELTA_DESKTOP_GAME_ROLE,
         "topsecret",
         "絕密",
@@ -89,6 +89,9 @@ def _install_rules() -> None:
             specify_free_basis="quantity",
             min_protector_count=1,
             required_game_roles=game_roles,
+            note=("護航保證：機密每小時內8殺"
+                  if key.endswith("_secret") and not key.endswith("_topsecret")
+                  else "護航保證：絕密每小時內7殺"),
             catalog_group_label=GROUP_LABEL,
         )
         validate_rule_definition(key, rule)

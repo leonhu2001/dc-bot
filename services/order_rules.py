@@ -633,11 +633,15 @@ def _add_delta_tech_rule(*, category: str, key: str, label: str, prices: dict[in
         specify_fee_by_role=_protectors_fee(),
         specify_free_min_units=2,
         specify_free_basis="quantity",
+        note={
+            "basic_tech_secret_single": "機密單護：每小時內保證 8 殺；機密雙護：777W 保底",
+            "basic_tech_topsecret_single": "絕密單護：每小時內保證 7 殺；絕密雙護：850W 保底",
+        }.get(key, ""),
     ))
 
 
-_add_delta_tech_rule(category="delta_desktop_basic", key="basic_tech_secret_single", label="技術陪〈端遊〉｜機密", prices={1: 400, 2: 750}, game_roles=DELTA_DESKTOP_GAME_ROLE)
-_add_delta_tech_rule(category="delta_desktop_basic", key="basic_tech_topsecret_single", label="技術陪〈端遊〉｜絕密", prices={1: 450, 2: 850}, game_roles=DELTA_DESKTOP_GAME_ROLE)
+_add_delta_tech_rule(category="delta_desktop_basic", key="basic_tech_secret_single", label="技術陪〈端遊〉｜機密", prices={1: 450, 2: 850}, game_roles=DELTA_DESKTOP_GAME_ROLE)
+_add_delta_tech_rule(category="delta_desktop_basic", key="basic_tech_topsecret_single", label="技術陪〈端遊〉｜絕密", prices={1: 500, 2: 950}, game_roles=DELTA_DESKTOP_GAME_ROLE)
 _add_delta_tech_rule(category="delta_mobile_basic", key="basic_mobile_tech_secret_single", label="技術陪〈手遊〉｜機密", prices={1: 380, 2: 760}, game_roles=DELTA_MOBILE_GAME_ROLE)
 _add_delta_tech_rule(category="delta_mobile_basic", key="basic_mobile_tech_topsecret_single", label="技術陪〈手遊〉｜絕密", prices={1: 420, 2: 840}, game_roles=DELTA_MOBILE_GAME_ROLE)
 
@@ -684,9 +688,9 @@ _add(OrderRule(
 # 舊雙導師規則不再加入 ORDER_RULES；
 # 已建立訂單仍使用建立當下保存的規則快照，不受影響。
 
-def _add_delta_entertain_rule(*, category: str, key: str, label: str, allowed_roles: tuple[RoleKey, ...], game_roles: tuple[str, ...]) -> None:
+def _add_delta_entertain_rule(*, category: str, key: str, label: str, allowed_roles: tuple[RoleKey, ...], game_roles: tuple[str, ...], prices: dict[int, int]) -> None:
     _add(OrderRule(
-        category, key, label, "hourly", 320, "H",
+        category, key, label, "hourly", int(prices[1]), "H",
         allowed_roles=allowed_roles,
         required_game_roles=game_roles,
         required_staff_count="player_count",
@@ -694,7 +698,7 @@ def _add_delta_entertain_rule(*, category: str, key: str, label: str, allowed_ro
         min_player_count=1,
         max_player_count=2,
         price_multiply_player_count=False,
-        player_count_prices={1: 320, 2: 600},
+        player_count_prices=dict(prices),
         allow_specify=True,
         max_specified_count=2,
         specify_fee_default=100,
@@ -702,6 +706,7 @@ def _add_delta_entertain_rule(*, category: str, key: str, label: str, allowed_ro
         specify_free_min_units=2,
         specify_free_basis="quantity",
         loyalty_benefits_enabled=True,
+        note="不保撤、無保底｜累積10小時送1小時券" if category == "delta_desktop_basic" else "",
     ))
 
 
@@ -709,9 +714,10 @@ for category, prefix, display, game_roles in [
     ("delta_desktop_basic", "basic_entertain", "娛樂陪〈端遊〉", DELTA_DESKTOP_GAME_ROLE),
     ("delta_mobile_basic", "basic_mobile_entertain", "娛樂陪〈手遊〉", DELTA_MOBILE_GAME_ROLE),
 ]:
-    _add_delta_entertain_rule(category=category, key=f"{prefix}_single", label=f"{display}｜不限", allowed_roles=COMPANION_ROLES, game_roles=game_roles)
-    _add_delta_entertain_rule(category=category, key=f"{prefix}_female_single", label=f"{display}｜女陪", allowed_roles=("female_companion",), game_roles=game_roles)
-    _add_delta_entertain_rule(category=category, key=f"{prefix}_male_single", label=f"{display}｜男陪", allowed_roles=("male_companion",), game_roles=game_roles)
+    desktop_prices = {1: 350, 2: 650} if category == "delta_desktop_basic" else {1: 320, 2: 600}
+    _add_delta_entertain_rule(category=category, key=f"{prefix}_single", label=f"{display}｜不限", allowed_roles=COMPANION_ROLES, game_roles=game_roles, prices=desktop_prices)
+    _add_delta_entertain_rule(category=category, key=f"{prefix}_female_single", label=f"{display}｜女陪", allowed_roles=("female_companion",), game_roles=game_roles, prices=desktop_prices)
+    _add_delta_entertain_rule(category=category, key=f"{prefix}_male_single", label=f"{display}｜男陪", allowed_roles=("male_companion",), game_roles=game_roles, prices=desktop_prices)
 
     # 歷史 fixed-double keys 不再出現在新 catalog。
     for suffix, text, roles in (
@@ -988,16 +994,35 @@ for (
     ))
 
 for key, label, price in [
-    ("basic_oil_fuel", "油鍋單｜火箭燃油", 2600),
-    ("basic_oil_satellite", "油鍋單｜GTI衛星通訊天線", 1800),
-    ("basic_oil_all", "油鍋單｜全包", 4000),
-    ("basic_bet_1000", "賭約單｜800w", 800),
-    ("basic_bet_1500", "賭約單｜1000w", 1200),
-    ("basic_bet_2500", "賭約單｜1200w", 1500),
-    ("basic_trial_500", "體驗單｜777w", 450),
-    ("basic_trial_1000", "體驗單｜1688w", 900),
+    ("basic_oil_fuel", "油鍋單｜火箭燃油", 3000),
+    ("basic_oil_satellite", "油鍋單｜GTI衛星通信天線", 2000),
+    ("basic_oil_all", "油鍋單｜全包", 4500),
+    ("basic_bet_1000", "賭約單｜800w", 1200),
+    ("basic_bet_1500", "賭約單｜1000w", 1500),
+    ("basic_bet_2500", "賭約單｜1200w", 2400),
+    ("basic_trial_500", "體驗單｜普通850w", 500),
+    ("basic_trial_1000", "體驗單｜尊爵1888w", 1000),
 ]:
-    _add(OrderRule("delta_desktop_basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
+    trial = key.startswith("basic_trial_")
+    note = {
+        "basic_trial_500": "普通體驗單｜850W 保底｜不卡底｜每週限一次｜打手選圖｜不適用折扣及加碼",
+        "basic_trial_1000": "尊爵體驗單｜1888W 保底｜每月限一次；金級以上每週一次｜打手選圖｜不適用折扣及加碼",
+        "basic_bet_1000": "賭約單｜800W｜未達指定金額不結單｜絕密｜打手選圖｜不卡底",
+        "basic_bet_1500": "賭約單｜1000W｜未達指定金額不結單｜絕密｜打手選圖｜不卡底",
+        "basic_bet_2500": "賭約單｜1200W｜未達指定金額不結單｜絕密｜打手選圖｜不卡底",
+        "basic_oil_fuel": "航天基地限定｜2000W 保底｜帶出即結單｜未出貨於下場撞場交貨",
+        "basic_oil_satellite": "航天基地限定｜1688W 保底｜帶出即結單｜未出貨於下場撞場交貨",
+        "basic_oil_all": "航天基地限定｜3688W 保底｜帶出即結單｜未出貨於下場撞場交貨",
+    }[key]
+    _add(OrderRule(
+        "delta_desktop_basic", key, label, "fixed", price,
+        allowed_roles=PROTECTOR_ROLES,
+        required_game_roles=DELTA_DESKTOP_GAME_ROLE,
+        required_staff_count=2, min_quantity=1, max_quantity=1,
+        allow_specify=False, note=note,
+        vip_discount_allowed=not trial,
+        point_benefits_allowed=not trial,
+    ))
 
 
 # ========= 趣味單 =========

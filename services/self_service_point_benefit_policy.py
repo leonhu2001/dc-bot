@@ -29,8 +29,9 @@ def check_order_point_benefit_allowed(
     rule_key = str(getattr(rule, "key", "") or "")
     rule_label = str(getattr(rule, "label", "") or "")
 
-    # Legacy non-selectable probe used only to open the combined point/member
-    # picker. Actual point choices are checked individually below.
+    if rule_key.startswith("basic_trial_"):
+        return False, "體驗單不適用折扣與點數福利。"
+
     if str(spec.get("key") or "") == "discount_20":
         return True, ""
 

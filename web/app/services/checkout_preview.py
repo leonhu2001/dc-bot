@@ -1824,6 +1824,11 @@ def build_checkout_preview(
         )
 
 
+    # Trials are explicitly non-discountable; do not let a member voucher
+    # quietly bypass the rule after point/VIP discounts were rejected.
+    if rule_key.startswith("basic_trial_") and benefit_coupon_id not in (None, ""):
+        raise ValueError("體驗單不適用任何折扣、福利券或加碼活動。")
+
     selected_benefit_coupon = None
     if benefit_coupon_id not in (None, ""):
         if selected_point_item is not None:
