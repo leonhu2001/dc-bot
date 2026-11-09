@@ -43,7 +43,7 @@ def test_profile_tip_close_requires_double_confirmation(monkeypatch):
     response.send_message.assert_awaited_once()
     kwargs = response.send_message.await_args.kwargs
     assert kwargs["ephemeral"] is True
-    assert "確認" in response.send_message.await_args.args[0]
+    assert "確定要關閉" in response.send_message.await_args.args[0]
     from views.review import ConfirmCloseTicketView
     assert isinstance(kwargs["view"], ConfirmCloseTicketView)
 
