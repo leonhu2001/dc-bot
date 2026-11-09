@@ -676,6 +676,8 @@ def update_summary_payout_status(
                 "WHERE r.order_id = w.id AND r.status = 'approved')"
             )
 
+        tip_scope, tip_extra_params = tip_salary_order_scope(order_filter, month)
+
         if role in {"all", "", "worker", "護航 / 陪玩"}:
             conn.execute(
                 f"""
@@ -694,11 +696,9 @@ def update_summary_payout_status(
                     payout_paid_at = {paid_at_sql},
                     updated_at = datetime('now', '+8 hours')
                 WHERE payment_status = 'paid'
-                  AND order_id IN (
-                    SELECT w.id FROM web_orders w WHERE {order_filter}
-                  )
+                  AND {tip_scope}
                 """,
-                [target_status, *params],
+                [target_status, *params, *tip_extra_params],
             )
 
         if role in {"all", "", "customer_service", "客服"}:
@@ -774,6 +774,8 @@ def update_summary_person_payout_status(
                 "WHERE r.order_id = w.id AND r.status = 'approved')"
             )
 
+        tip_scope, tip_extra_params = tip_salary_order_scope(order_filter, month)
+
         if update_worker:
             conn.execute(
                 f"""
@@ -794,11 +796,9 @@ def update_summary_person_payout_status(
                     updated_at = datetime('now', '+8 hours')
                 WHERE payment_status = 'paid'
                   AND worker_discord_id = ?
-                  AND order_id IN (
-                    SELECT w.id FROM web_orders w WHERE {order_filter}
-                  )
+                  AND {tip_scope}
                 """,
-                params_worker,
+                [*params_worker, *tip_extra_params],
             )
 
         if update_customer_service:
