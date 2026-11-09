@@ -232,6 +232,15 @@ _LOYALTY_SCOPE_FAMILY_ALIASES = {
     "apex_entertain_ranked_tier_diamond": "apex_entertain",
     "apex_entertain_ranked_tier_master": "apex_entertain",
     "apex_entertain_ranked_tier_predator": "apex_entertain",
+    "valorant_entertain_ranked_tier_diamond": "valorant_entertain_ranked",
+    "valorant_entertain_ranked_tier_ascendant": "valorant_entertain_ranked",
+    "valorant_entertain_ranked_tier_immortal": "valorant_entertain_ranked",
+    "valorant_entertain_ranked_tier_radiant": "valorant_entertain_ranked",
+    "lol_entertain_ranked_tier_emerald": "lol_entertain_ranked",
+    "lol_entertain_ranked_tier_diamond": "lol_entertain_ranked",
+    "lol_entertain_ranked_tier_master": "lol_entertain_ranked",
+    "lol_entertain_ranked_tier_grandmaster": "lol_entertain_ranked",
+    "lol_entertain_ranked_tier_challenger": "lol_entertain_ranked",
 }
 _LOYALTY_COMPANION_MIGRATION_KEY = "20261011_companion_service_units_v2"
 _LOYALTY_POLICY_V3_MIGRATION_KEY = "20261014_entertainment_only_policy_v3"
