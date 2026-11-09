@@ -3,6 +3,88 @@ from __future__ import annotations
 import discord
 
 
+def profile_tip_ticket_ids(channel: discord.TextChannel | None) -> tuple[int, int] | None:
+    if not isinstance(channel, discord.TextChannel):
+        return None
+    segments = str(channel.topic or "").split(";")
+    if (len(segments) != 2
+            or not segments[0].startswith("profile_tip_customer_id=")
+            or not segments[1].startswith("profile_tip_staff_id=")):
+        return None
+    customer = segments[0].split("=", 1)[1]
+    worker = segments[1].split("=", 1)[1]
+    if not customer.isdigit() or not worker.isdigit():
+        return None
+    return int(customer), int(worker)
+
+
+async def request_profile_tip_close(interaction: discord.Interaction) -> None:
+    ids = profile_tip_ticket_ids(interaction.channel)
+    if ids is None:
+        await interaction.response.send_message(
+            "這不是有效的名片雞腿票口。", ephemeral=True,
+        )
+        return
+
+    from core.permissions import is_customer_staff
+    customer_id, _ = ids
+    staff = (
+        isinstance(interaction.user, discord.Member)
+        and is_customer_staff(interaction.user)
+    )
+    if interaction.user.id != customer_id and not staff:
+        await interaction.response.send_message(
+            "只有這張票口的老闆或客服可以關閉票口。", ephemeral=True,
+        )
+        return
+
+    from views.review import ConfirmCloseTicketView
+    await interaction.response.send_message(
+        "⚠️ **確定要關閉這張雞腿票口嗎？**\n"
+        "關閉前會封存對話與付款紀錄；若有待審核雞腿，則會禁止關閉。",
+        view=ConfirmCloseTicketView(customer_id=customer_id),
+        ephemeral=True,
+    )
+
+
+class WorkerTipProfileCloseView(discord.ui.View):
+    """Reusable close button on confirmed profile-tip payment receipts."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="🔒 關閉票口",
+        style=discord.ButtonStyle.danger,
+        custom_id="worker_tip_profile_paid_close",
+    )
+    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await request_profile_tip_close(interaction)
+
+
+async def send_profile_tip_paid_panel(channel, tip_row) -> None:
+    """New independent tip receipt, with the same paid-tip summary as post-close."""
+    if profile_tip_ticket_ids(channel) is None:
+        return
+    if tip_row is None or str(tip_row["payment_status"] or "") != "paid":
+        return
+    amount = int(tip_row["amount"] or 0)
+    await channel.send(
+        "✅ **雞腿付款完成**\n"
+        f"老闆：<@{tip_row['customer_discord_id']}>\n"
+        f"指定陪玩：<@{tip_row['worker_discord_id']}>\n"
+        f"🍗 **雞腿**｜{amount:,}T 已付款\n"
+        f"🍗 **雞腿總覽**｜已付款 {amount:,}T\n"
+        f"付款方式：{tip_row['payment_method']}\n"
+        "此筆雞腿 100% 歸指定陪玩，已列入薪資明細。"
+        "\n確認紀錄無誤後，可按下方按鈕關閉票口。",
+        view=WorkerTipProfileCloseView(),
+        allowed_mentions=discord.AllowedMentions(
+            users=True, roles=False, everyone=False,
+        ),
+    )
+
+
 class WorkerTipProfileStartView(discord.ui.View):
     """Persistent button for a private chicken-leg ticket opened from a staff card."""
 
@@ -14,6 +96,14 @@ class WorkerTipProfileStartView(discord.ui.View):
         style=discord.ButtonStyle.primary,
         custom_id="worker_tip_profile_start",
     )
+    @discord.ui.button(
+        label="🔒 關閉票口",
+        style=discord.ButtonStyle.danger,
+        custom_id="worker_tip_profile_open_close",
+    )
+    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await request_profile_tip_close(interaction)
+
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
@@ -91,7 +181,9 @@ async def create_staff_profile_tip_ticket(
         interaction=interaction,
         category_id=customer_category_id,
         channel_name=f"雞腿-{member.id}",
-        allowed_roles=[customer_role],
+        # The channel-creation helper accepts both Role and Member overwrite
+        # targets. Grant the selected worker explicit view/send access.
+        allowed_roles=[customer_role, staff_member],
         intro_message=(
             f"🍗 **名片加雞腿**\n"
             f"老闆：{member.mention}\n"
