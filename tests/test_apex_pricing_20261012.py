@@ -168,7 +168,7 @@ def test_apex_ranked_adds_50_per_tier_per_worker_per_hour():
             amount = calculate_price(rule, quantity=2, player_count=2)
             assert amount.base_amount == (base_price + 50 * steps) * 4
             assert amount.total_amount == amount.base_amount
-            assert rule.loyalty_benefits_enabled is prefix == "apex_entertain"
+            assert rule.loyalty_benefits_enabled == (prefix == "apex_entertain")
 
 
 
