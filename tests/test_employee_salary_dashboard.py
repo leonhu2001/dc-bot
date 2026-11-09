@@ -39,7 +39,11 @@ def _create_salary_db(path):
                 worker_display_name TEXT,
                 amount INTEGER,
                 payment_status TEXT,
-                payout_status TEXT
+                payout_status TEXT,
+                customer_discord_id TEXT,
+                customer_display_name TEXT,
+                created_at TEXT,
+                paid_at TEXT
             );
 
             CREATE TABLE customer_service_payouts (
@@ -228,3 +232,51 @@ def test_employee_salary_pending_report_is_locked(tmp_path, monkeypatch):
     assert service_item["status_label"] == "報單待審核"
     assert ledger["summary"]["pending"] == 50
     assert ledger["summary"]["locked"] == 300
+
+def test_profile_tip_without_web_order_is_in_employee_salary_month_and_totals(
+    tmp_path, monkeypatch,
+):
+    db_file = tmp_path / "salary.db"
+    _create_salary_db(db_file)
+    with sqlite3.connect(db_file) as conn:
+        conn.execute(
+            """
+            INSERT INTO worker_tips
+                (id, order_id, worker_discord_id, worker_display_name, amount,
+                 payment_status, payout_status, customer_discord_id,
+                 customer_display_name, created_at, paid_at)
+            VALUES
+                (23,NULL,'123','測試陪玩',135,'paid','unpaid','999',
+                 '送雞腿老闆','2026-11-09T01:02:03','2026-11-09T01:03:00')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO worker_tips
+                (id, order_id, worker_discord_id, worker_display_name, amount,
+                 payment_status, payout_status, customer_discord_id,
+                 customer_display_name, created_at, paid_at)
+            VALUES
+                (24,NULL,'123','測試陪玩',700,'pending_review','unpaid','999',
+                 '尚未審核','2026-11-09T01:04:00',NULL)
+            """
+        )
+    monkeypatch.setattr(payouts, "my_payout_db_path", lambda: str(db_file))
+    monkeypatch.setattr(payouts, "_taipei_current_month", lambda: "2026-11")
+
+    unpaid, paid, totals = payouts.build_my_payout_rows("123", month="2026-11")
+    assert totals["unpaid_total"] == 135
+    assert totals["unpaid_count"] == 1
+    assert totals["paid_total"] == 0
+    assert [item["order_no"] for item in unpaid[0]["items"]] == ["TIP-23"]
+    assert unpaid[0]["items"][0]["customer_name"] == "送雞腿老闆"
+
+    months = {item["value"] for item in payouts.get_my_payout_month_options()}
+    assert "2026-11" in months
+    ledger = payouts.build_employee_salary_ledger("123")
+    tip = next(item for item in ledger["items"] if item["order_no"] == "TIP-23")
+    assert tip["service_label"] == "老闆加雞腿"
+    assert tip["amount"] == 135
+    assert tip["financial_state"] == "unpaid"
+    assert tip["status_label"] == "待發放"
+    assert ledger["categories"]["tip"]["total"] == 285
