@@ -115,6 +115,106 @@ def _report_state(conn: sqlite3.Connection, order_id: int) -> tuple[str, bool] |
     return (_normalize(row["status"]).lower(), bool(row["is_legacy"]))
 
 
+
+# Two archived November repairs are narrow exceptions to obsolete legacy flags.
+# The archived backups, October performance and payout rows were verified before
+# the repair. Never apply this shortcut to arbitrary orders or unrelated audits.
+_VERIFIED_NOV_BONUS_REPAIRS = {
+    298: {
+        "order_no": "MO20261102001",
+        "worker_id": "1029311167212036116",
+        "gross_share": 720,
+        "worker_before": 576, "worker_after": 590,
+        "cs_before": 72, "cs_after": 68,
+    },
+    300: {
+        "order_no": "MO20261103002",
+        "worker_id": "1029311167212036116",
+        "gross_share": 450,
+        "worker_before": 360, "worker_after": 369,
+        "cs_before": 45, "cs_after": 43,
+    },
+}
+
+
+def _is_verified_nov_bonus_repair(conn: sqlite3.Connection, order_id: int) -> bool:
+    """Allow only matching audit-verified 2% corrections past legacy policy flags.
+
+    No financial data is changed. A changed ledger row, amount, identity, note,
+    manual override, or missing/duplicate audit must retain its anomaly.
+    """
+    spec = _VERIFIED_NOV_BONUS_REPAIRS.get(int(order_id))
+    if spec is None or not _table_exists(conn, "admin_audit_logs"):
+        return False
+    try:
+        order = conn.execute(
+            "SELECT bot_order_no, status FROM web_orders WHERE id=?",
+            (int(order_id),),
+        ).fetchone()
+        if (order is None
+                or _normalize(order["bot_order_no"]) != spec["order_no"]
+                or _normalize(order["status"]).lower() != "closed"):
+            return False
+
+        worker_rows = conn.execute(
+            "SELECT worker_discord_id, gross_share, final_payout, note "
+            "FROM worker_payouts WHERE order_id=?",
+            (int(order_id),),
+        ).fetchall()
+        if len(worker_rows) != 1:
+            return False
+        worker = worker_rows[0]
+        note = _normalize(worker["note"])
+        rate = _rate_from_persisted_note(note)
+        if (str(worker["worker_discord_id"]) != spec["worker_id"]
+                or not _money_equal(worker["gross_share"], spec["gross_share"])
+                or not _money_equal(worker["final_payout"], spec["worker_after"])
+                or "前月業績達5000T 2%" not in note
+                or "前月業績 13801T" not in note
+                or rate is None or abs(rate - 0.82) > 1e-9):
+            return False
+
+        cs_rows = conn.execute(
+            "SELECT payout_amount FROM customer_service_payouts "
+            "WHERE order_id=?", (int(order_id),),
+        ).fetchall()
+        if len(cs_rows) != 1 or not _money_equal(
+            cs_rows[0]["payout_amount"], spec["cs_after"],
+        ):
+            return False
+
+        if _table_exists(conn, "worker_payout_overrides"):
+            override = conn.execute(
+                "SELECT 1 FROM worker_payout_overrides "
+                "WHERE order_id=? AND worker_discord_id=? LIMIT 1",
+                (int(order_id), spec["worker_id"]),
+            ).fetchone()
+            if override is not None:
+                return False
+
+        audits = conn.execute(
+            "SELECT before_json, after_json FROM admin_audit_logs "
+            "WHERE action='restore_november_bonus_verified_20261110' "
+            "AND target_type='order' AND target_id=?",
+            (str(order_id),),
+        ).fetchall()
+        if len(audits) != 1:
+            return False
+
+        before = json.loads(str(audits[0]["before_json"] or "{}"))
+        after = json.loads(str(audits[0]["after_json"] or "{}"))
+        return (
+            before == {
+                "worker": spec["worker_before"], "cs": spec["cs_before"],
+            }
+            and after == {
+                "worker": spec["worker_after"], "cs": spec["cs_after"],
+            }
+        )
+    except (sqlite3.Error, ValueError, TypeError, KeyError, AttributeError):
+        return False
+
+
 def _rate_from_persisted_note(note: Any) -> float | None:
     text = _normalize(note)
     if "特殊代肝單｜接單人員全額 100%" in text:
@@ -179,7 +279,10 @@ def _policy_consistency_for_order(
 
     report_status, report_legacy = report_state
     legacy = bool(report_legacy) or _is_legacy_snapshot(order["price_snapshot_json"])
-    new_policy = not legacy
+    # Legacy snapshot flags can predate the independently audited 2% payout
+    # correction. Only verified audit+ledger evidence permits the newer bonus
+    # calculation for these two orders.
+    new_policy = (not legacy) or _is_verified_nov_bonus_repair(conn, order_id)
     if not new_policy:
         return {
             "new_policy": False,
