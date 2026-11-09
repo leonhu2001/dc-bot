@@ -517,6 +517,13 @@ def _variant_data(
             f"{int(rule.required_staff_count)} 位"
         )
 
+    # Built-in trial variants are source-authoritative. Do not show old
+    # 777W/1688W labels when a persisted manager catalog still has those names.
+    if rule_key == "basic_trial_500":
+        public_label = "普通｜850w"
+    elif rule_key == "basic_trial_1000":
+        public_label = "尊爵｜1888w"
+
     return {
         "rule_key": rule_key,
         "label": public_label,
