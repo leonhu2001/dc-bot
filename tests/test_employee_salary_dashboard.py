@@ -273,3 +273,53 @@ def test_standalone_paid_chicken_leg_appears_in_salary_and_month_options(
     assert performance["123"] == 180
     assert performance["456"] == 500
     assert build_worker_performance_map(str(db_file), month="2026-10")["123"] == 600
+
+
+def test_standalone_tip_is_disbursable_from_admin_salary_summary(tmp_path, monkeypatch):
+    from web.app.routers import admin_payout_summary as admin
+
+    db_file = tmp_path / "salary.db"
+    _create_salary_db(db_file)
+    with sqlite3.connect(db_file) as conn:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS web_staff_members(
+                discord_id TEXT PRIMARY KEY,
+                is_customer_service INTEGER DEFAULT 0,
+                is_worker INTEGER DEFAULT 0,
+                is_companion INTEGER DEFAULT 0
+            )"""
+        )
+        conn.execute(
+            """
+            INSERT INTO worker_tips(
+                id, order_id, worker_discord_id, worker_display_name,
+                customer_discord_id, customer_display_name, amount,
+                payment_status, payout_status, paid_at, created_at
+            ) VALUES (
+                11, NULL, '123', '測試陪玩',
+                '999', '名片老闆', 180, 'paid', 'unpaid',
+                '2026-11-09 12:10:00', '2026-11-09 12:00:00'
+            )
+            """
+        )
+    monkeypatch.setattr(admin, "db_path", lambda: str(db_file))
+    people, totals = admin.fetch_rows("2026-11", "worker", "", "unpaid")
+    worker = next(person for person in people if person["discord_id"] == "123")
+    assert worker["unpaid_total"] == 180
+    assert totals["unpaid_total"] == 180
+    assert any(x["value"] == "2026-11" for x in admin.get_summary_month_options())
+
+    admin.update_summary_person_payout_status(
+        "2026-11", "worker", "123", "paid"
+    )
+    with sqlite3.connect(db_file) as conn:
+        assert conn.execute(
+            "SELECT payout_status FROM worker_tips WHERE id=11"
+        ).fetchone()[0] == "paid"
+    monkeypatch.setattr(payouts, "my_payout_db_path", lambda: str(db_file))
+    unpaid, paid, totals = payouts.build_my_payout_rows("123", month="2026-11")
+    assert totals["paid_total"] == 180
+    assert any(
+        item["order_no"] == "TIP-11"
+        for person in paid for item in person["items"]
+    )
