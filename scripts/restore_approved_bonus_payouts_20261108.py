@@ -217,6 +217,35 @@ def evaluate(current: sqlite3.Connection, snapshot: sqlite3.Connection, order_id
     return result
 
 
+def _candidate_snapshots(root: Path, explicit: Path | None) -> list[Path]:
+    if explicit is not None:
+        return [explicit.resolve()]
+    archive = root / "_archive"
+    return sorted(
+        (path for path in archive.glob("deploy_*/web_dashboard.db") if path.is_file()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+
+def _plan_from_snapshots(
+    current: sqlite3.Connection, snapshot_paths: list[Path], order_id: int
+) -> dict:
+    for path in snapshot_paths:
+        try:
+            with _open(path, readonly=True) as old:
+                plan = evaluate(current, old, order_id)
+        except sqlite3.Error:
+            continue  # A damaged/incomplete backup is never an authority.
+        if plan["state"] == "ready":
+            plan["snapshot_path"] = str(path)
+            return plan
+    return {
+        "order_id": int(order_id), "state": "blocked",
+        "reason": f"找不到與最近一次重算稽核相符的修復前備份（已查 {len(snapshot_paths)} 份）",
+    }
+
+
 def backup_current(current: sqlite3.Connection, root: Path) -> Path:
     destination = root / "_archive" / (
         "approved_bonus_restore_" + datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -230,9 +259,14 @@ def backup_current(current: sqlite3.Connection, root: Path) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--snapshot", type=Path, required=True,
+    sources = parser.add_mutually_exclusive_group(required=True)
+    sources.add_argument(
+        "--snapshot", type=Path,
         help="修復前資料庫備份，例如 _archive/deploy_.../web_dashboard.db",
+    )
+    sources.add_argument(
+        "--auto-archives", action="store_true",
+        help="自動逐一比對 _archive/deploy_*/web_dashboard.db 備份",
     )
     scope = parser.add_mutually_exclusive_group(required=True)
     scope.add_argument("--order-ids", type=int, nargs="+")
@@ -246,11 +280,14 @@ def main() -> int:
 
     path = ROOT / "web_dashboard.db"
     current = _open(path, readonly=not args.apply)
-    snapshot = _open(args.snapshot.resolve(), readonly=True)
     try:
+        snapshot_paths = _candidate_snapshots(ROOT, args.snapshot)
+        if not snapshot_paths:
+            raise RuntimeError("沒有找到任何部署前備份，拒絕猜測分潤")
         order_ids = (november_repair_order_ids(current) if args.all_november
                      else sorted(set(args.order_ids)))
-        plans = [evaluate(current, snapshot, order_id) for order_id in order_ids]
+        plans = [_plan_from_snapshots(current, snapshot_paths, order_id)
+                 for order_id in order_ids]
         ready = [plan for plan in plans if plan["state"] == "ready"]
         blocked = [plan for plan in plans if plan["state"] != "ready"]
         print(json.dumps({
@@ -276,9 +313,14 @@ def main() -> int:
         current.execute("BEGIN IMMEDIATE")
         try:
             # Re-check after acquiring write lock; abort the entire batch on drift.
-            plans = [evaluate(current, snapshot, order_id) for order_id in order_ids]
-            if (any(x["state"] != "ready" for x in plans)
-                    or len(plans) != len(order_ids)):
+            verified = []
+            for plan in plans:
+                with _open(Path(plan["snapshot_path"]), readonly=True) as old:
+                    locked = evaluate(current, old, plan["order_id"])
+                if locked["state"] != "ready" or locked["changes"] != plan["changes"]:
+                    raise RuntimeError("鎖定後資料或備份變動，已回滾")
+                verified.append(locked)
+            if len(verified) != len(order_ids):
                 raise RuntimeError("鎖定後條件變動，已回滾")
             for plan in plans:
                 before = {}
@@ -328,7 +370,6 @@ def main() -> int:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
     finally:
-        snapshot.close()
         current.close()
 
 
