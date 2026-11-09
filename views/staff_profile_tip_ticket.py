@@ -92,11 +92,6 @@ class WorkerTipProfileStartView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="🍗 加雞腿／輸入金額",
-        style=discord.ButtonStyle.primary,
-        custom_id="worker_tip_profile_start",
-    )
-    @discord.ui.button(
         label="🔒 關閉票口",
         style=discord.ButtonStyle.danger,
         custom_id="worker_tip_profile_open_close",
@@ -104,6 +99,11 @@ class WorkerTipProfileStartView(discord.ui.View):
     async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
         await request_profile_tip_close(interaction)
 
+    @discord.ui.button(
+        label="🍗 加雞腿／輸入金額",
+        style=discord.ButtonStyle.primary,
+        custom_id="worker_tip_profile_start",
+    )
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
