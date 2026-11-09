@@ -232,3 +232,44 @@ def test_employee_salary_pending_report_is_locked(tmp_path, monkeypatch):
     assert service_item["status_label"] == "報單待審核"
     assert ledger["summary"]["pending"] == 50
     assert ledger["summary"]["locked"] == 300
+
+def test_standalone_paid_chicken_leg_appears_in_salary_and_month_options(
+    tmp_path, monkeypatch
+):
+    from web.app.services.worker_performance import build_worker_performance_map
+
+    db_file = tmp_path / "salary.db"
+    _create_salary_db(db_file)
+    with sqlite3.connect(db_file) as conn:
+        conn.executemany(
+            """
+            INSERT INTO worker_tips (
+                id, order_id, worker_discord_id, worker_display_name,
+                customer_discord_id, customer_display_name, amount,
+                payment_status, payout_status, paid_at, created_at
+            ) VALUES (?, NULL, ?, '測試陪玩', '999', '名片老闆',
+                      ?, ?, 'unpaid', ?, '2026-11-09 12:00:00')
+            """,
+            [
+                (11, "123", 180, "paid", "2026-11-09 12:10:00"),
+                (12, "123", 999, "pending_review", None),
+                (13, "456", 500, "paid", "2026-11-09 12:10:00"),
+            ],
+        )
+    monkeypatch.setattr(payouts, "my_payout_db_path", lambda: str(db_file))
+    monkeypatch.setattr(payouts, "_taipei_current_month", lambda: "2026-11")
+    ledger = payouts.build_employee_salary_ledger("123")
+    tips = [item for item in ledger["items"] if item["category_key"] == "tip"]
+    assert len(tips) == 3  # 2 attached to completed orders, 1 independent
+    standalone = next(item for item in tips if item["order_no"] == "TIP-11")
+    assert standalone["amount"] == 180
+    assert standalone["customer_name"] == "名片老闆"
+    assert standalone["status_label"] == "待發放"
+    assert ledger["categories"]["tip"]["total"] == 330
+    assert ledger["summary"]["pending"] == 230
+    assert any(o["value"] == "2026-11" for o in payouts.get_my_payout_month_options())
+
+    performance = build_worker_performance_map(str(db_file), month="2026-11")
+    assert performance["123"] == 180
+    assert performance["456"] == 500
+    assert build_worker_performance_map(str(db_file), month="2026-10")["123"] == 900
