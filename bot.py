@@ -15,6 +15,7 @@ import io
 import asyncio
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from functools import partial
 
 from core.time_utils import (
     get_taipei_now,
@@ -1960,18 +1961,14 @@ configure_staff_profile_order_ticket_creator(
 )
 
 
-async def create_staff_profile_tip_ticket(*, interaction: discord.Interaction, staff_id: str):
-    await _create_profile_tip_ticket(
-        interaction=interaction,
-        staff_id=staff_id,
+configure_staff_profile_tip_ticket_creator(
+    partial(
+        _create_profile_tip_ticket,
         create_private_channel=create_private_channel,
         customer_role_id=CUSTOMER_ROLE_ID,
         customer_category_id=CUSTOMER_CATEGORY_ID,
-        channel_name=safe_channel_name("雞腿", interaction.user),
     )
-
-
-configure_staff_profile_tip_ticket_creator(create_staff_profile_tip_ticket)
+)
 
 
 # ========= 主面板 / 下單入口 View 設定 =========
