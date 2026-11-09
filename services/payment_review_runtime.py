@@ -482,10 +482,16 @@ async def _apply_tip_approval(bot: discord.Client, row: dict) -> None:
         except Exception:
             pass
 
-    await refresh_post_close_panel(
-        channel,
-        str(tip_row["customer_discord_id"] or ""),
+    from views.staff_profile_tip_ticket import (
+        profile_tip_ticket_ids, send_profile_tip_paid_panel,
     )
+    if profile_tip_ticket_ids(channel) is not None:
+        await send_profile_tip_paid_panel(channel, tip_row)
+    else:
+        await refresh_post_close_panel(
+            channel,
+            str(tip_row["customer_discord_id"] or ""),
+        )
     mark_payment_review_applied(int(row["id"]))
 
 
@@ -517,10 +523,12 @@ async def _apply_tip_rejection(bot: discord.Client, row: dict) -> None:
         ),
     )
 
-    await refresh_post_close_panel(
-        channel,
-        str(tip_row["customer_discord_id"] or ""),
-    )
+    from views.staff_profile_tip_ticket import profile_tip_ticket_ids
+    if profile_tip_ticket_ids(channel) is None:
+        await refresh_post_close_panel(
+            channel,
+            str(tip_row["customer_discord_id"] or ""),
+        )
     mark_payment_review_rejection_applied(int(row["id"]))
 
 
