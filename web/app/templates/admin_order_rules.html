@@ -419,7 +419,7 @@
                     </div>
                     <div class="rule-inline-note">
                         <span>跨單累積</span>
-                        <strong>{{ '10H → +30分鐘' if payload.get('pricing_type') == 'hourly' else ('20局 → +1局' if payload.get('pricing_type') == 'game' else '此計價方式不適用') }}</strong>
+                        <strong>{{ '10H → +1小時' if payload.get('pricing_type') == 'hourly' else ('15局 → +1局' if payload.get('pricing_type') == 'game' else '此計價方式不適用') }}</strong>
                     </div>
                 </section>
 
