@@ -5,6 +5,7 @@ from typing import Callable
 import discord
 
 from services.payment_methods import WALLET_PAYMENT_METHOD
+from services.payment_qr_assets import payment_qr_edit_kwargs
 from services.order_payment_policy import (
     is_zero_amount_order,
     requires_wallet_debit,
@@ -434,6 +435,7 @@ async def finalize_accepted_pending_payment(
                 payment_message = await payment_channel.fetch_message(payment_message_id)
                 await payment_message.edit(
                     embed=submitted_embed,
+                    **payment_qr_edit_kwargs(payment_method),
                     view=PaymentMethodView(
                         customer_id=customer_id,
                         channel_id=channel_id,
