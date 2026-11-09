@@ -64,7 +64,7 @@ def test_production_owns_public_factory_and_panel_sync() -> None:
     assert "quick._view_for_channel = _public_view_for_channel" in source
     assert "quick._ensure_panel = _clean_ensure_panel" in source
     assert "quick.build_entry_embed =" not in source
-    assert "add_price_list_control" in source
+    assert "add_price_list_control" not in source
     assert "panel_image_url" in source
 
 
