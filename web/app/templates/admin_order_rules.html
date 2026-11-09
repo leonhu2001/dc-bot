@@ -360,12 +360,34 @@
                     <div class="rule-form-grid rule-form-grid--4">
                         <label class="rule-field rule-field--wide"><span>商品名稱（第三欄）</span><input name="label" value="{{ payload.get('label', '') }}" required></label>
                         <label class="rule-field rule-field--wide"><span>第二層分類（第二欄）</span><input name="catalog_group_label" maxlength="100" value="{{ payload.get('catalog_group_label', '') }}" placeholder="例如：陪解"></label>
-                        <label class="rule-field"><span>售價</span><input name="price" type="number" min="0" value="{{ payload.get('price', 0) }}" required></label>
+                        <label class="rule-field">
+                            <span>{{ '價格參考值（依人數價表結帳）' if selected_uses_seat_price_table else '售價' }}</span>
+                            <input name="price" type="number" min="0" value="{{ payload.get('price', 0) }}" required {% if selected_uses_seat_price_table %}readonly{% endif %}>
+                        </label>
                         <label class="rule-field"><span>計價方式</span><select name="pricing_type">{% for value, label in pricing_types %}<option value="{{ value }}" {% if payload.get('pricing_type') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
                         <label class="rule-field"><span>單位</span><input name="unit_label" value="{{ payload.get('unit_label', '單') }}"></label>
                         <label class="rule-field"><span>需要人數</span><input name="required_staff_count" value="{{ payload.get('required_staff_count', 1) }}" placeholder="1 / 2 / player_count"></label>
                     </div>
                 </section>
+
+                {% if selected_uses_seat_price_table %}
+                <section class="rule-editor-section">
+                    <div class="rule-section-heading">
+                        <div>
+                            <h3>依陪玩人數定價</h3>
+                            <p class="muted-text">此商品實際結帳使用下方的人數對應金額，非上面的參考售價。修改後必須預覽並發布，才會更新 Web 與 DC Bot。</p>
+                        </div>
+                    </div>
+                    <div class="rule-form-grid rule-form-grid--4">
+                        {% for count, amount in payload.get('player_count_prices', {}).items()|sort %}
+                        <label class="rule-field">
+                            <span>{{ count }} 人總價（T）</span>
+                            <input name="player_count_price_{{ count }}" type="number" min="1" value="{{ amount }}" required>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
 
                 <section class="rule-editor-section">
                     <div class="rule-section-heading">
