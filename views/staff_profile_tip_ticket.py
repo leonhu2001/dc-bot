@@ -63,6 +63,8 @@ class WorkerTipProfileTicketView(discord.ui.View):
 
     def __init__(self):
         super().__init__(timeout=None)
+        for item in WorkerTipProfileStartView().children:
+            self.add_item(item)
         self.add_item(WorkerTipProfileCloseButton())
 
 
