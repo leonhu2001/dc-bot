@@ -14,7 +14,10 @@ from views.worker_tips import (
     WorkerTipAmountModal,
     WorkerTipPaymentMethodSelect,
 )
-from views.staff_profile_tip_ticket import WorkerTipProfileStartView
+from views.staff_profile_tip_ticket import (
+    WorkerTipProfileStartView, WorkerTipProfileTicketView,
+    WorkerTipProfileCloseView, profile_tip_ids, send_profile_tip_completion,
+)
 
 
 def test_payment_qr_matches_exact_uploaded_file_names(tmp_path, monkeypatch):
@@ -103,3 +106,44 @@ def test_isolated_payment_release_does_not_include_pending_delta_price_changes()
     # main is allowed to inherit the newer values without changing this branch.
     assert get_rule("basic_entertain_single").price in {320, 350}
     assert get_rule("basic_one_companion_one_guard_secret").price in {720, 800}
+
+
+def test_private_profile_tip_ticket_has_start_and_confirmed_close_buttons():
+    import types
+    view = WorkerTipProfileTicketView()
+    assert view.is_persistent()
+    labels = [item.label for item in view.children]
+    assert labels == ["🍗 加雞腿／輸入金額", "🔒 關閉票口"]
+    assert WorkerTipProfileCloseView().is_persistent()
+    valid = types.SimpleNamespace(
+        topic="profile_tip_customer_id=123;profile_tip_staff_id=456"
+    )
+    assert profile_tip_ids(valid) == (123, 456)
+    assert profile_tip_ids(types.SimpleNamespace(topic="order_customer_id=123")) is None
+
+
+def test_completed_profile_tip_displays_amount_and_close_action(monkeypatch):
+    import asyncio
+    from services import worker_tips
+
+    tip = {
+        "id": 75, "payment_status": "paid", "amount": 240,
+        "customer_discord_id": "123", "worker_discord_id": "456",
+    }
+    monkeypatch.setattr(worker_tips, "get_worker_tip", lambda tip_id: tip)
+    sent = []
+
+    class StubChannel:
+        topic = "profile_tip_customer_id=123;profile_tip_staff_id=456"
+        async def send(self, *args, **kwargs):
+            sent.append((args, kwargs))
+
+    asyncio.run(send_profile_tip_completion(StubChannel(), tip))
+    assert len(sent) == 1
+    assert "240T" in sent[0][0][0]
+    assert "待發放" in sent[0][0][0]
+    assert isinstance(sent[0][1]["view"], WorkerTipProfileCloseView)
+
+    tip["payment_status"] = "pending_review"
+    asyncio.run(send_profile_tip_completion(StubChannel(), tip))
+    assert len(sent) == 1  # Do not celebrate unpaid bank transfers.
