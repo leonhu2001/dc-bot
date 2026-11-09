@@ -59,7 +59,6 @@ async def create_staff_profile_tip_ticket(
     create_private_channel,
     customer_role_id: int,
     customer_category_id: int,
-    channel_name: str,
 ) -> None:
     """Open a private tip ticket without creating or posting a regular order."""
     guild, member = interaction.guild, interaction.user
@@ -91,7 +90,7 @@ async def create_staff_profile_tip_ticket(
     await create_private_channel(
         interaction=interaction,
         category_id=customer_category_id,
-        channel_name=channel_name,
+        channel_name=f"雞腿-{member.id}",
         allowed_roles=[customer_role],
         intro_message=(
             f"🍗 **名片加雞腿**\n"
