@@ -342,6 +342,18 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
             await interaction.response.send_message("請先選擇訂單項目，再設定折扣。", ephemeral=True)
             return
 
+        try:
+            selected_rule = _get_rule_from_self_service_data(data)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        if str(getattr(selected_rule, "key", "")) in {"basic_trial_500", "basic_trial_1000"}:
+            await interaction.response.send_message(
+                "體驗單不適用任何折扣、會員券或加碼活動。",
+                ephemeral=True,
+            )
+            return
+
         discount_percent_text = str(
             self.discount_percent.value
             or ""
@@ -853,6 +865,12 @@ class SelfServiceOrderView(discord.ui.View):
         if is_aw_collision_rule(rule):
             await interaction.response.send_message(
                 "AW代撞不套用客服折扣、會員或點數福利。",
+                ephemeral=True,
+            )
+            return
+        if str(getattr(rule, "key", "")) in {"basic_trial_500", "basic_trial_1000"}:
+            await interaction.response.send_message(
+                "體驗單不適用任何折扣、會員券或加碼活動。",
                 ephemeral=True,
             )
             return
