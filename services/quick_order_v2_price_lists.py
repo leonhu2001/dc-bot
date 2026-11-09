@@ -453,22 +453,28 @@ def _shared_special_service_copy(game: str) -> str:
 
 def _valorant_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
-{_aligned_code_block((("NG", "每人 300T / H"), ("積分", "每人 250T / 局")))}
+{_aligned_code_block((("NG", "每人 350T / H"), ("積分（白金以下）", "每人 280T / 局")))}
+積分段位加價：鑽石 +50T、超凡 +100T、神話 +150T、輻能 +200T（每人每局）。
+
+**娛樂陪無賠付**
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Ascendant", "超凡陪")}
-{_aligned_code_block((("NG", "每人 330T / H"), ("積分", "每人 290T / 局")))}
+{_aligned_code_block((("NG", "每人 330T / H"), ("積分（白金以下）", "每人 300T / 局")))}
+積分段位加價：鑽石 +50T、超凡 +100T、神話 +150T、輻能 +200T（每人每局）。
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Immortal", "神話陪")}
-{_aligned_code_block((("NG", "每人 350T / H"), ("積分", "每人 330T / 局")))}
+{_aligned_code_block((("NG", "每人 350T / H"), ("積分（白金以下）", "每人 330T / 局")))}
+積分段位加價：鑽石 +50T、超凡 +100T、神話 +150T、輻能 +200T（每人每局）。
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Radiant", "輻能陪")}
-{_aligned_code_block((("NG", "每人 380T / H"), ("積分", "每人 370T / 局")))}
+{_aligned_code_block((("NG", "每人 380T / H"), ("積分（白金以下）", "每人 370T / 局")))}
+積分段位加價：鑽石 +50T、超凡 +100T、神話 +150T、輻能 +200T（每人每局）。
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
@@ -480,6 +486,9 @@ def _valorant_price_list(interaction: discord.Interaction) -> str:
 📌 **指定陪玩**
 {_aligned_code_block((("指定打手／陪玩", "每人 +100T"),))}
 ⚠️ **2H 或 2局以上免指定費**
+
+🛡️ **技術陪賠付規則**
+超凡／神話／輻能陪 2 位以上，若該局未獲勝或未進前三，將補打一把（由客服確認）。
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
@@ -527,22 +536,26 @@ def _apex_price_list(interaction: discord.Interaction) -> str:
 
 def _lol_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
-{_aligned_code_block((("ARAM", "每人 350T / H"), ("NG", "每人 350T / H"), ("積分", "每人 280T / 局")))}
+{_aligned_code_block((("ARAM", "每人 350T / H"), ("NG", "每人 350T / H"), ("積分（白金以下）", "每人 280T / 局")))}
+積分段位加價：翡翠 +50T、鑽石 +100T、大師 +150T、宗師 +200T、菁英 +250T（每人每局）。
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Master", "大師陪")}
-{_aligned_code_block((("NG", "每人 380T / H"), ("積分", "每人 300T / 局")))}
+{_aligned_code_block((("NG", "每人 380T / H"), ("積分（白金以下）", "每人 300T / 局")))}
+積分段位加價：翡翠 +50T、鑽石 +100T、大師 +150T、宗師 +200T、菁英 +250T（每人每局）。
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Grandmaster", "宗師陪")}
-{_aligned_code_block((("NG", "每人 390T / H"), ("積分", "每人 350T / 局")))}
+{_aligned_code_block((("NG", "每人 390T / H"), ("積分（白金以下）", "每人 350T / 局")))}
+積分段位加價：翡翠 +50T、鑽石 +100T、大師 +150T、宗師 +200T、菁英 +250T（每人每局）。
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Challenger", "菁英陪")}
-{_aligned_code_block((("NG", "每人 400T / H"), ("積分", "每人 450T / 局")))}
+{_aligned_code_block((("NG", "每人 400T / H"), ("積分（白金以下）", "每人 430T / 局")))}
+積分段位加價：翡翠 +50T、鑽石 +100T、大師 +150T、宗師 +200T、菁英 +250T（每人每局）。
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
