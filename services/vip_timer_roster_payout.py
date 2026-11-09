@@ -151,7 +151,9 @@ def _legacy_static_roster_staff_ids(order_id: int, db) -> list[str]:
     return staff_ids
 
 
-def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
+def _raw_worker_shares(
+    order_id: int, db, *, include_billed_total: bool = False
+) -> dict[str, Decimal] | tuple[dict[str, Decimal], Decimal]:
     # Early VIP-timer installations (and historical test fixtures) predate the
     # rule_key column. Keep those ledgers readable: without a rule key they use
     # the original equal-per-staff split, while current ledgers can still apply
@@ -178,6 +180,7 @@ def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
         {"order_id": int(order_id)},
     ).mappings().all()
     shares: dict[str, Decimal] = defaultdict(Decimal)
+    billed_total = Decimal(0)
     role_types = _staff_role_types(int(order_id), db)
     legacy_static_roster: list[str] | None = None
 
@@ -204,6 +207,7 @@ def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
         seconds = max(0, int(row.get("billable_seconds") or 0))
         rate = max(0, int(row.get("hourly_rate") or 0))
         segment_gross = Decimal(rate) * Decimal(seconds) / Decimal(3600)
+        billed_total += segment_gross
 
         weighted = allocate_decimal_gross_shares(
             str(row.get("rule_key") or ""),
@@ -212,6 +216,8 @@ def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
                 for worker_id in unique
             ],
             segment_gross,
+            unit_price=rate,
+            scale_to_worker_basis=True,
         )
         if weighted is not None:
             for worker_id, amount in weighted.items():
@@ -221,6 +227,8 @@ def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
         per_worker = segment_gross / Decimal(len(unique))
         for worker_id in unique:
             shares[worker_id] += per_worker
+    if include_billed_total:
+        return dict(shares), billed_total
     return dict(shares)
 
 
@@ -256,8 +264,17 @@ def _worker_payout_plan(db, order: WebOrder) -> dict[str, dict[str, int | float 
         0,
         int(order.payout_base_amount if order.payout_base_amount is not None else order.amount or 0),
     )
-    raw = _raw_worker_shares(int(order.id), db)
-    shares = _allocate_integer_shares(raw, payout_base)
+    raw, billed_total = _raw_worker_shares(
+        int(order.id), db, include_billed_total=True
+    )
+    # Do not force the entire invoice (900T/H) back into staff payouts on
+    # top-secret one-guard segments (500+350=850T/H). Mixed VIP segments and
+    # existing discounts remain proportional to their recorded billed basis.
+    worker_basis_total = (
+        int(round(Decimal(payout_base) * sum(raw.values(), Decimal(0)) / billed_total))
+        if billed_total > 0 else payout_base
+    )
+    shares = _allocate_integer_shares(raw, worker_basis_total)
     if not shares:
         return {}
 
