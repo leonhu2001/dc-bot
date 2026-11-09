@@ -8,6 +8,7 @@ from core.database import remember_order_data, save_bot_data
 from core.time_utils import get_taipei_now_iso
 from services.logging_service import send_order_log
 from services.order_flow import build_payment_method_embed
+from services.payment_qr_assets import payment_qr_edit_kwargs, payment_qr_send_kwargs
 from services.orders import _to_int
 
 
@@ -191,6 +192,7 @@ async def ensure_acceptance_payment_panel(
                     content=content,
                     embed=payment_embed,
                     view=payment_view,
+                    **payment_qr_edit_kwargs(selected_method),
                     allowed_mentions=discord.AllowedMentions(
                         users=True,
                         roles=False,
@@ -211,6 +213,7 @@ async def ensure_acceptance_payment_panel(
             content=content,
             embed=payment_embed,
             view=payment_view,
+            **payment_qr_send_kwargs(selected_method),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
                 roles=False,
