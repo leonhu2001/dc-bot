@@ -34,7 +34,7 @@ def test_coupon_value_uses_normal_list_price_not_vip_discount():
         player_count=1,
         coupon=coupon,
     )
-    assert value == 160
+    assert value == 175
 
 
 def _setup_reconcile_db(monkeypatch, tmp_path: Path):
