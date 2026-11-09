@@ -146,7 +146,7 @@ def test_game_price_list_preserves_category_prices_and_rules() -> None:
     interaction = SimpleNamespace(guild=None)
     game_data = (
         ("valorant", ("超凡陪", "神話陪", "輻能陪"), ("330T", "350T", "380T", "370T")),
-        ("lol", ("大師陪", "宗師陪", "菁英陪"), ("380T", "390T", "400T", "450T")),
+        ("lol", ("大師陪", "宗師陪", "菁英陪"), ("380T", "390T", "400T", "430T")),
         ("apex", ("鑽石陪", "大師陪", "頂獵陪"), ("380T", "400T", "450T", "500T", "550T")),
     )
     for game, ranks, tech_prices in game_data:
