@@ -275,10 +275,13 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜娛樂陪",
         "selector_label": "模式",
-        "description": "NG 300T/人/H、積分 350T/人/H；指定每位 +100T，2H 以上免指定費；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
+        "description": "NG 320T/人/H、積分（白金以下）350T/人/H；積分段位每往上一階每人每小時 +50T：鑽石 +50T、大師 +100T、頂獵 +150T；指定每位 +100T，2H 以上免指定費；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
         "variants": [
             ("apex_entertain_ng", "NG"),
-            ("apex_entertain_ranked", "積分"),
+            ("apex_entertain_ranked", "積分（白金以下）"),
+            ("apex_entertain_ranked_tier_diamond", "積分（鑽石）"),
+            ("apex_entertain_ranked_tier_master", "積分（大師）"),
+            ("apex_entertain_ranked_tier_predator", "積分（頂獵）"),
         ],
     },
     {
@@ -286,10 +289,13 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜鑽石陪",
         "selector_label": "模式",
-        "description": "NG 400T/人/H、積分 450T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": "NG 380T/人/H、積分（白金以下）400T/人/H；積分段位每往上一階每人每小時 +50T：鑽石 +50T、大師 +100T、頂獵 +150T；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_diamond_ng", "NG"),
-            ("apex_diamond_ranked", "積分"),
+            ("apex_diamond_ranked", "積分（白金以下）"),
+            ("apex_diamond_ranked_tier_diamond", "積分（鑽石）"),
+            ("apex_diamond_ranked_tier_master", "積分（大師）"),
+            ("apex_diamond_ranked_tier_predator", "積分（頂獵）"),
         ],
     },
     {
@@ -297,10 +303,13 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜大師陪",
         "selector_label": "模式",
-        "description": "NG 480T/人/H、積分 530T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": "NG 400T/人/H、積分（白金以下）450T/人/H；積分段位每往上一階每人每小時 +50T：鑽石 +50T、大師 +100T、頂獵 +150T；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_master_ng", "NG"),
-            ("apex_master_ranked", "積分"),
+            ("apex_master_ranked", "積分（白金以下）"),
+            ("apex_master_ranked_tier_diamond", "積分（鑽石）"),
+            ("apex_master_ranked_tier_master", "積分（大師）"),
+            ("apex_master_ranked_tier_predator", "積分（頂獵）"),
         ],
     },
     {
@@ -308,10 +317,13 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜頂獵陪",
         "selector_label": "模式",
-        "description": "NG 580T/人/H、積分 630T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": "NG 500T/人/H、積分（白金以下）550T/人/H；積分段位每往上一階每人每小時 +50T：鑽石 +50T、大師 +100T、頂獵 +150T；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_predator_ng", "NG"),
-            ("apex_predator_ranked", "積分"),
+            ("apex_predator_ranked", "積分（白金以下）"),
+            ("apex_predator_ranked_tier_diamond", "積分（鑽石）"),
+            ("apex_predator_ranked_tier_master", "積分（大師）"),
+            ("apex_predator_ranked_tier_predator", "積分（頂獵）"),
         ],
     },
 
