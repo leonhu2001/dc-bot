@@ -79,6 +79,7 @@ jobs:
         run: |
           bash -n scripts/deploy_main.sh
           bash -n scripts/deploy_payment_bonus.sh
+          bash -n scripts/deploy_verified_nov_bonus_accounting_20261110.sh
 
       - name: Validate deploy PowerShell
         shell: pwsh
