@@ -32,3 +32,14 @@ def tip_month_filter(month: str | None) -> tuple[str, list[str]]:
     if not value:
         return "", []
     return f" AND substr({TIP_DATE_SQL}, 1, 7) = ? ", [value]
+
+
+def ensure_tip_salary_columns(conn) -> None:
+    """Forward-only migration for older tip tables created by salary modules."""
+    existing = {
+        str(row[1]) for row in conn.execute("PRAGMA table_info(worker_tips)")
+    }
+    for column in ("created_at", "paid_at", "customer_discord_id",
+                   "customer_display_name"):
+        if column not in existing:
+            conn.execute(f"ALTER TABLE worker_tips ADD COLUMN {column} TEXT")
