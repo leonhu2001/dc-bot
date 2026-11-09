@@ -74,7 +74,6 @@ $PricePaths = @(
     "services/self_service_point_benefit_policy.py",
     "web/app/services/order_groups.py",
     "web/app/services/order_service.py",
-    "web/app/services/accounting_reconciliation.py",
     "web/app/services/checkout_preview.py"
 )
 & git diff --quiet $PriceBase $Target -- @PricePaths
