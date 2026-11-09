@@ -75,7 +75,8 @@ def payout_bases_for_rule(
     rule_key: str | None, *, unit_price: int | None = None
 ) -> tuple[int, int] | None:
     key = str(rule_key or "").strip()
-    if unit_price == LEGACY_DESKTOP_ONE_GUARD_RETAIL_PRICES.get(key):
+    if (key in LEGACY_DESKTOP_ONE_GUARD_RETAIL_PRICES
+            and unit_price == LEGACY_DESKTOP_ONE_GUARD_RETAIL_PRICES[key]):
         return LEGACY_DESKTOP_ONE_GUARD_BASES[key]
     return ONE_COMPANION_ONE_GUARD_PAYOUT_BASES.get(key)
 
