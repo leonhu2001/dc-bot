@@ -164,8 +164,8 @@ GROUP_SPECS = [
         "label": "體驗單",
         "selector_label": "方案",
         "variants": [
-            ("basic_trial_500", "777w"),
-            ("basic_trial_1000", "1688w"),
+            ("basic_trial_500", "普通｜850w"),
+            ("basic_trial_1000", "尊爵｜1888w"),
         ],
     },
 
