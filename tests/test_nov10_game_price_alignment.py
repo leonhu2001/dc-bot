@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from services import quick_order_v2 as quick
-from services.quick_order_v2_price_lists import _apex_price_list, _lol_price_list, _steam_price_list
+from services.quick_order_v2_price_lists import _apex_price_list, _lol_price_list, _steam_price_list, _valorant_price_list
 from services.quick_order_v2_production import _public_view_for_channel
 from services.game_price_policy_20261023 import GAME_PRICE_OVERRIDES
 from services.loyalty_benefits import loyalty_scope_key
@@ -16,6 +16,15 @@ from web.app.services.order_groups import get_grouped_order_catalog
 
 
 OWNER_PRICES = {
+    # VALORANT: NG per hour and ranked per game.
+    "valorant_entertain_ng": 350,
+    "valorant_entertain_ranked": 280,
+    "valorant_ascendant_ng": 330,
+    "valorant_ascendant_ranked": 300,
+    "valorant_immortal_ng": 350,
+    "valorant_immortal_ranked": 330,
+    "valorant_radiant_ng": 380,
+    "valorant_radiant_ranked": 370,
     # LOL: ARAM/NG per hour, ranked per game.
     "lol_entertain_aram": 350,
     "lol_entertain_ng": 350,
@@ -25,7 +34,7 @@ OWNER_PRICES = {
     "lol_grandmaster_ng": 390,
     "lol_grandmaster_ranked": 350,
     "lol_elite_ng": 400,
-    "lol_elite_ranked": 450,
+    "lol_elite_ranked": 430,
     # APEX: all amounts per player/hour, platinum-or-below rank baseline.
     "apex_entertain_ng": 320,
     "apex_entertain_ranked": 350,
@@ -49,6 +58,10 @@ def test_shared_discord_web_price_source_and_legacy_policy_match(key, price):
 
 def test_all_discord_game_catalogs_use_same_prices_as_web():
     for category, label, group in (
+        ("valorant", "娛樂陪", "valorant_entertain"),
+        ("valorant", "超凡陪", "valorant_ascendant"),
+        ("valorant", "神話陪", "valorant_immortal"),
+        ("valorant", "輻能陪", "valorant_radiant"),
         ("lol", "娛樂陪", "lol_entertain"),
         ("lol", "大師陪", "lol_master"),
         ("lol", "宗師陪", "lol_grandmaster"),
@@ -107,6 +120,8 @@ def test_prices_in_discord_copy_match_new_poster():
     lol = _lol_price_list(interaction)
     apex = _apex_price_list(interaction)
     steam = _steam_price_list(interaction)
+    valorant = _valorant_price_list(interaction)
+    assert all(token in valorant for token in ("350T / H", "280T / 局", "330T / H", "300T / 局", "370T / 局", "+50T"))
     assert all(token in lol for token in (
         "350T / H", "280T / 局", "380T / H", "390T / H", "450T / 局",
         "15 局", "10 小時", "3H 起標",
@@ -119,12 +134,46 @@ def test_prices_in_discord_copy_match_new_poster():
     assert "一般陪玩" in steam and "350T / H" in steam
 
 
-def test_public_entry_views_no_longer_include_price_list_button():
-    for game in ("delta", "valorant", "lol", "apex", "steam"):
+def test_only_four_finished_game_entry_views_remove_price_list_button():
+    for game in ("valorant", "lol", "apex", "steam"):
         channel_id = quick.QUICK_ORDER_V2_CHANNELS[game]
         view = _public_view_for_channel(channel_id)
         assert not any(
             str(getattr(child, "custom_id", "") or "").startswith("quick_order_v2_price_list_")
             for child in view.children
         )
-    assert len(_public_view_for_channel(quick.QUICK_ORDER_V2_CHANNELS["delta"]).children) == 4
+    delta_channel_id = quick.QUICK_ORDER_V2_CHANNELS["delta"]
+    delta_view = _public_view_for_channel(delta_channel_id)
+    assert len(delta_view.children) == 5
+    assert f"quick_order_v2_price_list_{delta_channel_id}" in {
+        str(getattr(child, "custom_id", "") or "")
+        for child in delta_view.children
+    }
+
+def test_loL_and_valorant_customer_rank_price_and_loyalty_scopes():
+    tiers = (
+        ("valorant", ("diamond", "ascendant", "immortal", "radiant"), 4),
+        ("lol", ("emerald", "diamond", "master", "grandmaster", "challenger"), 5),
+    )
+    for game, tier_names, _ in tiers:
+        prefixes = (
+            ("valorant_entertain", "valorant_ascendant", "valorant_immortal", "valorant_radiant")
+            if game == "valorant" else
+            ("lol_entertain", "lol_master", "lol_grandmaster", "lol_elite")
+        )
+        for prefix in prefixes:
+            base = ORDER_RULES[f"{prefix}_ranked"]
+            assert base.pricing_type == "game"
+            for steps, tier in enumerate(tier_names, 1):
+                ranked_key = f"{prefix}_ranked_tier_{tier}"
+                rule = ORDER_RULES[ranked_key]
+                assert rule.price == base.price + steps * 50
+                assert rule.pricing_type == "game"
+                assert rule.unit_label == "局"
+                assert GAME_PRICE_OVERRIDES[ranked_key] == rule.price
+                amount = calculate_price(rule, quantity=2, player_count=2)
+                assert amount.base_amount == rule.price * 4
+                assert amount.specify_fee == 0
+                if prefix.endswith("entertain"):
+                    assert loyalty_scope_key(ranked_key) == loyalty_scope_key(f"{prefix}_ranked")
+
