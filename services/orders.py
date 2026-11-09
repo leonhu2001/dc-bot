@@ -82,8 +82,8 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "體驗單",
             "details": [
-                {"label": "777w", "value": "777w", "rule_key": "basic_trial_500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "1688w", "value": "1688w", "rule_key": "basic_trial_1000", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "普通｜850w", "value": "850w", "rule_key": "basic_trial_500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "尊爵｜1888w", "value": "1888w", "rule_key": "basic_trial_1000", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
         {
@@ -395,7 +395,11 @@ ORDER_RULE_KEY_BY_LABEL.update({
     "體驗單 500": "basic_trial_500",
     "體驗單 1000": "basic_trial_1000",
     "體驗單 777w": "basic_trial_500",
+    "體驗單 850w": "basic_trial_500",
+    "體驗單 普通850w": "basic_trial_500",
     "體驗單 1688w": "basic_trial_1000",
+    "體驗單 1888w": "basic_trial_1000",
+    "體驗單 尊爵1888w": "basic_trial_1000",
     "賽季3x3｜普通": "farm_season_3x3_normal",
     "賽季3x3｜命運契約": "farm_season_3x3_contract",
     "代解部門任務": "farm_department_task",
