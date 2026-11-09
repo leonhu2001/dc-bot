@@ -214,10 +214,26 @@ for game,prefixes,tiers in (
                 raise SystemExit(f"BLOCKED: {game} tier total mismatch: {rule.key}")
         web=next(g for g in get_grouped_order_catalog(game) if g["key"]==prefix)
         discord=get_order_item_details_for_group(game,web["label"].split("｜")[-1])
-        # LoL technical ARAM is an existing extra DC offering, kept for old users.
-        expected_rows=len(tiers)+2
-        if len(web["variants"])!=expected_rows or len(discord)<expected_rows:
-            raise SystemExit(f"BLOCKED: missing customer tier options: {prefix}")
+        # Only LoL entertainment officially lists ARAM on Web; technical
+        # ARAM is retained on Discord for historical customer selections.
+        expected_web_keys={f"{prefix}_ng",f"{prefix}_ranked"} | {
+            f"{prefix}_ranked_tier_{tier}" for tier in tiers
+        }
+        if game=="lol" and prefix=="lol_entertain":
+            expected_web_keys.add(f"{prefix}_aram")
+        expected_discord_keys=set(expected_web_keys)
+        if game=="lol":
+            expected_discord_keys.add(f"{prefix}_aram")
+        web_keys={row["rule_key"] for row in web["variants"]}
+        discord_keys={row["rule_key"] for row in discord}
+        if web_keys!=expected_web_keys or discord_keys!=expected_discord_keys:
+            raise SystemExit(
+                f"BLOCKED: customer tier options mismatch: {prefix}; "
+                f"web missing={sorted(expected_web_keys-web_keys)}, "
+                f"web extra={sorted(web_keys-expected_web_keys)}, "
+                f"discord missing={sorted(expected_discord_keys-discord_keys)}, "
+                f"discord extra={sorted(discord_keys-expected_discord_keys)}"
+            )
 for prefix,base in (
     ("apex_entertain",350),("apex_diamond",400),
     ("apex_master",450),("apex_predator",550),
