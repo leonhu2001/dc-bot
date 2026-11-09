@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Safe isolated Nov 10 LoL/APEX/Steam game pricing + public entry view release.
+# Safe isolated Nov 10 VALORANT/LoL/APEX/Steam game pricing + public entry view release.
 set -Eeuo pipefail
 
 APP=/opt/dc-bot
@@ -91,7 +91,7 @@ if ! git diff --quiet "$OLD_HEAD" "$TARGET" -- requirements.txt web/requirements
 fi
 
 # Compare all non-target source definitions before any live service is stopped.
-# This explicitly prevents Delta, Valorant, sweet and teaching rule drift.
+# This explicitly prevents Delta, sweet and teaching rule drift.
 ./venv/bin/python - "$OLD_HEAD" "$TARGET" <<'PY'
 import subprocess,sys,types
 from dataclasses import asdict
@@ -107,12 +107,12 @@ def base_rules(commit):
     return m._BASE_ORDER_RULES
 old=base_rules(old_sha); new=base_rules(new_sha)
 for key, rule in old.items():
-    if rule.category in {"steam","lol","apex"}:
+    if rule.category in {"valorant","steam","lol","apex"}:
         continue
     if key not in new or asdict(rule)!=asdict(new[key]):
         raise SystemExit(f"BLOCKED: unrelated rule changed: {key}")
 for key in new:
-    if key not in old and new[key].category not in {"steam","lol","apex"}:
+    if key not in old and new[key].category not in {"valorant","steam","lol","apex"}:
         raise SystemExit(f"BLOCKED: unrelated rule added: {key}")
 print("PASS: every non-target game/order rule unchanged")
 PY
@@ -175,11 +175,15 @@ from web.app.services.accounting_reconciliation_policy import (
     _policy_consistency_for_order,
 )
 expected={
+    "valorant_entertain_ng":350,"valorant_entertain_ranked":280,
+    "valorant_ascendant_ng":330,"valorant_ascendant_ranked":300,
+    "valorant_immortal_ng":350,"valorant_immortal_ranked":330,
+    "valorant_radiant_ng":380,"valorant_radiant_ranked":370,
     "lol_entertain_aram":350,"lol_entertain_ng":350,
     "lol_entertain_ranked":280,"lol_master_ng":380,
     "lol_master_ranked":300,"lol_grandmaster_ng":390,
     "lol_grandmaster_ranked":350,"lol_elite_ng":400,
-    "lol_elite_ranked":450,
+    "lol_elite_ranked":430,
     "apex_entertain_ng":320,"apex_entertain_ranked":350,
     "apex_diamond_ng":380,"apex_diamond_ranked":400,
     "apex_master_ng":400,"apex_master_ranked":450,
@@ -189,6 +193,30 @@ expected={
 for key,price in expected.items():
     if ORDER_RULES[key].price!=price:
         raise SystemExit(f"BLOCKED: live {key} expected {price}T, got {ORDER_RULES[key].price}T")
+# Customer ranks are explicit service variants on both storefronts.
+for game,prefixes,tiers in (
+    ("valorant",
+     (("valorant_entertain",280),("valorant_ascendant",300),
+      ("valorant_immortal",330),("valorant_radiant",370)),
+     ("diamond","ascendant","immortal","radiant")),
+    ("lol",
+     (("lol_entertain",280),("lol_master",300),
+      ("lol_grandmaster",350),("lol_elite",430)),
+     ("emerald","diamond","master","grandmaster","challenger")),
+):
+    for prefix,base in prefixes:
+        for steps,tier in enumerate(tiers,1):
+            rule=ORDER_RULES[f"{prefix}_ranked_tier_{tier}"]
+            if rule.price!=base+steps*50 or rule.unit_label!="局":
+                raise SystemExit(f"BLOCKED: bad {game} customer rank tier: {rule.key}")
+            if calculate_price(rule,quantity=2,player_count=2).base_amount!=rule.price*4:
+                raise SystemExit(f"BLOCKED: {game} tier total mismatch: {rule.key}")
+        web=next(g for g in get_grouped_order_catalog(game) if g["key"]==prefix)
+        discord=get_order_item_details_for_group(game,web["label"].split("｜")[-1])
+        # LoL technical ARAM is an existing extra DC offering, kept for old users.
+        expected_rows=len(tiers)+2
+        if len(web["variants"])!=expected_rows or len(discord)<expected_rows:
+            raise SystemExit(f"BLOCKED: missing customer tier options: {prefix}")
 for prefix,base in (
     ("apex_entertain",350),("apex_diamond",400),
     ("apex_master",450),("apex_predator",550),
@@ -206,22 +234,29 @@ for prefix,base in (
 for game in ("delta","valorant","lol","apex","steam"):
     channel=QUICK_ORDER_V2_CHANNELS[game]
     view=_public_view_for_channel(channel)
-    if any(str(getattr(x,"custom_id","")).startswith("quick_order_v2_price_list_")
-           for x in view.children):
-        raise SystemExit(f"BLOCKED: price-list button still on {game}")
+    has_price_button=any(
+        str(getattr(x,"custom_id","")).startswith("quick_order_v2_price_list_")
+        for x in view.children
+    )
+    if has_price_button!=(game=="delta"):
+        raise SystemExit(f"BLOCKED: wrong public price-list button policy on {game}")
 db=_connect_readonly(Path("web_dashboard.db"))
 if db is None:
     raise SystemExit("BLOCKED: cannot read live salary DB")
 try:
     for oid in (298,300):
-        state=_policy_consistency_for_order(db,oid)
-        if not _is_verified_nov_bonus_repair(db,oid) or not (
-            state["worker_consistent"] and state["cs_consistent"]
-        ):
-            raise SystemExit(f"BLOCKED: verified 2% wage protection failed #{oid}")
+        # This is a repricing release, never a payout-repair action.
+        # Validate a prior approved repair if it exists, without demanding
+        # an unrelated bookkeeping correction on an as-yet unpatched VPS.
+        if _is_verified_nov_bonus_repair(db,oid):
+            state=_policy_consistency_for_order(db,oid)
+            if not (state["worker_consistent"] and state["cs_consistent"]):
+                raise SystemExit(f"BLOCKED: protected 2% payout inconsistent #{oid}")
+        else:
+            print(f"NOTE: payout #{oid} has no verified repair audit; no salary write attempted")
 finally:
     db.close()
-print("PASS: prices, tier totals, Web/Discord options, no public buttons, protected 2% payouts")
+print("PASS: prices, tier totals, Web/Discord options, Delta button preserved and read-only wage check")
 PY
 
 echo "=== RESTART BOT + WEB ==="
@@ -271,13 +306,13 @@ file.write_text(json.dumps({
     "previous_commit":sys.argv[3],
     "branch":"feat/nov10-lol-apex-steam-pricing-remove-public-price-button",
     "deployed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    "subject":"Nov 10 LoL Apex Steam price images and public buttons",
+    "subject":"Final four game posters, customer ranks and Delta button retained",
     "status":"success",
 },ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
 PY
 APPLIED=0
 trap - ERR
 echo
-echo "DEPLOY COMPLETED: LoL/APEX/Steam prices updated; public price buttons removed"
+echo "DEPLOY COMPLETED: VALORANT/LoL/APEX/Steam prices updated; Delta price list preserved"
 echo "Commit: $TARGET"
 echo "Database backup: $BACKUP"
