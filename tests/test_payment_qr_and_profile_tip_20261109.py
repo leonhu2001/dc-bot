@@ -7,8 +7,8 @@ import pytest
 
 from services import payment_qr_assets as qr
 from services.order_flow import build_payment_method_embed
+from services import worker_tips
 from services.worker_tips import (
-    configure_worker_tip_store,
     create_worker_tip,
     get_worker_tip,
     mark_worker_tip_paid,
@@ -89,9 +89,9 @@ def test_profile_tip_private_ticket_view_and_topic():
     }
 
 
-def test_profile_tip_uses_existing_payroll_ledger_without_fake_order(tmp_path):
+def test_profile_tip_uses_existing_payroll_ledger_without_fake_order(tmp_path, monkeypatch):
     file = tmp_path / "web_dashboard.db"
-    configure_worker_tip_store(db_path_provider=lambda: file)
+    monkeypatch.setattr(worker_tips, "_DB_PATH_PROVIDER", lambda: file)
     tip_id = create_worker_tip(
         order=None,
         ticket_channel_id="123",
