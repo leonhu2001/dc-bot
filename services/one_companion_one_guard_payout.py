@@ -13,8 +13,8 @@ from shared.payout import OrderPayoutResult, calculate_order_payout
 # price of the matching product; the worker's existing payout rate / named bonus
 # is applied afterward by shared.payout.
 ONE_COMPANION_ONE_GUARD_PAYOUT_BASES: dict[str, tuple[int, int]] = {
-    "basic_one_companion_one_guard_secret": (400, 320),
-    "basic_one_companion_one_guard_topsecret": (450, 320),
+    "basic_one_companion_one_guard_secret": (450, 350),
+    "basic_one_companion_one_guard_topsecret": (500, 350),
     "basic_mobile_one_companion_one_guard_secret": (380, 320),
     "basic_mobile_one_companion_one_guard_topsecret": (420, 320),
 }
@@ -160,7 +160,7 @@ def calculate_one_companion_one_guard_order_payout(
     """Calculate normal-order payout using the product's two slot bases.
 
     Discounts and other payout-base adjustments are preserved by proportionally
-    scaling the 400/320 etc. slot weights to the order's actual payout basis.
+    scaling the per-product protector/companion slot weights to the order's actual payout basis.
     """
     workers = _unique_worker_roles(worker_roles)
 

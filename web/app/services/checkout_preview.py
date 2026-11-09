@@ -1595,10 +1595,13 @@ def build_checkout_options(
         "point_options":
             point_options,
 
-        "benefit_coupons": list_applicable_coupons(
-            customer_id,
-            rule_key=rule_key,
-            player_count=int(quote.get("player_count") or player_count or 1),
+        "benefit_coupons": (
+            [] if str(rule_key) in {"basic_trial_500", "basic_trial_1000"}
+            else list_applicable_coupons(
+                customer_id,
+                rule_key=rule_key,
+                player_count=int(quote.get("player_count") or player_count or 1),
+            )
         ),
 
         "payment_methods":
@@ -1825,6 +1828,10 @@ def build_checkout_preview(
 
 
     selected_benefit_coupon = None
+    is_trial_order = str(rule_key) in {"basic_trial_500", "basic_trial_1000"}
+    if is_trial_order and (benefit_coupon_id not in (None, "")
+                           or selected_point_item is not None):
+        raise ValueError("體驗單不適用任何折扣、會員券或加碼活動。")
     if benefit_coupon_id not in (None, ""):
         if selected_point_item is not None:
             raise ValueError("福利券與點數福利同張訂單只能擇一使用。")
@@ -1837,7 +1844,8 @@ def build_checkout_preview(
         if selected_benefit_coupon is None:
             raise ValueError("這張福利券已使用、已保留，或不適用這個方案。")
 
-    if selected_point_item is None and selected_benefit_coupon is None:
+    if (not is_trial_order
+            and selected_point_item is None and selected_benefit_coupon is None):
         selected_benefit_coupon = preview_same_order_benefit(
             customer_id,
             rule_key=rule_key,

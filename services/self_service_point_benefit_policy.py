@@ -29,6 +29,11 @@ def check_order_point_benefit_allowed(
     rule_key = str(getattr(rule, "key", "") or "")
     rule_label = str(getattr(rule, "label", "") or "")
 
+    # Owner policy: desktop trial orders exclude ALL coupons, discounts and
+    # promotions, including member coupons (the old picker-probe exception).
+    if rule_key in {"basic_trial_500", "basic_trial_1000"}:
+        return False, "體驗單不適用任何折扣、會員券或加碼活動。"
+
     # Legacy non-selectable probe used only to open the combined point/member
     # picker. Actual point choices are checked individually below.
     if str(spec.get("key") or "") == "discount_20":
