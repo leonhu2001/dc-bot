@@ -78,7 +78,7 @@ def verified_note(db: sqlite3.Connection, order_id: int, spec: dict) -> str:
     note = str(payout.get("note") or "")
     if ("前月業績達5000T 2%" not in note
             or f"前月業績 {PERFORMANCE}T" not in note
-            or _rate_from_persisted_note(note) != 0.82):
+            or abs(float(_rate_from_persisted_note(note) or 0) - 0.82) > 1e-9):
         raise RuntimeError("原始備份無法證明這位員工的 2% 資格或分潤率")
     if int(round(spec["old_gross"] * 0.82)) != spec["old"]:
         raise RuntimeError("修復前分潤金額與 82% 不一致")
