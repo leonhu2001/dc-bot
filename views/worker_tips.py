@@ -432,7 +432,10 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             )
             await _notify_worker_tip_paid(interaction, tip_row)
             await _log_worker_tip("paid", interaction=interaction, tip_row=tip_row)
-            if not self.standalone:
+            if self.standalone:
+                from views.staff_profile_tip_ticket import send_profile_tip_paid_panel
+                await send_profile_tip_paid_panel(channel, tip_row)
+            else:
                 await _refresh_post_close(channel, self.customer_id)
 
             try:
