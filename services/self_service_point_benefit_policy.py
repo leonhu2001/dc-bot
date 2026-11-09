@@ -29,6 +29,11 @@ def check_order_point_benefit_allowed(
     rule_key = str(getattr(rule, "key", "") or "")
     rule_label = str(getattr(rule, "label", "") or "")
 
+    # The desktop trial is a fixed-price, no-discount product. Manager point
+    # overrides and the selector's legacy probe may not bypass this rule.
+    if rule_key.startswith("basic_trial_") or rule_label.startswith("體驗單"):
+        return False, "體驗單不適用任何折扣、點數福利或加碼活動。"
+
     # Legacy non-selectable probe used only to open the combined point/member
     # picker. Actual point choices are checked individually below.
     if str(spec.get("key") or "") == "discount_20":
