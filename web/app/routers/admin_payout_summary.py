@@ -587,6 +587,7 @@ def _audit_payout_state(
     }
 
 def get_summary_month_options() -> list[dict]:
+    ensure_worker_tip_table()
     ensure_internal_transfer_tables(db_path())
     conn = sqlite3.connect(db_path())
     conn.row_factory = sqlite3.Row
