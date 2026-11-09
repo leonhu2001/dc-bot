@@ -433,7 +433,7 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             await _notify_worker_tip_paid(interaction, tip_row)
             await _log_worker_tip("paid", interaction=interaction, tip_row=tip_row)
             if not self.standalone:
-            await _refresh_post_close(channel, self.customer_id)
+                await _refresh_post_close(channel, self.customer_id)
 
             try:
                 await interaction.delete_original_response()
