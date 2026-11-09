@@ -42,21 +42,60 @@ def _as_json(value: str) -> dict:
         return {}
 
 
-def _rows(db: sqlite3.Connection, table: str, order_id: int) -> dict[int, dict]:
-    return {
-        int(r["id"]): dict(r)
-        for r in db.execute(
-            f"SELECT * FROM {table} WHERE order_id=? ORDER BY id", (order_id,)
+def _identity(table: str, row: dict) -> str:
+    field = ("worker_discord_id" if table == "worker_payouts"
+             else "customer_service_discord_id")
+    identity = str(row.get(field) or "").strip()
+    if not identity:
+        raise ValueError(f"{table} 缺少 {field}")
+    return identity
+
+
+def _rows(db: sqlite3.Connection, table: str, order_id: int) -> dict[str, dict]:
+    result: dict[str, dict] = {}
+    for record in db.execute(
+        f"SELECT * FROM {table} WHERE order_id=? ORDER BY id", (order_id,)
+    ):
+        row = dict(record)
+        identity = _identity(table, row)
+        if identity in result:
+            raise ValueError(f"{table} 接單身分重複：{identity}")
+        result[identity] = row
+    return result
+
+
+def _audit_rows(data: dict, table: str) -> dict[str, dict]:
+    result: dict[str, dict] = {}
+    for row in (data.get(table) or []):
+        if not isinstance(row, dict) or row.get("id") is None:
+            raise ValueError(f"{table} 稽核內容不完整")
+        identity = _identity(table, row)
+        if identity in result:
+            raise ValueError(f"{table} 稽核身分重複：{identity}")
+        result[identity] = row
+    return result
+
+
+def november_repair_order_ids(db: sqlite3.Connection) -> list[int]:
+    """UTC bounds for November 2026 in Asia/Taipei (no timezone ambiguity)."""
+    return [
+        int(row[0]) for row in db.execute(
+            """
+            SELECT DISTINCT o.id
+            FROM web_orders o
+            JOIN admin_audit_logs a
+              ON a.target_type='order'
+             AND a.action='accounting_recalculate_unpaid_payouts'
+             AND a.target_id=CAST(o.id AS TEXT)
+            WHERE o.status='closed'
+              AND COALESCE(o.closed_at, o.updated_at, o.created_at)
+                    >= '2026-10-31 16:00:00'
+              AND COALESCE(o.closed_at, o.updated_at, o.created_at)
+                    < '2026-11-30 16:00:00'
+            ORDER BY o.id
+            """
         )
-    }
-
-
-def _audit_rows(data: dict, key: str) -> dict[int, dict]:
-    return {
-        int(row["id"]): row
-        for row in (data.get(key) or [])
-        if isinstance(row, dict) and row.get("id") is not None
-    }
+    ]
 
 
 def evaluate(current: sqlite3.Connection, snapshot: sqlite3.Connection, order_id: int) -> dict:
@@ -68,6 +107,21 @@ def evaluate(current: sqlite3.Connection, snapshot: sqlite3.Connection, order_id
         result["reason"] = "訂單不存在"
         return result
     result["order_no"] = order["bot_order_no"]
+    already_restored = current.execute(
+        "SELECT 1 FROM admin_audit_logs "
+        "WHERE action='restore_approved_bonus_from_verified_backup' "
+        "AND target_type='order' AND target_id=? LIMIT 1",
+        (str(order_id),),
+    ).fetchone()
+    if already_restored:
+        result["reason"] = "已有額外獎金復原稽核，禁止重複補發"
+        return result
+    original_order = snapshot.execute(
+        "SELECT bot_order_no FROM web_orders WHERE id=?", (order_id,)
+    ).fetchone()
+    if original_order is None or str(original_order["bot_order_no"]) != str(order["bot_order_no"]):
+        result["reason"] = "備份的訂單編號不一致"
+        return result
     if str(order["status"]).lower() != "closed":
         result["reason"] = "僅接受已結單且已核准報單"
         return result
@@ -96,52 +150,64 @@ def evaluate(current: sqlite3.Connection, snapshot: sqlite3.Connection, order_id
         ("customer_service_payouts", CS_FIELDS, "payout_amount"),
     )
     changes = []
-    saw_previous_bonus = False
-    saw_worker_decrease = False
+    saw_verified_bonus_loss = False
     for table, fields, money_field in pairs:
-        now_rows = _rows(current, table, order_id)
-        old_rows = _rows(snapshot, table, order_id)
-        before_rows = _audit_rows(before, table)
-        after_rows = _audit_rows(after, table)
-        if not now_rows or now_rows.keys() != old_rows.keys() or now_rows.keys() != before_rows.keys() or now_rows.keys() != after_rows.keys():
-            result["reason"] = f"{table} 筆數或主鍵與備份/稽核不同"
+        try:
+            now_rows = _rows(current, table, order_id)
+            old_rows = _rows(snapshot, table, order_id)
+            before_rows = _audit_rows(before, table)
+            after_rows = _audit_rows(after, table)
+        except ValueError as exc:
+            result["reason"] = str(exc)
             return result
-        for row_id, now_row in now_rows.items():
-            old_row = old_rows[row_id]
-            before_row, after_row = before_rows[row_id], after_rows[row_id]
-            if (str(now_row["payout_status"]).lower() != "unpaid"
-                    or now_row["paid_at"] is not None):
-                result["reason"] = f"{table} #{row_id} 已發放或付款狀態不安全"
+        if (not now_rows or now_rows.keys() != old_rows.keys()
+                or now_rows.keys() != before_rows.keys()
+                or now_rows.keys() != after_rows.keys()):
+            result["reason"] = f"{table} 人員名單與備份/稽核不同，禁止猜測復原"
+            return result
+        for identity, now_row in now_rows.items():
+            old_row = old_rows[identity]
+            before_row, after_row = before_rows[identity], after_rows[identity]
+            row_id = int(now_row["id"])
+            # Generic recalculation deletes and reinserts payout rows. IDs can
+            # differ before/after, but each version must match its OWN audit.
+            if (int(old_row["id"]) != int(before_row["id"])
+                    or row_id != int(after_row["id"])):
+                result["reason"] = f"{table} {identity} 的資料列 ID 與稽核不一致"
                 return result
-            if (str(old_row["payout_status"]).lower() != "unpaid"
-                    or old_row["paid_at"] is not None):
-                result["reason"] = f"{table} #{row_id} 備份不是未發放狀態"
-                return result
-            identity_col = (
-                "worker_discord_id" if table == "worker_payouts"
-                else "customer_service_discord_id"
-            )
-            if str(now_row[identity_col]) != str(old_row[identity_col]):
-                result["reason"] = f"{table} #{row_id} 身分不同"
+            for label, record in (
+                ("目前", now_row), ("修復前備份", old_row),
+                ("稽核修復前", before_row), ("稽核修復後", after_row),
+            ):
+                if (str(record.get("payout_status")).lower() != "unpaid"
+                        or record.get("paid_at") is not None):
+                    result["reason"] = f"{table} {identity} {label}已發放或狀態不安全"
+                    return result
+            if "手動指定分潤" in str(now_row.get("note") or ""):
+                result["reason"] = f"{table} {identity} 有手動指定分潤"
                 return result
             old_amount, now_amount = int(old_row[money_field]), int(now_row[money_field])
             if (old_amount != int(before_row[money_field])
                     or now_amount != int(after_row[money_field])):
-                result["reason"] = f"{table} #{row_id} 無法驗證修復前後金額"
+                result["reason"] = f"{table} {identity} 無法驗證修復前後金額"
                 return result
-            if old_row[money_field] != now_row[money_field]:
+            if table == "worker_payouts":
+                if old_amount < now_amount:
+                    result["reason"] = f"{table} {identity} 修復後金額反而增加"
+                    return result
+                if (old_amount > now_amount
+                        and any(marker in str(old_row.get("note") or "")
+                                for marker in BONUS_MARKERS)):
+                    saw_verified_bonus_loss = True
+            if old_amount != now_amount or any(
+                    old_row[field] != now_row[field] for field in fields):
                 changes.append({
                     "table": table, "id": row_id, "from": now_amount,
                     "to": old_amount, "fields": fields,
                     "values": {field: old_row[field] for field in fields},
                 })
-            if table == "worker_payouts":
-                if old_amount > now_amount:
-                    saw_worker_decrease = True
-                if any(marker in str(old_row["note"] or "") for marker in BONUS_MARKERS):
-                    saw_previous_bonus = True
-    if not saw_worker_decrease or not saw_previous_bonus:
-        result["reason"] = "不符合額外2%曾被基礎重算降低的條件"
+    if not saw_verified_bonus_loss:
+        result["reason"] = "未找到同一位員工確實被重算減少的前月2%獎金"
         return result
     if not changes:
         result["reason"] = "已無需復原"
@@ -149,6 +215,35 @@ def evaluate(current: sqlite3.Connection, snapshot: sqlite3.Connection, order_id
     result["state"] = "ready"
     result["changes"] = changes
     return result
+
+
+def _candidate_snapshots(root: Path, explicit: Path | None) -> list[Path]:
+    if explicit is not None:
+        return [explicit.resolve()]
+    archive = root / "_archive"
+    return sorted(
+        (path for path in archive.glob("deploy_*/web_dashboard.db") if path.is_file()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+
+def _plan_from_snapshots(
+    current: sqlite3.Connection, snapshot_paths: list[Path], order_id: int
+) -> dict:
+    for path in snapshot_paths:
+        try:
+            with _open(path, readonly=True) as old:
+                plan = evaluate(current, old, order_id)
+        except sqlite3.Error:
+            continue  # A damaged/incomplete backup is never an authority.
+        if plan["state"] == "ready":
+            plan["snapshot_path"] = str(path)
+            return plan
+    return {
+        "order_id": int(order_id), "state": "blocked",
+        "reason": f"找不到與最近一次重算稽核相符的修復前備份（已查 {len(snapshot_paths)} 份）",
+    }
 
 
 def backup_current(current: sqlite3.Connection, root: Path) -> Path:
@@ -164,11 +259,19 @@ def backup_current(current: sqlite3.Connection, root: Path) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--snapshot", type=Path, required=True,
+    sources = parser.add_mutually_exclusive_group(required=True)
+    sources.add_argument(
+        "--snapshot", type=Path,
         help="修復前資料庫備份，例如 _archive/deploy_.../web_dashboard.db",
     )
-    parser.add_argument("--order-ids", type=int, nargs="+", required=True)
+    sources.add_argument(
+        "--auto-archives", action="store_true",
+        help="自動逐一比對 _archive/deploy_*/web_dashboard.db 備份",
+    )
+    scope = parser.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--order-ids", type=int, nargs="+")
+    scope.add_argument("--all-november", action="store_true",
+                       help="掃描11月已結單且有基本分潤重算稽核的訂單")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     if args.apply and os.environ.get("MW_ORDER_REPAIR_MAINTENANCE") != "1":
@@ -177,21 +280,47 @@ def main() -> int:
 
     path = ROOT / "web_dashboard.db"
     current = _open(path, readonly=not args.apply)
-    snapshot = _open(args.snapshot.resolve(), readonly=True)
     try:
-        order_ids = sorted(set(args.order_ids))
-        plans = [evaluate(current, snapshot, order_id) for order_id in order_ids]
+        snapshot_paths = _candidate_snapshots(ROOT, args.snapshot)
+        if not snapshot_paths:
+            raise RuntimeError("沒有找到任何部署前備份，拒絕猜測分潤")
+        order_ids = (november_repair_order_ids(current) if args.all_november
+                     else sorted(set(args.order_ids)))
+        plans = [_plan_from_snapshots(current, snapshot_paths, order_id)
+                 for order_id in order_ids]
+        ready = [plan for plan in plans if plan["state"] == "ready"]
+        blocked = [plan for plan in plans if plan["state"] != "ready"]
+        print(json.dumps({
+            "ready_count": len(ready), "blocked_count": len(blocked),
+            "total_worker_increase": sum(
+                change["to"] - change["from"]
+                for plan in ready for change in plan["changes"]
+                if change["table"] == "worker_payouts"
+            ),
+            "orders": plans,
+        }, ensure_ascii=False, indent=2, default=str))
         if not args.apply:
-            print(json.dumps(plans, ensure_ascii=False, indent=2, default=str))
-            return 0 if all(x["state"] == "ready" for x in plans) else 1
-        if any(x["state"] != "ready" for x in plans):
-            raise RuntimeError("存在不符合安全條件的訂單；沒有復原任何金額")
+            return 0 if ready else 1
+        if blocked and not args.all_november:
+            raise RuntimeError("指定訂單有不安全項目，沒有復原任何金額")
+        if not ready:
+            raise RuntimeError("沒有可安全復原的訂單；未改動資料")
+        # Auto-discovery deliberately skips unsafe/non-matching orders and
+        # reports them for manual investigation instead of guessing payouts.
+        order_ids = [p["order_id"] for p in ready]
+        plans = ready
         backup_path = backup_current(current, ROOT)
         current.execute("BEGIN IMMEDIATE")
         try:
             # Re-check after acquiring write lock; abort the entire batch on drift.
-            plans = [evaluate(current, snapshot, order_id) for order_id in order_ids]
-            if any(x["state"] != "ready" for x in plans):
+            verified = []
+            for plan in plans:
+                with _open(Path(plan["snapshot_path"]), readonly=True) as old:
+                    locked = evaluate(current, old, plan["order_id"])
+                if locked["state"] != "ready" or locked["changes"] != plan["changes"]:
+                    raise RuntimeError("鎖定後資料或備份變動，已回滾")
+                verified.append(locked)
+            if len(verified) != len(order_ids):
                 raise RuntimeError("鎖定後條件變動，已回滾")
             for plan in plans:
                 before = {}
@@ -227,6 +356,7 @@ def main() -> int:
             raise
         print(json.dumps({
             "state": "applied", "orders": order_ids,
+            "skipped_unsafe_orders": blocked,
             "current_backup": str(backup_path),
             "changes": [
                 {"order_id": p["order_id"], "rows": [
@@ -240,7 +370,6 @@ def main() -> int:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
     finally:
-        snapshot.close()
         current.close()
 
 
