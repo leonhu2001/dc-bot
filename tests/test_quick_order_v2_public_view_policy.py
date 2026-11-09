@@ -26,7 +26,7 @@ def test_delta_public_view_is_final_on_first_build() -> None:
         if custom_id.startswith("quick_order_v2_delta_")
     ]
     assert len(delta_ids) == 4
-    assert f"quick_order_v2_price_list_{channel_id}" not in custom_ids
+    assert f"quick_order_v2_price_list_{channel_id}" in custom_ids
 
     delta_buttons = [
         child
