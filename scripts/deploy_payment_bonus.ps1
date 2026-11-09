@@ -4,7 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ReleaseRef = "release/payment-qr-tips-bonus-no-price-20261110"
+$ReleaseRef = "fix/profile-tip-ticket-close-ledger-and-nov-bonus-20261110"
 $PriceBase = "d637f16412d15bb8bc77229d105c7816b35da06d"
 
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
