@@ -467,6 +467,20 @@ def _format_point_hours(hours) -> str:
 
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
+    if str(getattr(rule, "key", "") or "") in {"basic_trial_500", "basic_trial_1000"}:
+        # Reject stale selections too: a user may select a coupon, then switch
+        # the product to a no-discount trial without resetting ticket state.
+        rate, _, _, _ = _resolve_self_service_discount_rate(rule, data)
+        fixed = _to_int(
+            data.get("fixed_discount_amount",
+                     data.get("cash_coupon_amount")), 0
+        ) or 0
+        if (rate < 100 or fixed > 0
+                or data.get("selected_point_benefit_key")
+                or data.get("selected_benefit_coupon_id")
+                or data.get("selected_same_order_benefit")
+                or data.get("selected_vip_monthly_benefit_id")):
+            raise ValueError("體驗單不適用任何折扣、會員券或加碼活動，請先清除其他優惠。")
     if is_internal_ammo_dump_rule(rule):
         return calculate_internal_ammo_dump_financials(price_result, data)
     if is_aw_collision_rule(rule):
