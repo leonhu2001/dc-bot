@@ -406,7 +406,9 @@ from views.staff_profiles import (
     StaffProfilePanelView,
     refresh_staff_profile_panels_for_order,
     configure_staff_profile_order_ticket_creator,
+    configure_staff_profile_tip_ticket_creator,
 )
+from views.worker_tips import WorkerTipProfileStartView
 
 from views.support import (
     configure_support_views,
@@ -1955,6 +1957,69 @@ configure_staff_profile_order_ticket_creator(
 )
 
 
+async def create_staff_profile_tip_ticket(
+    *,
+    interaction: discord.Interaction,
+    staff_id: str,
+) -> None:
+    """A dedicated private payment ticket; does not create a fake game order."""
+    guild = interaction.guild
+    member = interaction.user
+    if guild is None or not isinstance(member, discord.Member):
+        raise ValueError("這個功能只能在伺服器內使用。")
+
+    try:
+        target_id = int(str(staff_id))
+    except (TypeError, ValueError):
+        raise ValueError("指定成員 ID 無效，請通知客服。")
+
+    if member.id == target_id:
+        raise ValueError("不能透過自己的名片給自己加雞腿。")
+
+    profile = get_staff_profile(str(staff_id))
+    if profile is None:
+        raise ValueError("找不到這位陪玩的個人牆。")
+
+    target = guild.get_member(target_id)
+    if target is None:
+        try:
+            target = await guild.fetch_member(target_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            target = None
+    if target is None:
+        raise ValueError("指定成員目前不在伺服器內，無法加雞腿。")
+
+    customer_role = guild.get_role(CUSTOMER_ROLE_ID)
+    if customer_role is None:
+        raise ValueError("找不到客服身分組，請管理員檢查設定。")
+
+    await create_private_channel(
+        interaction=interaction,
+        category_id=CUSTOMER_CATEGORY_ID,
+        channel_name=safe_channel_name("雞腿", member),
+        allowed_roles=[customer_role],
+        intro_message=(
+            "🍗 **陪玩名片加雞腿專用票口**\n"
+            f"老闆：{member.mention}\n"
+            f"指定陪玩：{target.mention}\n\n"
+            "請按下方「輸入雞腿金額」，選擇錢包、國泰轉帳或街口支付。\n"
+            "雞腿 100% 給指定陪玩；銀行／街口請貼付款截圖，"
+            "客服審核入帳後才列入薪資。\n"
+            "這裡只處理雞腿，不會建立遊戲訂單。"
+        ),
+        view=WorkerTipProfileStartView(
+            customer_id=member.id,
+            target={"staff_id": str(target_id), "display_name": target.display_name},
+        ),
+        topic=f"tip_customer_id={member.id};tip_staff_id={target_id}",
+        mention_roles_in_intro=False,
+        order_log_status="名片加雞腿",
+    )
+
+
+configure_staff_profile_tip_ticket_creator(create_staff_profile_tip_ticket)
+
+
 # ========= 主面板 / 下單入口 View 設定 =========
 
 configure_panel_views(
@@ -2918,6 +2983,44 @@ async def on_ready():
         bot._staff_profile_views_registered = True
         if restored_profile_views:
             print(f"Restored staff profile views: {restored_profile_views}")
+
+
+    if not getattr(bot, "_profile_tip_ticket_views_registered", False):
+        restored_profile_tip_views = 0
+        seen_profile_tip_pairs = set()
+        for guild in bot.guilds:
+            for channel in guild.text_channels:
+                if channel.category_id != CUSTOMER_CATEGORY_ID:
+                    continue
+                topic = str(channel.topic or "")
+                parts = {
+                    part.split("=", 1)[0]: part.split("=", 1)[1]
+                    for part in topic.split(";") if "=" in part
+                }
+                customer_id = parts.get("tip_customer_id", "")
+                staff_id = parts.get("tip_staff_id", "")
+                if not customer_id.isdigit() or not staff_id.isdigit():
+                    continue
+                pair = (customer_id, staff_id)
+                if pair in seen_profile_tip_pairs:
+                    continue
+                seen_profile_tip_pairs.add(pair)
+                profile = get_staff_profile(staff_id)
+                display_name = (
+                    str(profile.get("display_name") or staff_id)
+                    if profile is not None else staff_id
+                )
+                try:
+                    bot.add_view(WorkerTipProfileStartView(
+                        customer_id=int(customer_id),
+                        target={"staff_id": staff_id, "display_name": display_name},
+                    ))
+                    restored_profile_tip_views += 1
+                except ValueError:
+                    pass
+        bot._profile_tip_ticket_views_registered = True
+        if restored_profile_tip_views:
+            print(f"Restored profile tip ticket entry views: {restored_profile_tip_views}")
 
     restored_dispatch_views = 0
     for message_id in list(ORDER_CLAIMS.keys()):
