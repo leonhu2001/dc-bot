@@ -7,7 +7,8 @@ from pathlib import Path
 
 from web.app.services.tip_payout_sql import (
     TIP_CATEGORY_SQL, TIP_CUSTOMER_SQL, TIP_DATE_SQL,
-    TIP_ELIGIBLE_SQL, TIP_ITEM_SQL, TIP_ORDER_NO_SQL, tip_month_filter,
+    TIP_ELIGIBLE_SQL, TIP_ITEM_SQL, TIP_ORDER_NO_SQL,
+    ensure_tip_salary_columns, tip_month_filter,
 )
 
 from fastapi import APIRouter, Request
@@ -78,6 +79,7 @@ def ensure_worker_tip_table() -> None:
             )
             """
         )
+        ensure_tip_salary_columns(conn)
         conn.commit()
     finally:
         conn.close()
