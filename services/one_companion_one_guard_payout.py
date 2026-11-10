@@ -4,6 +4,11 @@ from dataclasses import replace
 from decimal import Decimal, ROUND_FLOOR
 
 from services.staff_internal_ammo_dump_policy import calculate_internal_ammo_dump_cs_payout
+from services.farm_fixed_cut_policy import (
+    PUBLIC_FARM_FIXED_CUTS,
+    is_public_farm_fixed_cut_rule,
+    calculate_farm_fixed_cut_settlement,
+)
 from typing import Iterable
 
 from shared.payout import OrderPayoutResult, calculate_order_payout
@@ -25,6 +30,7 @@ FULL_WORKER_PAYOUT_RULE_KEYS = frozenset({
     "staff_internal_ammo_dump_500m",
     "staff_internal_car_500m",
     "staff_internal_aw_collision",
+    *PUBLIC_FARM_FIXED_CUTS,
 })
 FULL_WORKER_PAYOUT_RULE_PREFIXES = ("farm_aw_collision_",)
 
@@ -163,6 +169,35 @@ def calculate_one_companion_one_guard_order_payout(
     scaling the 400/320 etc. slot weights to the order's actual payout basis.
     """
     workers = _unique_worker_roles(worker_roles)
+
+    if is_public_farm_fixed_cut_rule(rule_key):
+        if len(workers) > 1:
+            raise ValueError("固定店抽代肝單只能有一名接單人員。")
+        worker_amount = max(0, int(total_amount or 0))
+        customer_amount = (
+            worker_amount + PUBLIC_FARM_FIXED_CUTS[str(rule_key)][1]
+            if customer_service_total_amount is None
+            else int(customer_service_total_amount)
+        )
+        settlement = calculate_farm_fixed_cut_settlement(
+            rule_key, customer_amount, worker_amount
+        )
+        # This is a direct worker wage, NOT a generic worker 80% commission.
+        # Named, stream, previous-month and binding bonuses do not apply.
+        payout = calculate_order_payout(
+            total_amount=worker_amount,
+            worker_discord_ids=[worker_id for worker_id, _ in workers],
+            worker_base_rate=1.0,
+            customer_service_rate=0.0,
+            named_bonus_rate=0.0,
+        )
+        cs_amount = settlement.customer_service_amount if workers else 0
+        return replace(
+            payout,
+            customer_service_rate=(cs_amount / customer_amount if customer_amount else 0.0),
+            customer_service_payout=cs_amount,
+            total_payout=payout.total_worker_payout + cs_amount,
+        )
 
     if is_full_worker_payout_rule(rule_key):
         worker_ids = [worker_id for worker_id, _role_type in workers]
