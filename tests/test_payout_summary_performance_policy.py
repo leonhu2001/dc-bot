@@ -36,6 +36,15 @@ def test_worker_performance_ignores_internal_payroll_transfers(tmp_path):
                 amount INTEGER,
                 effective_at TEXT
             );
+            CREATE TABLE worker_tips (
+                id INTEGER PRIMARY KEY,
+                order_id INTEGER,
+                worker_discord_id TEXT,
+                amount INTEGER,
+                payment_status TEXT,
+                payout_status TEXT,
+                paid_at TEXT
+            );
             """
         )
         conn.execute(
@@ -49,6 +58,17 @@ def test_worker_performance_ignores_internal_payroll_transfers(tmp_path):
         )
         conn.execute(
             "INSERT INTO worker_payouts VALUES (2, 2, 'staff-1', 2800, 2250)"
+        )
+        # Chicken-leg tips are payable wages but never count toward service
+        # performance, whether tied to an order or added from a worker profile.
+        conn.executemany(
+            "INSERT INTO worker_tips VALUES (?, ?, 'staff-1', ?, ?, ?, ?)",
+            [
+                (1, 1, 200, "paid", "unpaid", "2026-10-05 13:00:00"),
+                (2, None, 140, "paid", "unpaid", "2026-10-06 14:00:00"),
+                (3, 2, 999, "pending_review", "unpaid", None),
+                (4, None, 500, "paid", "paid", "2026-11-01 10:00:00"),
+            ],
         )
         # Internal payroll transfers affect settlement only. Performance continues
         # to use the approved final_payout basis from completed companion orders.
@@ -70,6 +90,12 @@ def test_worker_performance_ignores_internal_payroll_transfers(tmp_path):
     assert progress["target"] == MONTHLY_PERFORMANCE_TARGET == 5000
     assert progress["reached"] is False
     assert progress["remaining"] == 150
+    assert build_worker_performance_map(
+        str(db_file), month="2026-11", employee_ids={"staff-1"}
+    ) == {}
+    assert build_worker_performance_map(
+        str(db_file), month="2026-10", employee_ids={"some-other-worker"}
+    ) == {}
 
 
 def test_dual_role_employee_is_one_row_with_one_performance_total():
