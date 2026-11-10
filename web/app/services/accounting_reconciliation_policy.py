@@ -8,6 +8,10 @@ from typing import Any
 
 from services.one_companion_one_guard_payout import is_full_worker_payout_rule
 from services.staff_internal_ammo_dump_policy import calculate_internal_ammo_dump_cs_payout
+from services.farm_fixed_cut_policy import (
+    is_public_farm_fixed_cut_rule,
+    calculate_farm_fixed_cut_settlement,
+)
 from shared.payout import (
     CUSTOMER_SERVICE_PAYOUT_RATE,
     LEGACY_CUSTOMER_SERVICE_POLICY,
@@ -241,6 +245,8 @@ def _rate_from_persisted_note(note: Any) -> float | None:
     text = _normalize(note)
     if "特殊代肝單｜接單人員全額 100%" in text:
         return 1.0
+    if "固定店抽" in text and ("員工" in text or "固定店抽代肝" in text):
+        return 1.0
     if "分潤：基礎80%" not in text:
         return None
 
@@ -384,15 +390,26 @@ def _policy_consistency_for_order(
                 if payout_base > 0
                 else 0.80
             )
-            expected_cs = (
-                calculate_internal_ammo_dump_cs_payout(
+            if is_public_farm_fixed_cut_rule(order["order_rule_key"]):
+                try:
+                    settlement = calculate_farm_fixed_cut_settlement(
+                        order["order_rule_key"],
+                        order["customer_pay_amount"]
+                        if order["customer_pay_amount"] is not None else order["amount"],
+                        payout_base,
+                    )
+                    expected_cs = settlement.customer_service_amount
+                except (ValueError, TypeError):
+                    expected_cs = -1  # preserve anomaly for malformed ledger
+            elif is_full_worker_payout_rule(order["order_rule_key"]):
+                expected_cs = calculate_internal_ammo_dump_cs_payout(
                     order["order_rule_key"],
                     order["customer_pay_amount"]
                     if order["customer_pay_amount"] is not None else order["amount"],
                     payout_base,
                 )
-                if is_full_worker_payout_rule(order["order_rule_key"])
-                else int(
+            else:
+                expected_cs = int(
                     round(
                         calculate_customer_service_payout(
                             int(cs_base),
@@ -401,7 +418,6 @@ def _policy_consistency_for_order(
                         )
                     )
                 )
-            )
             cs_consistent = _money_equal(
                 expected_cs,
                 cs_rows[0]["payout_amount"],
