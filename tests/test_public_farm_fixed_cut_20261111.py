@@ -161,6 +161,58 @@ def test_wrong_worker_base_is_blocked_not_replaced_by_generic_80pct(key, values)
         )
 
 
+
+@pytest.mark.parametrize("key,values", EXPECTED.items())
+def test_report_approval_cannot_reapply_80pct_or_take_cs_from_sale(
+    monkeypatch, key, values,
+):
+    from web.app.services import worker_bonus_payout as bonuses
+
+    price, cut, worker_wage, cs, retained = values
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE order_acceptance_meta (order_id INTEGER PRIMARY KEY, status TEXT)"
+        )
+    with Session(engine) as db:
+        order = WebOrder(
+            category="farm", item=key, order_rule_key=key, status="closed",
+            amount=price, customer_pay_amount=price,
+            payout_base_amount=worker_wage, closed_at=datetime(2026, 11, 11),
+        )
+        db.add(order)
+        db.flush()
+        db.add(OrderAssignment(
+            order_id=order.id, worker_discord_id="worker-1",
+            is_active=True, has_named_bonus=True, role_type="booster",
+        ))
+        db.flush()
+        recalculate_order_payouts(db, order.id)
+        db.commit()
+        order_id = order.id
+
+    monkeypatch.setattr(bonuses, "SessionLocal", lambda: Session(engine))
+    def forbidden(*args, **kwargs):
+        raise AssertionError("fixed store-cut farming must never recalculate staff bonus")
+    monkeypatch.setattr(bonuses, "previous_month_performance", forbidden)
+    monkeypatch.setattr(bonuses, "is_store_binding_effective_at", forbidden)
+    monkeypatch.setattr(bonuses, "_approved_stream_map", forbidden)
+    monkeypatch.setattr(bonuses, "_assignment_stream_override_map", forbidden)
+
+    bonuses.apply_approved_report_worker_bonuses(order_id)
+    with Session(engine) as db:
+        worker = db.query(WorkerPayout).filter_by(order_id=order_id).one()
+        cs_row = db.query(CustomerServicePayout).filter_by(order_id=order_id).one()
+        assert int(round(worker.final_payout)) == worker_wage
+        assert worker.base_rate == 1.0
+        assert worker.named_bonus_amount == 0
+        assert "固定店抽" in worker.note
+        assert cs_row.payout_amount == cs
+        assert price - worker.final_payout - cs_row.payout_amount == retained
+
+
+
 def test_wallet_is_payment_not_discount_on_public_checkout(monkeypatch):
     from web.app.services import checkout_preview as checkout
     monkeypatch.setattr(
