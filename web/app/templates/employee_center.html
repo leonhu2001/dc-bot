@@ -1,6 +1,6 @@
 {% extends "site_layout.html" %}
 {% block head %}
-<link rel="stylesheet" href="/static/css/pages/employee_center.css?v=20261020-2">
+<link rel="stylesheet" href="/static/css/pages/employee_center.css?v=20261111-1">
 <link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-9">
 <link rel="stylesheet" href="/static/css/pages/employee_center_payout.css?v=20261020-1">
 {% endblock %}
@@ -145,6 +145,14 @@
                 <span>日期</span><span>訂單</span><span>項目</span><span>狀態</span><span class="csp-sa-a527bac1ee">金額</span>
             </div>
             <div id="salaryRows"><div class="salary-loading">正在整理薪資明細…</div></div>
+            <nav class="salary-pagination" id="salaryPagination" aria-label="薪資明細分頁" hidden>
+                <span class="salary-pagination-summary" id="salaryPageSummary" aria-live="polite"></span>
+                <div class="salary-pagination-controls">
+                    <button type="button" id="salaryPagePrevious" class="salary-page-button" aria-label="上一頁">上一頁</button>
+                    <span class="salary-pagination-numbers" id="salaryPageNumbers" aria-label="頁碼"></span>
+                    <button type="button" id="salaryPageNext" class="salary-page-button" aria-label="下一頁">下一頁</button>
+                </div>
+            </nav>
         </div>
     </section>
 
@@ -179,6 +187,6 @@
 </section>
 
 <script src="/static/js/pages/employee_workspace_identity.js?v=20261020-1"></script>
-<script src="/static/js/pages/employee_center.js?v=20261020-2"></script>
+<script src="/static/js/pages/employee_center.js?v=20261111-1"></script>
 <script src="/static/js/pages/store_binding_employee.js?v=20261020-2"></script>
 {% endblock %}
