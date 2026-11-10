@@ -32,13 +32,13 @@ def build_worker_performance_map(
     month: str = "",
     employee_ids: Iterable[str] | None = None,
 ) -> dict[str, int]:
-    """Return earned worker wages, including paid chicken-leg tips.
+    """Return only service-order wages earned by workers in the closing month.
 
-    Performance is based on completed orders in the order closing month. It
-    includes the worker's ``final_payout`` plus paid ``worker_tips.amount``.
-    Payroll/internal-transfer adjustments are deliberately excluded, so moving
-    salary between employees or into a wallet never creates or destroys earned
-    performance.
+    Monthly performance is the approved ``worker_payouts.final_payout`` of
+    closed service orders. Tips (``worker_tips``, whether added to an order or
+    independently via a worker profile), customer-service commission, and
+    internal payroll transfers do not count toward performance or its 5,000T
+    threshold. Those amounts still belong to the regular salary/payout ledger.
     """
 
     ids = {
@@ -91,43 +91,13 @@ def build_worker_performance_map(
             params,
         ).fetchall()
 
-        tip_rows = []
-        if _table_exists(conn, "worker_tips") and _column_exists(conn, "worker_tips", "amount"):
-            tip_where = [
-                "w.status = 'closed'",
-                "p.payment_status = 'paid'",
-                "COALESCE(p.amount, 0) > 0",
-                "COALESCE(p.worker_discord_id, '') <> ''",
-            ]
-            tip_params: list[str] = []
-            if month:
-                tip_where.append(
-                    "substr(COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), "
-                    "NULLIF(w.created_at, '')), 1, 7) = ?"
-                )
-                tip_params.append(month)
-            if ids:
-                placeholders = ",".join("?" for _ in ids)
-                tip_where.append(f"CAST(p.worker_discord_id AS TEXT) IN ({placeholders})")
-                tip_params.extend(sorted(ids))
-            tip_rows = conn.execute(
-                f"""
-                SELECT
-                    CAST(p.worker_discord_id AS TEXT) AS discord_id,
-                    COALESCE(p.amount, 0) AS amount
-                FROM worker_tips p
-                JOIN web_orders w ON w.id = p.order_id
-                WHERE {' AND '.join(tip_where)}
-                """,
-                tip_params,
-            ).fetchall()
     except sqlite3.Error:
         return {}
     finally:
         conn.close()
 
     totals: dict[str, int] = {}
-    for row in [*rows, *tip_rows]:
+    for row in rows:
         discord_id = str(row["discord_id"] or "").strip()
         if not discord_id:
             continue
