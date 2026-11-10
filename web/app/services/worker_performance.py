@@ -3,6 +3,8 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterable
 
+from web.app.services.worker_tip_salary_sql import tip_earning_date_expr
+
 
 MONTHLY_PERFORMANCE_TARGET = 5000
 
@@ -34,11 +36,11 @@ def build_worker_performance_map(
 ) -> dict[str, int]:
     """Return earned worker wages, including paid chicken-leg tips.
 
-    Performance is based on completed orders in the order closing month. It
-    includes the worker's ``final_payout`` plus paid ``worker_tips.amount``.
-    Payroll/internal-transfer adjustments are deliberately excluded, so moving
-    salary between employees or into a wallet never creates or destroys earned
-    performance.
+    Performance includes completed-order final wages and confirmed chicken-
+    leg tips. Linked tips use the completed order's close month; independent
+    profile tips have no order and use their paid_at month, consistent with the
+    payroll ledger. Unpaid/cancelled tips and internal transfers are excluded.
+    A settled salary does not change the original earned performance.
     """
 
     ids = {
@@ -55,46 +57,51 @@ def build_worker_performance_map(
 
     conn.row_factory = sqlite3.Row
     try:
-        if not _table_exists(conn, "worker_payouts") or not _table_exists(conn, "web_orders"):
-            return {}
-        if not _column_exists(conn, "worker_payouts", "final_payout"):
-            return {}
-
-        where = [
-            "w.status = 'closed'",
-            "COALESCE(p.final_payout, 0) > 0",
-            "COALESCE(p.worker_discord_id, '') <> ''",
-        ]
-        params: list[str] = []
-
-        if month:
-            where.append(
-                "substr(COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), "
-                "NULLIF(w.created_at, '')), 1, 7) = ?"
-            )
-            params.append(month)
-
-        if ids:
-            placeholders = ",".join("?" for _ in ids)
-            where.append(f"CAST(p.worker_discord_id AS TEXT) IN ({placeholders})")
-            params.extend(sorted(ids))
-
-        rows = conn.execute(
-            f"""
-            SELECT
-                CAST(p.worker_discord_id AS TEXT) AS discord_id,
-                COALESCE(p.final_payout, 0) AS amount
-            FROM worker_payouts p
-            JOIN web_orders w ON w.id = p.order_id
-            WHERE {' AND '.join(where)}
-            """,
-            params,
-        ).fetchall()
+        has_orders = _table_exists(conn, "web_orders")
+        has_worker_payouts = (
+            has_orders
+            and _table_exists(conn, "worker_payouts")
+            and _column_exists(conn, "worker_payouts", "final_payout")
+        )
+        rows = []
+        if has_worker_payouts:
+            where = [
+                "w.status = 'closed'",
+                "COALESCE(p.final_payout, 0) > 0",
+                "COALESCE(p.worker_discord_id, '') <> ''",
+            ]
+            params: list[str] = []
+            if month:
+                where.append(
+                    "substr(COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), "
+                    "NULLIF(w.created_at, '')), 1, 7) = ?"
+                )
+                params.append(month)
+            if ids:
+                placeholders = ",".join("?" for _ in ids)
+                where.append(f"CAST(p.worker_discord_id AS TEXT) IN ({placeholders})")
+                params.extend(sorted(ids))
+            rows = conn.execute(
+                f"""
+                SELECT
+                    CAST(p.worker_discord_id AS TEXT) AS discord_id,
+                    COALESCE(p.final_payout, 0) AS amount
+                FROM worker_payouts p
+                JOIN web_orders w ON w.id = p.order_id
+                WHERE {' AND '.join(where)}
+                """,
+                params,
+            ).fetchall()
 
         tip_rows = []
-        if _table_exists(conn, "worker_tips") and _column_exists(conn, "worker_tips", "amount"):
+        if (
+            _table_exists(conn, "worker_tips")
+            and _column_exists(conn, "worker_tips", "amount")
+            and _column_exists(conn, "worker_tips", "order_id")
+            and has_orders
+        ):
             tip_where = [
-                "w.status = 'closed'",
+                "(w.status = 'closed' OR p.order_id IS NULL)",
                 "p.payment_status = 'paid'",
                 "COALESCE(p.amount, 0) > 0",
                 "COALESCE(p.worker_discord_id, '') <> ''",
@@ -102,8 +109,7 @@ def build_worker_performance_map(
             tip_params: list[str] = []
             if month:
                 tip_where.append(
-                    "substr(COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), "
-                    "NULLIF(w.created_at, '')), 1, 7) = ?"
+                    f"substr({tip_earning_date_expr('p', 'w')}, 1, 7) = ?"
                 )
                 tip_params.append(month)
             if ids:
@@ -116,7 +122,7 @@ def build_worker_performance_map(
                     CAST(p.worker_discord_id AS TEXT) AS discord_id,
                     COALESCE(p.amount, 0) AS amount
                 FROM worker_tips p
-                JOIN web_orders w ON w.id = p.order_id
+                LEFT JOIN web_orders w ON w.id = p.order_id
                 WHERE {' AND '.join(tip_where)}
                 """,
                 tip_params,
