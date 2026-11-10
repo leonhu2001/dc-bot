@@ -144,6 +144,10 @@ APEX_GAME_ROLE = ("apex_game",)
 COIN_WASH_AW_ORDER_RULE_KEYS = frozenset({
     "farm_halfcoin_120m",
     "farm_halfcoin_360m",
+    "farm_ammo_dump_100m", "farm_ammo_dump_200m", "farm_ammo_dump_300m",
+    "farm_ammo_dump_500m", "farm_ammo_dump_1000m", "farm_ammo_dump_2000m",
+    "farm_car_crash_100m", "farm_car_crash_200m",
+    "farm_car_crash_500m", "farm_car_crash_1000m",
     "farm_aw_collision_1_100",
     "farm_aw_collision_101_500",
     "farm_aw_collision_501_plus",
@@ -1131,6 +1135,26 @@ for key, label, price in [
     ("farm_halfcoin_360m", "哈夫幣代洗｜360M", 3400),
 ]:
     _add(OrderRule("farm", key, label, "fixed", price, allowed_roles=HALFCOIN_RECEIVER_ROLES, required_game_roles=(), required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
+
+# Customer-visible public Delta代肝: worker earns list price minus a fixed gross
+# store cut. CS is paid 25% OF the cut, never 25% of the full order.
+# No VIP / loyalty / points / worker-specify fees or extra worker bonus.
+from services.farm_fixed_cut_policy import PUBLIC_FARM_FIXED_CUTS
+
+for _farm_key, (_farm_price, _farm_cut) in PUBLIC_FARM_FIXED_CUTS.items():
+    _farm_kind = "倒子彈代肝" if _farm_key.startswith("farm_ammo_dump_") else "撞車代肝"
+    _farm_size = _farm_key.rsplit("_", 1)[-1].upper()
+    _add(OrderRule(
+        category="farm", key=_farm_key,
+        label=f"{_farm_kind}｜{_farm_size}",
+        pricing_type="fixed", price=_farm_price,
+        allowed_roles=COIN_WASH_AW_RECEIVER_ROLES, required_game_roles=(),
+        required_staff_count=1, min_quantity=1, max_quantity=1,
+        allow_specify=False, vip_discount_allowed=False,
+        point_benefits_allowed=False, loyalty_benefits_enabled=False,
+        note=f"固定店抽 {_farm_cut}T；客服從店抽分 25%；其餘全歸接單人員",
+    ))
+
 
 for key, plan in AW_COLLISION_PRICING_BY_RULE.items():
     _add(OrderRule(
