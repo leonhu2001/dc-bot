@@ -3,10 +3,11 @@
 set -Eeuo pipefail
 
 APP=/opt/dc-bot
-RELEASE_REF=fix/admin-order-rules-verified-edit-20261110
+RELEASE_REF=fix/tips-excluded-performance-employee-salary-pagination-20261111
 PREVIOUS_RELEASE=4386dddf1da66adb01d55a5ffdf4df42749912e2
 OPTIONAL_ACCOUNTING_RELEASE=922cfc686f2cfe329db5bdadfb87c64e70e0b13b
 PREVIOUS_POSTER_RELEASE=558fe84f6842a799a375f996a699eb1c4362ab79
+PREVIOUS_ADMIN_RELEASE=6bfca436e2cb41ff4df6014a32311ada53cc018f
 TARGET="${1:-}"
 BOT_SERVICE=dc-bot.service
 WEB_SERVICE=dc-bot-dashboard.service
@@ -18,7 +19,7 @@ fi
 cd "$APP"
 OLD_HEAD="$(git rev-parse HEAD)"
 case "$OLD_HEAD" in
-    "$PREVIOUS_RELEASE"|"$OPTIONAL_ACCOUNTING_RELEASE"|"$PREVIOUS_POSTER_RELEASE") ;;
+    "$PREVIOUS_RELEASE"|"$OPTIONAL_ACCOUNTING_RELEASE"|"$PREVIOUS_POSTER_RELEASE"|"$PREVIOUS_ADMIN_RELEASE") ;;
     *) echo "BLOCKED: Unexpected deployed HEAD $OLD_HEAD"; exit 2 ;;
 esac
 
@@ -68,6 +69,13 @@ while IFS= read -r file; do
         web/app/services/order_groups.py|\
         web/app/services/accounting_reconciliation_policy.py|\
         web/app/routers/admin_order_rules.py|\
+        web/app/services/worker_performance.py|\
+        web/app/static/js/pages/employee_center.js|\
+        web/app/static/css/pages/employee_center.css|\
+        web/app/templates/employee_center.html|\
+        tests/test_payout_summary_performance_policy.py|\
+        tests/test_employee_salary_dashboard.py|\
+        tests/e2e/test_employee_salary_pagination.py|\
         web/app/templates/admin_order_rules.html|\
         tests/test_admin_order_rules_every_product_20261110.py|\
         tests/test_game_service_rules.py|\
@@ -170,7 +178,8 @@ git checkout -B "$RELEASE_REF" "$TARGET"
 echo "=== READ-ONLY PRICE AND ACCOUNTING CONTRACT ==="
 ./venv/bin/python - <<'PY'
 from pathlib import Path
-from services.order_rules import ORDER_RULES, calculate_price
+from services.order_rules import ORDER_RULES, calculate_price, get_base_rule, OWNER_APPROVED_GAME_PRICE_REVISION
+from services.order_rule_store import get_active_override
 from services.orders import get_order_item_details_for_group
 from web.app.services.order_groups import get_grouped_order_catalog
 from services.quick_order_v2_production import _public_view_for_channel
@@ -195,9 +204,22 @@ expected={
     "apex_predator_ng":500,"apex_predator_ranked":550,
     "steam_play":350,
 }
+def assert_approved_price(key, poster_price):
+    # Poster base values are immutable; a *new* explicit manager publish can
+    # override them for future orders, while old unmarked overrides cannot.
+    if get_base_rule(key).price != poster_price:
+        raise SystemExit(f"BLOCKED: poster base price drifted: {key}")
+    active = get_active_override(key)
+    payload = (active or {}).get("payload") or {}
+    actual = (
+        int(payload.get("price", poster_price))
+        if payload.get("_owner_price_revision") == OWNER_APPROVED_GAME_PRICE_REVISION
+        else poster_price
+    )
+    if ORDER_RULES[key].price != actual:
+        raise SystemExit(f"BLOCKED: published/active price differs for {key}")
 for key,price in expected.items():
-    if ORDER_RULES[key].price!=price:
-        raise SystemExit(f"BLOCKED: live {key} expected {price}T, got {ORDER_RULES[key].price}T")
+    assert_approved_price(key,price)
 # Customer ranks are explicit service variants on both storefronts.
 for game,prefixes,tiers in (
     ("valorant",
@@ -212,8 +234,9 @@ for game,prefixes,tiers in (
     for prefix,base in prefixes:
         for steps,tier in enumerate(tiers,1):
             rule=ORDER_RULES[f"{prefix}_ranked_tier_{tier}"]
-            if rule.price!=base+steps*50 or rule.unit_label!="局":
-                raise SystemExit(f"BLOCKED: bad {game} customer rank tier: {rule.key}")
+            assert_approved_price(rule.key, base+steps*50)
+            if rule.unit_label!="局":
+                raise SystemExit(f"BLOCKED: bad {game} customer rank unit: {rule.key}")
             if calculate_price(rule,quantity=2,player_count=2).base_amount!=rule.price*4:
                 raise SystemExit(f"BLOCKED: {game} tier total mismatch: {rule.key}")
         web=next(g for g in get_grouped_order_catalog(game) if g["key"]==prefix)
@@ -244,8 +267,7 @@ for prefix,base in (
 ):
     for tier,step in (("diamond",1),("master",2),("predator",3)):
         rule=ORDER_RULES[f"{prefix}_ranked_tier_{tier}"]
-        if rule.price!=base+step*50:
-            raise SystemExit(f"BLOCKED: bad Apex tier {rule.key}")
+        assert_approved_price(rule.key,base+step*50)
         if calculate_price(rule,quantity=2,player_count=2).base_amount!=rule.price*4:
             raise SystemExit(f"BLOCKED: Apex tier total mismatch {rule.key}")
     web=next(g for g in get_grouped_order_catalog("apex") if g["key"]==prefix)
@@ -312,6 +334,43 @@ if total < 20 or not {"valorant","lol","apex","steam","farm","custom"}.issubset(
 print(f"PASS: {total} editable admin rules across {len(categories)} categories; Web rule data is consistent")
 PY
 
+echo "=== READ-ONLY MONTHLY PERFORMANCE AND SALARY CONTRACT ==="
+./venv/bin/python - <<'PY'
+import sqlite3
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from web.app.services.worker_performance import build_worker_performance_map
+from web.app.services.worker_tip_salary_sql import tip_earning_date_expr
+
+month = datetime.now(ZoneInfo("Asia/Taipei")).strftime("%Y-%m")
+db = "web_dashboard.db"
+performance = build_worker_performance_map(db, month=month)
+with sqlite3.connect("file:web_dashboard.db?mode=ro", uri=True) as conn:
+    expected = {}
+    for worker, amount in conn.execute("""
+        SELECT CAST(p.worker_discord_id AS TEXT), p.final_payout
+        FROM worker_payouts p
+        JOIN web_orders w ON w.id = p.order_id
+        WHERE w.status='closed'
+          AND COALESCE(p.final_payout,0)>0
+          AND COALESCE(p.worker_discord_id,'')<>''
+          AND substr(COALESCE(NULLIF(w.closed_at,''),NULLIF(w.updated_at,''),
+                              NULLIF(w.created_at,'')),1,7)=?
+    """, (month,)):
+        expected[worker] = expected.get(worker, 0) + int(round(float(amount or 0)))
+    if expected != performance:
+        raise SystemExit("BLOCKED: monthly performance differs from service-only wages")
+    tips_table = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='worker_tips'"
+    ).fetchone()
+    if tips_table:
+        paid_tips = conn.execute(
+            "SELECT COUNT(*),COALESCE(SUM(amount),0) FROM worker_tips WHERE payment_status='paid'"
+        ).fetchone()
+        print(f"PASS: paid tip records remain in payroll table ({paid_tips[0]} rows, {paid_tips[1]}T); not counted in performance")
+print(f"PASS: {len(performance)} workers' service-only monthly performance validated ({month}); salary tables untouched")
+PY
+
 echo "=== RESTART BOT + WEB ==="
 systemctl restart "$BOT_SERVICE" "$WEB_SERVICE"
 for service in "$BOT_SERVICE" "$WEB_SERVICE"; do
@@ -357,7 +416,7 @@ file=Path(sys.argv[1]); file.parent.mkdir(parents=True,exist_ok=True)
 file.write_text(json.dumps({
     "commit":sys.argv[2],
     "previous_commit":sys.argv[3],
-    "branch":"fix/admin-order-rules-verified-edit-20261110",
+    "branch":"fix/tips-excluded-performance-employee-salary-pagination-20261111",
     "deployed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
     "subject":"Four game posters plus verified admin order rule editability",
     "status":"success",
@@ -366,6 +425,6 @@ PY
 APPLIED=0
 trap - ERR
 echo
-echo "DEPLOY COMPLETED: prices and admin rules verified; Delta price list preserved"
+echo "DEPLOY COMPLETED: chicken legs excluded from performance; salary pagination active; prices and admin rules preserved"
 echo "Commit: $TARGET"
 echo "Database backup: $BACKUP"
