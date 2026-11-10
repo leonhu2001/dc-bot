@@ -6,11 +6,9 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 
 from playwright.sync_api import Page, expect
 
-ROOT = Path(__file__).resolve().parents[2]
 BASE_URL = os.environ.get("E2E_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 
@@ -74,8 +72,10 @@ def test_salary_pagination_keeps_totals_and_filters_without_long_page(page: Page
             body=json.dumps({"ok": True, "data": data}, ensure_ascii=False),
         ),
     )
+    # Load the served static asset as a same-origin external script: the
+    # production CSP intentionally rejects Playwright's injected inline text.
     page.add_script_tag(
-        path=str(ROOT / "web/app/static/js/pages/employee_center.js")
+        url=f"{BASE_URL}/static/js/pages/employee_center.js"
     )
 
     expect(page.locator("#salaryRows .salary-row")).to_have_count(12)
