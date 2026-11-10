@@ -116,7 +116,8 @@ def test_delta_farm_category_opens_second_level_selector() -> None:
     assert selector.custom_id == "quick_order_v2_delta_farm_price_list"
     assert [option.label for option in selector.options] == [
         "AW子彈代撞",
-        "守夜人口風琴",
+        "倒子彈代肝",
+        "撞車代肝",
         "代解部門任務",
         "3×3安全箱",
     ]
