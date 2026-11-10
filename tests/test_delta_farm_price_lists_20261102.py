@@ -10,7 +10,8 @@ def test_delta_farm_price_list_has_owner_approved_four_items() -> None:
     labels = [str(plan["label"]) for plan in price_lists.DELTA_FARM_PRICE_LISTS.values()]
     assert labels == [
         "AW子彈代撞",
-        "守夜人口風琴",
+        "倒子彈代肝",
+        "撞車代肝",
         "代解部門任務",
         "3×3安全箱",
     ]
@@ -31,11 +32,15 @@ def test_delta_farm_aw_collision_prices_match_source_copy() -> None:
     assert "```text" in text
 
 
-def test_delta_farm_night_population_copy_matches_source() -> None:
-    text = str(price_lists.DELTA_FARM_PRICE_LISTS["night_population"]["text"])
-    assert "800T" in text
-    assert "3 天" in text
-    assert "登入前會通知" in text
+def test_delta_farm_fixed_farming_prices_and_mouth_organ_removed() -> None:
+    assert "night_population" not in price_lists.DELTA_FARM_PRICE_LISTS
+    for name, key, values in [
+        ("倒子彈代肝", "ammo_dump", ("800T", "1,500T", "2,100T", "3,300T", "6,400T", "11,500T")),
+        ("撞車代肝", "car_crash", ("700T", "1,400T", "3,250T", "6,100T")),
+    ]:
+        plan = price_lists.DELTA_FARM_PRICE_LISTS[key]
+        assert plan["label"] == name
+        assert all(value in plan["text"] for value in values)
 
 
 def test_delta_farm_department_mission_copy_matches_source() -> None:
@@ -111,7 +116,8 @@ def test_delta_farm_category_opens_second_level_selector() -> None:
     assert selector.custom_id == "quick_order_v2_delta_farm_price_list"
     assert [option.label for option in selector.options] == [
         "AW子彈代撞",
-        "守夜人口風琴",
+        "倒子彈代肝",
+        "撞車代肝",
         "代解部門任務",
         "3×3安全箱",
     ]

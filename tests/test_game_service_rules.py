@@ -637,7 +637,7 @@ def test_delta_farm_orders_accept_either_desktop_or_mobile_identity():
     for rule_key, rule in ORDER_RULES.items():
         if rule.category != "farm":
             continue
-        if rule_key.startswith(("farm_aw_collision_", "farm_halfcoin_")):
+        if rule_key.startswith(("farm_aw_collision_", "farm_halfcoin_", "farm_ammo_dump_", "farm_car_crash_")):
             continue
 
         assert get_required_game_role_keys(rule) == (

@@ -505,6 +505,15 @@ def get_payout_override(
 
 
 def _customer_service_payout_base(order: WebOrder) -> int:
+    from services.farm_fixed_cut_policy import is_public_farm_fixed_cut_rule
+    if is_public_farm_fixed_cut_rule(getattr(order, "order_rule_key", None)):
+        # CS's entitlement is 25% of the FIXED store cut. This argument
+        # carries the full customer charge (wallet usage is still payment).
+        return int(
+            order.customer_pay_amount
+            if order.customer_pay_amount is not None
+            else order.amount or 0
+        )
     from services.staff_internal_ammo_dump_policy import is_internal_ammo_dump_rule
 
     if is_internal_ammo_dump_rule(getattr(order, "order_rule_key", None)):
@@ -606,6 +615,15 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
         override = overrides.get(worker_payout.worker_discord_id)
         final_payout = worker_payout.final_payout
         note = None
+        from services.farm_fixed_cut_policy import (
+            is_public_farm_fixed_cut_rule, fixed_store_cut,
+        )
+        if is_public_farm_fixed_cut_rule(getattr(order, "order_rule_key", None)):
+            note = (
+                f"固定店抽 {fixed_store_cut(order.order_rule_key)}T｜"
+                "員工薪資為售價扣除店抽｜客服從店抽分25%｜"
+                "無掛名、直播或業績額外加成"
+            )
 
         if override is not None:
             final_payout = int(override.manual_final_payout or 0)

@@ -7,6 +7,10 @@ from sqlalchemy import func, inspect, select, text
 
 from services.one_companion_one_guard_payout import is_full_worker_payout_rule
 from services.staff_internal_ammo_dump_policy import calculate_internal_ammo_dump_cs_payout
+from services.farm_fixed_cut_policy import (
+    is_public_farm_fixed_cut_rule,
+    calculate_farm_fixed_cut_settlement,
+)
 from shared.db import SessionLocal
 from shared.models import CustomerServicePayout, OrderAssignment, PayoutStatus, WebOrder, WorkerPayout
 from shared.payout import (
@@ -216,9 +220,10 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
         for payout in payouts:
             worker_id = str(payout.worker_discord_id or "")
             if full_worker_payout:
-                # Farm/coin-wash/AW direct-pay products are 100% worker payout.
-                # Report named/streamed flags are informational only; they must
-                # never replace the payout with the generic 80-90% bonus model.
+                # Direct-payment farm/coin-wash/AW products keep 100% of
+                # their own wage basis, even after report approval. New public
+                # ammo/car wages are sale LESS fixed store cut; the store cut
+                # is split 25% to CS, not taken again from worker wages.
                 gross = max(0, int(payout.gross_share or 0))
                 manual_override = "手動指定分潤" in str(payout.note or "")
                 locked = payout.payout_status == PayoutStatus.PAID.value or manual_override
@@ -228,7 +233,10 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     payout.named_bonus_rate = 0.0
                     payout.named_bonus_amount = 0
                     payout.final_payout = gross
-                    payout.note = "特殊代肝單｜接單人員全額 100%｜無客服分潤及額外獎金"
+                    if is_public_farm_fixed_cut_rule(order.order_rule_key):
+                        payout.note = "固定店抽代肝｜員工拿售價扣除固定店抽｜客服由店抽領25%｜不另加成"
+                    else:
+                        payout.note = "特殊代肝單｜接單人員全額 100%｜無客服分潤及額外獎金"
                 details.append({
                     "worker_id": worker_id,
                     "rate": 1.0,
@@ -323,9 +331,15 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     order.customer_pay_amount
                     if order.customer_pay_amount is not None else order.amount or 0
                 )
-                cs_amount = calculate_internal_ammo_dump_cs_payout(
-                    order.order_rule_key, customer_paid, payout_base
-                )
+                if is_public_farm_fixed_cut_rule(order.order_rule_key):
+                    settlement = calculate_farm_fixed_cut_settlement(
+                        order.order_rule_key, customer_paid, payout_base
+                    )
+                    cs_amount = settlement.customer_service_amount
+                else:
+                    cs_amount = calculate_internal_ammo_dump_cs_payout(
+                        order.order_rule_key, customer_paid, payout_base
+                    )
                 cs_rate = cs_amount / customer_paid if customer_paid > 0 else 0.0
             elif legacy:
                 cs_rate = LEGACY_CUSTOMER_SERVICE_GROSS_RATE

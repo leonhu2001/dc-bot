@@ -3,11 +3,12 @@
 set -Eeuo pipefail
 
 APP=/opt/dc-bot
-RELEASE_REF=fix/tips-excluded-performance-employee-salary-pagination-20261111
+RELEASE_REF=feat/delta-farm-ammo-crash-fixed-cuts-20261111
 PREVIOUS_RELEASE=4386dddf1da66adb01d55a5ffdf4df42749912e2
 OPTIONAL_ACCOUNTING_RELEASE=922cfc686f2cfe329db5bdadfb87c64e70e0b13b
 PREVIOUS_POSTER_RELEASE=558fe84f6842a799a375f996a699eb1c4362ab79
 PREVIOUS_ADMIN_RELEASE=6bfca436e2cb41ff4df6014a32311ada53cc018f
+PREVIOUS_SALARY_RELEASE=eb6179d6e2a6083a8a18cc81e652e2924abd266a
 TARGET="${1:-}"
 BOT_SERVICE=dc-bot.service
 WEB_SERVICE=dc-bot-dashboard.service
@@ -19,7 +20,7 @@ fi
 cd "$APP"
 OLD_HEAD="$(git rev-parse HEAD)"
 case "$OLD_HEAD" in
-    "$PREVIOUS_RELEASE"|"$OPTIONAL_ACCOUNTING_RELEASE"|"$PREVIOUS_POSTER_RELEASE"|"$PREVIOUS_ADMIN_RELEASE") ;;
+    "$PREVIOUS_RELEASE"|"$OPTIONAL_ACCOUNTING_RELEASE"|"$PREVIOUS_POSTER_RELEASE"|"$PREVIOUS_ADMIN_RELEASE"|"$PREVIOUS_SALARY_RELEASE") ;;
     *) echo "BLOCKED: Unexpected deployed HEAD $OLD_HEAD"; exit 2 ;;
 esac
 
@@ -61,6 +62,17 @@ while IFS= read -r file; do
     case "$file" in
         .github/workflows/ci.yml|\
         services/order_rules.py|\
+        services/farm_fixed_cut_policy.py|\
+        services/self_service_financials.py|\
+        services/one_companion_one_guard_payout.py|\
+        web/app/services/checkout_preview.py|\
+        web/app/services/order_service.py|\
+        web/app/services/worker_bonus_payout.py|\
+        web/app/services/accounting_reconciliation.py|\
+        tests/test_public_farm_fixed_cut_20261111.py|\
+        tests/test_coin_wash_aw_exclusive_receiver_20261105.py|\
+        tests/test_delta_farm_price_lists_20261102.py|\
+        tests/test_delta_farm_price_lists_20261102.py|\
         services/game_price_policy_20261023.py|\
         services/quick_order_v2_price_lists.py|\
         services/quick_order_v2_production.py|\
@@ -110,6 +122,16 @@ import subprocess,sys,types
 from dataclasses import asdict
 from pathlib import Path
 old_sha,new_sha=sys.argv[1:3]
+# Load the new self-contained fixed-cut module from its pinned commit before
+# running the rule-module side-by-side audit. At this point checkout has NOT
+# happened and the live old filesystem does not contain the new file yet.
+farm_name="services.farm_fixed_cut_policy"
+farm_src=subprocess.check_output(
+    ["git","show",f"{new_sha}:services/farm_fixed_cut_policy.py"],text=True
+)
+farm_mod=types.ModuleType(farm_name); sys.modules[farm_name]=farm_mod
+exec(compile(farm_src,"services/farm_fixed_cut_policy.py","exec"),farm_mod.__dict__)
+new_farm_keys=set(farm_mod.PUBLIC_FARM_FIXED_CUTS)
 def base_rules(commit):
     source=subprocess.check_output(
         ["git","show",f"{commit}:services/order_rules.py"], text=True
@@ -126,7 +148,8 @@ for key, rule in old.items():
         raise SystemExit(f"BLOCKED: unrelated rule changed: {key}")
 for key in new:
     if key not in old and new[key].category not in {"valorant","steam","lol","apex"}:
-        raise SystemExit(f"BLOCKED: unrelated rule added: {key}")
+        if key not in new_farm_keys or new[key].category != "farm":
+            raise SystemExit(f"BLOCKED: unrelated rule added: {key}")
 print("PASS: every non-target game/order rule unchanged")
 PY
 
@@ -371,6 +394,44 @@ with sqlite3.connect("file:web_dashboard.db?mode=ro", uri=True) as conn:
 print(f"PASS: {len(performance)} workers' service-only monthly performance validated ({month}); salary tables untouched")
 PY
 
+echo "=== PUBLIC FARM FIXED CUT CONTRACT (READ-ONLY) ==="
+./venv/bin/python - <<'PY'
+from services.farm_fixed_cut_policy import (
+    PUBLIC_FARM_FIXED_CUTS,calculate_farm_fixed_cut_settlement,
+)
+from services.order_rules import ORDER_RULES,calculate_price
+from services.orders import get_order_item_details_for_group
+from services.one_companion_one_guard_payout import calculate_one_companion_one_guard_order_payout
+from services.quick_order_v2_price_lists import DELTA_FARM_PRICE_LISTS
+from web.app.services.order_groups import get_grouped_order_catalog
+
+assert len(PUBLIC_FARM_FIXED_CUTS)==10
+assert "night_population" not in DELTA_FARM_PRICE_LISTS
+web={g["key"]:g for g in get_grouped_order_catalog("farm")}
+for group,prefix in (("ammo_dump","farm_ammo_dump_"),("car_crash","farm_car_crash_")):
+    expected={key for key in PUBLIC_FARM_FIXED_CUTS if key.startswith(prefix)}
+    assert {x["rule_key"] for x in web[group]["variants"]}==expected
+    discord=get_order_item_details_for_group("farm",web[group]["label"])
+    assert {x["rule_key"] for x in discord}==expected
+for key,(price,cut) in PUBLIC_FARM_FIXED_CUTS.items():
+    rule=ORDER_RULES[key]
+    if rule.price!=price or rule.required_staff_count!=1 or rule.allowed_roles!=("halfcoin_receiver",):
+        raise SystemExit(f"BLOCKED: unexpected fixed farming price/role on {key}")
+    if rule.vip_discount_allowed or rule.point_benefits_allowed or rule.loyalty_benefits_enabled:
+        raise SystemExit(f"BLOCKED: fixed margin product has a discount: {key}")
+    settlement=calculate_farm_fixed_cut_settlement(key,price)
+    payout=calculate_one_companion_one_guard_order_payout(
+        rule_key=key,total_amount=settlement.worker_amount,
+        worker_roles=[("deploy-preview","booster")],
+        customer_service_total_amount=price,
+    )
+    if (payout.worker_payouts[0].final_payout!=settlement.worker_amount
+        or payout.customer_service_payout!=settlement.customer_service_amount
+        or settlement.customer_service_amount+settlement.store_retained_amount!=cut):
+        raise SystemExit(f"BLOCKED: fixed farm payout does not reconcile: {key}")
+print("PASS: all 10 fixed store cuts, CS split, receiver role, Bot/Web options and mouth-organ removal verified")
+PY
+
 echo "=== RESTART BOT + WEB ==="
 systemctl restart "$BOT_SERVICE" "$WEB_SERVICE"
 for service in "$BOT_SERVICE" "$WEB_SERVICE"; do
@@ -416,15 +477,15 @@ file=Path(sys.argv[1]); file.parent.mkdir(parents=True,exist_ok=True)
 file.write_text(json.dumps({
     "commit":sys.argv[2],
     "previous_commit":sys.argv[3],
-    "branch":"fix/tips-excluded-performance-employee-salary-pagination-20261111",
+    "branch":"feat/delta-farm-ammo-crash-fixed-cuts-20261111",
     "deployed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    "subject":"Four game posters plus verified admin order rule editability",
+    "subject":"Public Delta ammo/car fixed store cuts, CS split and menu update",
     "status":"success",
 },ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
 PY
 APPLIED=0
 trap - ERR
 echo
-echo "DEPLOY COMPLETED: chicken legs excluded from performance; salary pagination active; prices and admin rules preserved"
+echo "DEPLOY COMPLETED: public ammo/crash fixed cuts and CS from store cut; prior salaries protected"
 echo "Commit: $TARGET"
 echo "Database backup: $BACKUP"

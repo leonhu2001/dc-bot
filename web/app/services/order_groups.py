@@ -241,6 +241,35 @@ GROUP_SPECS = [
     },
 
     {
+        "key": "ammo_dump",
+        "category": "farm",
+        "label": "倒子彈代肝",
+        "selector_label": "規格",
+        "description": "依 M 數定價；店抽固定，客服分潤從店抽中支付。",
+        "variants": [
+            ("farm_ammo_dump_100m", "100M"),
+            ("farm_ammo_dump_200m", "200M"),
+            ("farm_ammo_dump_300m", "300M"),
+            ("farm_ammo_dump_500m", "500M"),
+            ("farm_ammo_dump_1000m", "1000M"),
+            ("farm_ammo_dump_2000m", "2000M"),
+        ],
+    },
+    {
+        "key": "car_crash",
+        "category": "farm",
+        "label": "撞車代肝",
+        "selector_label": "規格",
+        "description": "依 M 數定價；店抽固定，客服分潤從店抽中支付。",
+        "variants": [
+            ("farm_car_crash_100m", "100M"),
+            ("farm_car_crash_200m", "200M"),
+            ("farm_car_crash_500m", "500M"),
+            ("farm_car_crash_1000m", "1000M"),
+        ],
+    },
+
+    {
         "key": "halfcoin",
         "category": "farm",
         "label": "哈夫幣代洗",

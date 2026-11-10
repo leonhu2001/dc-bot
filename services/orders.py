@@ -156,6 +156,20 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             ],
         },
         {
+            "label": "倒子彈代肝",
+            "details": [
+                {"label": size, "value": size.lower(), "rule_key": f"farm_ammo_dump_{size.lower()}", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}
+                for size in ("100M", "200M", "300M", "500M", "1000M", "2000M")
+            ],
+        },
+        {
+            "label": "撞車代肝",
+            "details": [
+                {"label": size, "value": size.lower(), "rule_key": f"farm_car_crash_{size.lower()}", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}
+                for size in ("100M", "200M", "500M", "1000M")
+            ],
+        },
+        {
             "label": "AW代撞",
             "details": [
                 {"label": "1～100發｜5T/發", "value": "1_100", "rule_key": "farm_aw_collision_1_100", "quantity_unit": "發", "min_quantity": 1, "max_quantity": 100, "quantity_input_mode": "modal"},
