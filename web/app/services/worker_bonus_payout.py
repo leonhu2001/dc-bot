@@ -64,10 +64,12 @@ def _previous_month_utc_bounds(now: datetime | None = None) -> tuple[datetime, d
 
 
 def previous_month_performance(db, worker_discord_id: str, *, now: datetime | None = None) -> int:
-    """Return completed-order worker wages plus paid chicken-leg tips.
+    """Return completed-order wages plus paid (including independent) tips.
 
-    Both parts are attributed by the order closing time. Payout status and
-    payroll-transfer adjustments do not affect performance.
+    Order-linked tips use the closed order's earning period, whereas a
+    standalone profile tip is attributed to its confirmation month. This is
+    identical to the salary ledger's tip scope. Payroll transfers and payout
+    settlement status never add to or remove earned performance.
     """
     start_at, end_at = _previous_month_utc_bounds(now)
     order_date = func.coalesce(
@@ -87,6 +89,13 @@ def previous_month_performance(db, worker_discord_id: str, *, now: datetime | No
         )
     )
 
+    local_now = now or datetime.now(TAIPEI_TZ)
+    if local_now.tzinfo is None:
+        local_now = local_now.replace(tzinfo=TAIPEI_TZ)
+    prior_month = (
+        local_now.astimezone(TAIPEI_TZ).replace(day=1) - timedelta(days=1)
+    ).strftime("%Y-%m")
+
     tip_total = 0
     # Some unit-test/minimal databases do not create the optional tips table.
     # Treat that as zero tips instead of breaking payout recalculation.
@@ -96,19 +105,29 @@ def previous_month_performance(db, worker_discord_id: str, *, now: datetime | No
                 """
                 SELECT COALESCE(SUM(t.amount), 0)
                 FROM worker_tips t
-                JOIN web_orders w ON w.id = t.order_id
+                LEFT JOIN web_orders w ON w.id = t.order_id
                 WHERE CAST(t.worker_discord_id AS TEXT) = :worker_id
-                  AND w.status = 'closed'
                   AND t.payment_status = 'paid'
                   AND COALESCE(t.amount, 0) > 0
-                  AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) >= :start_at
-                  AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) < :end_at
+                  AND (
+                      (
+                          t.order_id IS NULL
+                          AND substr(COALESCE(NULLIF(t.paid_at, ''), NULLIF(t.created_at, '')), 1, 7) = :prior_month
+                      )
+                      OR (
+                          t.order_id IS NOT NULL
+                          AND w.status = 'closed'
+                          AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) >= :start_at
+                          AND COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) < :end_at
+                      )
+                  )
                 """
             ),
             {
                 "worker_id": str(worker_discord_id),
                 "start_at": start_at,
                 "end_at": end_at,
+                "prior_month": prior_month,
             },
         )
     return max(0, int(wage_total or 0) + int(tip_total or 0))
