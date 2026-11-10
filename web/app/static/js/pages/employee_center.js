@@ -16,8 +16,10 @@
     const cacheKey = `mw_employee_salary_v2:${employeeId}`;
     const CACHE_MAX_AGE = 10 * 60 * 1000;
     const REQUEST_TIMEOUT = 7000;
+    const PAGE_SIZE = 10;
     let salaryItems = [];
     let activeFilter = 'all';
+    let currentPage = 1;
     let requestSerial = 0;
 
     function el(tag, className, text){
@@ -27,18 +29,71 @@
         return node;
     }
 
+    function updatePagination(total){
+        const host = document.getElementById('salaryPagination');
+        if(!host) return;
+        const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        currentPage = Math.max(1, Math.min(currentPage, pages));
+        host.hidden = total <= PAGE_SIZE;
+
+        const summary = document.getElementById('salaryPageSummary');
+        if(summary){
+            const start = total ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+            const end = Math.min(total, currentPage * PAGE_SIZE);
+            summary.textContent = `顯示第 ${start}–${end} 筆，共 ${total} 筆・第 ${currentPage} / ${pages} 頁`;
+        }
+        const prev = document.getElementById('salaryPagePrevious');
+        const next = document.getElementById('salaryPageNext');
+        if(prev) prev.disabled = currentPage <= 1;
+        if(next) next.disabled = currentPage >= pages;
+
+        const pageNumbers = document.getElementById('salaryPageNumbers');
+        if(!pageNumbers) return;
+        pageNumbers.replaceChildren();
+        const start = Math.max(1, Math.min(currentPage - 2, pages - 4));
+        const end = Math.min(pages, start + 4);
+        for(let page = start; page <= end; page += 1){
+            const button = el('button','salary-page-button',String(page));
+            button.type = 'button';
+            button.dataset.salaryPage = String(page);
+            button.setAttribute('aria-label',`第 ${page} 頁`);
+            if(page === currentPage){
+                button.classList.add('is-current');
+                button.setAttribute('aria-current','page');
+            }
+            pageNumbers.appendChild(button);
+        }
+    }
+
+    function goToPage(page){
+        const total = activeFilter === 'all'
+            ? salaryItems.length
+            : salaryItems.filter(item => item.category_key === activeFilter).length;
+        const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        const requested = Number(page);
+        if(!Number.isInteger(requested)) return;
+        const nextPage = Math.max(1, Math.min(requested, pages));
+        if(nextPage === currentPage) return;
+        currentPage = nextPage;
+        renderRows();
+        // Move back to the top of the list after a page turn, including mobile.
+        document.querySelector('.salary-list')?.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+
     function renderRows(){
         rowsHost.replaceChildren();
         const visible = activeFilter === 'all'
             ? salaryItems
             : salaryItems.filter(item => item.category_key === activeFilter);
 
+        updatePagination(visible.length);
         if(!visible.length){
             rowsHost.appendChild(el('div','salary-empty','這個分類目前沒有薪資紀錄。'));
             return;
         }
 
-        visible.forEach(item => {
+        const start = (currentPage - 1) * PAGE_SIZE;
+        visible.slice(start, start + PAGE_SIZE).forEach(item => {
             const row = el('div','salary-row');
             row.appendChild(el('span','salary-date',item.closed_date || '未紀錄'));
             row.appendChild(el('span','salary-order',item.order_no || '未紀錄訂單'));
@@ -66,6 +121,7 @@
 
     function activate(filter){
         activeFilter = filter;
+        currentPage = 1;
         tabs.forEach(tab => tab.classList.toggle('active',tab.dataset.filter === filter));
         renderRows();
     }
@@ -170,6 +226,12 @@
     }
 
     tabs.forEach(tab => tab.addEventListener('click',() => activate(tab.dataset.filter)));
+    document.getElementById('salaryPagePrevious')?.addEventListener('click',() => goToPage(currentPage - 1));
+    document.getElementById('salaryPageNext')?.addEventListener('click',() => goToPage(currentPage + 1));
+    document.getElementById('salaryPageNumbers')?.addEventListener('click',event => {
+        const target = event.target.closest('[data-salary-page]');
+        if(target) goToPage(Number(target.dataset.salaryPage));
+    });
 
     const cached = readCache();
     if(cached){
