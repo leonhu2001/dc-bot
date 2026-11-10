@@ -16,8 +16,15 @@
     const cacheKey = `mw_employee_salary_v2:${employeeId}`;
     const CACHE_MAX_AGE = 10 * 60 * 1000;
     const REQUEST_TIMEOUT = 7000;
+    const PAGE_SIZE = 12;
+    const pager = document.getElementById('salaryPagination');
+    const pageInfo = document.getElementById('salaryPageInfo');
+    const pageNumbers = document.getElementById('salaryPageNumbers');
+    const pagePrevious = document.getElementById('salaryPagePrevious');
+    const pageNext = document.getElementById('salaryPageNext');
     let salaryItems = [];
     let activeFilter = 'all';
+    let currentPage = 1;
     let requestSerial = 0;
 
     function el(tag, className, text){
@@ -27,18 +34,65 @@
         return node;
     }
 
+    function renderPagination(count){
+        const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+        currentPage = Math.min(Math.max(currentPage, 1), totalPages);
+        if(!pager) return;
+
+        pager.hidden = count <= PAGE_SIZE;
+        if(pager.hidden) return;
+
+        const first = (currentPage - 1) * PAGE_SIZE + 1;
+        const last = Math.min(currentPage * PAGE_SIZE, count);
+        if(pageInfo) pageInfo.textContent = `顯示第 ${first}–${last} 筆，共 ${count} 筆｜第 ${currentPage}／${totalPages} 頁`;
+        if(pagePrevious) pagePrevious.disabled = currentPage === 1;
+        if(pageNext) pageNext.disabled = currentPage >= totalPages;
+        if(pageNumbers){
+            pageNumbers.replaceChildren();
+            const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+            const end = Math.min(totalPages, start + 4);
+            for(let page = start; page <= end; page++){
+                const button = el('button', 'salary-page-number', page);
+                button.type = 'button';
+                button.setAttribute('aria-label', `第 ${page} 頁`);
+                if(page === currentPage){
+                    button.classList.add('active');
+                    button.setAttribute('aria-current', 'page');
+                }
+                button.addEventListener('click', () => goToPage(page));
+                pageNumbers.appendChild(button);
+            }
+        }
+    }
+
+    function goToPage(page){
+        const filteredCount = activeFilter === 'all'
+            ? salaryItems.length
+            : salaryItems.filter(item => item.category_key === activeFilter).length;
+        const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
+        if(!Number.isInteger(page) || page < 1 || page > totalPages || page === currentPage) return;
+        currentPage = page;
+        renderRows();
+        const list = document.querySelector('.salary-list');
+        if(list) list.scrollIntoView({
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+            block: 'start',
+        });
+    }
+
     function renderRows(){
         rowsHost.replaceChildren();
         const visible = activeFilter === 'all'
             ? salaryItems
             : salaryItems.filter(item => item.category_key === activeFilter);
+        renderPagination(visible.length);
 
         if(!visible.length){
             rowsHost.appendChild(el('div','salary-empty','這個分類目前沒有薪資紀錄。'));
             return;
         }
 
-        visible.forEach(item => {
+        visible.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).forEach(item => {
             const row = el('div','salary-row');
             row.appendChild(el('span','salary-date',item.closed_date || '未紀錄'));
             row.appendChild(el('span','salary-order',item.order_no || '未紀錄訂單'));
@@ -66,6 +120,7 @@
 
     function activate(filter){
         activeFilter = filter;
+        currentPage = 1;
         tabs.forEach(tab => tab.classList.toggle('active',tab.dataset.filter === filter));
         renderRows();
     }
@@ -170,6 +225,8 @@
     }
 
     tabs.forEach(tab => tab.addEventListener('click',() => activate(tab.dataset.filter)));
+    if(pagePrevious) pagePrevious.addEventListener('click', () => goToPage(currentPage - 1));
+    if(pageNext) pageNext.addEventListener('click', () => goToPage(currentPage + 1));
 
     const cached = readCache();
     if(cached){
