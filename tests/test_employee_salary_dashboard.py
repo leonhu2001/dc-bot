@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 from web.app.routers import payouts
+from web.app.services.worker_performance import build_worker_performance_map
 
 
 def _create_salary_db(path):
@@ -280,3 +281,14 @@ def test_profile_tip_without_web_order_is_in_employee_salary_month_and_totals(
     assert tip["financial_state"] == "unpaid"
     assert tip["status_label"] == "待發放"
     assert ledger["categories"]["tip"]["total"] == 285
+
+    # Tips stay payable even though none (order-attached or independent) count
+    # toward employee service performance for the 5,000T monthly target.
+    october_performance = build_worker_performance_map(
+        str(db_file), month="2026-10", employee_ids={"123"}
+    )
+    assert october_performance == {"123": 500}
+    november_performance = build_worker_performance_map(
+        str(db_file), month="2026-11", employee_ids={"123"}
+    )
+    assert november_performance == {}

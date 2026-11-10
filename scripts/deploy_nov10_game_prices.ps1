@@ -4,11 +4,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ReleaseRef = "fix/admin-order-rules-verified-edit-20261110"
+$ReleaseRef = "fix/tips-excluded-performance-employee-salary-pagination-20261111"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $RepoRoot
 
-Write-Host "=== SAFE GAME PRICES + ADMIN ORDER RULES DEPLOY ===" -ForegroundColor Yellow
+Write-Host "=== SAFE SALARY PERFORMANCE + EMPLOYEE PAGINATION DEPLOY ===" -ForegroundColor Yellow
 
 if (git status --porcelain) {
     git status --short
@@ -71,5 +71,5 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "DEPLOY COMPLETED - game prices and admin order rules verified; Delta price list preserved." -ForegroundColor Green
+Write-Host "DEPLOY COMPLETED - tips excluded from performance; employee salary pagination enabled." -ForegroundColor Green
 Write-Host "Commit: $Target" -ForegroundColor Cyan
