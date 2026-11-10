@@ -114,6 +114,10 @@ def test_closed_order_recalculation_preserves_worker_wages_and_cs_split(key, val
     price, cut, worker_wage, cs, retained = values
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE order_acceptance_meta (order_id INTEGER PRIMARY KEY, status TEXT)"
+        )
     with Session(engine) as db:
         order = WebOrder(
             category="farm", item=key, order_rule_key=key, status="closed",
