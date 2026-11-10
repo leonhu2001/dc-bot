@@ -5,6 +5,11 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from services.farm_fixed_cut_policy import (
+    is_public_farm_fixed_cut_rule,
+    calculate_farm_fixed_cut_settlement,
+)
+
 from services.order_flow import (
     get_payment_method_info,
 )
@@ -1748,6 +1753,15 @@ def build_checkout_preview(
         else 100
     )
 
+    if is_public_farm_fixed_cut_rule(rule_key):
+        # Fixed shop cuts cannot absorb a VIP discount. Keep list price and
+        # per-tier worker wages identical on Discord and Web.
+        vip = {**vip, "eligible": False, "pay_rate": 100}
+        vip_rate = 100
+        if benefit_coupon_id not in (None, ""):
+            raise ValueError("固定店抽代肝商品不能使用福利券。")
+
+
 
     selected_point_item = None
 
@@ -1891,6 +1905,25 @@ def build_checkout_preview(
         )
     )
 
+
+    if is_public_farm_fixed_cut_rule(rule_key):
+        # Wallet is a payment method, NOT a discount. Use pre-wallet total.
+        # No VIP/point/loyalty benefit may eat into the fixed gross shop cut.
+        if selected_point_item is not None or selected_benefit_coupon is not None:
+            raise ValueError("固定店抽代肝商品不適用點數及累積福利。")
+        customer_gross = int(finance["customer_pay_amount"])
+        original_gross = int(quote.get("customer_pay_amount") or 0)
+        if customer_gross != original_gross or int(finance.get("specify_fee") or 0) != 0:
+            raise ValueError("固定店抽商品不可折扣或加收指定費。")
+        settlement = calculate_farm_fixed_cut_settlement(rule_key, customer_gross)
+        finance.update(
+            payout_base_amount=settlement.worker_amount,
+            payout_base_preview=settlement.worker_amount,
+            store_margin_amount=settlement.fixed_store_cut,
+            customer_service_payout_amount=settlement.customer_service_amount,
+            store_retained_amount=settlement.store_retained_amount,
+            fixed_store_cut_policy="farm_fixed_cut_cs25_v1",
+        )
 
     remaining = int(
         finance[
