@@ -70,6 +70,8 @@ while IFS= read -r file; do
         web/app/services/worker_bonus_payout.py|\
         web/app/services/accounting_reconciliation.py|\
         tests/test_public_farm_fixed_cut_20261111.py|\
+        tests/test_coin_wash_aw_exclusive_receiver_20261105.py|\
+        tests/test_delta_farm_price_lists_20261102.py|\
         tests/test_delta_farm_price_lists_20261102.py|\
         services/game_price_policy_20261023.py|\
         services/quick_order_v2_price_lists.py|\
