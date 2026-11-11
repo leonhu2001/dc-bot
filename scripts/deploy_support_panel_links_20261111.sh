@@ -128,6 +128,7 @@ echo "=== VERIFY ORIGINAL DISCORD MESSAGE IN PLACE ==="
 ./venv/bin/python - <<'PY'
 import json
 import os
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -141,6 +142,18 @@ if not token:
 
 channel_id="1497622678138519572"
 message_id="1537533276884045856"
+# Match bot.py's configured panel IDs without importing core.config (which
+# can migrate/write config.json). This is strictly read-only.
+settings_path=Path("config.json")
+if settings_path.exists():
+    try:
+        settings=json.loads(settings_path.read_text(encoding="utf-8"))
+        if not isinstance(settings,dict):
+            raise ValueError("config must be an object")
+        channel_id=str(int(settings.get("DISPATCH_SUPPORT_ONLINE_CHANNEL_ID") or channel_id))
+        message_id=str(int(settings.get("MAIN_SERVICE_PANEL_MESSAGE_ID") or message_id))
+    except (ValueError,TypeError,OSError) as error:
+        raise SystemExit("BLOCKED: cannot resolve configured support panel IDs")
 base="https://discord.com/api/v10"
 headers={
     "Authorization": "Bot "+token,
