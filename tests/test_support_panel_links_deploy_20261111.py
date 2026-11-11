@@ -26,7 +26,7 @@ def test_support_panel_release_bash_is_valid_and_scope_is_narrow():
     assert "WEB AND DATABASES UNTOUCHED" in text
     assert "git reset --hard" in text
     assert 'request("PATCH",path,{"embeds":[embed]})' in text
-    assert 'request("PATCH",welcome_path,{"embeds":[welcome_embed]})' in text
+    assert 'request("PATCH",welcome_path,{"embeds":[welcome_embed],"allowed_mentions":{"parse":[]}})' in text
     assert 'button_ids(after)!=expected_buttons' in text
     assert 'after["embeds"][0].get("description")!=description' in text
     assert "DEPLOY COMPLETED: welcome and existing support panel link" in text
