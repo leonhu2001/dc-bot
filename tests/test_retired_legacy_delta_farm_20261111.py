@@ -60,6 +60,59 @@ def test_old_halfcoin_and_mouth_organ_absent_from_web_bot_new_order_menus():
         assert len(groups[kind]["variants"]) == count
 
 
+
+@pytest.mark.parametrize("retired_group", (
+    "守夜人口風琴",
+    "守夜人口風琴｜活動",
+    "哈夫幣代洗",
+    "哈夫幣代肝",
+))
+def test_discord_hides_historical_custom_group_from_active_database(
+    monkeypatch, retired_group,
+):
+    """A live manager group can outlive its event and even have active rows.
+
+    Old CI used an empty rule DB and missed a group that existed only in the
+    production SQLite store. Defend at the GROUP level independently of status.
+    """
+    install_discord_catalog_guards()
+    original_groups = orders._dynamic_admin_group_labels
+    monkeypatch.setattr(
+        orders, "_dynamic_admin_group_labels",
+        lambda category: [*original_groups(category), retired_group]
+        if category == "farm" else original_groups(category),
+    )
+
+    # Make the old group appear to have an active custom rule, as in a stale
+    # production catalog. The group itself must still be excluded.
+    original_details = orders.get_order_item_details_for_group
+    monkeypatch.setattr(
+        orders, "get_order_item_details_for_group",
+        lambda category, group: (
+            [{"rule_key": "custom_expired_farm_event", "label": "測試舊活動"}]
+            if category == "farm" and group == retired_group
+            else original_details(category, group)
+        ),
+    )
+    visible = orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get("farm")
+    assert retired_group not in visible
+    assert "倒子彈代肝" in visible
+    assert "撞車代肝" in visible
+
+
+@pytest.mark.parametrize("retired_group", (
+    "守夜人口風琴", "守夜人口風琴｜活動",
+    "哈夫幣代洗", "哈夫幣代肝",
+))
+def test_retired_farm_group_cannot_be_selected_from_stale_discord_menu(
+    retired_group,
+):
+    install_discord_catalog_guards()
+    assert orders.is_retired_farm_group("farm", retired_group)
+    assert orders.get_order_item_details_for_group("farm", retired_group) == []
+    assert not orders.is_retired_farm_group("lol", retired_group)
+
+
 @pytest.mark.parametrize("key", sorted(RETIRED_LEGACY_FARM_RULE_KEYS))
 def test_bot_direct_stale_selection_rejected_even_if_rule_still_exists(key):
     install_discord_catalog_guards()
