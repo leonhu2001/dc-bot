@@ -149,13 +149,6 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         },
         {"label": "部門任務", "details": [{"label": "部門任務", "value": "department", "rule_key": "farm_department_task", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {
-            "label": "哈夫幣代洗",
-            "details": [
-                {"label": "120M", "value": "120m", "rule_key": "farm_halfcoin_120m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "360M", "value": "360m", "rule_key": "farm_halfcoin_360m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-            ],
-        },
-        {
             "label": "倒子彈代肝",
             "details": [
                 {"label": size, "value": size.lower(), "rule_key": f"farm_ammo_dump_{size.lower()}", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}
@@ -416,6 +409,9 @@ CATALOG_HIDDEN_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
+    # Retired public farm tiers remain in the registry for history only.
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
     "valorant_entertain",
     "valorant_tech",
     "valorant_top_tech",
