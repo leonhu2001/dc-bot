@@ -231,6 +231,38 @@ if button_ids(after)!=expected_buttons:
     raise SystemExit("BLOCKED: original Discord panel buttons changed")
 print("PASS: original support panel updated on Discord with all six links")
 print("PASS: original four buttons retained; no duplicate panel created")
+
+# Verify an existing welcome in-place as well. No new message is sent and the
+# customer's name/avatar is kept. Future welcomes use the updated source.
+welcome_channel="1482080953353375752"
+if settings_path.exists():
+    welcome_channel=str(int(settings.get("WELCOME_CHANNEL_ID") or welcome_channel))
+recent=request("GET",f"/channels/{welcome_channel}/messages?limit=100")
+existing=None
+for item in recent:
+    if str(item.get("author",{}).get("id"))!=str(me.get("id")):
+        continue
+    if not item.get("embeds"):
+        continue
+    member=extract_welcome_member_mention(item["embeds"][0].get("description"))
+    if member:
+        existing=(item,member)
+        break
+if existing:
+    item,member=existing
+    original=item["embeds"][0]
+    avatar_url=(original.get("thumbnail") or {}).get("url")
+    welcome_embed=build_welcome_embed(member,avatar_url=avatar_url).to_dict()
+    welcome_path=f"/channels/{welcome_channel}/messages/{item['id']}"
+    request("PATCH",welcome_path,{"embeds":[welcome_embed]})
+    updated=request("GET",welcome_path)
+    if not updated.get("embeds") or updated["embeds"][0].get("description")!=build_welcome_description(member):
+        raise SystemExit("BLOCKED: existing welcome message did not update")
+    if (updated["embeds"][0].get("thumbnail") or {}).get("url")!=avatar_url:
+        raise SystemExit("BLOCKED: existing welcome avatar thumbnail changed")
+    print("PASS: existing welcome message updated in place; member mention and avatar retained")
+else:
+    print("INFO: no recent welcome embed found; newly generated welcomes use updated text")
 PY
 
 systemctl is-active --quiet "$BOT_SERVICE"
