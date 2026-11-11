@@ -66,6 +66,7 @@ while IFS= read -r file; do
         services/order_product_status.py|\
         web/app/services/public_checkout.py|\
         tests/test_retired_legacy_delta_farm_20261111.py|\
+        tests/test_deploy_farm_scope_preflight_20261111.py|\
         services/farm_fixed_cut_policy.py|\
         services/self_service_financials.py|\
         services/one_companion_one_guard_payout.py|\
