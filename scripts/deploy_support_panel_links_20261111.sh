@@ -5,8 +5,9 @@ set -Eeuo pipefail
 
 APP=/opt/dc-bot
 BOT_SERVICE=dc-bot.service
-RELEASE_REF=feat/main-support-panel-channel-links-20261111
+RELEASE_REF=feat/welcome-order-navigation-sync-20261111
 PREVIOUS_RELEASE=ed70f897a1dc4178922df8296cb6d1395acf61f5
+PREVIOUS_PANEL_RELEASE=b179aa72b50400ccf01d80840e145dbdb2e6accc
 TARGET="${1:-}"
 
 if [[ -z "$TARGET" || "$(id -u)" -ne 0 ]]; then
@@ -15,7 +16,7 @@ if [[ -z "$TARGET" || "$(id -u)" -ne 0 ]]; then
 fi
 cd "$APP"
 OLD_HEAD="$(git rev-parse HEAD)"
-if [[ "$OLD_HEAD" != "$PREVIOUS_RELEASE" ]]; then
+if [[ "$OLD_HEAD" != "$PREVIOUS_RELEASE" && "$OLD_HEAD" != "$PREVIOUS_PANEL_RELEASE" ]]; then
     echo "BLOCKED: unexpected VPS HEAD $OLD_HEAD (expected $PREVIOUS_RELEASE)"
     exit 2
 fi
@@ -55,6 +56,8 @@ while IFS= read -r changed; do
     case "$changed" in
         .github/workflows/ci.yml|\
         views/panels.py|\
+        views/welcome.py|\
+        tests/test_welcome_message.py|\
         tests/test_main_service_panel.py|\
         tests/test_support_panel_links_deploy_20261111.py|\
         scripts/deploy_support_panel_links_20261111.sh|\
@@ -62,8 +65,8 @@ while IFS= read -r changed; do
         *) echo "BLOCKED: unauthorized file modified by panel release: $changed"; exit 2 ;;
     esac
 done < <(git diff --name-only "$OLD_HEAD" "$TARGET")
-if git diff --quiet "$OLD_HEAD" "$TARGET" -- views/panels.py; then
-    echo "BLOCKED: panel text did not change"
+if git diff --quiet "$OLD_HEAD" "$TARGET" -- views/welcome.py; then
+    echo "BLOCKED: welcome text did not change"
     exit 2
 fi
 
@@ -72,6 +75,7 @@ STAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP="$APP/_archive/support_panel_links_$STAMP"
 mkdir -p "$BACKUP"
 cp -p views/panels.py "$BACKUP/panels.py"
+cp -p views/welcome.py "$BACKUP/welcome.py"
 echo "PASS: original panel source backed up: $BACKUP"
 
 APPLIED=0
@@ -91,19 +95,22 @@ trap rollback ERR
 echo "=== APPLY CODE AND VERIFY ORIGINAL BUTTONS ==="
 git checkout -B "$RELEASE_REF" "$TARGET"
 APPLIED=1
-./venv/bin/python -m py_compile views/panels.py
+./venv/bin/python -m py_compile views/panels.py views/welcome.py
 # Production venv intentionally does not need pytest: CI already executed the
 # full suite; this runtime precheck only imports the actual embed and buttons.
 ./venv/bin/python - <<'PY'
 from views.panels import build_main_panel_embed,MainPanelView
+from views.welcome import build_welcome_description
 embed=build_main_panel_embed()
 description=embed.description or ""
+welcome=build_welcome_description("<@123456789>")
 expected=("1569412217269395597","1562940108246753331",
           "1562940127976890509","1562940161313087498",
           "1562940249171042415","1562940146632888450")
 assert all(description.count("<#"+cid+">")==1 for cid in expected)
+assert all(welcome.count("<#"+cid+">")==1 for cid in expected)
 assert len(MainPanelView().children)==4
-print("PASS: six source links and four persistent panel buttons")
+print("PASS: six same channel links in welcome and panel, four persistent buttons")
 PY
 
 echo "=== RESTART BOT ONLY (WEB AND DATABASES UNTOUCHED) ==="
@@ -134,6 +141,7 @@ from urllib.request import Request, urlopen
 
 from dotenv import load_dotenv
 from views.panels import MainPanelView, build_main_panel_embed
+from views.welcome import build_welcome_description,build_welcome_embed,extract_welcome_member_mention
 
 load_dotenv(dotenv_path=".env")
 token=os.getenv("DISCORD_TOKEN")
@@ -228,6 +236,6 @@ PY
 systemctl is-active --quiet "$BOT_SERVICE"
 APPLIED=0
 trap - ERR
-echo "DEPLOY COMPLETED: main support panel linked to all order channels and price list"
+echo "DEPLOY COMPLETED: welcome and existing support panel link to all game order channels and price list"
 echo "Commit: $TARGET"
 echo "Original panel source backup: $BACKUP"
