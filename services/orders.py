@@ -149,13 +149,6 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         },
         {"label": "部門任務", "details": [{"label": "部門任務", "value": "department", "rule_key": "farm_department_task", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {
-            "label": "哈夫幣代洗",
-            "details": [
-                {"label": "120M", "value": "120m", "rule_key": "farm_halfcoin_120m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "360M", "value": "360m", "rule_key": "farm_halfcoin_360m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-            ],
-        },
-        {
             "label": "倒子彈代肝",
             "details": [
                 {"label": size, "value": size.lower(), "rule_key": f"farm_ammo_dump_{size.lower()}", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}
@@ -416,6 +409,9 @@ CATALOG_HIDDEN_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
+    # Retired public farm tiers remain in the registry for history only.
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
     "valorant_entertain",
     "valorant_tech",
     "valorant_top_tech",
@@ -474,6 +470,19 @@ ORDER_ITEM_TO_CATEGORY = {
 CANONICAL_DETAIL_LABEL_RULE_KEYS = set(SOURCE_AUTHORITY_RULE_KEYS)
 
 DYNAMIC_ADMIN_GROUP_LABEL = "後台新增商品"
+
+# The event and the old halfcoin catalog were retired on 2026-11-11.
+# Filtering only individual rule keys does not cover historical manager-created
+# GROUP labels from the production SQLite database. Guard both static and
+# dynamically generated group labels; keep historical OrderRule data untouched.
+RETIRED_FARM_GROUP_WORDS = ("守夜人口風琴", "哈夫幣代洗", "哈夫幣代肝")
+
+
+def is_retired_farm_group(category: str | None, group_label: str | None) -> bool:
+    return str(category or "") == "farm" and any(
+        word in str(group_label or "") for word in RETIRED_FARM_GROUP_WORDS
+    )
+
 
 
 def _dynamic_admin_rule_keys(category: str | None) -> list[str]:
@@ -568,7 +577,10 @@ class DynamicOrderItemGroups(dict):
         for group_label in _dynamic_admin_group_labels(category_text):
             if group_label not in base:
                 base.append(group_label)
-        return base
+        return [
+            label for label in base
+            if not is_retired_farm_group(category_text, label)
+        ]
 
     def __getitem__(self, category):
         if not super().__contains__(category):
@@ -645,6 +657,10 @@ def get_order_item_details_for_group(category: str | None, group_label: str | No
 
     category_text = str(category)
     group_text = str(group_label)
+    # Old Discord ephemeral menus/cached selections may still send the former
+    # group label even when the fresh dropdown no longer lists it.
+    if is_retired_farm_group(category_text, group_text):
+        return []
     result: list[dict] = []
 
     # Built-in products also honor manager-controlled second/third-level labels.

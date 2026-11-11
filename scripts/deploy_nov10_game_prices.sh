@@ -3,12 +3,13 @@
 set -Eeuo pipefail
 
 APP=/opt/dc-bot
-RELEASE_REF=feat/delta-farm-ammo-crash-fixed-cuts-20261111
+RELEASE_REF=fix/retire-mouth-organ-and-old-halfcoin-20261111
 PREVIOUS_RELEASE=4386dddf1da66adb01d55a5ffdf4df42749912e2
 OPTIONAL_ACCOUNTING_RELEASE=922cfc686f2cfe329db5bdadfb87c64e70e0b13b
 PREVIOUS_POSTER_RELEASE=558fe84f6842a799a375f996a699eb1c4362ab79
 PREVIOUS_ADMIN_RELEASE=6bfca436e2cb41ff4df6014a32311ada53cc018f
 PREVIOUS_SALARY_RELEASE=eb6179d6e2a6083a8a18cc81e652e2924abd266a
+PREVIOUS_FARM_RELEASE=0f0ea2d600c04efc27b16b5db33b0801a1ec8ed2
 TARGET="${1:-}"
 BOT_SERVICE=dc-bot.service
 WEB_SERVICE=dc-bot-dashboard.service
@@ -20,7 +21,7 @@ fi
 cd "$APP"
 OLD_HEAD="$(git rev-parse HEAD)"
 case "$OLD_HEAD" in
-    "$PREVIOUS_RELEASE"|"$OPTIONAL_ACCOUNTING_RELEASE"|"$PREVIOUS_POSTER_RELEASE"|"$PREVIOUS_ADMIN_RELEASE"|"$PREVIOUS_SALARY_RELEASE") ;;
+    "$PREVIOUS_RELEASE"|"$OPTIONAL_ACCOUNTING_RELEASE"|"$PREVIOUS_POSTER_RELEASE"|"$PREVIOUS_ADMIN_RELEASE"|"$PREVIOUS_SALARY_RELEASE"|"$PREVIOUS_FARM_RELEASE") ;;
     *) echo "BLOCKED: Unexpected deployed HEAD $OLD_HEAD"; exit 2 ;;
 esac
 
@@ -62,6 +63,10 @@ while IFS= read -r file; do
     case "$file" in
         .github/workflows/ci.yml|\
         services/order_rules.py|\
+        services/order_product_status.py|\
+        web/app/services/public_checkout.py|\
+        tests/test_retired_legacy_delta_farm_20261111.py|\
+        tests/test_deploy_farm_scope_preflight_20261111.py|\
         services/farm_fixed_cut_policy.py|\
         services/self_service_financials.py|\
         services/one_companion_one_guard_payout.py|\
@@ -122,9 +127,18 @@ import subprocess,sys,types
 from dataclasses import asdict
 from pathlib import Path
 old_sha,new_sha=sys.argv[1:3]
-# Load the new self-contained fixed-cut module from its pinned commit before
-# running the rule-module side-by-side audit. At this point checkout has NOT
-# happened and the live old filesystem does not contain the new file yet.
+# CRITICAL: services.__init__ imports order_rules, which imports the
+# farm module. Registering an empty farm placeholder first triggered the
+# circular-import failure on the VPS. Importing the live services package
+# instead is also unsafe here: it installs runtime patches and can initialize
+# SQLite. Create an isolated import-only namespace for the two pure helper
+# modules used by order_rules, without executing services.__init__ or Bot/Web.
+package=types.ModuleType("services")
+package.__path__=[str(Path.cwd()/"services")]
+package.__package__="services"
+sys.modules["services"]=package
+# The old VPS may predate the fixed-cut module, so load the exact pinned
+# target source into this isolated namespace before rule comparisons.
 farm_name="services.farm_fixed_cut_policy"
 farm_src=subprocess.check_output(
     ["git","show",f"{new_sha}:services/farm_fixed_cut_policy.py"],text=True
@@ -432,6 +446,51 @@ for key,(price,cut) in PUBLIC_FARM_FIXED_CUTS.items():
 print("PASS: all 10 fixed store cuts, CS split, receiver role, Bot/Web options and mouth-organ removal verified")
 PY
 
+echo "=== RETIRED FARM PRODUCTS (READ-ONLY) ==="
+./venv/bin/python - <<'PY'
+from services.order_product_status import (
+    RETIRED_LEGACY_FARM_RULE_KEYS, is_order_product_active,
+    is_retired_legacy_farm_product, install_web_catalog_guards,
+    install_discord_catalog_guards,
+)
+from services.order_rules import ORDER_RULES
+from services import orders
+from web.app.services.order_groups import get_grouped_order_catalog
+from web.app.services.public_checkout import build_public_quote
+from web.app.routers.admin_order_rules import _is_admin_editable_rule
+from services.quick_order_v2_price_lists import DELTA_FARM_PRICE_LISTS
+
+install_web_catalog_guards()
+install_discord_catalog_guards()
+assert RETIRED_LEGACY_FARM_RULE_KEYS=={"farm_halfcoin_120m","farm_halfcoin_360m"}
+assert all(key in ORDER_RULES and not is_order_product_active(key) for key in RETIRED_LEGACY_FARM_RULE_KEYS)
+assert "night_population" not in DELTA_FARM_PRICE_LISTS
+farm_groups=orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get("farm")
+expired_groups=[label for label in farm_groups if orders.is_retired_farm_group("farm",label)]
+if expired_groups:
+    raise SystemExit(f"BLOCKED: retired farm groups still visible: {expired_groups!r}")
+if not {"倒子彈代肝","撞車代肝"}.issubset(set(farm_groups)):
+    raise SystemExit(f"BLOCKED: new public farm groups missing: {farm_groups!r}")
+assert not any(_is_admin_editable_rule(key) for key in RETIRED_LEGACY_FARM_RULE_KEYS)
+web=get_grouped_order_catalog("farm")
+keys={v["rule_key"] for group in web for v in group["variants"]}
+assert not RETIRED_LEGACY_FARM_RULE_KEYS.intersection(keys)
+assert "halfcoin" not in {group["key"] for group in web}
+assert "ammo_dump" in {group["key"] for group in web}
+assert "car_crash" in {group["key"] for group in web}
+for key in RETIRED_LEGACY_FARM_RULE_KEYS:
+    try:
+        build_public_quote(rule_key=key, quantity=1, player_count=1)
+    except ValueError as e:
+        if "停止提供" not in str(e) and "已下架" not in str(e):
+            raise
+    else:
+        raise SystemExit(f"BLOCKED: retired product remains orderable: {key}")
+for key in ("farm_ammo_dump_100m","farm_car_crash_100m","staff_internal_ammo_dump_500m"):
+    assert not is_retired_legacy_farm_product(key)
+print("PASS: old halfcoin and mouth-organ retired, Bot/Web/manager blocked, historical rules retained")
+PY
+
 echo "=== RESTART BOT + WEB ==="
 systemctl restart "$BOT_SERVICE" "$WEB_SERVICE"
 for service in "$BOT_SERVICE" "$WEB_SERVICE"; do
@@ -477,15 +536,15 @@ file=Path(sys.argv[1]); file.parent.mkdir(parents=True,exist_ok=True)
 file.write_text(json.dumps({
     "commit":sys.argv[2],
     "previous_commit":sys.argv[3],
-    "branch":"feat/delta-farm-ammo-crash-fixed-cuts-20261111",
+    "branch":"fix/retire-mouth-organ-and-old-halfcoin-20261111",
     "deployed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    "subject":"Public Delta ammo/car fixed store cuts, CS split and menu update",
+    "subject":"Retire old mouth organ and halfcoin from new orders; preserve new ammo/car cuts",
     "status":"success",
 },ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
 PY
 APPLIED=0
 trap - ERR
 echo
-echo "DEPLOY COMPLETED: public ammo/crash fixed cuts and CS from store cut; prior salaries protected"
+echo "DEPLOY COMPLETED: expired mouth-organ and legacy halfcoin removed from new orders; fixed-cut farming retained"
 echo "Commit: $TARGET"
 echo "Database backup: $BACKUP"

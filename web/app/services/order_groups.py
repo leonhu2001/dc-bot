@@ -42,6 +42,8 @@ HIDDEN_PUBLIC_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
     "valorant_entertain",
     "valorant_tech",
     "valorant_top_tech",
@@ -266,17 +268,6 @@ GROUP_SPECS = [
             ("farm_car_crash_200m", "200M"),
             ("farm_car_crash_500m", "500M"),
             ("farm_car_crash_1000m", "1000M"),
-        ],
-    },
-
-    {
-        "key": "halfcoin",
-        "category": "farm",
-        "label": "哈夫幣代洗",
-        "selector_label": "數量",
-        "variants": [
-            ("farm_halfcoin_120m", "120M"),
-            ("farm_halfcoin_360m", "360M"),
         ],
     },
 

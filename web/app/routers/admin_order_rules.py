@@ -11,6 +11,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from services.order_product_status import (
+    is_retired_legacy_farm_product,
     ensure_order_product_status_store,
     get_order_product_status,
     install_web_catalog_guards,
@@ -102,6 +103,8 @@ ADMIN_HISTORICAL_ONLY_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
     "valorant_entertain",
     "valorant_tech",
     "valorant_top_tech",
@@ -273,6 +276,7 @@ def _is_admin_editable_rule(rule_key: str) -> bool:
         rule is not None
         and str(rule.category) not in ADMIN_HIDDEN_RULE_CATEGORIES
         and key not in ADMIN_HISTORICAL_ONLY_RULE_KEYS
+        and not is_retired_legacy_farm_product(key)
     )
 
 

@@ -17,6 +17,8 @@ PUBLIC_DISABLED_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
     "valorant_entertain",
     "valorant_tech",
     "valorant_top_tech",

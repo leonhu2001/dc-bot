@@ -2796,11 +2796,6 @@ MW_ORDER_GROUP_FALLBACKS = {
         "farm_department_task",
     ],
 
-    "半幣": [
-        "farm_halfcoin_120m",
-        "farm_halfcoin_360m",
-    ],
-
     "Steam": [
         "steam_play",
     ],
