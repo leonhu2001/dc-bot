@@ -4,11 +4,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ReleaseRef = "feat/delta-farm-ammo-crash-fixed-cuts-20261111"
+$ReleaseRef = "fix/retire-mouth-organ-and-old-halfcoin-20261111"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $RepoRoot
 
-Write-Host "=== SAFE PUBLIC DELTA FARM FIXED-STORE-CUT DEPLOY ===" -ForegroundColor Yellow
+Write-Host "=== SAFE LEGACY DELTA FARM RETIREMENT DEPLOY ===" -ForegroundColor Yellow
 
 if (git status --porcelain) {
     git status --short
@@ -71,5 +71,5 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "DEPLOY COMPLETED - public ammo/car fixed store cuts and CS split; existing payroll protected." -ForegroundColor Green
+Write-Host "DEPLOY COMPLETED - old mouth organ and halfcoin blocked, new farming and historical wages retained." -ForegroundColor Green
 Write-Host "Commit: $Target" -ForegroundColor Cyan
