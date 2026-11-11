@@ -17,7 +17,7 @@ REPO = Path(__file__).resolve().parents[1]
 DEPLOY_SCRIPT = REPO / "scripts/deploy_nov10_game_prices.sh"
 
 
-def test_release_scope_guard_bootstraps_services_before_target_module():
+def test_release_scope_guard_uses_isolated_services_namespace():
     source = DEPLOY_SCRIPT.read_text(encoding="utf-8")
     match = re.search(
         r'^\./venv/bin/python - "\$OLD_HEAD" "\$TARGET" <<\'PY\'\n(.*?)\nPY$',
@@ -25,7 +25,8 @@ def test_release_scope_guard_bootstraps_services_before_target_module():
     )
     assert match, "Scope-guard heredoc changed; test its exact new entry point"
     scope_guard = match.group(1)
-    assert scope_guard.index("import services\n") < scope_guard.index(
+    assert "import services\\n" not in scope_guard
+    assert scope_guard.index('sys.modules["services"]=package') < scope_guard.index(
         'sys.modules[farm_name]=farm_mod'
     )
     # HEAD vs HEAD proves the guard is independent of the deployed branch's
