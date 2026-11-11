@@ -4,11 +4,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ReleaseRef = "feat/main-support-panel-channel-links-20261111"
+$ReleaseRef = "fix/support-panel-order-guide-recruit-examiner-20261111"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $RepoRoot
 
-Write-Host "=== SAFE MAIN SUPPORT PANEL LINKS DEPLOY ===" -ForegroundColor Yellow
+Write-Host "=== SAFE SUPPORT PANEL ORDER NOTICE + RECRUIT EXAMINER DEPLOY ===" -ForegroundColor Yellow
 
 if (git status --porcelain) {
     git status --short
@@ -62,5 +62,5 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "DEPLOY COMPLETED - original Discord customer-service panel updated, all buttons retained." -ForegroundColor Green
+Write-Host "DEPLOY COMPLETED - order notice linked, emojis removed, recruiter examiner authorized; four buttons retained." -ForegroundColor Green
 Write-Host "Commit: $Target" -ForegroundColor Cyan
