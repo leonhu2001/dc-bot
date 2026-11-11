@@ -19,6 +19,9 @@ CUSTOMER_ROLE_ID: int | None = None
 EXAMINER_ROLE_ID: int | None = None
 MANAGER_ROLE_ID: int | None = None
 RECRUIT_APPLICANT_ROLE_ID: int | None = None
+# Newly appointed examiners join recruitment tickets without changing the
+# legacy examiner/customer-service role for other bot flows.
+RECRUIT_PANEL_EXAMINER_ROLE_ID = 1570070903935737887
 
 safe_channel_name: Callable[[str, discord.Member], str] | None = None
 create_private_channel: Callable[..., Awaitable[Any]] | None = None
@@ -32,17 +35,18 @@ def build_main_panel_embed() -> discord.Embed:
         title="魔丸娛樂｜聯絡客服",
         description=(
             "歡迎來到魔丸娛樂 👋\n"
-            "下單前可以先查看價目表，也可以直接前往各遊戲下單區。\n"
+            "下單前可以先閱讀價目表與下單須知，再前往對應遊戲的下單區。\n"
             "\n"
             "📌 **下單前先看看**\n"
-            "📖 價目表：<#1569412217269395597>\n"
+            "價目表：<#1569412217269395597>\n"
+            "下單須知：<#1543738337519730768>\n"
             "\n"
-            "🎮 **各遊戲下單區**\n"
-            "🔺 三角洲：<#1562940108246753331>\n"
-            "🎯 特戰英豪：<#1562940127976890509>\n"
-            "⚔️ 英雄聯盟：<#1562940161313087498>\n"
-            "🕹️ Steam 遊戲：<#1562940249171042415>\n"
-            "🏹 APEX：<#1562940146632888450>\n"
+            "**各遊戲下單區**\n"
+            "三角洲：<#1562940108246753331>\n"
+            "特戰英豪：<#1562940127976890509>\n"
+            "英雄聯盟：<#1562940161313087498>\n"
+            "Steam 遊戲：<#1562940249171042415>\n"
+            "APEX：<#1562940146632888450>\n"
             "\n"
             "🙋 **需要真人客服協助嗎？**\n"
             "請按下方 **🔔 呼叫客服**，系統會建立／開啟你的私人客服票口並通知客服。\n"
@@ -302,11 +306,21 @@ class RecruitModal(discord.ui.Modal, title="我要入職"):
         manager_role = guild.get_role(manager_role_id)
         customer_role = guild.get_role(customer_role_id)
         applicant_role = guild.get_role(applicant_role_id)
+        dedicated_examiner_role = guild.get_role(RECRUIT_PANEL_EXAMINER_ROLE_ID)
+
+        # Fail closed: a ticket with no actual examiner access would appear
+        # successful, but new interviewers could not view or answer applicants.
+        if dedicated_examiner_role is None:
+            await interaction.response.send_message(
+                "找不到指定考官身分組，入職票口尚未建立；請通知管理員檢查身分組設定。",
+                ephemeral=True,
+            )
+            return
 
         recruit_staff_roles = []
         seen_role_ids = set()
 
-        for role in (examiner_role, manager_role, customer_role):
+        for role in (examiner_role, manager_role, customer_role, dedicated_examiner_role):
             if role is None or role.id in seen_role_ids:
                 continue
 
