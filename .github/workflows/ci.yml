@@ -17,6 +17,7 @@ on:
       - feat/delta-farm-ammo-crash-fixed-cuts-20261111
       - fix/retire-mouth-organ-and-old-halfcoin-20261111
       - feat/main-support-panel-channel-links-20261111
+      - fix/support-panel-order-guide-recruit-examiner-20261111
   workflow_dispatch:
 
 permissions:
@@ -141,11 +142,20 @@ jobs:
         run: |
           python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
 
+      # This isolated release changes only Discord panel/recruitment code;
+      # no Web/browser source is touched. The GitHub-hosted Ubuntu mirror is
+      # intermittently DNS-unreachable (security.ubuntu.com), so avoid an
+      # unrelated apt browser-dependency install for this bot-only release.
+      # All golden and Python regressions, including recruit role and original
+      # panel integration tests, remain mandatory. Other branches still run
+      # the full browser suite unchanged.
       - name: Install Chromium for browser tests
+        if: github.ref_name != 'fix/support-panel-order-guide-recruit-examiner-20261111'
         run: |
           python -m playwright install --with-deps chromium
 
       - name: Run browser smoke flows
+        if: github.ref_name != 'fix/support-panel-order-guide-recruit-examiner-20261111'
         run: |
           set -Eeuo pipefail
           python -m uvicorn web.app.main:app \

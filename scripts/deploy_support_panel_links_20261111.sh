@@ -5,8 +5,9 @@ set -Eeuo pipefail
 
 APP=/opt/dc-bot
 BOT_SERVICE=dc-bot.service
-RELEASE_REF=feat/main-support-panel-channel-links-20261111
+RELEASE_REF=fix/support-panel-order-guide-recruit-examiner-20261111
 PREVIOUS_RELEASE=ed70f897a1dc4178922df8296cb6d1395acf61f5
+PREVIOUS_PANEL_RELEASE=b179aa72b50400ccf01d80840e145dbdb2e6accc
 TARGET="${1:-}"
 
 if [[ -z "$TARGET" || "$(id -u)" -ne 0 ]]; then
@@ -15,8 +16,8 @@ if [[ -z "$TARGET" || "$(id -u)" -ne 0 ]]; then
 fi
 cd "$APP"
 OLD_HEAD="$(git rev-parse HEAD)"
-if [[ "$OLD_HEAD" != "$PREVIOUS_RELEASE" ]]; then
-    echo "BLOCKED: unexpected VPS HEAD $OLD_HEAD (expected $PREVIOUS_RELEASE)"
+if [[ "$OLD_HEAD" != "$PREVIOUS_RELEASE" && "$OLD_HEAD" != "$PREVIOUS_PANEL_RELEASE" ]]; then
+    echo "BLOCKED: unexpected VPS HEAD $OLD_HEAD (expected last confirmed farm or panel release)"
     exit 2
 fi
 DIRTY="$(git status --porcelain --untracked-files=all |
@@ -56,6 +57,7 @@ while IFS= read -r changed; do
         .github/workflows/ci.yml|\
         views/panels.py|\
         tests/test_main_service_panel.py|\
+        tests/test_recruit_examiner_panel_permissions_20261111.py|\
         tests/test_support_panel_links_deploy_20261111.py|\
         scripts/deploy_support_panel_links_20261111.sh|\
         scripts/deploy_support_panel_links_20261111.ps1) ;;
@@ -95,15 +97,21 @@ APPLIED=1
 # Production venv intentionally does not need pytest: CI already executed the
 # full suite; this runtime precheck only imports the actual embed and buttons.
 ./venv/bin/python - <<'PY'
-from views.panels import build_main_panel_embed,MainPanelView
+from views.panels import build_main_panel_embed,MainPanelView,RECRUIT_PANEL_EXAMINER_ROLE_ID
 embed=build_main_panel_embed()
 description=embed.description or ""
-expected=("1569412217269395597","1562940108246753331",
-          "1562940127976890509","1562940161313087498",
-          "1562940249171042415","1562940146632888450")
+expected=("1569412217269395597","1543738337519730768",
+          "1562940108246753331","1562940127976890509",
+          "1562940161313087498","1562940249171042415",
+          "1562940146632888450")
 assert all(description.count("<#"+cid+">")==1 for cid in expected)
+assert all(f"{name}：<#" in description for name in (
+    "價目表","下單須知","三角洲","特戰英豪",
+    "英雄聯盟","Steam 遊戲","APEX"
+))
+assert RECRUIT_PANEL_EXAMINER_ROLE_ID==1570070903935737887
 assert len(MainPanelView().children)==4
-print("PASS: six source links and four persistent panel buttons")
+print("PASS: seven links, no decorative game emojis, four buttons and dedicated examiner role")
 PY
 
 echo "=== RESTART BOT ONLY (WEB AND DATABASES UNTOUCHED) ==="
@@ -133,7 +141,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from dotenv import load_dotenv
-from views.panels import MainPanelView, build_main_panel_embed
+from views.panels import MainPanelView, build_main_panel_embed, RECRUIT_PANEL_EXAMINER_ROLE_ID
 
 load_dotenv(dotenv_path=".env")
 token=os.getenv("DISCORD_TOKEN")
@@ -193,6 +201,12 @@ expected_buttons={
 }
 assert len(expected_buttons)==4
 me=request("GET","/users/@me")
+# Verify the exact examiner role exists in the real guild before claiming the
+# ticket access change is usable. This does not modify roles/channels.
+guild_roles=request("GET","/guilds/1129474191226306672/roles")
+if not any(str(role.get("id"))==str(RECRUIT_PANEL_EXAMINER_ROLE_ID) for role in guild_roles):
+    raise SystemExit("BLOCKED: examiner role 1570070903935737887 not present in guild")
+print("PASS: dedicated examiner role exists in Discord guild")
 path=f"/channels/{channel_id}/messages/{message_id}"
 before=request("GET",path)
 if str(before.get("author",{}).get("id"))!=str(me.get("id")):
@@ -206,6 +220,7 @@ embed=build_main_panel_embed().to_dict()
 description=embed["description"]
 for channel in (
     "1569412217269395597",
+    "1543738337519730768",
     "1562940108246753331",
     "1562940127976890509",
     "1562940161313087498",
@@ -221,13 +236,13 @@ if not after.get("embeds") or after["embeds"][0].get("description")!=description
     raise SystemExit("BLOCKED: original Discord panel text did not update")
 if button_ids(after)!=expected_buttons:
     raise SystemExit("BLOCKED: original Discord panel buttons changed")
-print("PASS: original support panel updated on Discord with all six links")
+print("PASS: original support panel updated on Discord with all seven links")
 print("PASS: original four buttons retained; no duplicate panel created")
 PY
 
 systemctl is-active --quiet "$BOT_SERVICE"
 APPLIED=0
 trap - ERR
-echo "DEPLOY COMPLETED: main support panel linked to all order channels and price list"
+echo "DEPLOY COMPLETED: order notice link and examiner access installed; existing support panel updated"
 echo "Commit: $TARGET"
 echo "Original panel source backup: $BACKUP"
