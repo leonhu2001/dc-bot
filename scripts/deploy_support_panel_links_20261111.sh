@@ -91,7 +91,19 @@ echo "=== APPLY CODE AND VERIFY ORIGINAL BUTTONS ==="
 git checkout -B "$RELEASE_REF" "$TARGET"
 APPLIED=1
 ./venv/bin/python -m py_compile views/panels.py
-./venv/bin/python -m pytest -q tests/test_main_service_panel.py
+# Production venv intentionally does not need pytest: CI already executed the
+# full suite; this runtime precheck only imports the actual embed and buttons.
+./venv/bin/python - <<'PY'
+from views.panels import build_main_panel_embed,MainPanelView
+embed=build_main_panel_embed()
+description=embed.description or ""
+expected=("1569412217269395597","1562940108246753331",
+          "1562940127976890509","1562940161313087498",
+          "1562940249171042415","1562940146632888450")
+assert all(description.count("<#"+cid+">")==1 for cid in expected)
+assert len(MainPanelView().children)==4
+print("PASS: six source links and four persistent panel buttons")
+PY
 
 echo "=== RESTART BOT ONLY (WEB AND DATABASES UNTOUCHED) ==="
 systemctl restart "$BOT_SERVICE"
@@ -171,7 +183,7 @@ path=f"/channels/{channel_id}/messages/{message_id}"
 before=request("GET",path)
 if str(before.get("author",{}).get("id"))!=str(me.get("id")):
     raise SystemExit("BLOCKED: target panel is not authored by this Bot")
-if before.get("embeds",[])[:1] and before["embeds"][0].get("title")!="魔丸娛樂｜聯絡客服":
+if not before.get("embeds") or before["embeds"][0].get("title")!="魔丸娛樂｜聯絡客服":
     raise SystemExit("BLOCKED: target message is not the expected support panel")
 if button_ids(before)!=expected_buttons:
     raise SystemExit("BLOCKED: target message's four existing buttons differ")
