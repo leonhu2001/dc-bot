@@ -16,6 +16,7 @@ on:
       - fix/tips-excluded-performance-employee-salary-pagination-20261111
       - feat/delta-farm-ammo-crash-fixed-cuts-20261111
       - fix/retire-mouth-organ-and-old-halfcoin-20261111
+      - feat/main-support-panel-channel-links-20261111
   workflow_dispatch:
 
 permissions:
