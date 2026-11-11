@@ -17,6 +17,7 @@ def test_main_service_panel_has_all_six_clickable_channel_mentions_in_order():
 
     channels = (
         ("價目表", "1569412217269395597"),
+        ("下單須知", "1543738337519730768"),
         ("三角洲", "1562940108246753331"),
         ("特戰英豪", "1562940127976890509"),
         ("英雄聯盟", "1562940161313087498"),
@@ -34,6 +35,19 @@ def test_main_service_panel_has_all_six_clickable_channel_mentions_in_order():
     assert "私人客服票口" in description
     assert "🔔 呼叫客服" in description
     assert "客服服務時間" in description
+
+
+def test_main_service_panel_order_links_have_no_decorative_emojis():
+    text = build_main_panel_embed().description or ""
+    assert "📌 **下單前先看看**" in text
+    assert "**各遊戲下單區**" in text
+    for name in ("價目表", "下單須知", "三角洲", "特戰英豪", "英雄聯盟", "Steam 遊戲", "APEX"):
+        assert f"{name}：<#" in text
+        line = next(line for line in text.splitlines() if line.startswith(f"{name}：<#"))
+        assert line.startswith(name)
+    for unwanted in ("📖 價目表：", "🎮 **各遊戲下單區**", "🔺 三角洲：",
+                     "🎯 特戰英豪：", "⚔️ 英雄聯盟：", "🕹️ Steam 遊戲：", "🏹 APEX："):
+        assert unwanted not in text
 
 
 def test_main_service_panel_existing_message_is_edited_on_bot_startup():
