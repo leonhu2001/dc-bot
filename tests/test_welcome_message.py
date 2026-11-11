@@ -3,6 +3,8 @@ from pathlib import Path
 from views.welcome import (
     PROFILE_CHANNEL_IDS,
     SUPPORT_CHANNEL_ID,
+    PRICE_LIST_CHANNEL_ID,
+    GAME_ORDER_CHANNELS,
     build_welcome_description,
     build_welcome_embed,
     extract_welcome_member_mention,
@@ -16,7 +18,34 @@ def test_welcome_copy_routes_to_profiles_and_support():
     assert f"<#{PROFILE_CHANNEL_IDS[0]}>" in description
     assert f"<#{PROFILE_CHANNEL_IDS[1]}>" in description
     assert f"<#{SUPPORT_CHANNEL_ID}>" in description
+    assert f"<#{PRICE_LIST_CHANNEL_ID}>" in description
+    assert "🔔 呼叫客服" in description
+    assert "客服服務時間：**AM 10:00－隔日 AM 2:00**" in description
     assert "祝你在魔丸玩得開心" in description
+    assert "直接下單、詢問服務或尋求協助" not in description
+    assert len(description) <= 4096
+
+
+def test_welcome_game_order_links_match_main_customer_service_panel():
+    from views.panels import build_main_panel_embed
+
+    welcome = build_welcome_description("<@123>")
+    main = build_main_panel_embed().description or ""
+    mentions = [
+        f"<#{PRICE_LIST_CHANNEL_ID}>",
+        *(f"<#{channel_id}>" for _, channel_id in GAME_ORDER_CHANNELS),
+    ]
+    assert len(mentions) == 6
+    for label, channel_id in GAME_ORDER_CHANNELS:
+        assert label in welcome
+        assert welcome.count(f"<#{channel_id}>") == 1
+    for mention in mentions:
+        assert welcome.count(mention) == 1
+        assert main.count(mention) == 1
+    assert welcome.index(mentions[0]) < welcome.index(mentions[1])
+    assert [welcome.index(x) for x in mentions] == sorted(
+        welcome.index(x) for x in mentions
+    )
 
 
 def test_welcome_embed_keeps_member_avatar():
@@ -34,8 +63,10 @@ def test_welcome_sections_are_visually_separated():
     description = build_welcome_description("<@123>")
 
     assert "歡迎加入我們 ฅ՞•ﻌ•՞ฅ\n\n👤 **挑選陪玩／打手**" in description
-    assert "先看看大家的個人牆\n\n🎟️ **下單／客服**" in description
-    assert "直接下單、詢問服務或尋求協助\n\n**祝你在魔丸玩得開心 🖤**" in description
+    assert "📖 **下單前先看價目表**" in description
+    assert "🎮 **各遊戲下單區**" in description
+    assert "🔔 **需要真人客服？**" in description
+    assert description.endswith("**祝你在魔丸玩得開心 🖤**")
 
 
 
