@@ -4,11 +4,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ReleaseRef = "feat/main-support-panel-channel-links-20261111"
+$ReleaseRef = "feat/welcome-order-navigation-sync-20261111"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $RepoRoot
 
-Write-Host "=== SAFE MAIN SUPPORT PANEL LINKS DEPLOY ===" -ForegroundColor Yellow
+Write-Host "=== SAFE WELCOME + CUSTOMER SUPPORT LINKS DEPLOY ===" -ForegroundColor Yellow
 
 if (git status --porcelain) {
     git status --short
@@ -58,9 +58,9 @@ $RemoteCommand = "cd /opt/dc-bot && git fetch origin '$ReleaseRef' && git show '
 Write-Host "VPS: $Vps" -ForegroundColor Cyan
 & ssh @SshArgs $Vps $RemoteCommand
 if ($LASTEXITCODE -ne 0) {
-    throw "BLOCKED: support panel was not verified on Discord. See rollback output."
+    throw "BLOCKED: welcome/support panel was not verified on Discord. See rollback output."
 }
 
 Write-Host ""
-Write-Host "DEPLOY COMPLETED - original Discord customer-service panel updated, all buttons retained." -ForegroundColor Green
+Write-Host "DEPLOY COMPLETED - welcome links and original customer-service panel updated; buttons retained." -ForegroundColor Green
 Write-Host "Commit: $Target" -ForegroundColor Cyan
