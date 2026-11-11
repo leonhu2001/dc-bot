@@ -335,6 +335,11 @@ def _guarded_discord_details(
 
     category_text = str(category)
     group_text = str(group_label)
+    # A retired GROUP label from old custom/manager rows must never resolve
+    # details, even when its individual status row was left as active.
+    from services.orders import is_retired_farm_group
+    if is_retired_farm_group(category_text, group_text):
+        return []
     result: list[dict] = []
 
     # This function's code object is installed onto services.orders at runtime.
@@ -430,7 +435,12 @@ def _guarded_dynamic_group_get(self, category, default=None):
             candidate_labels.append(group_label)
 
     result = []
+    # Filter legacy group aliases independently of per-rule status. The
+    # production database may contain custom rules grouped under a retired
+    # event name, which does not occur in clean CI database fixtures.
     for group_label in candidate_labels:
+        if is_retired_farm_group(category_text, group_label):
+            continue
         if get_order_item_details_for_group(category_text, group_label):
             result.append(group_label)
     return result
