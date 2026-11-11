@@ -126,9 +126,17 @@ import subprocess,sys,types
 from dataclasses import asdict
 from pathlib import Path
 old_sha,new_sha=sys.argv[1:3]
-# Load the new self-contained fixed-cut module from its pinned commit before
-# running the rule-module side-by-side audit. At this point checkout has NOT
-# happened and the live old filesystem does not contain the new file yet.
+# CRITICAL: bootstrap the currently deployed services package BEFORE adding
+# a placeholder for the target farm module. services.__init__ imports
+# services.order_rules, which in the farm release imports
+# PUBLIC_FARM_FIXED_CUTS. Registering an empty placeholder first causes a
+# circular-import failure on the *old* deployed version (before any update).
+# This import uses the live old code; the target code is still only read via
+# git show, and this preflight is strictly read-only.
+import services
+# Now the old package/rule registry is fully initialized; safely load the
+# new target module for the side-by-side rule comparison. The old VPS may
+# predate this farm module altogether, so use the pinned target source.
 farm_name="services.farm_fixed_cut_policy"
 farm_src=subprocess.check_output(
     ["git","show",f"{new_sha}:services/farm_fixed_cut_policy.py"],text=True
