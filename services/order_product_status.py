@@ -17,6 +17,46 @@ _WEB_GUARDS_INSTALLED = False
 _DISCORD_GUARDS_INSTALLED = False
 
 
+# Permanent public-catalog retirement. Keep the underlying OrderRule and all
+# previous orders/snapshots/payouts intact for settlement and historical lookup.
+# These are the *old* halfcoin tiers, not the 2026-11-11 public fixed-cut
+# ammo/car plans, nor the staff-internal 500M plans.
+RETIRED_LEGACY_FARM_RULE_KEYS = frozenset({
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
+})
+_RETIRED_LEGACY_FARM_WORDS = (
+    "守夜人口風琴",
+    "哈夫幣代洗",
+    "哈夫幣代肝",
+)
+
+
+def is_retired_legacy_farm_product(rule_key: str) -> bool:
+    """Block old public orders, including manager-created obsolete products.
+
+    The mouth-organ event had no built-in OrderRule, but manager-defined rules
+    might still be stored in SQLite. Only look at the `farm` category, so
+    unrelated historical product labels cannot be accidentally retired.
+    """
+    key = str(rule_key or "").strip()
+    if key in RETIRED_LEGACY_FARM_RULE_KEYS:
+        return True
+    if not key:
+        return False
+    try:
+        from services.order_rules import ORDER_RULES
+        rule = ORDER_RULES.get(key)
+        if rule is None or str(getattr(rule, "category", "")) != "farm":
+            return False
+        label = str(getattr(rule, "label", "") or "")
+        group = str(getattr(rule, "catalog_group_label", "") or "")
+        return any(word in label or word in group for word in _RETIRED_LEGACY_FARM_WORDS)
+    except Exception:
+        # Built-in keys above are always blocked even if SQLite is unavailable.
+        return False
+
+
 def _path(db_file: str | Path | None = None) -> Path:
     return Path(db_file) if db_file is not None else order_rule_store.default_db_path()
 
@@ -135,6 +175,17 @@ def get_order_product_status(
     if not key:
         return {"rule_key": "", "is_active": False, "updated_at": ""}
 
+    # An explicit owner retirement takes precedence over old manager DB
+    # statuses, including a stale is_active=1 or a later enable request.
+    if is_retired_legacy_farm_product(key):
+        return {
+            "rule_key": key,
+            "is_active": False,
+            "updated_by_discord_id": "",
+            "updated_by_display_name": "舊商品已退役",
+            "updated_at": "",
+        }
+
     if db_file is not None:
         item = load_order_product_statuses(db_file).get(key)
     else:
@@ -169,6 +220,8 @@ def set_order_product_active(
     key = str(rule_key or "").strip()
     if not key:
         raise ValueError("缺少商品代碼。")
+    if is_active and is_retired_legacy_farm_product(key):
+        raise ValueError("舊哈夫幣／守夜人口風琴商品已退役，不能重新上架。")
 
     path = _path(db_file)
     ensure_order_product_status_store(path)
@@ -461,6 +514,8 @@ __all__ = [
     "install_discord_catalog_guards",
     "install_web_catalog_guards",
     "invalidate_order_product_status_cache",
+    "RETIRED_LEGACY_FARM_RULE_KEYS",
+    "is_retired_legacy_farm_product",
     "is_order_product_active",
     "load_order_product_statuses",
     "set_order_product_active",
