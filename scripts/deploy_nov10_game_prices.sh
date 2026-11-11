@@ -465,8 +465,12 @@ install_discord_catalog_guards()
 assert RETIRED_LEGACY_FARM_RULE_KEYS=={"farm_halfcoin_120m","farm_halfcoin_360m"}
 assert all(key in ORDER_RULES and not is_order_product_active(key) for key in RETIRED_LEGACY_FARM_RULE_KEYS)
 assert "night_population" not in DELTA_FARM_PRICE_LISTS
-assert "哈夫幣代洗" not in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get("farm")
-assert "守夜人口風琴" not in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get("farm")
+farm_groups=orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get("farm")
+expired_groups=[label for label in farm_groups if orders.is_retired_farm_group("farm",label)]
+if expired_groups:
+    raise SystemExit(f"BLOCKED: retired farm groups still visible: {expired_groups!r}")
+if not {"倒子彈代肝","撞車代肝"}.issubset(set(farm_groups)):
+    raise SystemExit(f"BLOCKED: new public farm groups missing: {farm_groups!r}")
 assert not any(_is_admin_editable_rule(key) for key in RETIRED_LEGACY_FARM_RULE_KEYS)
 web=get_grouped_order_catalog("farm")
 keys={v["rule_key"] for group in web for v in group["variants"]}
