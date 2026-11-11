@@ -254,7 +254,7 @@ if existing:
     avatar_url=(original.get("thumbnail") or {}).get("url")
     welcome_embed=build_welcome_embed(member,avatar_url=avatar_url).to_dict()
     welcome_path=f"/channels/{welcome_channel}/messages/{item['id']}"
-    request("PATCH",welcome_path,{"embeds":[welcome_embed]})
+    request("PATCH",welcome_path,{"embeds":[welcome_embed],"allowed_mentions":{"parse":[]}})
     updated=request("GET",welcome_path)
     if not updated.get("embeds") or updated["embeds"][0].get("description")!=build_welcome_description(member):
         raise SystemExit("BLOCKED: existing welcome message did not update")
