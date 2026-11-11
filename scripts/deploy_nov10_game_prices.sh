@@ -127,17 +127,18 @@ import subprocess,sys,types
 from dataclasses import asdict
 from pathlib import Path
 old_sha,new_sha=sys.argv[1:3]
-# CRITICAL: bootstrap the currently deployed services package BEFORE adding
-# a placeholder for the target farm module. services.__init__ imports
-# services.order_rules, which in the farm release imports
-# PUBLIC_FARM_FIXED_CUTS. Registering an empty placeholder first causes a
-# circular-import failure on the *old* deployed version (before any update).
-# This import uses the live old code; the target code is still only read via
-# git show, and this preflight is strictly read-only.
-import services
-# Now the old package/rule registry is fully initialized; safely load the
-# new target module for the side-by-side rule comparison. The old VPS may
-# predate this farm module altogether, so use the pinned target source.
+# CRITICAL: services.__init__ imports order_rules, which imports the
+# farm module. Registering an empty farm placeholder first triggered the
+# circular-import failure on the VPS. Importing the live services package
+# instead is also unsafe here: it installs runtime patches and can initialize
+# SQLite. Create an isolated import-only namespace for the two pure helper
+# modules used by order_rules, without executing services.__init__ or Bot/Web.
+package=types.ModuleType("services")
+package.__path__=[str(Path.cwd()/"services")]
+package.__package__="services"
+sys.modules["services"]=package
+# The old VPS may predate the fixed-cut module, so load the exact pinned
+# target source into this isolated namespace before rule comparisons.
 farm_name="services.farm_fixed_cut_policy"
 farm_src=subprocess.check_output(
     ["git","show",f"{new_sha}:services/farm_fixed_cut_policy.py"],text=True
