@@ -56,6 +56,7 @@ while IFS= read -r changed; do
         .github/workflows/ci.yml|\
         views/panels.py|\
         tests/test_main_service_panel.py|\
+        tests/test_support_panel_links_deploy_20261111.py|\
         scripts/deploy_support_panel_links_20261111.sh|\
         scripts/deploy_support_panel_links_20261111.ps1) ;;
         *) echo "BLOCKED: unauthorized file modified by panel release: $changed"; exit 2 ;;
