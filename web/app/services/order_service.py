@@ -590,6 +590,12 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
             customer_service_total_amount=customer_service_base,
         )
 
+    from services.coin_wash_urgent_policy import urgent_fee_from_price_snapshot
+    urgent_fee_amount = urgent_fee_from_price_snapshot(
+        getattr(order, "price_snapshot_json", None)
+    )
+    urgent_receiver_id = str(worker_ids[0]) if worker_ids else None
+
     overrides = {
         override.worker_discord_id: override
         for override in db.scalars(
@@ -616,6 +622,11 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
             note = f"手動指定分潤：{final_payout}T"
             if override.reason:
                 note += f"｜原因：{override.reason}"
+
+        if urgent_fee_amount and str(worker_payout.worker_discord_id) == urgent_receiver_id:
+            final_payout += urgent_fee_amount
+            urgency_note = f"加急 +{urgent_fee_amount}T（全額歸接單打手；不抽成）"
+            note = f"{note}｜{urgency_note}" if note else urgency_note
 
         db.add(
             WorkerPayout(
