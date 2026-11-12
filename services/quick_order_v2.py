@@ -148,7 +148,9 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
             description=(
                 "**洗幣｜500M**\n"
                 "• 倒子彈：**有掛名 2,650T／單｜無掛名 3,000T／單**（由客服勾選）\n"
-                "• 撞車：**2,480T／單**\n\n"
+                "  加急各 +260T：有掛名 2,910T；無掛名 3,260T\n"
+                "• 撞車：**2,480T／單**；加急 **2,740T**\n"
+                "  加急費全歸接單打手，不增加店抽或客服分潤。\n\n"
                 "**AW 子彈**\n"
                 "• 代撞：**4T／發**（發數自行輸入）\n\n"
                 "請在下方選擇服務，再確認建立私人下單票口。\n"
@@ -403,6 +405,7 @@ class QuickOrderConfirmView(discord.ui.View):
         self.item_group = item_group
         self.source_channel_id = source_channel_id
         self.opening = False
+        self.created_ticket_id: int | None = None
 
     @discord.ui.button(
         label="確認下單",
@@ -420,6 +423,12 @@ class QuickOrderConfirmView(discord.ui.View):
                 ephemeral=True,
             )
             return
+        if self.created_ticket_id is not None:
+            await interaction.response.send_message(
+                f"這次下單已建立票口 <#{self.created_ticket_id}>，請勿重複開票。",
+                ephemeral=True,
+            )
+            return
         if self.opening:
             await interaction.response.send_message(
                 "票口正在建立，請勿重複點擊。",
@@ -430,12 +439,14 @@ class QuickOrderConfirmView(discord.ui.View):
         self.opening = True
         button.disabled = True
         try:
-            await _create_ticket(
+            ticket = await _create_ticket(
                 interaction,
                 category=self.category,
                 item_group=self.item_group,
                 source_channel_id=self.source_channel_id,
             )
+            if ticket is not None:
+                self.created_ticket_id = int(ticket.id)
         finally:
             self.opening = False
 

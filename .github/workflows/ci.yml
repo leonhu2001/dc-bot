@@ -18,6 +18,7 @@ on:
       - fix/retire-mouth-organ-and-old-halfcoin-20261111
       - feat/main-support-panel-channel-links-20261111
       - fix/support-panel-order-guide-recruit-examiner-20261111
+      - fix/quick-ticket-duplicate-and-farm-rush-fees-20261112
   workflow_dispatch:
 
 permissions:

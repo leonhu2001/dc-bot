@@ -3,7 +3,10 @@ from __future__ import annotations
 import discord
 
 from core.permissions import is_customer_staff
-from services.staff_internal_ammo_dump_policy import AMMO_DUMP_RULE_KEY
+from services.staff_internal_ammo_dump_policy import (
+    AMMO_DUMP_RULE_KEY, AMMO_DUMP_RUSH_RULE_KEY, INTERNAL_RUSH_FEE,
+    is_internal_ammo_dump_rule,
+)
 
 
 class InternalAmmoNamedSelect(discord.ui.Select):
@@ -13,6 +16,11 @@ class InternalAmmoNamedSelect(discord.ui.Select):
         self.customer_id = int(customer_id)
         self.channel_id = int(channel_id)
         self.panel_message_id = panel_message_id
+        from services import self_service_ui_runtime as ui
+        data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        self.rule_key = str(data.get("order_rule_key") or AMMO_DUMP_RULE_KEY)
+        rush = self.rule_key == AMMO_DUMP_RUSH_RULE_KEY
+        extra = INTERNAL_RUSH_FEE if rush else 0
         super().__init__(
             custom_id="staff_internal_ammo_named_select",
             placeholder="送單時選擇：有掛名／無掛名",
@@ -20,14 +28,14 @@ class InternalAmmoNamedSelect(discord.ui.Select):
             max_values=1,
             options=[
                 discord.SelectOption(
-                    label="有掛名｜顧客 2,650T",
+                    label=f"有掛名｜顧客 {2_650 + extra:,}T",
                     value="named",
-                    description="代肝 2,650T；店家差額 0T",
+                    description=f"打手 {2_650 + extra:,}T；店家差額 0T",
                 ),
                 discord.SelectOption(
-                    label="無掛名｜顧客 3,000T",
+                    label=f"無掛名｜顧客 {3_000 + extra:,}T",
                     value="unnamed",
-                    description="代肝 2,650T；客服 88T；店家 262T",
+                    description=f"打手 {2_650 + extra:,}T；客服 88T；店家 262T",
                 ),
             ],
             row=0,
@@ -44,7 +52,7 @@ class InternalAmmoNamedSelect(discord.ui.Select):
         from services import self_service_ui_runtime as ui
 
         data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id)
-        if not isinstance(data, dict) or str(data.get("order_rule_key") or "") != AMMO_DUMP_RULE_KEY:
+        if not isinstance(data, dict) or not is_internal_ammo_dump_rule(data.get("order_rule_key")) or str(data.get("order_rule_key")) != self.rule_key:
             await interaction.response.send_message("訂單商品已變更，請重新按「送出等待接單」。", ephemeral=True)
             return
 

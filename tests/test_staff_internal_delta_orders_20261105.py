@@ -61,7 +61,15 @@ def test_internal_500m_coin_wash_is_one_fixed_normal_order(group, rule_key, expe
     apply_self_service_category_selection(draft, INTERNAL_CATEGORY)
     detail = apply_self_service_item_group_selection(draft, group)
 
-    assert detail is not None
+    # The group now offers regular and rush. Choosing the group alone must
+    # not silently select or charge the regular product.
+    assert detail is None
+    options = orders.get_order_item_details_for_group(INTERNAL_CATEGORY, group)
+    assert {x["rule_key"] for x in options} == {
+        rule_key, rule_key + "_rush"
+    }
+    from services.self_service_selection_state import apply_self_service_detail_selection
+    apply_self_service_detail_selection(draft, next(x for x in options if x["rule_key"] == rule_key))
     assert draft["order_rule_key"] == rule_key
     assert draft["quantity"] == 1
     assert _order_requires_credentials(draft) is True
@@ -140,6 +148,8 @@ def test_internal_aw_keeps_special_direct_payment_calculation():
     [
         "staff_internal_ammo_dump_500m",
         "staff_internal_car_500m",
+        "staff_internal_ammo_dump_500m_rush",
+        "staff_internal_car_500m_rush",
         "staff_internal_aw_collision",
     ],
 )

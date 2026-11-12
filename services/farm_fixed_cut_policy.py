@@ -25,6 +25,14 @@ PUBLIC_FARM_FIXED_CUTS: dict[str, tuple[int, int]] = {
     "farm_car_crash_500m": (3250, 150),
     "farm_car_crash_1000m": (6100, 300),
 }
+# Optional rush service is a separate selectable rule key, not an extra
+# store fee. The +280T is paid in full to the assigned worker.
+PUBLIC_FARM_RUSH_FEE = 280
+_BASE_PUBLIC_FARM_FIXED_CUTS = dict(PUBLIC_FARM_FIXED_CUTS)
+PUBLIC_FARM_FIXED_CUTS.update({
+    f"{key}_rush": (price + PUBLIC_FARM_RUSH_FEE, cut)
+    for key, (price, cut) in _BASE_PUBLIC_FARM_FIXED_CUTS.items()
+})
 CUSTOMER_SERVICE_SHARE_OF_STORE_CUT = 25  # percent
 
 
@@ -84,12 +92,14 @@ def calculate_farm_fixed_cut_financials(rule_or_key, price_result, data: dict) -
         customer_service_payout_amount=summary.customer_service_amount,
         store_retained_amount=summary.store_retained_amount,
         fixed_store_cut_policy="farm_fixed_cut_cs25_v1",
+        farm_rush_fee=PUBLIC_FARM_RUSH_FEE if key.endswith("_rush") else 0,
     )
     return finance
 
 
 __all__ = [
     "PUBLIC_FARM_FIXED_CUTS",
+    "PUBLIC_FARM_RUSH_FEE",
     "CUSTOMER_SERVICE_SHARE_OF_STORE_CUT",
     "FarmFixedCutSettlement",
     "is_public_farm_fixed_cut_rule",

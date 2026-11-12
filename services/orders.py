@@ -151,15 +151,27 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "倒子彈代肝",
             "details": [
-                {"label": size, "value": size.lower(), "rule_key": f"farm_ammo_dump_{size.lower()}", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}
+                {
+                    "label": size + ("｜加急 +280T" if rush else ""),
+                    "value": size.lower() + ("_rush" if rush else ""),
+                    "rule_key": f"farm_ammo_dump_{size.lower()}" + ("_rush" if rush else ""),
+                    "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
+                }
                 for size in ("100M", "200M", "300M", "500M", "1000M", "2000M")
+                for rush in (False, True)
             ],
         },
         {
             "label": "撞車代肝",
             "details": [
-                {"label": size, "value": size.lower(), "rule_key": f"farm_car_crash_{size.lower()}", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}
+                {
+                    "label": size + ("｜加急 +280T" if rush else ""),
+                    "value": size.lower() + ("_rush" if rush else ""),
+                    "rule_key": f"farm_car_crash_{size.lower()}" + ("_rush" if rush else ""),
+                    "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
+                }
                 for size in ("100M", "200M", "500M", "1000M")
+                for rush in (False, True)
             ],
         },
         {
@@ -176,12 +188,14 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             "label": "倒子彈｜500M",
             "details": [
                 {"label": "倒子彈｜500M", "value": "ammo_dump_500m", "rule_key": "staff_internal_ammo_dump_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "倒子彈｜500M｜加急 +260T", "value": "ammo_dump_500m_rush", "rule_key": "staff_internal_ammo_dump_500m_rush", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
         {
             "label": "撞車｜500M",
             "details": [
                 {"label": "撞車｜500M", "value": "car_500m", "rule_key": "staff_internal_car_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "撞車｜500M｜加急 +260T", "value": "car_500m_rush", "rule_key": "staff_internal_car_500m_rush", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
         {

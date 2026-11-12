@@ -1746,33 +1746,9 @@ class OrderControlView(discord.ui.View):
             )
             return
 
-        customer = interaction.guild.get_member(customer_id) if interaction.guild else None
-        customer_mention = customer.mention if customer is not None else f"<@{customer_id}>"
-
-        embed = discord.Embed(
-            title="自助下單",
-            description=(
-                f"下單用戶：{customer_mention}\n\n"
-                "請下單用戶依序選擇訂單類別、訂單項目、指定選項與數量。\n"
-                "畫面會即時顯示試算金額、可接職位與接單需求。\n"
-                "送出後會先派單等待接單，人數滿後才會開放付款。"
-            ),
-            color=discord.Color.purple()
-        )
-
-        await interaction.response.defer()
-
-        await interaction.channel.send(
-            embed=embed,
-            view=SelfServiceOrderView(
-                customer_id=customer_id,
-                channel_id=interaction.channel.id
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
-            )
+        from services.self_service_panel_dedupe import handle_legacy_order_control_dispatch
+        await handle_legacy_order_control_dispatch(
+            interaction, customer_id=customer_id, view_factory=SelfServiceOrderView,
         )
 
 # profile_direct_order_ticket_creator_v1

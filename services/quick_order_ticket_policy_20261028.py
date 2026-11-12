@@ -25,6 +25,7 @@ class QuickOrderNoticeConfirmView(discord.ui.View):
         self.source_channel_id = int(source_channel_id)
         self.quick_module = quick_module
         self.opening = False
+        self.created_ticket_id: int | None = None
 
     @discord.ui.button(
         label="已閱讀下單須知，建立票口",
@@ -43,6 +44,12 @@ class QuickOrderNoticeConfirmView(discord.ui.View):
             )
             return
 
+        if self.created_ticket_id is not None:
+            await interaction.response.send_message(
+                f"票口已建立：<#{self.created_ticket_id}>。請不要再次開票。",
+                ephemeral=True,
+            )
+            return
         if self.opening:
             await interaction.response.send_message(
                 "票口正在建立，請勿重複點擊。",
@@ -53,14 +60,15 @@ class QuickOrderNoticeConfirmView(discord.ui.View):
         self.opening = True
         button.disabled = True
         try:
-            # _create_ticket owns the interaction response lifecycle and starts by
-            # deferring this button interaction. Do not acknowledge it beforehand.
-            await self.quick_module._create_ticket(
+            # _create_ticket owns the response lifecycle; do not defer twice.
+            ticket = await self.quick_module._create_ticket(
                 interaction,
                 category=self.category,
                 item_group=self.item_group,
                 source_channel_id=self.source_channel_id,
             )
+            if ticket is not None:
+                self.created_ticket_id = int(ticket.id)
         finally:
             self.opening = False
 
