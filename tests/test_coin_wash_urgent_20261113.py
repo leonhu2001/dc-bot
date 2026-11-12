@@ -87,3 +87,78 @@ def test_payroll_bonus_only_from_matching_snapshot():
     assert urgent_fee_from_price_snapshot({**good, "urgent_fee_amount": 2600}) == 0
     assert urgent_fee_from_price_snapshot({"order_rule_key": "steam_play", "urgent_fee_amount": 260}) == 0
     assert urgent_fee_from_price_snapshot("not-json") == 0
+
+
+@pytest.mark.parametrize(
+    ("rule_key", "paid", "basis", "fee", "cs_expected"),
+    [
+        ("staff_internal_ammo_dump_500m", 3260, 2650, 260, 88),
+        ("staff_internal_ammo_dump_500m", 2910, 2650, 260, 0),
+        ("staff_internal_car_500m", 2740, 2480, 260, 0),
+        ("farm_halfcoin_120m", 1530, 1250, 280, 0),
+    ],
+)
+def test_web_salary_recalculation_and_report_preserve_entire_urgent_fee(
+    monkeypatch, rule_key, paid, basis, fee, cs_expected
+):
+    from datetime import datetime
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from shared.db import Base
+    from shared.models import (
+        CustomerServicePayout, OrderAssignment, PayoutStatus, WebOrder, WorkerPayout,
+    )
+    from web.app.services import worker_bonus_payout as report_bonus
+    from web.app.services.order_service import recalculate_order_payouts
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        order = WebOrder(
+            category="staff_internal" if rule_key.startswith("staff_internal") else "farm",
+            item="洗幣加急",
+            order_rule_key=rule_key,
+            amount=paid,
+            customer_pay_amount=paid,
+            payout_base_amount=basis,
+            price_snapshot_json=json.dumps({
+                "order_rule_key": rule_key,
+                "urgent_fee_amount": fee,
+            }),
+            status="closed",
+            closed_at=datetime(2026, 11, 13, 0, 0, 0),
+        )
+        db.add(order)
+        db.flush()
+        db.add(OrderAssignment(
+            order_id=order.id,
+            worker_discord_id="worker-1",
+            is_active=True,
+            role_type="booster",
+        ))
+        db.flush()
+        recalculate_order_payouts(db, int(order.id))
+        db.commit()
+        order_id = int(order.id)
+
+    with Session(engine) as db:
+        wage = db.query(WorkerPayout).filter_by(order_id=order_id).one()
+        cs = db.query(CustomerServicePayout).filter_by(order_id=order_id).one()
+        assert wage.final_payout == basis + fee
+        assert cs.payout_amount == cs_expected
+        assert paid - wage.final_payout - cs.payout_amount == (
+            262 if cs_expected == 88 else 0
+        )
+        assert "加急" in wage.note
+
+    monkeypatch.setattr(report_bonus, "SessionLocal", lambda: Session(engine))
+    report_bonus.apply_approved_report_worker_bonuses(order_id)
+
+    with Session(engine) as db:
+        wage = db.query(WorkerPayout).filter_by(order_id=order_id).one()
+        cs = db.query(CustomerServicePayout).filter_by(order_id=order_id).one()
+        assert wage.payout_status == PayoutStatus.UNPAID.value
+        assert wage.final_payout == basis + fee
+        assert cs.payout_amount == cs_expected
+        assert "加急" in wage.note
