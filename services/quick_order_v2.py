@@ -405,6 +405,7 @@ class QuickOrderConfirmView(discord.ui.View):
         self.item_group = item_group
         self.source_channel_id = source_channel_id
         self.opening = False
+        self.created_ticket_id: int | None = None
 
     @discord.ui.button(
         label="確認下單",
@@ -422,6 +423,12 @@ class QuickOrderConfirmView(discord.ui.View):
                 ephemeral=True,
             )
             return
+        if self.created_ticket_id is not None:
+            await interaction.response.send_message(
+                f"這次下單已建立票口 <#{self.created_ticket_id}>，請勿重複開票。",
+                ephemeral=True,
+            )
+            return
         if self.opening:
             await interaction.response.send_message(
                 "票口正在建立，請勿重複點擊。",
@@ -432,12 +439,14 @@ class QuickOrderConfirmView(discord.ui.View):
         self.opening = True
         button.disabled = True
         try:
-            await _create_ticket(
+            ticket = await _create_ticket(
                 interaction,
                 category=self.category,
                 item_group=self.item_group,
                 source_channel_id=self.source_channel_id,
             )
+            if ticket is not None:
+                self.created_ticket_id = int(ticket.id)
         finally:
             self.opening = False
 
