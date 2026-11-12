@@ -64,6 +64,9 @@ _PRODUCT_DEPENDENT_KEYS = (
     "staff_internal_ammo_named_set_by",
     "staff_internal_ammo_named_set_at",
     "store_margin_amount",
+    # Urgency cannot carry across coin-wash products or into normal orders.
+    "coin_wash_urgent",
+    "urgent_fee_amount",
 )
 
 
