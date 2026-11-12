@@ -118,6 +118,11 @@ def test_named_state_clears_when_switching_product():
         "store_margin_amount": 350,
     }
     apply_self_service_item_group_selection(data, "撞車｜500M")
+    assert "order_rule_key" not in data  # two choices: regular and rush
+    from services.orders import get_order_item_details_for_group
+    from services.self_service_selection_state import apply_self_service_detail_selection
+    options=get_order_item_details_for_group("staff_internal","撞車｜500M")
+    apply_self_service_detail_selection(data, options[0])
     assert data["order_rule_key"] == "staff_internal_car_500m"
     assert NAMED_SELECTION_KEY not in data
     assert "staff_internal_ammo_named_set_by" not in data
