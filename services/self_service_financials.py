@@ -482,7 +482,7 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
     if is_public_farm_fixed_cut_rule(rule):
         return calculate_farm_fixed_cut_financials(rule, price_result, data)
     if is_internal_ammo_dump_rule(rule):
-        return calculate_internal_ammo_dump_financials(price_result, data)
+        return calculate_internal_ammo_dump_financials(price_result, data, rule)
     if is_aw_collision_rule(rule):
         return calculate_aw_collision_financials(price_result, data)
 
