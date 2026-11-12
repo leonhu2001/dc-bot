@@ -629,7 +629,12 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
         elif str(getattr(order, "order_rule_key", "") or "") in {
             "staff_internal_ammo_dump_500m_rush", "staff_internal_car_500m_rush",
         }:
-            note = "內部洗幣｜加急費260T全額給打手｜店家與客服分潤不含加急費"
+            note = (
+                "特殊代肝單｜接單人員全額 100%｜"
+                "加急費260T全額給打手，不計入店抽或客服分潤"
+            )
+            if str(order.order_rule_key).startswith("staff_internal_ammo_dump_"):
+                note += "｜無掛名時店抽350T，客服固定88T"
 
         if override is not None:
             final_payout = int(override.manual_final_payout or 0)
