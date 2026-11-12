@@ -82,6 +82,13 @@ def render_self_service_financial_breakdown_fields(
 
     embed.add_field(name=final_label, value=_format_plain_amount(final), inline=True)
     embed.add_field(name="打手分潤基準", value=_format_plain_amount(payout), inline=True)
+    priority = _price_int(src, "priority_fee_amount", default=0)
+    if priority:
+        embed.add_field(
+            name="加急費（全額給打手）",
+            value=f"+{priority:,}T｜不計入店家／客服抽成",
+            inline=True,
+        )
     if is_internal_ammo_dump_rule(src.get("order_rule_key")) or (
         "staff_internal_ammo_named" in src
     ):
