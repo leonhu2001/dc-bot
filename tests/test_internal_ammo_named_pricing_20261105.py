@@ -118,7 +118,7 @@ def test_named_state_clears_when_switching_product():
         "store_margin_amount": 350,
     }
     apply_self_service_item_group_selection(data, "撞車｜500M")
-    assert data["order_rule_key"] == "staff_internal_car_500m"
+    assert "order_rule_key" not in data  # must pick normal or expedited car detail
     assert NAMED_SELECTION_KEY not in data
     assert "staff_internal_ammo_named_set_by" not in data
     assert "store_margin_amount" not in data
