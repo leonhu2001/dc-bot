@@ -3,7 +3,10 @@ from __future__ import annotations
 import discord
 
 from core.permissions import is_customer_staff
-from services.staff_internal_ammo_dump_policy import AMMO_DUMP_RULE_KEY
+from services.staff_internal_ammo_dump_policy import (
+    AMMO_DUMP_RULE_KEY, AMMO_DUMP_RUSH_RULE_KEY, INTERNAL_PRIORITY_FEE,
+    is_internal_ammo_dump_rule,
+)
 
 
 class InternalAmmoNamedSelect(discord.ui.Select):
@@ -44,7 +47,7 @@ class InternalAmmoNamedSelect(discord.ui.Select):
         from services import self_service_ui_runtime as ui
 
         data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id)
-        if not isinstance(data, dict) or str(data.get("order_rule_key") or "") != AMMO_DUMP_RULE_KEY:
+        if not isinstance(data, dict) or not is_internal_ammo_dump_rule(data.get("order_rule_key")):
             await interaction.response.send_message("訂單商品已變更，請重新按「送出等待接單」。", ephemeral=True)
             return
 
