@@ -51,4 +51,23 @@ async def send_self_service_panel_once(channel, *, embed, view, allowed_mentions
         return True
 
 
-__all__ = ["message_is_self_service_panel", "has_self_service_panel", "send_self_service_panel_once"]
+async def send_legacy_control_panel_once(
+    interaction, *, embed, view, allowed_mentions,
+) -> bool:
+    """Reuse quick-order selector rather than sending a second one."""
+    created = await send_self_service_panel_once(
+        interaction.channel, embed=embed, view=view,
+        allowed_mentions=allowed_mentions,
+    )
+    if not created:
+        await interaction.followup.send(
+            "這個下單票口已經有自助下單面板，請使用原本的面板，不會重複發送。",
+            ephemeral=True,
+        )
+    return created
+
+
+__all__ = [
+    "message_is_self_service_panel", "has_self_service_panel",
+    "send_self_service_panel_once", "send_legacy_control_panel_once",
+]
