@@ -93,6 +93,8 @@ def test_legacy_dispatch_button_uses_dedupe_not_unconditional_send():
     start=source.index("class OrderControlView(")
     end=source.index("# profile_direct_order_ticket_creator_v1",start)
     block=source[start:end]
-    assert "ensure_single_self_service_panel(" in block
+    assert "handle_legacy_order_control_dispatch(" in block
     assert 'await interaction.channel.send(' not in block
-    assert "票口已有自助下單面板" in block
+    helper=(Path(__file__).resolve().parents[1]/"services/self_service_panel_dedupe.py").read_text(encoding="utf-8")
+    assert "ensure_single_self_service_panel(" in helper
+    assert "票口已有自助下單面板" in helper
