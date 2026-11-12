@@ -80,6 +80,15 @@ def render_self_service_financial_breakdown_fields(
             text = f"+{_format_plain_amount(specify_effective)}"
         embed.add_field(name="指定費", value=text, inline=True)
 
+    rush_fee = max(
+        0, _price_int(src, "farm_rush_fee", default=0)
+    )
+    if rush_fee:
+        embed.add_field(
+            name="加急費（全歸接單打手）",
+            value=f"+{rush_fee:,}T｜不增加店抽或客服分潤",
+            inline=True,
+        )
     embed.add_field(name=final_label, value=_format_plain_amount(final), inline=True)
     embed.add_field(name="打手分潤基準", value=_format_plain_amount(payout), inline=True)
     if is_internal_ammo_dump_rule(src.get("order_rule_key")) or (
