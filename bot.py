@@ -1836,59 +1836,21 @@ class OrderControlView(discord.ui.View):
 
         await interaction.response.defer()
 
-        # A quick-order ticket already creates this panel. Reopening it from
-        # the staff control must edit the existing message, not send a second
-        # self-service form into the same ticket.
-        from services import self_service_ui_runtime as self_service_ui
-        draft = SELF_SERVICE_ORDER_SELECTIONS.setdefault(interaction.channel.id, {})
-        existing_panel = None
-        saved_id = draft.get("self_service_panel_message_id")
-        if saved_id:
-            try:
-                existing_panel = await interaction.channel.fetch_message(int(saved_id))
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError, TypeError):
-                pass
-        if existing_panel is None:
-            try:
-                async for candidate in interaction.channel.history(limit=100):
-                    if bot.user is not None and candidate.author.id != bot.user.id:
-                        continue
-                    if any(
-                        str(getattr(component, "custom_id", "") or "").startswith("self_service_order_")
-                        for row in (candidate.components or [])
-                        for component in (getattr(row, "children", []) or [])
-                    ):
-                        existing_panel = candidate
-                        break
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-
-        form_view = SelfServiceOrderView(
-            customer_id=customer_id,
-            channel_id=interaction.channel.id,
-            selected_category=(
-                draft.get("category") if draft.get("quick_order_v2") else None
-            ),
+        from services.ticket_self_service_panel_idempotency import (
+            ensure_ticket_self_service_panel,
         )
-        if existing_panel is not None:
-            # Use the live draft so reopening does not reset customer's choices.
-            embed = self_service_ui.build_self_service_panel_embed(
-                customer_id, draft, interaction.guild
-            )
-            await existing_panel.edit(embed=embed, view=form_view)
-            panel_message = existing_panel
-        else:
-            panel_message = await interaction.channel.send(
-                embed=embed,
-                view=form_view,
-                allowed_mentions=discord.AllowedMentions(
-                    users=True,
-                    roles=False,
-                    everyone=False,
-                ),
-            )
-        draft["self_service_panel_message_id"] = panel_message.id
-        remember_order_data(interaction.channel.id, draft)
+        from services import self_service_ui_runtime as self_service_ui
+
+        await ensure_ticket_self_service_panel(
+            interaction=interaction,
+            customer_id=customer_id,
+            selections=SELF_SERVICE_ORDER_SELECTIONS,
+            bot_user_id=bot.user.id if bot.user is not None else None,
+            view_type=SelfServiceOrderView,
+            panel_embed_builder=self_service_ui.build_self_service_panel_embed,
+            remember_data=remember_order_data,
+            fallback_embed=embed,
+        )
 
 # profile_direct_order_ticket_creator_v1
 async def create_staff_profile_order_ticket(
