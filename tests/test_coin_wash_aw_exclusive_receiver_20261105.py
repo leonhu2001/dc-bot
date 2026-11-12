@@ -29,11 +29,19 @@ EXPECTED_RULE_KEYS = {
     "farm_ammo_dump_500m", "farm_ammo_dump_1000m", "farm_ammo_dump_2000m",
     "farm_car_crash_100m", "farm_car_crash_200m",
     "farm_car_crash_500m", "farm_car_crash_1000m",
+    *(f"{key}_rush" for key in (
+        "farm_ammo_dump_100m","farm_ammo_dump_200m","farm_ammo_dump_300m",
+        "farm_ammo_dump_500m","farm_ammo_dump_1000m","farm_ammo_dump_2000m",
+        "farm_car_crash_100m","farm_car_crash_200m",
+        "farm_car_crash_500m","farm_car_crash_1000m",
+    )),
     "farm_aw_collision_1_100",
     "farm_aw_collision_101_500",
     "farm_aw_collision_501_plus",
     "staff_internal_ammo_dump_500m",
+    "staff_internal_ammo_dump_500m_rush",
     "staff_internal_car_500m",
+    "staff_internal_car_500m_rush",
     "staff_internal_aw_collision",
 }
 
