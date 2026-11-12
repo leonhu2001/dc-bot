@@ -25,7 +25,20 @@ PUBLIC_FARM_FIXED_CUTS: dict[str, tuple[int, int]] = {
     "farm_car_crash_500m": (3250, 150),
     "farm_car_crash_1000m": (6100, 300),
 }
+# Priority is a separate selectable variant: the additional 280T is paid
+# ENTIRELY to the assigned booster. Neither the shop's fixed cut nor its
+# customer-service 25% share may increase.
+PUBLIC_FARM_PRIORITY_FEE = 280
+BASE_PUBLIC_FARM_FIXED_CUTS = dict(PUBLIC_FARM_FIXED_CUTS)
+PUBLIC_FARM_FIXED_CUTS.update({
+    f"{key}_rush": (price + PUBLIC_FARM_PRIORITY_FEE, shop_cut)
+    for key, (price, shop_cut) in BASE_PUBLIC_FARM_FIXED_CUTS.items()
+})
 CUSTOMER_SERVICE_SHARE_OF_STORE_CUT = 25  # percent
+
+
+def public_farm_priority_fee(rule_or_key) -> int:
+    return PUBLIC_FARM_PRIORITY_FEE if _key(rule_or_key).endswith("_rush") and is_public_farm_fixed_cut_rule(rule_or_key) else 0
 
 
 def _key(rule_or_key) -> str:
@@ -84,11 +97,16 @@ def calculate_farm_fixed_cut_financials(rule_or_key, price_result, data: dict) -
         customer_service_payout_amount=summary.customer_service_amount,
         store_retained_amount=summary.store_retained_amount,
         fixed_store_cut_policy="farm_fixed_cut_cs25_v1",
+        priority_fee_amount=public_farm_priority_fee(key),
+        priority_fee_receiver="worker" if public_farm_priority_fee(key) else "",
     )
     return finance
 
 
 __all__ = [
+    "BASE_PUBLIC_FARM_FIXED_CUTS",
+    "PUBLIC_FARM_PRIORITY_FEE",
+    "public_farm_priority_fee",
     "PUBLIC_FARM_FIXED_CUTS",
     "CUSTOMER_SERVICE_SHARE_OF_STORE_CUT",
     "FarmFixedCutSettlement",
