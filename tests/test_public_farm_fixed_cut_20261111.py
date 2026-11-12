@@ -43,7 +43,14 @@ EXPECTED = {
     "farm_car_crash_200m": (1400, 120, 1280, 30, 90),
     "farm_car_crash_500m": (3250, 150, 3100, 38, 112),
     "farm_car_crash_1000m": (6100, 300, 5800, 75, 225),
-}
+} 
+
+# Rush is a selectable 280T addition paid entirely to the worker. The gross
+# fixed store cut and its 25% customer service share do not change.
+EXPECTED.update({
+    f"{key}_rush": (price + 280, cut, wage + 280, cs, retained)
+    for key, (price, cut, wage, cs, retained) in tuple(EXPECTED.items())
+})
 
 
 @pytest.mark.parametrize("key,values", EXPECTED.items())
