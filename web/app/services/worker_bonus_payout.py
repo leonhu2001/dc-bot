@@ -334,12 +334,13 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     order.customer_pay_amount
                     if order.customer_pay_amount is not None else order.amount or 0
                 )
+                original_payment = max(0, customer_paid - urgent_fee_amount)
                 cs_amount = calculate_internal_ammo_dump_cs_payout(
                     order.order_rule_key,
-                    max(0, customer_paid - urgent_fee_amount),
+                    original_payment,
                     payout_base,
                 )
-                cs_rate = cs_amount / customer_paid if customer_paid > 0 else 0.0
+                cs_rate = cs_amount / original_payment if original_payment > 0 else 0.0
             elif legacy:
                 cs_rate = LEGACY_CUSTOMER_SERVICE_GROSS_RATE
                 cs_amount = int(round(int(cs_base) * cs_rate))
