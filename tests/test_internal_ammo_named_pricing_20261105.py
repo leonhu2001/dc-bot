@@ -156,6 +156,8 @@ def test_store_internal_panel_displays_both_ammo_prices_and_cs_choice():
     [
         "staff_internal_ammo_dump_500m",
         "staff_internal_car_500m",
+        "staff_internal_ammo_dump_500m_rush",
+        "staff_internal_car_500m_rush",
         "staff_internal_aw_collision",
         "farm_halfcoin_120m",
         "farm_aw_collision_501_plus",
