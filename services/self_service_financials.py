@@ -483,6 +483,19 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
         return calculate_farm_fixed_cut_financials(rule, price_result, data)
     if is_internal_ammo_dump_rule(rule):
         return calculate_internal_ammo_dump_financials(price_result, data, rule)
+    if str(getattr(rule, "key", "") or "") in (
+        "staff_internal_car_500m", "staff_internal_car_500m_rush"
+    ):
+        # Internal car tickets are direct worker payments, including +260T
+        # rush, and must not accept generic discount / store commission paths.
+        finance = calculate_aw_collision_financials(price_result, {})
+        finance["farm_rush_fee"] = (
+            260 if str(rule.key).endswith("_rush") else 0
+        )
+        finance["store_margin_amount"] = 0
+        finance["store_retained_amount"] = 0
+        finance["customer_service_payout_amount"] = 0
+        return finance
     if is_aw_collision_rule(rule):
         return calculate_aw_collision_financials(price_result, data)
 
