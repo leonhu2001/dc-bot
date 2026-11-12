@@ -4,6 +4,9 @@ from services.aw_collision_financials import calculate_aw_collision_financials
 
 
 AMMO_DUMP_RULE_KEY = "staff_internal_ammo_dump_500m"
+AMMO_DUMP_RUSH_RULE_KEY = "staff_internal_ammo_dump_500m_rush"
+INTERNAL_PRIORITY_FEE = 260
+AMMO_DUMP_RULE_KEYS = frozenset((AMMO_DUMP_RULE_KEY, AMMO_DUMP_RUSH_RULE_KEY))
 NAMED_PRICE = 2650
 UNNAMED_PRICE = 3000
 WORKER_PAYOUT = 2650
@@ -18,7 +21,7 @@ NAMED_SELECTION_KEY = "staff_internal_ammo_named"
 
 def is_internal_ammo_dump_rule(rule_or_key) -> bool:
     key = str(getattr(rule_or_key, "key", rule_or_key) or "").strip()
-    return key == AMMO_DUMP_RULE_KEY
+    return key in AMMO_DUMP_RULE_KEYS
 
 
 def selected_ammo_dump_named(data: dict | None) -> bool | None:
@@ -44,21 +47,31 @@ def calculate_internal_ammo_dump_cs_payout(
     """
     if not is_internal_ammo_dump_rule(rule_or_key):
         return 0
+    rush = INTERNAL_PRIORITY_FEE if str(getattr(rule_or_key, "key", rule_or_key)) == AMMO_DUMP_RUSH_RULE_KEY else 0
+    # Compare both charge and worker wage against the SAME rule variant.
+    # Priority never increases shop or CS profit (350T remains 350T).
     if (
-        int(customer_pay_amount or 0) == UNNAMED_PRICE
-        and int(worker_payout_base_amount or 0) == WORKER_PAYOUT
+        int(customer_pay_amount or 0) == UNNAMED_PRICE + rush
+        and int(worker_payout_base_amount or 0) == WORKER_PAYOUT + rush
     ):
         return UNNAMED_CS_PAYOUT
     return 0
 
 
-def calculate_internal_ammo_dump_financials(price_result, data: dict) -> dict:
+def calculate_internal_ammo_dump_financials(
+    price_result, data: dict, rule_or_key=AMMO_DUMP_RULE_KEY,
+) -> dict:
+    if not is_internal_ammo_dump_rule(rule_or_key):
+        raise ValueError("這不是內部倒子彈商品。")
+    rush = INTERNAL_PRIORITY_FEE if str(getattr(rule_or_key, "key", rule_or_key)) == AMMO_DUMP_RUSH_RULE_KEY else 0
     named = selected_ammo_dump_named(data)
-    customer_price = UNNAMED_PRICE if named is False else NAMED_PRICE
-    store_margin = customer_price - WORKER_PAYOUT if named is not None else 0
+    base_customer_price = UNNAMED_PRICE if named is False else NAMED_PRICE
+    customer_price = base_customer_price + rush
+    worker_wage = WORKER_PAYOUT + rush
+    store_margin = base_customer_price - WORKER_PAYOUT if named is not None else 0
     customer_service_payout = (
         calculate_internal_ammo_dump_cs_payout(
-            AMMO_DUMP_RULE_KEY, customer_price, WORKER_PAYOUT
+            rule_or_key, customer_price, worker_wage
         )
         if named is not None else 0
     )
@@ -75,7 +88,9 @@ def calculate_internal_ammo_dump_financials(price_result, data: dict) -> dict:
         original_amount=customer_price,
         priced_amount=customer_price,
         customer_pay_amount=customer_price,
-        payout_base_amount=WORKER_PAYOUT,
+        payout_base_amount=worker_wage,
+        priority_fee_amount=rush,
+        priority_fee_receiver="worker" if rush else "",
         store_margin_amount=store_margin,
         customer_service_payout_amount=customer_service_payout,
         store_retained_amount=store_margin - customer_service_payout,
@@ -86,6 +101,9 @@ def calculate_internal_ammo_dump_financials(price_result, data: dict) -> dict:
 
 __all__ = [
     "AMMO_DUMP_RULE_KEY",
+    "AMMO_DUMP_RUSH_RULE_KEY",
+    "AMMO_DUMP_RULE_KEYS",
+    "INTERNAL_PRIORITY_FEE",
     "NAMED_PRICE",
     "UNNAMED_PRICE",
     "WORKER_PAYOUT",
