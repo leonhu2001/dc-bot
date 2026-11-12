@@ -619,11 +619,22 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
             is_public_farm_fixed_cut_rule, fixed_store_cut,
         )
         if is_public_farm_fixed_cut_rule(getattr(order, "order_rule_key", None)):
+            rush = str(getattr(order, "order_rule_key", "") or "").endswith("_rush")
             note = (
                 f"固定店抽 {fixed_store_cut(order.order_rule_key)}T｜"
                 "員工薪資為售價扣除店抽｜客服從店抽分25%｜"
                 "無掛名、直播或業績額外加成"
+                + ("｜加急費280T全額給打手，不列入店抽" if rush else "")
             )
+        elif str(getattr(order, "order_rule_key", "") or "") in {
+            "staff_internal_ammo_dump_500m_rush", "staff_internal_car_500m_rush",
+        }:
+            note = (
+                "特殊代肝單｜接單人員全額 100%｜"
+                "加急費260T全額給打手，不計入店抽或客服分潤"
+            )
+            if str(order.order_rule_key).startswith("staff_internal_ammo_dump_"):
+                note += "｜無掛名時店抽350T，客服固定88T"
 
         if override is not None:
             final_payout = int(override.manual_final_payout or 0)

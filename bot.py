@@ -1760,19 +1760,13 @@ class OrderControlView(discord.ui.View):
             color=discord.Color.purple()
         )
 
-        await interaction.response.defer()
-
-        await interaction.channel.send(
+        from services.quick_order_ticket_dedupe_policy import send_legacy_control_panel_once
+        await interaction.response.defer(ephemeral=True)
+        await send_legacy_control_panel_once(
+            interaction,
             embed=embed,
-            view=SelfServiceOrderView(
-                customer_id=customer_id,
-                channel_id=interaction.channel.id
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
-            )
+            view=SelfServiceOrderView(customer_id=customer_id, channel_id=interaction.channel.id),
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
 
 # profile_direct_order_ticket_creator_v1

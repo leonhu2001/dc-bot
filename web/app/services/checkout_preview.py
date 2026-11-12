@@ -8,6 +8,7 @@ from typing import Any
 from services.farm_fixed_cut_policy import (
     is_public_farm_fixed_cut_rule,
     calculate_farm_fixed_cut_settlement,
+    public_farm_priority_fee,
 )
 
 from services.order_flow import (
@@ -1923,6 +1924,8 @@ def build_checkout_preview(
             customer_service_payout_amount=settlement.customer_service_amount,
             store_retained_amount=settlement.store_retained_amount,
             fixed_store_cut_policy="farm_fixed_cut_cs25_v1",
+            priority_fee_amount=public_farm_priority_fee(rule_key),
+            priority_fee_receiver="worker" if public_farm_priority_fee(rule_key) else "",
         )
 
     remaining = int(

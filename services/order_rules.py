@@ -148,11 +148,15 @@ COIN_WASH_AW_ORDER_RULE_KEYS = frozenset({
     "farm_ammo_dump_500m", "farm_ammo_dump_1000m", "farm_ammo_dump_2000m",
     "farm_car_crash_100m", "farm_car_crash_200m",
     "farm_car_crash_500m", "farm_car_crash_1000m",
+    *(f"farm_ammo_dump_{size}m_rush" for size in (100,200,300,500,1000,2000)),
+    *(f"farm_car_crash_{size}m_rush" for size in (100,200,500,1000)),
     "farm_aw_collision_1_100",
     "farm_aw_collision_101_500",
     "farm_aw_collision_501_plus",
     "staff_internal_ammo_dump_500m",
+    "staff_internal_ammo_dump_500m_rush",
     "staff_internal_car_500m",
+    "staff_internal_car_500m_rush",
     "staff_internal_aw_collision",
 })
 
@@ -1143,16 +1147,18 @@ from services.farm_fixed_cut_policy import PUBLIC_FARM_FIXED_CUTS
 
 for _farm_key, (_farm_price, _farm_cut) in PUBLIC_FARM_FIXED_CUTS.items():
     _farm_kind = "倒子彈代肝" if _farm_key.startswith("farm_ammo_dump_") else "撞車代肝"
-    _farm_size = _farm_key.rsplit("_", 1)[-1].upper()
+    _rush = _farm_key.endswith("_rush")
+    _farm_size = _farm_key.removesuffix("_rush").rsplit("_", 1)[-1].upper()
+    _farm_option = f"{_farm_size}｜加急 +280T" if _rush else _farm_size
     _add(OrderRule(
         category="farm", key=_farm_key,
-        label=f"{_farm_kind}｜{_farm_size}",
+        label=f"{_farm_kind}｜{_farm_option}",
         pricing_type="fixed", price=_farm_price,
         allowed_roles=COIN_WASH_AW_RECEIVER_ROLES, required_game_roles=(),
         required_staff_count=1, min_quantity=1, max_quantity=1,
         allow_specify=False, vip_discount_allowed=False,
         point_benefits_allowed=False, loyalty_benefits_enabled=False,
-        note=f"固定店抽 {_farm_cut}T；客服從店抽分 25%；其餘全歸接單人員",
+        note=f"固定店抽 {_farm_cut}T；客服從店抽分 25%；其餘全歸接單人員" + ("；加急 280T 全額給打手" if _rush else ""),
     ))
 
 
@@ -1176,7 +1182,9 @@ for key, plan in AW_COLLISION_PRICING_BY_RULE.items():
 # 票口沿用正常接單流程；付款成立後觸發帳號密碼私密流程。
 for key, label, price in (
     ("staff_internal_ammo_dump_500m", "內部洗幣｜倒子彈 500M", 2650),
+    ("staff_internal_ammo_dump_500m_rush", "內部洗幣｜倒子彈 500M｜加急 +260T", 2910),
     ("staff_internal_car_500m", "內部洗幣｜撞車 500M", 2480),
+    ("staff_internal_car_500m_rush", "內部洗幣｜撞車 500M｜加急 +260T", 2740),
 ):
     _add(OrderRule(
         category="staff_internal", key=key, label=label,

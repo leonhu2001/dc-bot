@@ -44,6 +44,12 @@ EXPECTED = {
     "farm_car_crash_500m": (3250, 150, 3100, 38, 112),
     "farm_car_crash_1000m": (6100, 300, 5800, 75, 225),
 }
+# Priority is an explicit selectable tier, and its entire +280T belongs to
+# the same worker. Fixed store cuts and CS remain identical to the base tier.
+EXPECTED.update({
+    f"{key}_rush": (price + 280, shop + 0, worker + 280, cs, retained)
+    for key, (price, shop, worker, cs, retained) in tuple(EXPECTED.items())
+})
 
 
 @pytest.mark.parametrize("key,values", EXPECTED.items())

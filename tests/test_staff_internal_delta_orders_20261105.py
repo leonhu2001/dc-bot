@@ -21,6 +21,7 @@ from services.quick_order_v2 import (
 from services.self_service_selection_state import (
     apply_self_service_category_selection,
     apply_self_service_item_group_selection,
+    apply_self_service_detail_selection,
 )
 
 
@@ -61,7 +62,12 @@ def test_internal_500m_coin_wash_is_one_fixed_normal_order(group, rule_key, expe
     apply_self_service_category_selection(draft, INTERNAL_CATEGORY)
     detail = apply_self_service_item_group_selection(draft, group)
 
-    assert detail is not None
+    assert detail is None  # normal and priority are now separate variants
+    variants = orders.get_order_item_details_for_group(INTERNAL_CATEGORY, group)
+    assert len(variants) == 2
+    assert variants[0]["rule_key"] == rule_key
+    assert variants[1]["rule_key"] == f"{rule_key}_rush"
+    apply_self_service_detail_selection(draft, variants[0])
     assert draft["order_rule_key"] == rule_key
     assert draft["quantity"] == 1
     assert _order_requires_credentials(draft) is True

@@ -482,7 +482,19 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
     if is_public_farm_fixed_cut_rule(rule):
         return calculate_farm_fixed_cut_financials(rule, price_result, data)
     if is_internal_ammo_dump_rule(rule):
-        return calculate_internal_ammo_dump_financials(price_result, data)
+        return calculate_internal_ammo_dump_financials(price_result, data, rule)
+    if str(getattr(rule, "key", "") or "") in {
+        "staff_internal_car_500m", "staff_internal_car_500m_rush",
+    }:
+        # This is a direct-payment 500M farm, not a normal discounted
+        # companion order; the entire +260T belongs to the booster.
+        finance = calculate_aw_collision_financials(price_result, {})
+        rush = 260 if str(rule.key).endswith("_rush") else 0
+        finance.update(
+            priority_fee_amount=rush,
+            priority_fee_receiver="worker" if rush else "",
+        )
+        return finance
     if is_aw_collision_rule(rule):
         return calculate_aw_collision_financials(price_result, data)
 

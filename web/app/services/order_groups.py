@@ -249,12 +249,10 @@ GROUP_SPECS = [
         "selector_label": "規格",
         "description": "依 M 數定價；店抽固定，客服分潤從店抽中支付。",
         "variants": [
-            ("farm_ammo_dump_100m", "100M"),
-            ("farm_ammo_dump_200m", "200M"),
-            ("farm_ammo_dump_300m", "300M"),
-            ("farm_ammo_dump_500m", "500M"),
-            ("farm_ammo_dump_1000m", "1000M"),
-            ("farm_ammo_dump_2000m", "2000M"),
+            *((f"farm_ammo_dump_{size}m" + ("_rush" if rush else ""),
+                f"{size}M" + ("｜加急 +280T" if rush else ""))
+              for size in (100, 200, 300, 500, 1000, 2000)
+              for rush in (False, True)),
         ],
     },
     {
@@ -264,10 +262,10 @@ GROUP_SPECS = [
         "selector_label": "規格",
         "description": "依 M 數定價；店抽固定，客服分潤從店抽中支付。",
         "variants": [
-            ("farm_car_crash_100m", "100M"),
-            ("farm_car_crash_200m", "200M"),
-            ("farm_car_crash_500m", "500M"),
-            ("farm_car_crash_1000m", "1000M"),
+            *((f"farm_car_crash_{size}m" + ("_rush" if rush else ""),
+                f"{size}M" + ("｜加急 +280T" if rush else ""))
+              for size in (100, 200, 500, 1000)
+              for rush in (False, True)),
         ],
     },
 
