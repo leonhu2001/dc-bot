@@ -233,10 +233,17 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     payout.named_bonus_rate = 0.0
                     payout.named_bonus_amount = 0
                     payout.final_payout = gross
+                    priority = str(order.order_rule_key or "").endswith("_rush")
                     if is_public_farm_fixed_cut_rule(order.order_rule_key):
-                        payout.note = "固定店抽代肝｜員工拿售價扣除固定店抽｜客服由店抽領25%｜不另加成"
+                        payout.note = (
+                            "固定店抽代肝｜員工拿售價扣除固定店抽｜客服由店抽領25%｜不另加成"
+                            + ("｜加急+280T全給打手，店抽不變" if priority else "")
+                        )
                     else:
-                        payout.note = "特殊代肝單｜接單人員全額 100%｜無客服分潤及額外獎金"
+                        payout.note = (
+                            "特殊代肝單｜接單人員全額 100%｜無客服分潤及額外獎金"
+                            + ("｜加急+260T全給打手，不計店抽／客服" if priority else "")
+                        )
                 details.append({
                     "worker_id": worker_id,
                     "rate": 1.0,
