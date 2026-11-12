@@ -39,9 +39,14 @@ async def ensure_single_self_service_panel(
     lock = _PANEL_LOCKS.setdefault(int(channel.id), asyncio.Lock())
     async with lock:
         bot_id = getattr(getattr(channel.guild, "me", None), "id", None)
-        async for message in channel.history(limit=80):
+        async for message in channel.history(limit=150):
             if _is_self_service_panel(message, bot_id=bot_id):
                 return message, False
+        if "quick_order_v2=1" in str(getattr(channel, "topic", "") or ""):
+            # Every successfully opened quick ticket already sent its sole
+            # selector. If it is absent/deleted/too old for history, fail
+            # closed rather than silently creating a duplicate panel.
+            raise ValueError("快速下單票口已有獨立面板紀錄，找不到原面板，請聯絡客服主管修復。")
         created = await channel.send(
             embed=embed,
             view=view_factory(customer_id=int(customer_id),channel_id=int(channel.id)),
@@ -77,6 +82,9 @@ async def handle_legacy_order_control_dispatch(
         panel,created=await ensure_single_self_service_panel(
             channel,customer_id=customer_id,embed=embed,view_factory=view_factory,
         )
+    except ValueError as exc:
+        await interaction.followup.send(str(exc), ephemeral=True)
+        return
     except (discord.Forbidden,discord.HTTPException):
         await interaction.followup.send(
             "自助下單面板檢查失敗，請通知客服主管確認票口權限，不會重複發送。",
