@@ -4,6 +4,8 @@ from services.aw_collision_financials import calculate_aw_collision_financials
 
 
 AMMO_DUMP_RULE_KEY = "staff_internal_ammo_dump_500m"
+AMMO_DUMP_RUSH_RULE_KEY = "staff_internal_ammo_dump_500m_rush"
+INTERNAL_RUSH_FEE = 260
 NAMED_PRICE = 2650
 UNNAMED_PRICE = 3000
 WORKER_PAYOUT = 2650
@@ -18,7 +20,7 @@ NAMED_SELECTION_KEY = "staff_internal_ammo_named"
 
 def is_internal_ammo_dump_rule(rule_or_key) -> bool:
     key = str(getattr(rule_or_key, "key", rule_or_key) or "").strip()
-    return key == AMMO_DUMP_RULE_KEY
+    return key in (AMMO_DUMP_RULE_KEY, AMMO_DUMP_RUSH_RULE_KEY)
 
 
 def selected_ammo_dump_named(data: dict | None) -> bool | None:
@@ -44,21 +46,29 @@ def calculate_internal_ammo_dump_cs_payout(
     """
     if not is_internal_ammo_dump_rule(rule_or_key):
         return 0
+    rush = str(getattr(rule_or_key, "key", rule_or_key) or "").strip() == AMMO_DUMP_RUSH_RULE_KEY
+    extra = INTERNAL_RUSH_FEE if rush else 0
     if (
-        int(customer_pay_amount or 0) == UNNAMED_PRICE
-        and int(worker_payout_base_amount or 0) == WORKER_PAYOUT
+        int(customer_pay_amount or 0) == UNNAMED_PRICE + extra
+        and int(worker_payout_base_amount or 0) == WORKER_PAYOUT + extra
     ):
         return UNNAMED_CS_PAYOUT
     return 0
 
 
-def calculate_internal_ammo_dump_financials(price_result, data: dict) -> dict:
+def calculate_internal_ammo_dump_financials(price_result, data: dict, rule_or_key=None) -> dict:
+    key = str(getattr(rule_or_key, "key", rule_or_key) or data.get("order_rule_key") or AMMO_DUMP_RULE_KEY)
+    if not is_internal_ammo_dump_rule(key):
+        raise ValueError("不是內部倒子彈 500M 的有效方案")
+    rush = key == AMMO_DUMP_RUSH_RULE_KEY
+    extra = INTERNAL_RUSH_FEE if rush else 0
     named = selected_ammo_dump_named(data)
-    customer_price = UNNAMED_PRICE if named is False else NAMED_PRICE
-    store_margin = customer_price - WORKER_PAYOUT if named is not None else 0
+    customer_price = (UNNAMED_PRICE if named is False else NAMED_PRICE) + extra
+    worker_payout = WORKER_PAYOUT + extra
+    store_margin = customer_price - worker_payout if named is not None else 0
     customer_service_payout = (
         calculate_internal_ammo_dump_cs_payout(
-            AMMO_DUMP_RULE_KEY, customer_price, WORKER_PAYOUT
+            key, customer_price, worker_payout
         )
         if named is not None else 0
     )
@@ -75,8 +85,9 @@ def calculate_internal_ammo_dump_financials(price_result, data: dict) -> dict:
         original_amount=customer_price,
         priced_amount=customer_price,
         customer_pay_amount=customer_price,
-        payout_base_amount=WORKER_PAYOUT,
+        payout_base_amount=worker_payout,
         store_margin_amount=store_margin,
+        farm_rush_fee=extra,
         customer_service_payout_amount=customer_service_payout,
         store_retained_amount=store_margin - customer_service_payout,
         staff_internal_ammo_named=named,
@@ -86,6 +97,8 @@ def calculate_internal_ammo_dump_financials(price_result, data: dict) -> dict:
 
 __all__ = [
     "AMMO_DUMP_RULE_KEY",
+    "AMMO_DUMP_RUSH_RULE_KEY",
+    "INTERNAL_RUSH_FEE",
     "NAMED_PRICE",
     "UNNAMED_PRICE",
     "WORKER_PAYOUT",
