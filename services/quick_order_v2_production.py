@@ -281,6 +281,56 @@ async def _clean_ticket_messages(ticket: discord.TextChannel) -> None:
         return
 
 
+class CoinWashUrgentButton(discord.ui.Button):
+    """Toggle a separate worker-only urgency fee without creating new messages."""
+
+    def __init__(self, *, customer_id: int, channel_id: int, fee: int, selected: bool):
+        super().__init__(
+            label=f"加急 +{fee}T｜{'已選' if selected else '未選'}",
+            style=discord.ButtonStyle.success if selected else discord.ButtonStyle.secondary,
+            custom_id="coin_wash_urgent_toggle_button",
+            row=4,
+        )
+        self.customer_id = int(customer_id)
+        self.channel_id = int(channel_id)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        from core.database import remember_order_data
+        from core.permissions import can_operate_self_service_order
+        from services.coin_wash_urgent_policy import (
+            URGENT_SELECTION_KEY, urgent_fee_for_rule,
+        )
+        from services import self_service_ui_runtime as ui
+
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開單用戶或客服能選擇加急。", ephemeral=True)
+            return
+        if interaction.channel is None or interaction.channel.id != self.channel_id:
+            await interaction.response.send_message("請在原始下單票口選擇加急。", ephemeral=True)
+            return
+
+        data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id)
+        if not isinstance(data, dict) or not urgent_fee_for_rule(data.get("order_rule_key")):
+            await interaction.response.send_message("目前選擇的商品不支援加急。", ephemeral=True)
+            return
+        if data.get("dispatch_message_id") or data.get("provisional_dispatch_message_id") or str(
+            data.get("status") or ""
+        ).lower() in {"waiting_acceptance", "accepted_pending_pay", "active", "stored", "completed", "cancelled"}:
+            await interaction.response.send_message("訂單已送出，不能變更加急選項。", ephemeral=True)
+            return
+
+        data[URGENT_SELECTION_KEY] = data.get(URGENT_SELECTION_KEY) is not True
+        remember_order_data(self.channel_id, data)
+        await interaction.response.edit_message(
+            embed=ui.build_self_service_panel_embed(self.customer_id, data, interaction.guild),
+            view=ui.SelfServiceOrderView(
+                customer_id=self.customer_id,
+                channel_id=self.channel_id,
+                selected_category=data.get("category"),
+            ),
+        )
+
+
 def _install_ticket_ui_policy() -> None:
     """Install the single active Quick Order ticket UI policy."""
     global _BASE_PANEL_BUILDER, _BASE_VIEW_INIT
@@ -407,6 +457,15 @@ def _install_ticket_ui_policy() -> None:
                 child.disabled = True
 
         apply_quick_order_select_display(self, data)
+        from services.coin_wash_urgent_policy import urgent_fee_for_rule
+        urgent_fee = urgent_fee_for_rule(rule_key)
+        if urgent_fee:
+            self.add_item(CoinWashUrgentButton(
+                customer_id=customer_id,
+                channel_id=channel_id,
+                fee=urgent_fee,
+                selected=data.get("coin_wash_urgent") is True,
+            ))
         if rule_key == "staff_internal_aw_collision":
             for child in self.children:
                 if getattr(child, "custom_id", None) == "self_service_order_quantity_select":
