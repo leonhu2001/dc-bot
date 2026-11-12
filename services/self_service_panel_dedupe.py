@@ -50,4 +50,45 @@ async def ensure_single_self_service_panel(
         return created, True
 
 
-__all__=["ensure_single_self_service_panel","_is_self_service_panel"]
+async def handle_legacy_order_control_dispatch(
+    interaction: discord.Interaction, *, customer_id: int, view_factory,
+) -> None:
+    """Staff action: reuse the existing selector instead of posting a second.
+
+    Creation is serialized per ticket, and all prompts remain ephemeral. This
+    does not change any order status or duplicate a dispatch/order row.
+    """
+    channel=interaction.channel
+    customer=(interaction.guild.get_member(customer_id)
+              if interaction.guild is not None else None)
+    mention=customer.mention if customer is not None else f"<@{customer_id}>"
+    embed=discord.Embed(
+        title="自助下單",
+        description=(
+            f"下單用戶：{mention}\n\n"
+            "請下單用戶依序選擇訂單類別、訂單項目、指定選項與數量。\n"
+            "畫面會即時顯示試算金額、可接職位與接單需求。\n"
+            "送出後會先派單等待接單，人數滿後才會開放付款。"
+        ),
+        color=discord.Color.purple(),
+    )
+    await interaction.response.defer(ephemeral=True,thinking=True)
+    try:
+        panel,created=await ensure_single_self_service_panel(
+            channel,customer_id=customer_id,embed=embed,view_factory=view_factory,
+        )
+    except (discord.Forbidden,discord.HTTPException):
+        await interaction.followup.send(
+            "自助下單面板檢查失敗，請通知客服主管確認票口權限，不會重複發送。",
+            ephemeral=True,
+        )
+        return
+    await interaction.followup.send(
+        (f"已開啟自助下單面板：{panel.jump_url}" if created
+         else f"這張票口已有自助下單面板，請使用原本的：{panel.jump_url}"),
+        ephemeral=True,
+    )
+
+
+__all__=["ensure_single_self_service_panel","_is_self_service_panel",
+         "handle_legacy_order_control_dispatch"]
