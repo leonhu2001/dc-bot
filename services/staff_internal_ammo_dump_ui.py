@@ -12,7 +12,8 @@ from services.staff_internal_ammo_dump_policy import (
 class InternalAmmoNamedSelect(discord.ui.Select):
     """Send-order-only choice: selecting an option opens the existing note modal."""
 
-    def __init__(self, *, customer_id: int, channel_id: int, panel_message_id: int | None):
+    def __init__(self, *, customer_id: int, channel_id: int, panel_message_id: int | None, priority: bool = False):
+        self.priority = bool(priority)
         self.customer_id = int(customer_id)
         self.channel_id = int(channel_id)
         self.panel_message_id = panel_message_id
@@ -23,14 +24,14 @@ class InternalAmmoNamedSelect(discord.ui.Select):
             max_values=1,
             options=[
                 discord.SelectOption(
-                    label="有掛名｜顧客 2,650T",
+                    label=f"有掛名｜顧客 {2650 + (INTERNAL_PRIORITY_FEE if self.priority else 0):,}T",
                     value="named",
-                    description="代肝 2,650T；店家差額 0T",
+                    description="加急全給打手；店抽 0T" if self.priority else "代肝 2,650T；店家差額 0T",
                 ),
                 discord.SelectOption(
-                    label="無掛名｜顧客 3,000T",
+                    label=f"無掛名｜顧客 {3000 + (INTERNAL_PRIORITY_FEE if self.priority else 0):,}T",
                     value="unnamed",
-                    description="代肝 2,650T；客服 88T；店家 262T",
+                    description="加急全給打手；客服 88T；店家 262T" if self.priority else "代肝 2,650T；客服 88T；店家 262T",
                 ),
             ],
             row=0,
@@ -71,13 +72,14 @@ class InternalAmmoNamedSelect(discord.ui.Select):
 
 
 class InternalAmmoNamedView(discord.ui.View):
-    def __init__(self, *, customer_id: int, channel_id: int, panel_message_id: int | None):
+    def __init__(self, *, customer_id: int, channel_id: int, panel_message_id: int | None, priority: bool = False):
         super().__init__(timeout=300)
         self.add_item(
             InternalAmmoNamedSelect(
                 customer_id=customer_id,
                 channel_id=channel_id,
                 panel_message_id=panel_message_id,
+                priority=priority,
             )
         )
 
