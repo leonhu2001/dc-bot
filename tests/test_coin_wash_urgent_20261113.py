@@ -113,6 +113,12 @@ def test_web_salary_recalculation_and_report_preserve_entire_urgent_fee(
 
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
+    # The real dashboard migration creates this raw SQLite table separately
+    # from SQLAlchemy Base.metadata; this isolated test must mirror it.
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "CREATE TABLE order_acceptance_meta (order_id INTEGER PRIMARY KEY, status TEXT)"
+        )
 
     with Session(engine) as db:
         order = WebOrder(
