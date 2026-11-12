@@ -28,7 +28,9 @@ FULL_WORKER_PAYOUT_RULE_KEYS = frozenset({
     "farm_halfcoin_120m",
     "farm_halfcoin_360m",
     "staff_internal_ammo_dump_500m",
+    "staff_internal_ammo_dump_500m_rush",
     "staff_internal_car_500m",
+    "staff_internal_car_500m_rush",
     "staff_internal_aw_collision",
     *PUBLIC_FARM_FIXED_CUTS,
 })
