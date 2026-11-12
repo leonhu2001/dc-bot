@@ -20,8 +20,9 @@ class FakePanelMessage:
 
 
 class FakeChannel:
-    def __init__(self, initial=()):
+    def __init__(self, initial=(), *, topic=None):
         self.id=1234567
+        self.topic=topic
         self.guild=SimpleNamespace(me=SimpleNamespace(id=99))
         self.messages=list(initial)
         self.sent=0
@@ -78,6 +79,14 @@ def test_two_staff_clicks_racing_are_serialized_for_same_ticket():
     assert channel.sent==1
     assert {flag for _,flag in results}=={True,False}
     assert results[0][0] is results[1][0]
+
+
+def test_missing_quick_ticket_panel_fails_closed_and_does_not_recreate():
+    channel=FakeChannel(topic="order_customer_id=23;quick_order_v2=1;source_channel_id=8")
+    import pytest
+    with pytest.raises(ValueError,match="找不到原面板"):
+        asyncio.run(_ensure(channel))
+    assert channel.sent==0
 
 
 def test_other_user_and_non_self_service_embed_not_mistaken_for_panel():
