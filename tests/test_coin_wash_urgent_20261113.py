@@ -168,3 +168,21 @@ def test_web_salary_recalculation_and_report_preserve_entire_urgent_fee(
         assert wage.final_payout == basis + fee
         assert cs.payout_amount == cs_expected
         assert "加急" in wage.note
+
+
+def test_dispatch_worker_preview_includes_full_urgent_fee():
+    from web.app.services.order_service import get_worker_dispatch_payout_preview
+    order = SimpleNamespace(
+        status="waiting_acceptance",
+        order_rule_key="staff_internal_car_500m",
+        price_snapshot_json=json.dumps({
+            "order_rule_key": "staff_internal_car_500m",
+            "urgent_fee_amount": 260,
+        }),
+        payouts=[],
+        payout_base_amount=2480,
+        dispatch_required_staff_count=1,
+    )
+    preview = get_worker_dispatch_payout_preview(order, "worker-1")
+    assert preview["is_estimate"] is True
+    assert preview["amount"] == 2740
