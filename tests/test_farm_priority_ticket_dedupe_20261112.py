@@ -209,6 +209,100 @@ def test_rapid_confirm_retries_and_multiple_confirm_views_do_not_create_two_tick
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("key,customer,worker,cs", [
+    ("staff_internal_ammo_dump_500m_rush", 2910, 2910, 0),
+    ("staff_internal_ammo_dump_500m_rush", 3260, 2910, 88),
+    ("staff_internal_car_500m_rush", 2740, 2740, 0),
+])
+def test_internal_rush_closed_salary_and_report_approval_keep_full_worker_and_original_cs(
+    monkeypatch, key, customer, worker, cs,
+):
+    from datetime import datetime
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from shared.db import Base
+    from shared.models import WebOrder, OrderAssignment, WorkerPayout, CustomerServicePayout
+    from web.app.services.order_service import recalculate_order_payouts
+    from web.app.services import worker_bonus_payout as bonuses
+
+    engine=create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with engine.begin() as con:
+        con.exec_driver_sql(
+            "CREATE TABLE order_acceptance_meta (order_id INTEGER PRIMARY KEY, status TEXT)"
+        )
+    with Session(engine) as db:
+        order=WebOrder(
+            category="staff_internal",item=key,order_rule_key=key,status="closed",
+            amount=customer,customer_pay_amount=customer,
+            payout_base_amount=worker,closed_at=datetime(2026,11,12),
+        )
+        db.add(order)
+        db.flush()
+        db.add(OrderAssignment(
+            order_id=order.id,worker_discord_id="booster",
+            role_type="booster",is_active=True,has_named_bonus=True,
+        ))
+        db.flush()
+        recalculate_order_payouts(db,order.id)
+        db.commit()
+        order_id=order.id
+        salary=db.query(WorkerPayout).filter_by(order_id=order_id).one()
+        cs_row=db.query(CustomerServicePayout).filter_by(order_id=order_id).one()
+        assert salary.final_payout==worker
+        assert cs_row.payout_amount==cs
+        assert salary.base_rate==1.0
+        assert customer==worker+cs+(customer-worker-cs)
+
+    monkeypatch.setattr(bonuses,"SessionLocal",lambda: Session(engine))
+    def forbidden(*args,**kwargs):
+        raise AssertionError("priority full-worker payout must not query performance bonus")
+    monkeypatch.setattr(bonuses,"previous_month_performance",forbidden)
+    monkeypatch.setattr(bonuses,"is_store_binding_effective_at",forbidden)
+    monkeypatch.setattr(bonuses,"_approved_stream_map",forbidden)
+    monkeypatch.setattr(bonuses,"_assignment_stream_override_map",forbidden)
+    bonuses.apply_approved_report_worker_bonuses(order_id)
+    with Session(engine) as db:
+        salary=db.query(WorkerPayout).filter_by(order_id=order_id).one()
+        cs_row=db.query(CustomerServicePayout).filter_by(order_id=order_id).one()
+        assert salary.final_payout==worker
+        assert salary.base_rate==1.0
+        assert salary.named_bonus_amount==0
+        assert "加急+260T" in salary.note
+        if cs:
+            assert "客服固定88T" in salary.note
+        assert cs_row.payout_amount==cs
+        assert customer-worker-cs==(262 if cs else 0)
+
+
+def test_public_web_priority_wallet_and_vip_discount_cannot_take_worker_fee(monkeypatch):
+    from web.app.services import checkout_preview as checkout
+    monkeypatch.setattr(
+        checkout,"load_customer_state",
+        lambda *_: {"vip_name":"白金","points":100,"wallet_balance":200},
+    )
+    monkeypatch.setattr(
+        checkout,"vip_discount_policy",
+        lambda **kwargs: {"eligible":True,"pay_rate":94,"reason":"測試折扣"},
+    )
+    monkeypatch.setattr(checkout,"preview_same_order_benefit",lambda *a,**kw:None)
+    monkeypatch.setattr(checkout,"resolve_selected_staff",lambda **kwargs:([],[]))
+    preview=checkout.build_checkout_preview(
+        customer_id="farm-rush-wallet-test",
+        rule_key="farm_ammo_dump_100m_rush",use_wallet=True,
+    )
+    finance=preview["finance"]
+    assert finance["customer_pay_amount"]==1080
+    assert finance["wallet_use_amount"]==200
+    assert finance["remaining_pay_amount"]==880
+    assert finance["payout_base_amount"]==990
+    assert finance["store_margin_amount"]==90
+    assert finance["customer_service_payout_amount"]==23
+    assert finance["store_retained_amount"]==67
+    assert finance["priority_fee_amount"]==280
+    assert preview["vip"]["pay_rate"]==100
+
+
 def test_existing_bot_customer_service_dispatch_calls_idempotent_sender():
     from pathlib import Path
     s=(Path(__file__).resolve().parents[1]/"bot.py").read_text(encoding="utf-8")
