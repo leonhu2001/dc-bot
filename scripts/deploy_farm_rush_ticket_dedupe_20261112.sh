@@ -60,6 +60,7 @@ while IFS= read -r file; do
     services/order_rules.py|\
     services/orders.py|\
     services/quick_order_v2.py|\
+    services/quick_order_ticket_policy_20261028.py|\
     services/self_service_financial_breakdown_display.py|\
     services/self_service_financials.py|\
     services/self_service_panel_dedupe.py|\
