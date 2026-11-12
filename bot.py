@@ -1760,19 +1760,31 @@ class OrderControlView(discord.ui.View):
             color=discord.Color.purple()
         )
 
-        await interaction.response.defer()
+        # Existing quick tickets already contain a self-service selector.
+        # The legacy "派單" control previously sent a SECOND copy every click.
+        # Serialize simultaneous staff clicks, reuse the existing panel and
+        # only send one when this older ticket has no panel at all.
+        from services.self_service_panel_dedupe import ensure_single_self_service_panel
 
-        await interaction.channel.send(
-            embed=embed,
-            view=SelfServiceOrderView(
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            panel, created = await ensure_single_self_service_panel(
+                interaction.channel,
                 customer_id=customer_id,
-                channel_id=interaction.channel.id
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
+                embed=embed,
+                view_factory=SelfServiceOrderView,
             )
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            await interaction.followup.send(
+                "自助下單面板檢查失敗，請通知客服主管確認票口權限，不會重複發送。",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(
+            (f"已開啟自助下單面板：{panel.jump_url}"
+             if created else f"這張票口已有自助下單面板，請使用原本的：{panel.jump_url}"),
+            ephemeral=True,
         )
 
 # profile_direct_order_ticket_creator_v1
