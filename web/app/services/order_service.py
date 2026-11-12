@@ -569,6 +569,20 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
         resolve_one_guard_unit_price,
     )
 
+    from services.coin_wash_urgent_policy import urgent_fee_from_price_snapshot
+    from services.one_companion_one_guard_payout import is_full_worker_payout_rule
+
+    urgent_fee_amount = urgent_fee_from_price_snapshot(
+        getattr(order, "price_snapshot_json", None)
+    )
+    # Full-worker direct settlements use actual customer payment to calculate
+    # their special named/unnamed margin. Remove worker-only urgency first.
+    if is_full_worker_payout_rule(getattr(order, "order_rule_key", None)):
+        customer_paid = getattr(order, "customer_pay_amount", None)
+        if customer_paid is None:
+            customer_paid = order.amount
+        customer_service_base = max(0, int(customer_paid or 0) - urgent_fee_amount)
+
     payout_result = calculate_one_companion_one_guard_order_payout(
         rule_key=getattr(order, "order_rule_key", None),
         unit_price=resolve_one_guard_unit_price(
