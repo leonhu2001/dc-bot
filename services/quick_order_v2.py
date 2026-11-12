@@ -664,7 +664,7 @@ async def _create_ticket(
         )
 
         stage = "build_order_selector_panel"
-        await ticket.send(
+        panel_message = await ticket.send(
             embed=ui.build_self_service_panel_embed(member.id, data, guild),
             view=ui.SelfServiceOrderView(
                 customer_id=member.id,
@@ -677,6 +677,8 @@ async def _create_ticket(
                 everyone=False,
             ),
         )
+        data["self_service_panel_message_id"] = panel_message.id
+        remember_order_data(ticket.id, data)
     except Exception as exc:
         if ticket is not None:
             try:
