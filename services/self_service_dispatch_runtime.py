@@ -266,6 +266,7 @@ async def _create_waiting_acceptance_order_once(
         "manual_discount_amount": price_adjustment.get("manual_discount_amount"),
         "payout_base_amount": price_adjustment.get("payout_base_amount"),
         "store_margin_amount": price_adjustment.get("store_margin_amount", 0),
+        "urgent_fee_amount": price_adjustment.get("urgent_fee_amount", 0),
         "staff_internal_ammo_named": price_adjustment.get("staff_internal_ammo_named"),
         "cash_coupon_amount": price_adjustment.get("cash_coupon_amount"),
         "point_benefit_key": price_adjustment.get("point_benefit_key"),
@@ -414,6 +415,9 @@ async def _create_waiting_acceptance_order_once(
             if named is True
             else "掛名：無掛名｜顧客 3000T｜代肝 2650T｜店抽 350T"
         )
+
+    if price_adjustment.get("urgent_fee_amount"):
+        web_note_parts.append(f"加急 +{int(price_adjustment['urgent_fee_amount'])}T｜全額歸接單打手")
 
     if price_adjustment.get(
         "service_bonus_text"
