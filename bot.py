@@ -1866,6 +1866,9 @@ class OrderControlView(discord.ui.View):
         form_view = SelfServiceOrderView(
             customer_id=customer_id,
             channel_id=interaction.channel.id,
+            selected_category=(
+                draft.get("category") if draft.get("quick_order_v2") else None
+            ),
         )
         if existing_panel is not None:
             # Use the live draft so reopening does not reset customer's choices.
