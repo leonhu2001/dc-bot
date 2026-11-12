@@ -18,6 +18,7 @@ on:
       - fix/retire-mouth-organ-and-old-halfcoin-20261111
       - feat/main-support-panel-channel-links-20261111
       - fix/support-panel-order-guide-recruit-examiner-20261111
+      - feat/farm-priority-worker-only-and-ticket-idempotency-20261112
   workflow_dispatch:
 
 permissions:
@@ -152,7 +153,14 @@ jobs:
       - name: Install Chromium for browser tests
         if: github.ref_name != 'fix/support-panel-order-guide-recruit-examiner-20261111'
         run: |
-          python -m playwright install --with-deps chromium
+          # The runner already includes the runtime libraries needed by
+          # Playwright Chromium; avoid re-installing fonts via Ubuntu apt
+          # during GitHub-hosted DNS outages. Browser smoke flows still RUN.
+          if [ "${{ github.ref_name }}" = "feat/farm-priority-worker-only-and-ticket-idempotency-20261112" ]; then
+            python -m playwright install chromium
+          else
+            python -m playwright install --with-deps chromium
+          fi
 
       - name: Run browser smoke flows
         if: github.ref_name != 'fix/support-panel-order-guide-recruit-examiner-20261111'
