@@ -202,6 +202,8 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
 
         legacy = _is_legacy_order(order)
         full_worker_payout = is_full_worker_payout_rule(order.order_rule_key)
+        from services.coin_wash_urgent_policy import urgent_fee_from_price_snapshot
+        urgent_fee_amount = urgent_fee_from_price_snapshot(order.price_snapshot_json)
         stream_map = {} if full_worker_payout else _approved_stream_map(db, int(order_id))
         stream_override_map = (
             {} if full_worker_payout else _assignment_stream_override_map(db, int(order_id))
@@ -212,6 +214,9 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
             ).all()
         )
 
+        # Washing SKUs require exactly one receiver. Select one deterministically
+        # and do not duplicate the surcharge across multiple payout rows.
+        urgency_receiver_id = str(payouts[0].worker_discord_id) if payouts else None
         details: list[dict] = []
         for payout in payouts:
             worker_id = str(payout.worker_discord_id or "")
@@ -227,8 +232,14 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     payout.base_payout = gross
                     payout.named_bonus_rate = 0.0
                     payout.named_bonus_amount = 0
-                    payout.final_payout = gross
-                    payout.note = "特殊代肝單｜接單人員全額 100%｜無客服分潤及額外獎金"
+                    surcharge = (
+                        urgent_fee_amount if worker_id == urgency_receiver_id else 0
+                    )
+                    payout.final_payout = gross + surcharge
+                    payout.note = (
+                        "特殊代肝單｜接單人員全額 100%｜無其他額外獎金"
+                        + (f"｜加急 +{surcharge}T 全額歸打手" if surcharge else "")
+                    )
                 details.append({
                     "worker_id": worker_id,
                     "rate": 1.0,
@@ -324,7 +335,9 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     if order.customer_pay_amount is not None else order.amount or 0
                 )
                 cs_amount = calculate_internal_ammo_dump_cs_payout(
-                    order.order_rule_key, customer_paid, payout_base
+                    order.order_rule_key,
+                    max(0, customer_paid - urgent_fee_amount),
+                    payout_base,
                 )
                 cs_rate = cs_amount / customer_paid if customer_paid > 0 else 0.0
             elif legacy:
