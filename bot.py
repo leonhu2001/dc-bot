@@ -1746,45 +1746,9 @@ class OrderControlView(discord.ui.View):
             )
             return
 
-        customer = interaction.guild.get_member(customer_id) if interaction.guild else None
-        customer_mention = customer.mention if customer is not None else f"<@{customer_id}>"
-
-        embed = discord.Embed(
-            title="自助下單",
-            description=(
-                f"下單用戶：{customer_mention}\n\n"
-                "請下單用戶依序選擇訂單類別、訂單項目、指定選項與數量。\n"
-                "畫面會即時顯示試算金額、可接職位與接單需求。\n"
-                "送出後會先派單等待接單，人數滿後才會開放付款。"
-            ),
-            color=discord.Color.purple()
-        )
-
-        # Existing quick tickets already contain a self-service selector.
-        # The legacy "派單" control previously sent a SECOND copy every click.
-        # Serialize simultaneous staff clicks, reuse the existing panel and
-        # only send one when this older ticket has no panel at all.
-        from services.self_service_panel_dedupe import ensure_single_self_service_panel
-
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            panel, created = await ensure_single_self_service_panel(
-                interaction.channel,
-                customer_id=customer_id,
-                embed=embed,
-                view_factory=SelfServiceOrderView,
-            )
-        except (discord.Forbidden, discord.HTTPException) as exc:
-            await interaction.followup.send(
-                "自助下單面板檢查失敗，請通知客服主管確認票口權限，不會重複發送。",
-                ephemeral=True,
-            )
-            return
-
-        await interaction.followup.send(
-            (f"已開啟自助下單面板：{panel.jump_url}"
-             if created else f"這張票口已有自助下單面板，請使用原本的：{panel.jump_url}"),
-            ephemeral=True,
+        from services.self_service_panel_dedupe import handle_legacy_order_control_dispatch
+        await handle_legacy_order_control_dispatch(
+            interaction, customer_id=customer_id, view_factory=SelfServiceOrderView,
         )
 
 # profile_direct_order_ticket_creator_v1
