@@ -196,12 +196,12 @@ def test_rapid_confirm_retries_and_multiple_confirm_views_do_not_create_two_tick
                 response=SimpleNamespace(send_message=AsyncMock()),
             )
         first,second=interaction(),interaction()
-        await asyncio.gather(a.confirm(first,SimpleNamespace(disabled=False)),
-                             b.confirm(second,SimpleNamespace(disabled=False)))
+        await asyncio.gather(a.children[0].callback(first),
+                             b.children[0].callback(second))
         assert created==1
         assert second.response.send_message.await_count+first.response.send_message.await_count==1
         third=interaction()
-        await b.confirm(third,SimpleNamespace(disabled=False))
+        await b.children[0].callback(third)
         third.response.send_message.assert_awaited_once()
         assert "剛剛已建立" in third.response.send_message.await_args.args[0]
         assert created==1
@@ -212,5 +212,6 @@ def test_rapid_confirm_retries_and_multiple_confirm_views_do_not_create_two_tick
 def test_existing_bot_customer_service_dispatch_calls_idempotent_sender():
     from pathlib import Path
     s=(Path(__file__).resolve().parents[1]/"bot.py").read_text(encoding="utf-8")
-    assert 'from services.quick_order_ticket_dedupe_policy import send_self_service_panel_once' in s
-    assert "這個下單票口已經有自助下單面板" in s
+    assert 'from services.quick_order_ticket_dedupe_policy import send_legacy_control_panel_once' in s
+    source=(Path(__file__).resolve().parents[1]/"services/quick_order_ticket_dedupe_policy.py").read_text(encoding="utf-8")
+    assert "這個下單票口已經有自助下單面板" in source
