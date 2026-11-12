@@ -98,3 +98,19 @@ def test_legacy_dispatch_button_uses_dedupe_not_unconditional_send():
     helper=(Path(__file__).resolve().parents[1]/"services/self_service_panel_dedupe.py").read_text(encoding="utf-8")
     assert "ensure_single_self_service_panel(" in helper
     assert "票口已有自助下單面板" in helper
+
+
+def test_all_confirmation_views_block_repeated_successful_ticket_creation():
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]
+    for file_name, expected in (
+        ("services/quick_order_v2.py","ticket = await _create_ticket("),
+        ("services/quick_order_ticket_policy_20261028.py",
+         "ticket = await self.quick_module._create_ticket("),
+    ):
+        text=(root/file_name).read_text(encoding="utf-8")
+        assert "self.created_ticket_id: int | None = None" in text
+        assert "if self.created_ticket_id is not None:" in text
+        assert expected in text
+        assert "self.created_ticket_id = int(ticket.id)" in text
+        assert "請勿重複點擊" in text or "請不要再次開票" in text
