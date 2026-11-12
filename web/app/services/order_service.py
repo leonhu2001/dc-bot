@@ -400,9 +400,14 @@ def get_worker_dispatch_payout_preview(
                 None,
             )
             if preview is not None:
+                from services.coin_wash_urgent_policy import urgent_fee_from_price_snapshot
+
+                urgent_fee = urgent_fee_from_price_snapshot(
+                    getattr(order, "price_snapshot_json", None)
+                )
                 return {
                     "label": "預估分潤",
-                    "amount": int(round(float(preview.final_payout or 0))),
+                    "amount": int(round(float(preview.final_payout or 0))) + urgent_fee,
                     "is_estimate": True,
                 }
 
