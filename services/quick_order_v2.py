@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import asyncio
+import time
 import traceback
 
 import discord
@@ -37,6 +39,13 @@ _PATCH_INSTALLED = False
 _ORIGINAL_VIEW_INIT = None
 _ORIGINAL_PANEL_BUILDER = None
 VIP_TIMER_CUSTOM_ORDER_VALUE = "__vip_timer_custom_order__"
+
+# Prevent rapid repeated confirmations (even from separate ephemeral confirm
+# views) from opening more than one new ticket for the SAME service.
+_TICKET_CREATE_IN_FLIGHT: set[tuple[int, int, str, str]] = set()
+_RECENT_TICKET_SUCCESS: dict[tuple[int, int, str, str], tuple[float, int]] = {}
+_TICKET_DUPLICATE_WINDOW_SECONDS = 20
+
 
 _GAME_ENTRY_META = {
     QUICK_ORDER_V2_CHANNELS["valorant"]: ("valorant", "🎯 特戰英豪"),
@@ -422,23 +431,45 @@ class QuickOrderConfirmView(discord.ui.View):
                 ephemeral=True,
             )
             return
-        if self.opening:
+        # Discord can deliver retries or multiple confirmation views for one
+        # customer; per-view "opening" alone does not protect those requests.
+        key = (int(interaction.user.id), int(self.source_channel_id),
+               str(self.category), str(self.item_group))
+        now = time.monotonic()
+        for old, (expires, _channel_id) in list(_RECENT_TICKET_SUCCESS.items()):
+            if expires <= now:
+                _RECENT_TICKET_SUCCESS.pop(old, None)
+        if self.opening or key in _TICKET_CREATE_IN_FLIGHT:
             await interaction.response.send_message(
                 "票口正在建立，請勿重複點擊。",
+                ephemeral=True,
+            )
+            return
+        recent = _RECENT_TICKET_SUCCESS.get(key)
+        if recent and recent[0] > now:
+            await interaction.response.send_message(
+                f"剛剛已建立票口：<#{recent[1]}>，請不要重複開單。",
                 ephemeral=True,
             )
             return
 
         self.opening = True
         button.disabled = True
+        _TICKET_CREATE_IN_FLIGHT.add(key)
         try:
-            await _create_ticket(
+            ticket = await _create_ticket(
                 interaction,
                 category=self.category,
                 item_group=self.item_group,
                 source_channel_id=self.source_channel_id,
             )
+            if ticket is not None:
+                _RECENT_TICKET_SUCCESS[key] = (
+                    time.monotonic() + _TICKET_DUPLICATE_WINDOW_SECONDS,
+                    int(ticket.id),
+                )
         finally:
+            _TICKET_CREATE_IN_FLIGHT.discard(key)
             self.opening = False
 
     @discord.ui.button(
@@ -666,7 +697,10 @@ async def _create_ticket(
         )
 
         stage = "build_order_selector_panel"
-        await ticket.send(
+        from services.quick_order_ticket_dedupe_policy import send_self_service_panel_once
+
+        await send_self_service_panel_once(
+            ticket,
             embed=ui.build_self_service_panel_embed(member.id, data, guild),
             view=ui.SelfServiceOrderView(
                 customer_id=member.id,
