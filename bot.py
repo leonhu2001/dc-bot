@@ -1760,27 +1760,14 @@ class OrderControlView(discord.ui.View):
             color=discord.Color.purple()
         )
 
-        from services.quick_order_ticket_dedupe_policy import send_self_service_panel_once
-
+        from services.quick_order_ticket_dedupe_policy import send_legacy_control_panel_once
         await interaction.response.defer(ephemeral=True)
-        created = await send_self_service_panel_once(
-            interaction.channel,
+        await send_legacy_control_panel_once(
+            interaction,
             embed=embed,
-            view=SelfServiceOrderView(
-                customer_id=customer_id,
-                channel_id=interaction.channel.id
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
-            )
+            view=SelfServiceOrderView(customer_id=customer_id, channel_id=interaction.channel.id),
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
-        if not created:
-            await interaction.followup.send(
-                "這個下單票口已經有自助下單面板，請使用原本的面板，不會重複發送。",
-                ephemeral=True,
-            )
 
 # profile_direct_order_ticket_creator_v1
 async def create_staff_profile_order_ticket(
