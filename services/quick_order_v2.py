@@ -697,10 +697,10 @@ async def _create_ticket(
         )
 
         stage = "build_order_selector_panel"
-        from services.quick_order_ticket_dedupe_policy import send_self_service_panel_once
-
-        await send_self_service_panel_once(
-            ticket,
+        # A freshly-created channel has no prior selector. The atomic quick
+        # confirm guard above owns this first (single) panel; do not fetch
+        # channel history here (VIP/older ticket shims may not support it).
+        await ticket.send(
             embed=ui.build_self_service_panel_embed(member.id, data, guild),
             view=ui.SelfServiceOrderView(
                 customer_id=member.id,
