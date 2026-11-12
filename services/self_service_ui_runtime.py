@@ -921,13 +921,19 @@ class SelfServiceOrderView(discord.ui.View):
         if is_internal_ammo_dump_rule(rule):
             from services.staff_internal_ammo_dump_ui import InternalAmmoNamedView
 
+            priority = str(getattr(rule, "key", "") or "").endswith("_rush")
             await interaction.response.send_message(
                 "送出倒子彈 500M 前，請由客服選擇掛名狀態。"
-                "\n有掛名 2,650T；無掛名 3,000T（差額 350T：客服 88T、店家 262T）。",
+                + (
+                    "\n加急 +260T 全給打手：有掛名 2,910T；無掛名 3,260T（差額 350T：客服 88T、店家 262T）。"
+                    if priority else
+                    "\n有掛名 2,650T；無掛名 3,000T（差額 350T：客服 88T、店家 262T）。"
+                ),
                 view=InternalAmmoNamedView(
                     customer_id=self.customer_id,
                     channel_id=self.channel_id,
                     panel_message_id=panel_message_id,
+                    priority=priority,
                 ),
                 ephemeral=True,
             )
