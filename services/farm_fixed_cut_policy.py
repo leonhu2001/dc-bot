@@ -92,6 +92,7 @@ def calculate_farm_fixed_cut_financials(rule_or_key, price_result, data: dict) -
         customer_service_payout_amount=summary.customer_service_amount,
         store_retained_amount=summary.store_retained_amount,
         fixed_store_cut_policy="farm_fixed_cut_cs25_v1",
+        farm_rush_fee=PUBLIC_FARM_RUSH_FEE if key.endswith("_rush") else 0,
     )
     return finance
 
