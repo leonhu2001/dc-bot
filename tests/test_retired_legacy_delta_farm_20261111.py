@@ -56,7 +56,7 @@ def test_old_halfcoin_and_mouth_organ_absent_from_web_bot_new_order_menus():
 
     # New replacements remain available, with prices and cuts untouched.
     groups = {group["key"]: group for group in visible}
-    for kind, count in (("ammo_dump", 6), ("car_crash", 4)):
+    for kind, count in (("ammo_dump", 12), ("car_crash", 8)):
         assert len(groups[kind]["variants"]) == count
 
 
