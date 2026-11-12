@@ -240,9 +240,13 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                             + ("｜加急+280T全給打手，店抽不變" if priority else "")
                         )
                     else:
+                        ammo = str(order.order_rule_key or "").startswith(
+                            "staff_internal_ammo_dump_"
+                        )
                         payout.note = (
-                            "特殊代肝單｜接單人員全額 100%｜無客服分潤及額外獎金"
-                            + ("｜加急+260T全給打手，不計店抽／客服" if priority else "")
+                            "特殊代肝單｜接單人員全額 100%｜無額外獎金"
+                            + ("｜無掛名時店抽350T，客服固定88T" if ammo else "｜客服分潤0T")
+                            + ("｜加急+260T全給打手，不計店抽或客服" if priority else "")
                         )
                 details.append({
                     "worker_id": worker_id,
