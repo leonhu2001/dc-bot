@@ -287,6 +287,9 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
             base_payout = int(round(gross * WORKER_BASE_PAYOUT_RATE))
             named_amount = int(round(gross * (LEGACY_WORKER_NAMED_BONUS_RATE if legacy and named else WORKER_NAMED_BONUS_RATE if named else 0.0)))
             final_amount = int(round(gross * rate))
+            worker_urgent_fee = (
+                urgent_fee_amount if worker_id == urgency_receiver_id else 0
+            )
 
             manual_override = "手動指定分潤" in str(payout.note or "")
             locked = payout.payout_status == PayoutStatus.PAID.value or manual_override
@@ -295,7 +298,7 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                 payout.base_payout = base_payout
                 payout.named_bonus_rate = LEGACY_WORKER_NAMED_BONUS_RATE if legacy else WORKER_NAMED_BONUS_RATE
                 payout.named_bonus_amount = named_amount
-                payout.final_payout = final_amount
+                payout.final_payout = final_amount + worker_urgent_fee
                 payout.note = (
                     f"分潤：基礎80%"
                     + (f"＋掛名{5 if legacy else 3}%" if named else "")
@@ -303,6 +306,10 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     + ("＋前月業績達5000T 2%" if previous_bonus else "")
                     + ("＋綁店3%" if store_bound else "")
                     + f"｜前月業績 {previous_performance}T"
+                    + (
+                        f"｜加急 +{worker_urgent_fee}T 全額歸接單打手，不抽成"
+                        if worker_urgent_fee else ""
+                    )
                 )
 
             details.append({
@@ -346,6 +353,12 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                 cs_amount = int(round(int(cs_base) * cs_rate))
             else:
                 total_worker = sum(max(0, int(row.final_payout or 0)) for row in payouts)
+                # Urgency is not part of payout_base and must not shrink the
+                # CS margin when report approval recalculates salary.
+                if urgent_fee_amount and urgency_receiver_id in {
+                    str(row.worker_discord_id) for row in payouts
+                }:
+                    total_worker = max(0, total_worker - urgent_fee_amount)
                 effective_worker_rate = min(1.0, total_worker / payout_base) if payout_base > 0 else WORKER_BASE_PAYOUT_RATE
                 raw = calculate_customer_service_payout(
                     int(cs_base),
