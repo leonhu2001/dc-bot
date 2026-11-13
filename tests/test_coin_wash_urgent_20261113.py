@@ -22,8 +22,10 @@ from services.staff_internal_ammo_dump_policy import calculate_internal_ammo_dum
     [
         ("staff_internal_car_500m", 260),
         ("staff_internal_ammo_dump_500m", 260),
-        ("farm_halfcoin_120m", 280),
-        ("farm_halfcoin_360m", 280),
+        ("farm_coin_wash_car", 280),
+        ("farm_coin_wash_ammo_dump", 280),
+        ("farm_halfcoin_120m", 0),
+        ("farm_halfcoin_360m", 0),
         ("staff_internal_aw_collision", 0),
         ("farm_aw_collision_1_100", 0),
         ("steam_play", 0),
@@ -75,7 +77,7 @@ def test_public_washing_urgency_is_only_surcharge_not_commission_base():
         "original_amount": 1250, "priced_amount": 1250,
         "customer_pay_amount": 1250, "payout_base_amount": 1250,
     }
-    with_urgent = apply_urgent_fee("farm_halfcoin_120m", {"coin_wash_urgent": True}, base)
+    with_urgent = apply_urgent_fee("farm_coin_wash_car", {"coin_wash_urgent": True}, base)
     assert with_urgent["customer_pay_amount"] == 1250 + EXTERNAL_URGENT_FEE
     assert with_urgent["payout_base_amount"] == 1250
     assert base["customer_pay_amount"] == 1250
@@ -90,16 +92,18 @@ def test_payroll_bonus_only_from_matching_snapshot():
 
 
 @pytest.mark.parametrize(
-    ("rule_key", "paid", "basis", "fee", "cs_expected"),
+    ("rule_key", "paid", "basis", "fee", "cs_expected", "worker_expected", "store_expected"),
     [
-        ("staff_internal_ammo_dump_500m", 3260, 2650, 260, 88),
-        ("staff_internal_ammo_dump_500m", 2910, 2650, 260, 0),
-        ("staff_internal_car_500m", 2740, 2480, 260, 0),
-        ("farm_halfcoin_120m", 1530, 1250, 280, 0),
+        ("staff_internal_ammo_dump_500m", 3260, 2650, 260, 88, 2910, 262),
+        ("staff_internal_ammo_dump_500m", 2910, 2650, 260, 0, 2910, 0),
+        ("staff_internal_car_500m", 2740, 2480, 260, 0, 2740, 0),
+        ("farm_coin_wash_car", 2280, 2000, 280, 100, 1880, 300),
+        ("farm_coin_wash_ammo_dump", 2280, 2000, 280, 100, 1880, 300),
     ],
 )
 def test_web_salary_recalculation_and_report_preserve_entire_urgent_fee(
-    monkeypatch, rule_key, paid, basis, fee, cs_expected
+    monkeypatch, rule_key, paid, basis, fee, cs_expected,
+    worker_expected, store_expected
 ):
     from datetime import datetime
     from sqlalchemy import create_engine
@@ -151,21 +155,21 @@ def test_web_salary_recalculation_and_report_preserve_entire_urgent_fee(
     with Session(engine) as db:
         wage = db.query(WorkerPayout).filter_by(order_id=order_id).one()
         cs = db.query(CustomerServicePayout).filter_by(order_id=order_id).one()
-        assert wage.final_payout == basis + fee
+        assert wage.final_payout == worker_expected
         assert cs.payout_amount == cs_expected
-        assert paid - wage.final_payout - cs.payout_amount == (
-            262 if cs_expected == 88 else 0
-        )
+        assert paid - wage.final_payout - cs.payout_amount == store_expected
         assert "加急" in wage.note
 
     monkeypatch.setattr(report_bonus, "SessionLocal", lambda: Session(engine))
+    monkeypatch.setattr(report_bonus, "previous_month_performance", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(report_bonus, "is_store_binding_effective_at", lambda *args, **kwargs: False)
     report_bonus.apply_approved_report_worker_bonuses(order_id)
 
     with Session(engine) as db:
         wage = db.query(WorkerPayout).filter_by(order_id=order_id).one()
         cs = db.query(CustomerServicePayout).filter_by(order_id=order_id).one()
         assert wage.payout_status == PayoutStatus.UNPAID.value
-        assert wage.final_payout == basis + fee
+        assert wage.final_payout == worker_expected
         assert cs.payout_amount == cs_expected
         assert "加急" in wage.note
 
@@ -186,3 +190,25 @@ def test_dispatch_worker_preview_includes_full_urgent_fee():
     preview = get_worker_dispatch_payout_preview(order, "worker-1")
     assert preview["is_estimate"] is True
     assert preview["amount"] == 2740
+
+
+def test_obsolete_halfcoin_products_not_in_customer_catalog_or_order_item_list():
+    from services.orders import (
+        SELF_SERVICE_ORDER_CATALOG,
+        ORDER_ITEMS_BY_CATEGORY,
+        CATALOG_HIDDEN_RULE_KEYS,
+    )
+    retired = {"farm_halfcoin_120m", "farm_halfcoin_360m"}
+    assert retired <= CATALOG_HIDDEN_RULE_KEYS
+    farm = SELF_SERVICE_ORDER_CATALOG["farm"]
+    assert "哈夫幣代洗" not in [group["label"] for group in farm]
+    assert all(
+        detail["rule_key"] not in retired
+        for group in farm
+        for detail in group.get("details", [])
+    )
+    assert not any("哈夫幣代洗" in label for label in ORDER_ITEMS_BY_CATEGORY["farm"])
+    public_wash = next(group for group in farm if group["label"] == "對外洗幣")
+    assert {detail["rule_key"] for detail in public_wash["details"]} == {
+        "farm_coin_wash_car", "farm_coin_wash_ammo_dump"
+    }
