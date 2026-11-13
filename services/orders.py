@@ -149,10 +149,10 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         },
         {"label": "部門任務", "details": [{"label": "部門任務", "value": "department", "rule_key": "farm_department_task", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {
-            "label": "哈夫幣代洗",
+            "label": "對外洗幣",
             "details": [
-                {"label": "120M", "value": "120m", "rule_key": "farm_halfcoin_120m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "360M", "value": "360m", "rule_key": "farm_halfcoin_360m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "撞車｜客服報價", "value": "car", "rule_key": "farm_coin_wash_car", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "倒子彈｜客服報價", "value": "ammo_dump", "rule_key": "farm_coin_wash_ammo_dump", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
         {
@@ -344,6 +344,10 @@ for _prefix, _category in (
 
 # 所有 rule label 仍保留，讓舊訂單 / 舊紀錄可繼續被辨識。
 CATALOG_HIDDEN_RULE_KEYS = {
+    # Retired 120M/360M halfcoin SKUs stay resolvable for historical orders
+    # but must never appear as new customer-facing choices.
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
     "basic_sweet_single",
     "basic_sweet_double",
     "basic_black_tide_entertain_1",
