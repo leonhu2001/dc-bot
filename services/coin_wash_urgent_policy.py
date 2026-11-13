@@ -13,11 +13,11 @@ INTERNAL_WASH_RULE_KEYS = frozenset({
     "staff_internal_car_500m",
     "staff_internal_ammo_dump_500m",
 })
-# Public catalogue currently has 120M/360M halfcoin washing SKUs. New
-# public car/ammo variants can be added here once their base prices exist.
+# External washing must attach only to the current car / ammo services.
+# The obsolete halfcoin 120M/360M rules are strictly historical.
 EXTERNAL_WASH_RULE_KEYS = frozenset({
-    "farm_halfcoin_120m",
-    "farm_halfcoin_360m",
+    "farm_coin_wash_car",
+    "farm_coin_wash_ammo_dump",
 })
 
 
