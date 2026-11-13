@@ -163,6 +163,8 @@ def test_web_salary_recalculation_and_report_preserve_entire_urgent_fee(
     monkeypatch.setattr(report_bonus, "SessionLocal", lambda: Session(engine))
     monkeypatch.setattr(report_bonus, "previous_month_performance", lambda *args, **kwargs: 0)
     monkeypatch.setattr(report_bonus, "is_store_binding_effective_at", lambda *args, **kwargs: False)
+    monkeypatch.setattr(report_bonus, "_approved_stream_map", lambda *args, **kwargs: {})
+    monkeypatch.setattr(report_bonus, "_assignment_stream_override_map", lambda *args, **kwargs: {})
     report_bonus.apply_approved_report_worker_bonuses(order_id)
 
     with Session(engine) as db:
