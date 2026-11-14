@@ -11,6 +11,7 @@ from services.order_rules import (
     AW_COLLISION_RECEIVER_ROLE_ID,
     COIN_WASH_ORDER_RULE_KEYS,
     HALFCOIN_RECEIVER_ROLE_ID,
+    PUBLIC_COIN_WASH_PRICE_RULE_KEYS,
 )
 from web.app.services.dispatch_assignment_eligibility import (
     cached_staff_role_ids,
@@ -33,7 +34,7 @@ SPECIAL_ID = WASH_ID
 OLD_ID = "1565369029005287595"
 COMPANION_ID = "1500751059239440575"
 PROTECTOR_ID = "1500234130871550004"
-SPECIAL_PRODUCTS = [
+SPECIAL_PRODUCTS = sorted(PUBLIC_COIN_WASH_PRICE_RULE_KEYS) + [
     "staff_internal_ammo_dump_500m",
     "staff_internal_car_500m",
     "staff_internal_aw_collision",
