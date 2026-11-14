@@ -295,8 +295,13 @@ def test_public_farm_catalog_replaces_old_halfcoin_with_wash_and_aw(page: Page) 
 
     page.locator('[data-order-group="coin_wash"]').click()
     expect(page.locator("#mw-dialog-title")).to_have_text("洗幣服務")
-    assert page.locator("#mw-variant option").count() == 2
-    expect(page.locator("#mw-variant")).to_have_value("farm_coin_wash_car")
+    assert page.locator("#mw-variant option").count() == 10
+    expect(page.locator("#mw-variant")).to_have_value("farm_coin_wash_car_100m")
+    expect(page.locator("#mw-total")).to_have_text("700T")
+    page.locator("#mw-adjustments input[value='coin_wash_urgent']").check()
+    expect(page.locator("#mw-total")).to_have_text("980T")
+    page.locator("#mw-variant").select_option("farm_coin_wash_ammo_dump_2000m")
+    expect(page.locator("#mw-total")).to_have_text("11,500T")
     page.locator("#mw-dialog-close").click()
 
     page.locator('[data-order-group="aw_collision"]').click()
