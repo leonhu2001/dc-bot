@@ -206,7 +206,7 @@ def test_same_order_buy_get_is_disabled_and_loyalty_is_entertainment_only():
     ).service_quantity == 8
 
     lol = ORDER_RULES["lol_entertain_aram"]
-    assert lol.price == 300
+    assert lol.price == 350
     assert lol.unit_label == "H"
     assert lol.loyalty_benefits_enabled is True
     assert calculate_price(lol, quantity=8, player_count=1).service_quantity == 8
@@ -747,26 +747,26 @@ def test_storefront_business_values_are_direct_rules():
         "basic_oil_fuel": ("fixed", 3000, "單"),
         "basic_oil_satellite": ("fixed", 2000, "單"),
         "basic_oil_all": ("fixed", 4500, "單"),
-        "steam_play": ("hourly", 320, "H"),
+        "steam_play": ("hourly", 350, "H"),
 
-        "valorant_entertain_ng": ("hourly", 300, "H"),
-        "valorant_entertain_ranked": ("game", 250, "局"),
+        "valorant_entertain_ng": ("hourly", 350, "H"),
+        "valorant_entertain_ranked": ("game", 280, "局"),
         "valorant_ascendant_ng": ("hourly", 330, "H"),
-        "valorant_ascendant_ranked": ("game", 290, "局"),
+        "valorant_ascendant_ranked": ("game", 300, "局"),
         "valorant_immortal_ng": ("hourly", 350, "H"),
         "valorant_immortal_ranked": ("game", 330, "局"),
         "valorant_radiant_ng": ("hourly", 380, "H"),
         "valorant_radiant_ranked": ("game", 370, "局"),
 
-        "lol_entertain_aram": ("hourly", 300, "H"),
-        "lol_entertain_ng": ("hourly", 300, "H"),
-        "lol_entertain_ranked": ("game", 250, "局"),
-        "lol_master_ng": ("hourly", 340, "H"),
+        "lol_entertain_aram": ("hourly", 350, "H"),
+        "lol_entertain_ng": ("hourly", 350, "H"),
+        "lol_entertain_ranked": ("game", 280, "局"),
+        "lol_master_ng": ("hourly", 380, "H"),
         "lol_master_ranked": ("game", 300, "局"),
-        "lol_grandmaster_ng": ("hourly", 360, "H"),
-        "lol_grandmaster_ranked": ("game", 300, "局"),
+        "lol_grandmaster_ng": ("hourly", 390, "H"),
+        "lol_grandmaster_ranked": ("game", 350, "局"),
         "lol_elite_ng": ("hourly", 400, "H"),
-        "lol_elite_ranked": ("game", 400, "局"),
+        "lol_elite_ranked": ("game", 430, "局"),
 
         "apex_entertain_platinum": ("hourly", 300, "H"),
         "apex_entertain_platinum_ranked": ("hourly", 350, "H"),

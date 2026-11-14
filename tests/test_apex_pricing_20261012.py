@@ -6,14 +6,14 @@ from web.app.services.order_groups import get_grouped_order_catalog
 
 
 ACTIVE_APEX_PRICES = {
-    "apex_entertain_ng": 300,
+    "apex_entertain_ng": 320,
     "apex_entertain_ranked": 350,
-    "apex_diamond_ng": 400,
-    "apex_diamond_ranked": 450,
-    "apex_master_ng": 480,
-    "apex_master_ranked": 530,
-    "apex_predator_ng": 580,
-    "apex_predator_ranked": 630,
+    "apex_diamond_ng": 380,
+    "apex_diamond_ranked": 400,
+    "apex_master_ng": 400,
+    "apex_master_ranked": 450,
+    "apex_predator_ng": 500,
+    "apex_predator_ranked": 550,
 }
 
 
@@ -37,15 +37,15 @@ def test_apex_new_pricing_is_fixed_per_person_per_hour():
         assert rule.loyalty_benefits_enabled is rule_key.startswith("apex_entertain_")
 
 
-def test_apex_double_predator_ranked_two_hours_costs_2520():
+def test_apex_double_predator_ranked_two_hours_costs_2200():
     result = calculate_price(
         ORDER_RULES["apex_predator_ranked"],
         quantity=2,
         player_count=2,
     )
-    assert result.base_amount == 2520
+    assert result.base_amount == 2200
     assert result.specify_fee == 0
-    assert result.total_amount == 2520
+    assert result.total_amount == 2200
     assert result.required_staff_count == 2
 
 
@@ -59,9 +59,9 @@ def test_apex_specify_fee_is_100_each_and_free_from_two_hours():
         player_count=2,
         specified_roles=specified,
     )
-    assert one_hour.base_amount == 800
+    assert one_hour.base_amount == 760
     assert one_hour.specify_fee == 200
-    assert one_hour.total_amount == 1000
+    assert one_hour.total_amount == 960
     assert one_hour.free_specify_fee is False
 
     two_hours = calculate_price(
@@ -70,9 +70,9 @@ def test_apex_specify_fee_is_100_each_and_free_from_two_hours():
         player_count=2,
         specified_roles=specified,
     )
-    assert two_hours.base_amount == 1600
+    assert two_hours.base_amount == 1520
     assert two_hours.specify_fee == 0
-    assert two_hours.total_amount == 1600
+    assert two_hours.total_amount == 1520
     assert two_hours.free_specify_fee is True
 
 

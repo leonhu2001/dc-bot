@@ -275,7 +275,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜娛樂陪",
         "selector_label": "模式",
-        "description": "NG 300T/人/H、積分 350T/人/H；指定每位 +100T，2H 以上免指定費；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
+        "description": f"NG {ORDER_RULES['apex_entertain_ng'].price}T/人/H、積分 {ORDER_RULES['apex_entertain_ranked'].price}T/人/H；指定每位 +100T，2H 以上免指定費；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
         "variants": [
             ("apex_entertain_ng", "NG"),
             ("apex_entertain_ranked", "積分"),
@@ -286,7 +286,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜鑽石陪",
         "selector_label": "模式",
-        "description": "NG 400T/人/H、積分 450T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": f"NG {ORDER_RULES['apex_diamond_ng'].price}T/人/H、積分 {ORDER_RULES['apex_diamond_ranked'].price}T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_diamond_ng", "NG"),
             ("apex_diamond_ranked", "積分"),
@@ -297,7 +297,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜大師陪",
         "selector_label": "模式",
-        "description": "NG 480T/人/H、積分 530T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": f"NG {ORDER_RULES['apex_master_ng'].price}T/人/H、積分 {ORDER_RULES['apex_master_ranked'].price}T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_master_ng", "NG"),
             ("apex_master_ranked", "積分"),
@@ -308,7 +308,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜頂獵陪",
         "selector_label": "模式",
-        "description": "NG 580T/人/H、積分 630T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": f"NG {ORDER_RULES['apex_predator_ng'].price}T/人/H、積分 {ORDER_RULES['apex_predator_ranked'].price}T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_predator_ng", "NG"),
             ("apex_predator_ranked", "積分"),

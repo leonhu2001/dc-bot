@@ -211,22 +211,22 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {"label": "娛樂陪", "details": [
             {"label": "NG", "value": "ng", "rule_key": "lol_entertain_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "RK", "value": "ranked", "rule_key": "lol_entertain_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
-            {"label": "AR", "value": "aram", "rule_key": "lol_entertain_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "ARAM", "value": "aram", "rule_key": "lol_entertain_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "大師陪", "details": [
             {"label": "NG", "value": "ng", "rule_key": "lol_master_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "RK", "value": "ranked", "rule_key": "lol_master_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
-            {"label": "AR", "value": "aram", "rule_key": "lol_master_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "ARAM", "value": "aram", "rule_key": "lol_master_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "宗師陪", "details": [
             {"label": "NG", "value": "ng", "rule_key": "lol_grandmaster_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "RK", "value": "ranked", "rule_key": "lol_grandmaster_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
-            {"label": "AR", "value": "aram", "rule_key": "lol_grandmaster_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "ARAM", "value": "aram", "rule_key": "lol_grandmaster_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ]},
         {"label": "菁英陪", "details": [
             {"label": "NG", "value": "ng", "rule_key": "lol_elite_ng", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             {"label": "RK", "value": "ranked", "rule_key": "lol_elite_ranked", "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24},
-            {"label": "AR", "value": "aram", "rule_key": "lol_elite_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "ARAM", "value": "aram", "rule_key": "lol_elite_aram", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ]},
     ],
     "apex": [

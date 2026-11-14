@@ -146,8 +146,8 @@ def test_game_price_list_preserves_category_prices_and_rules() -> None:
     interaction = SimpleNamespace(guild=None)
     game_data = (
         ("valorant", ("超凡陪", "神話陪", "輻能陪"), ("330T", "350T", "380T", "370T")),
-        ("lol", ("大師陪", "宗師陪", "菁英陪"), ("340T", "360T", "400T")),
-        ("apex", ("鑽石陪", "大師陪", "頂獵陪"), ("400T", "480T", "580T", "630T")),
+        ("lol", ("大師陪", "宗師陪", "菁英陪"), ("380T", "390T", "400T", "430T")),
+        ("apex", ("鑽石陪", "大師陪", "頂獵陪"), ("380T", "400T", "450T", "500T", "550T")),
     )
     for game, ranks, tech_prices in game_data:
         channel_id = int(quick.QUICK_ORDER_V2_CHANNELS[game])
@@ -170,13 +170,13 @@ def test_game_price_list_preserves_category_prices_and_rules() -> None:
         assert "指定陪玩" in sweet and "2H 以上免指定費" in sweet
         assert "500T / H" in teaching and "3H 起標" in teaching
         for other_key in ("entertainment", "technical", "sweet"):
-            assert "500T / H" not in plans[other_key]
+            assert "教學單（1 對 1）" not in plans[other_key]
 
     steam_id = int(quick.QUICK_ORDER_V2_CHANNELS["steam"])
     steam = price_lists._game_price_list_sections(interaction, steam_id)
     assert tuple(steam) == ("entertainment", "sweet")
     assert "一般陪玩" in steam["entertainment"]
-    assert "320T / H" in steam["entertainment"]
+    assert "350T / H" in steam["entertainment"]
     assert "520T / H" in steam["sweet"]
     assert "1314T / H" in steam["sweet"]
     assert all("教學單" not in p for p in steam.values())

@@ -43,9 +43,9 @@ def _rule(key: str, *, price: int, max_players: int = 4):
         ("basic_black_tide_tech", 400, 2, 380),
         ("basic_black_tide_tech", 400, 3, 380),
         ("basic_black_tide_tech", 400, 4, 380),
-        ("steam_play", 320, 2, 320),
-        ("steam_play", 320, 3, 320),
-        ("steam_play", 320, 4, 320),
+        ("steam_play", 350, 2, 350),
+        ("steam_play", 350, 3, 350),
+        ("steam_play", 350, 4, 350),
     ],
 )
 def test_loyalty_reward_uses_selected_tier_per_companion_share(

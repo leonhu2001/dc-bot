@@ -130,7 +130,7 @@ def test_coupon_value_is_one_companion_service_unit_not_whole_multi_order():
 
     assert single_value == 175
     assert double_value == 150
-    assert valorant_four_value == 150
+    assert valorant_four_value == 175
 
 
 def test_existing_processed_progress_is_repaired_from_real_companion_units(monkeypatch, tmp_path: Path):
