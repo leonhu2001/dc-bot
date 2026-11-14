@@ -4,6 +4,7 @@ from dataclasses import replace
 from typing import Any
 
 from services.order_rules import (
+    RETIRED_PUBLIC_COIN_WASH_RULE_KEYS,
     CATEGORY_LABELS,
     ORDER_RULES,
     ROLE_LABELS,
@@ -13,10 +14,7 @@ from services.order_rules import (
 
 
 PUBLIC_DISABLED_RULE_KEYS = {
-    # Retired 120M/360M halfcoin products are historical only.
-    # Explicitly block forged direct /order/quote, checkout and final orders.
-    "farm_halfcoin_120m",
-    "farm_halfcoin_360m",
+    *RETIRED_PUBLIC_COIN_WASH_RULE_KEYS,
     "farm_season_3x3_skin",
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
@@ -311,6 +309,21 @@ def build_public_quote(
             )
 
 
+    from services.coin_wash_urgent_policy import (
+        URGENT_SELECTION_KEY, selected_urgent_fee,
+    )
+    urgent_requested = URGENT_SELECTION_KEY in adjustments
+    urgent_fee = selected_urgent_fee(
+        rule, {URGENT_SELECTION_KEY: urgent_requested}
+    )
+    if urgent_requested and not urgent_fee:
+        raise ValueError("這個商品不支援洗幣加急。")
+    # The extra fee belongs 100% to the worker. It is never a rule-level
+    # staff_adjustment, which would inflate store/CS payout percentages.
+    price_adjustments = [
+        key for key in adjustments if key != URGENT_SELECTION_KEY
+    ]
+
     is_apex_base_rule = (
         str(rule.category) == "apex"
         and not rule_key.endswith("_ranked")
@@ -324,7 +337,7 @@ def build_public_quote(
         unknown = [
             key
             for key
-            in adjustments
+            in price_adjustments
             if key not in
             SEASON_NORMAL_ADJUSTMENTS
         ]
@@ -341,7 +354,7 @@ def build_public_quote(
         unknown = [
             key
             for key
-            in adjustments
+            in price_adjustments
             if key != "ranked"
         ]
 
@@ -351,7 +364,7 @@ def build_public_quote(
                 "這張 APEX 訂單包含未開放的附加需求。"
             )
 
-    elif adjustments:
+    elif price_adjustments:
 
         raise ValueError(
             "這個方案沒有開放附加需求。"
@@ -374,7 +387,7 @@ def build_public_quote(
         staff_adjustments=(
             []
             if is_apex_base_rule
-            else adjustments
+            else price_adjustments
         ),
     )
 
@@ -415,6 +428,7 @@ def build_public_quote(
     # 命運契約第 5 個封頂 3000T。
     # --------------------------------------------------------
 
+    adjustment_amount += urgent_fee
     original_amount = (
         base_amount
         + adjustment_amount
@@ -441,6 +455,13 @@ def build_public_quote(
 
 
     for key in adjustments:
+        if key == URGENT_SELECTION_KEY:
+            adjustment_details.append({
+                "key": key,
+                "label": "洗幣加急（全額歸接單打手）",
+                "amount": urgent_fee,
+            })
+            continue
 
         if (
             is_apex_base_rule
@@ -554,6 +575,7 @@ def build_public_quote(
                 )
                 == "manual"
             ),
+        "urgent_fee_amount": int(urgent_fee),
 
         "special_price_applied":
             special_price_applied,
