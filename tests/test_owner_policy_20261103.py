@@ -7,19 +7,19 @@ from services.vip_monthly_store_funding_repair_20261103 import _monthly_evidence
 from web.app.services import customer_portal
 
 
-def test_aw_and_halfcoin_receiver_roles_share_owner_approved_special_group():
-    assert order_rules.AW_COLLISION_RECEIVER_ROLE_ID == "1565369317929918554"
+def test_aw_and_halfcoin_receiver_roles_are_separate_as_owner_approved():
+    assert order_rules.AW_COLLISION_RECEIVER_ROLE_ID == "1571080769407942787"
     assert order_rules.HALFCOIN_RECEIVER_ROLE_ID == "1565369317929918554"
     assert (
         order_rules.ALL_ROLE_IDS[order_rules.AW_COLLISION_RECEIVER_ROLE_KEY]
-        == "1565369317929918554"
+        == "1571080769407942787"
     )
     assert (
         order_rules.ALL_ROLE_IDS[order_rules.HALFCOIN_RECEIVER_ROLE_KEY]
         == "1565369317929918554"
     )
     assert order_rules.SPECIAL_RECEIVER_ROLE_IDS_BY_KEY == {
-        order_rules.AW_COLLISION_RECEIVER_ROLE_KEY: "1565369317929918554",
+        order_rules.AW_COLLISION_RECEIVER_ROLE_KEY: "1571080769407942787",
         order_rules.HALFCOIN_RECEIVER_ROLE_KEY: "1565369317929918554",
     }
 
