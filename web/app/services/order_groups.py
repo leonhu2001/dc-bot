@@ -8,6 +8,8 @@ from services.order_rule_store import (
 )
 from services.order_rules import (
     AW_COLLISION_PRICING_BY_RULE,
+    PUBLIC_COIN_WASH_VARIANTS,
+    RETIRED_PUBLIC_COIN_WASH_RULE_KEYS,
     CATEGORY_LABELS,
     ORDER_RULES,
     SOURCE_AUTHORITY_RULE_KEYS,
@@ -38,8 +40,7 @@ CATEGORY_ORDER = [
 
 HIDDEN_PUBLIC_RULE_KEYS = {
     # 已下架 120M／360M 舊代洗僅供歷史訂單使用，不能再出現在網站。
-    "farm_halfcoin_120m",
-    "farm_halfcoin_360m",
+    *RETIRED_PUBLIC_COIN_WASH_RULE_KEYS,
     # 造型不再作為獨立商品。
     # 前台改成賽季 3x3｜普通底下 +3000T 的附加選項。
     "farm_season_3x3_skin",
@@ -248,11 +249,11 @@ GROUP_SPECS = [
         "key": "coin_wash",
         "category": "farm",
         "label": "洗幣服務",
-        "selector_label": "洗幣方式",
-        "description": "撞車／倒子彈由客服確認基本價格，加急另加 280T，全額歸接單打手。",
+        "selector_label": "洗幣方式／數量",
+        "description": "撞車與倒子彈請依洗幣數量選擇價格；可選加急 +280T，額外費用全額歸接單打手。",
         "variants": [
-            ("farm_coin_wash_car", "撞車｜客服報價"),
-            ("farm_coin_wash_ammo_dump", "倒子彈｜客服報價"),
+            (key, f"{service_label}｜{millions}M")
+            for key, service_label, millions, _price in PUBLIC_COIN_WASH_VARIANTS
         ],
     },
     {
@@ -491,6 +492,11 @@ def _variant_data(
         quantity_enabled = True
 
     customer_adjustments = []
+
+    if rule_key in {key for key, _label, _million, _price in PUBLIC_COIN_WASH_VARIANTS}:
+        customer_adjustments = [
+            {"key": "coin_wash_urgent", "label": "加急（全額歸接單打手）", "amount": 280}
+        ]
 
     # --------------------------------------------------------
     # 賽季 3x3 特殊規格
