@@ -102,6 +102,8 @@ def test_payroll_bonus_only_from_matching_snapshot():
         ("staff_internal_car_500m", 2740, 2480, 260, 0, 2740, 0),
         ("farm_coin_wash_car", 2280, 2000, 280, 100, 1880, 300),
         ("farm_coin_wash_ammo_dump", 2280, 2000, 280, 100, 1880, 300),
+        ("farm_coin_wash_car_100m", 980, 700, 280, 35, 840, 105),
+        ("farm_coin_wash_ammo_dump_100m", 1080, 800, 280, 40, 920, 120),
     ],
 )
 def test_web_salary_recalculation_and_report_preserve_entire_urgent_fee(
