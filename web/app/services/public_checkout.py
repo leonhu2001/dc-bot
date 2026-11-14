@@ -13,6 +13,10 @@ from services.order_rules import (
 
 
 PUBLIC_DISABLED_RULE_KEYS = {
+    # Retired 120M/360M halfcoin products are historical only.
+    # Explicitly block forged direct /order/quote, checkout and final orders.
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
     "farm_season_3x3_skin",
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
