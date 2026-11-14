@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 
 from services.order_rules import (
-    COIN_WASH_AW_ORDER_RULE_KEYS,
-    COIN_WASH_AW_RECEIVER_ROLE_ID,
+    AW_COLLISION_ORDER_RULE_KEYS,
+    AW_COLLISION_RECEIVER_ROLE_ID,
+    COIN_WASH_ORDER_RULE_KEYS,
+    HALFCOIN_RECEIVER_ROLE_ID,
     ORDER_RULES,
     get_allowed_role_ids,
     get_required_game_role_ids,
@@ -36,10 +38,12 @@ def dispatch_assignment_role_requirements(order) -> tuple[set[str], set[str], se
     if not rule_key and isinstance(acceptance_meta, dict):
         rule_key = str(acceptance_meta.get("order_rule_key") or "").strip()
 
-    # Old snapshots, custom price overrides and old staff flags cannot loosen
-    # the owner's dedicated coin-wash/AW receiver qualification.
-    if rule_key in COIN_WASH_AW_ORDER_RULE_KEYS:
-        return {COIN_WASH_AW_RECEIVER_ROLE_ID}, set(), set()
+    # Override historical claim snapshots: only the corresponding receiver
+    # group may be shown in CS's Web dispatch assignment picker.
+    if rule_key in AW_COLLISION_ORDER_RULE_KEYS:
+        return {AW_COLLISION_RECEIVER_ROLE_ID}, set(), set()
+    if rule_key in COIN_WASH_ORDER_RULE_KEYS:
+        return {HALFCOIN_RECEIVER_ROLE_ID}, set(), set()
 
     if isinstance(acceptance_meta, dict):
         allowed = _as_role_id_set(acceptance_meta.get("allowed_role_ids_json"))
