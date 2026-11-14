@@ -110,6 +110,11 @@
             "mw-quantity"
         );
 
+    const awQuantityInput =
+        document.getElementById(
+            "mw-aw-quantity-input"
+        );
+
     const quantityHelp =
         document.getElementById(
             "mw-quantity-help"
@@ -348,7 +353,13 @@
         let base = 0;
 
 
-        if (override !== null) {
+        if (Number(activeVariant.aw_rate_x2) > 0) {
+            // AW's 101–500 shot tier uses 4.5T/shot.
+            // Discord/website prices must both round a final half-T upwards.
+            base = Math.ceil(
+                quantity * Number(activeVariant.aw_rate_x2) / 2
+            );
+        } else if (override !== null) {
 
             base = override;
 
@@ -611,6 +622,16 @@
 
         quantityValue.textContent =
             String(quantity);
+        if (awQuantityInput) {
+            const isAW = Number(activeVariant.aw_rate_x2) > 0;
+            awQuantityInput.hidden = !isAW;
+            quantityValue.hidden = isAW;
+            awQuantityInput.min = String(activeVariant.min_quantity || 1);
+            awQuantityInput.max = String(activeVariant.max_quantity || 999999);
+            if (isAW) {
+                awQuantityInput.value = String(quantity);
+            }
+        }
 
 
         playerValue.textContent =
@@ -638,7 +659,10 @@
             quantityHelp.textContent =
                 `可選 ${activeVariant.min_quantity}`
                 + ` ～ ${activeVariant.max_quantity}`
-                + ` ${activeVariant.unit_label}`;
+                + ` ${activeVariant.unit_label}`
+                + (Number(activeVariant.aw_rate_x2) > 0
+                    ? "；可直接輸入發數"
+                    : "");
         }
 
 
@@ -977,6 +1001,9 @@
 
             quantityValue.textContent =
                 String(quantity);
+            if (awQuantityInput && !awQuantityInput.hidden) {
+                awQuantityInput.value = String(quantity);
+            }
 
             calculate();
         }
@@ -1005,10 +1032,48 @@
 
             quantityValue.textContent =
                 String(quantity);
+            if (awQuantityInput && !awQuantityInput.hidden) {
+                awQuantityInput.value = String(quantity);
+            }
 
             calculate();
         }
     );
+
+
+    if (awQuantityInput) {
+        const applyAwQuantity = (commit) => {
+            if (!activeVariant || !Number(activeVariant.aw_rate_x2)) {
+                return;
+            }
+            const raw = awQuantityInput.value.trim();
+            if (!/^\d+$/.test(raw)) {
+                if (commit) {
+                    awQuantityInput.value = String(quantity);
+                }
+                return;
+            }
+            const parsed = Number(raw);
+            if (!Number.isSafeInteger(parsed)) {
+                if (commit) {
+                    awQuantityInput.value = String(quantity);
+                }
+                return;
+            }
+            quantity = clamp(
+                parsed,
+                Number(activeVariant.min_quantity || 1),
+                Number(activeVariant.max_quantity || 999999)
+            );
+            quantityValue.textContent = String(quantity);
+            if (commit || parsed !== quantity) {
+                awQuantityInput.value = String(quantity);
+            }
+            calculate();
+        };
+        awQuantityInput.addEventListener("input", () => applyAwQuantity(false));
+        awQuantityInput.addEventListener("change", () => applyAwQuantity(true));
+    }
 
 
     playerMinus.addEventListener(
