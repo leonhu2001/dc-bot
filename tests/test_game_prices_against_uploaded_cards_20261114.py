@@ -111,3 +111,51 @@ def test_website_apex_description_is_from_current_order_rules():
         ng = APPROVED_PRICE[pair + "_ng"]
         ranked = APPROVED_PRICE[pair + "_ranked"]
         assert f"NG {ng}T/人/H、積分 {ranked}T/人/H" in groups[pair]["description"]
+
+
+def test_screenshot_lol_aram_vip_96_percent_uses_new_350_price(monkeypatch):
+    """The user's old Discord panel showed 300 -> 288; new quote must be 350 -> 336."""
+    from services import self_service_financials as finance
+    from services import self_service_loyalty_discount as loyalty
+
+    monkeypatch.setattr(finance, "_to_int", lambda v, default=None: int(v) if v not in (None, "") else default)
+    monkeypatch.setattr(
+        finance, "_resolve_self_service_discount_rate",
+        lambda rule, data: (96.0, "自動VIP優惠", "vip", "鑽石魔丸"),
+    )
+    monkeypatch.setattr(finance, "get_selected_order_point_benefit", lambda data, rule: None)
+    monkeypatch.setattr(finance, "calculate_one_seat_service_bonus_value", lambda **kwargs: 0)
+    monkeypatch.setattr(finance, "resolve_vip_monthly_cash_discount", lambda data, **kwargs: (None, 0))
+    monkeypatch.setattr(finance, "build_vip_monthly_discount_result", lambda *args: {})
+    monkeypatch.setattr(finance, "build_vip_monthly_discount_note", lambda *args, **kwargs: "")
+    monkeypatch.setattr(
+        loyalty, "resolve_self_service_loyalty_discount",
+        lambda **kwargs: {
+            "service_value": 0, "discount_amount": 0,
+            "coupon_id": None, "coupon_title": "",
+            "coupon": None, "service_note": "",
+        },
+    )
+
+    def allocate(*, after_percent_amount, fixed_discount_amount,
+                 additional_store_discount_amount=0,
+                 extra_customer_charge_amount=0):
+        return SimpleNamespace(
+            payout_base_amount=after_percent_amount + extra_customer_charge_amount,
+            customer_pay_amount=max(0, after_percent_amount - fixed_discount_amount
+                                    - additional_store_discount_amount
+                                    + extra_customer_charge_amount),
+            store_absorbed_amount=fixed_discount_amount + additional_store_discount_amount,
+        )
+
+    monkeypatch.setattr(finance, "allocate_store_absorbed_fixed_discount", allocate)
+    rule = ORDER_RULES["lol_entertain_aram"]
+    price = calculate_price(rule, quantity=1, player_count=1)
+    result = finance.calculate_self_service_financials(
+        rule, price, {"quantity": 1, "player_count": 1}
+    )
+    assert price.base_amount == 350
+    assert result["rule_original_amount"] == 350
+    assert result["discount_rate_percent"] == 96.0
+    assert result["customer_pay_amount"] == 336
+    assert result["payout_base_amount"] == 336
