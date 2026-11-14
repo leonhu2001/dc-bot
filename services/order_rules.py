@@ -1204,7 +1204,7 @@ for key, label in (
 for key, service_label, millions, price in PUBLIC_COIN_WASH_VARIANTS:
     _add(OrderRule(
         category="farm", key=key,
-        label=f"對外洗幣｜{service_label} {millions}M",
+        label=f"哈夫幣代洗｜{service_label} {millions}M",
         pricing_type="fixed", price=price, unit_label="單",
         allowed_roles=HALFCOIN_RECEIVER_ROLES, required_game_roles=(),
         required_staff_count=1, min_quantity=1, max_quantity=1,
