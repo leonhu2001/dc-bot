@@ -1943,6 +1943,7 @@ class EffectiveOrderRules(dict):
                     rule, price=base.price, pricing_type=base.pricing_type,
                     unit_label=base.unit_label, min_quantity=1, max_quantity=1,
                     catalog_group_label=base.catalog_group_label,
+                    label=base.label,
                     vip_discount_allowed=False, point_benefits_allowed=False,
                     loyalty_benefits_enabled=False,
                 )
