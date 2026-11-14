@@ -48,7 +48,9 @@ def test_public_site_has_current_wash_and_aw_but_no_retired_halfcoin():
     assert "halfcoin" not in cards
     assert "coin_wash" in full and "coin_wash" in cards
     assert "aw_collision" in full and "aw_collision" in cards
-    assert "哈夫幣代洗" not in [item["label"] for item in full.values()]
+    assert full["coin_wash"]["label"] == "哈夫幣代洗"
+    assert cards["coin_wash"]["label"] == "哈夫幣代洗"
+    assert "對外洗幣" not in [item["label"] for item in full.values()]
     assert all(
         variant["rule_key"] not in RETIRED
         for group in full.values()
