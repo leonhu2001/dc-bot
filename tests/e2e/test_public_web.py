@@ -284,3 +284,33 @@ def test_mobile_staff_and_vip_cards_do_not_inherit_oversized_min_heights(page: P
 def test_health_endpoint_stays_public(page: Page) -> None:
     response = page.goto(f"{BASE_URL}/health", wait_until="domcontentloaded")
     assert response is not None and response.ok
+
+
+def test_public_farm_catalog_replaces_old_halfcoin_with_wash_and_aw(page: Page) -> None:
+    response = page.goto(f"{BASE_URL}/order?category=farm", wait_until="domcontentloaded")
+    assert response is not None and response.ok
+    expect(page.locator('[data-order-group-card="halfcoin"]')).to_have_count(0)
+    expect(page.locator('[data-order-group-card="coin_wash"]')).to_be_visible()
+    expect(page.locator('[data-order-group-card="aw_collision"]')).to_be_visible()
+
+    page.locator('[data-order-group="coin_wash"]').click()
+    expect(page.locator("#mw-dialog-title")).to_have_text("洗幣服務")
+    assert page.locator("#mw-variant option").count() == 2
+    expect(page.locator("#mw-variant")).to_have_value("farm_coin_wash_car")
+    page.locator("#mw-dialog-close").click()
+
+    page.locator('[data-order-group="aw_collision"]').click()
+    expect(page.locator("#mw-dialog-title")).to_have_text("AW 代撞")
+    expect(page.locator("#mw-variant option")).to_have_count(3)
+    expect(page.locator("#mw-total")).to_have_text("5T")
+    page.locator("#mw-variant").select_option("farm_aw_collision_101_500")
+    expect(page.locator("#mw-aw-quantity-input")).to_be_visible()
+    expect(page.locator("#mw-total")).to_have_text("455T")
+    page.locator("#mw-aw-quantity-input").fill("102")
+    expect(page.locator("#mw-total")).to_have_text("459T")
+    page.locator("#mw-variant").select_option("farm_aw_collision_501_plus")
+    expect(page.locator("#mw-aw-quantity-input")).to_have_value("501")
+    expect(page.locator("#mw-total")).to_have_text("2,004T")
+
+    page.locator("#mw-dialog-close").click()
+    expect(page.locator("#mw-order-dialog")).not_to_be_visible()
