@@ -686,7 +686,10 @@ def _group_data(
         in variants
     )
 
-    if manual_only:
+    if spec["key"] == "aw_collision":
+        # Unit-rate display only; 501+ shots are NOT a 4T-total order.
+        starting_price_text = "4T／發起"
+    elif manual_only:
         starting_price_text = (
             "客服報價"
         )
