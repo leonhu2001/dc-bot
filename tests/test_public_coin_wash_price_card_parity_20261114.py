@@ -139,4 +139,5 @@ def test_manager_override_cannot_put_old_manual_rate_back(monkeypatch):
     rule = ORDER_RULES[key]
     assert rule.price == 700
     assert rule.pricing_type == "fixed"
+    assert rule.label == "哈夫幣代洗｜撞車 100M"
     assert get_allowed_role_ids(rule) == [HALFCOIN_RECEIVER_ROLE_ID]
