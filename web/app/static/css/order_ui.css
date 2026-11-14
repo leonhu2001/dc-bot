@@ -109,3 +109,24 @@ body.mw-order-open {
         padding: 6px 8px !important;
     }
 }
+
+/* AW tiers can run to hundreds of shots; typing the exact shot count must
+   remain legible on desktop and mobile without stepping hundreds of times. */
+.order3-aw-quantity-input:not([hidden]) {
+    box-sizing: border-box;
+    width: min(125px, 40vw);
+    min-width: 72px;
+    height: 40px;
+    padding: 6px 10px;
+    background: #161618;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, .23);
+    border-radius: 10px;
+    text-align: center;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+}
+.order3-aw-quantity-input:focus-visible {
+    outline: 2px solid #deb86b;
+    outline-offset: 2px;
+}

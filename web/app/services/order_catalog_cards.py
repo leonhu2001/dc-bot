@@ -86,7 +86,9 @@ def _group_card_data(spec: dict) -> dict | None:
         for variant in variants
     )
 
-    if manual_only:
+    if str(spec.get("key") or "") == "aw_collision":
+        starting_price_text = "4T／發起"
+    elif manual_only:
         starting_price_text = "客服報價"
     elif len(variants) == 1:
         starting_price_text = str(variants[0]["price_text"])
