@@ -98,3 +98,8 @@ assets/order_panels/**/*.png
 web/app/static/order_panels/*.png
 web/app/static/order_panels/pricelists/*.png
 web/app/static/order_panels/**/*.png
+
+# Runtime payment QR code images are maintained on the VPS, not in Git.
+# Keeping them ignored preserves real payment endpoints during safe deployments.
+web/app/static/images/payment/cathay_qr.jpg
+web/app/static/images/payment/jkopay_qr.jpg
