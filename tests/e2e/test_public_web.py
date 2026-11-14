@@ -294,7 +294,7 @@ def test_public_farm_catalog_replaces_old_halfcoin_with_wash_and_aw(page: Page) 
     expect(page.locator('[data-order-group-card="aw_collision"]')).to_be_visible()
 
     page.locator('[data-order-group="coin_wash"]').click()
-    expect(page.locator("#mw-dialog-title")).to_have_text("洗幣服務")
+    expect(page.locator("#mw-dialog-title")).to_have_text("哈夫幣代洗")
     assert page.locator("#mw-variant option").count() == 10
     expect(page.locator("#mw-variant")).to_have_value("farm_coin_wash_car_100m")
     expect(page.locator("#mw-total")).to_have_text("700T")
