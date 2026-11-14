@@ -10,8 +10,10 @@ from typing import Any
 from sqlalchemy import text
 
 from services.order_rules import (
-    COIN_WASH_AW_ORDER_RULE_KEYS,
-    COIN_WASH_AW_RECEIVER_ROLE_ID,
+    AW_COLLISION_ORDER_RULE_KEYS,
+    AW_COLLISION_RECEIVER_ROLE_ID,
+    COIN_WASH_ORDER_RULE_KEYS,
+    HALFCOIN_RECEIVER_ROLE_ID,
     role_ids_match_requirements,
 )
 from shared.db import engine
@@ -50,14 +52,16 @@ def _effective_claim_role_requirements(
     allowed_role_ids: set[str],
     required_game_role_ids: set[str],
 ) -> tuple[set[str], set[str]]:
-    """Honor the dedicated coin-wash/AW receiver group, even on old order snapshots.
+    """Apply current, separate receiver requirements even to stale snapshots.
 
-    Old dispatched internal orders recorded all receiver groups, and old AW
-    orders recorded a separate AW-only role. Never trust those stale role
-    lists when deciding who may actually claim an order.
+    A wash member cannot claim AW, nor can an AW-only member claim washing
+    merely because an earlier dispatch was created with the shared role.
     """
-    if str(order_rule_key or "").strip() in COIN_WASH_AW_ORDER_RULE_KEYS:
-        return {COIN_WASH_AW_RECEIVER_ROLE_ID}, set()
+    key = str(order_rule_key or "").strip()
+    if key in AW_COLLISION_ORDER_RULE_KEYS:
+        return {AW_COLLISION_RECEIVER_ROLE_ID}, set()
+    if key in COIN_WASH_ORDER_RULE_KEYS:
+        return {HALFCOIN_RECEIVER_ROLE_ID}, set()
     return allowed_role_ids, required_game_role_ids
 
 
