@@ -549,6 +549,12 @@ async def payment_review_worker(bot: discord.Client) -> None:
     await bot.wait_until_ready()
 
     while not bot.is_closed():
+        # Payment and salary-transfer approvals share the CS review channel.
+        # Notifications are independent from applying approved payments.
+        from services.customer_service_pending_notifications import (
+            process_customer_service_pending_notifications,
+        )
+        await process_customer_service_pending_notifications(bot)
         rows = list_payment_reviews_for_runtime(limit=30)
 
         for row in rows:

@@ -25,6 +25,8 @@ from shared.order_state import WAITING_ACCEPTANCE
 EXPECTED_RULE_KEYS = {
     "farm_halfcoin_120m",
     "farm_halfcoin_360m",
+    "farm_coin_wash_car",
+    "farm_coin_wash_ammo_dump",
     "farm_aw_collision_1_100",
     "farm_aw_collision_101_500",
     "farm_aw_collision_501_plus",
@@ -67,7 +69,7 @@ def test_all_internal_and_external_special_products_only_allow_shared_role(rule_
 
 @pytest.mark.parametrize(
     "rule_key",
-    ["farm_halfcoin_120m", "farm_aw_collision_1_100", "staff_internal_car_500m"],
+    ["farm_coin_wash_car", "farm_aw_collision_1_100", "staff_internal_car_500m"],
 )
 def test_admin_override_cannot_broaden_shared_receiver_qualification(monkeypatch, rule_key):
     monkeypatch.setattr(ORDER_RULES, "_refresh_external", lambda: None)

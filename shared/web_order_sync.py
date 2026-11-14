@@ -314,11 +314,47 @@ def _recalculate_web_order_payouts(db, order: WebOrder) -> None:
         if bool(a.has_named_bonus)
     ]
 
-    payout_result = calculate_order_payout(
-        total_amount=_order_payout_base_amount(order),
-        worker_discord_ids=worker_ids,
-        named_bonus_worker_ids=named_bonus_worker_ids,
+    from services.coin_wash_urgent_policy import urgent_fee_from_price_snapshot
+    from services.one_companion_one_guard_payout import (
+        calculate_one_companion_one_guard_order_payout,
+        is_full_worker_payout_rule,
+        resolve_one_guard_unit_price,
     )
+
+    urgent_fee_amount = urgent_fee_from_price_snapshot(
+        getattr(order, "price_snapshot_json", None)
+    )
+    customer_service_base = _order_payout_base_amount(order)
+    if is_full_worker_payout_rule(getattr(order, "order_rule_key", None)):
+        customer_paid = getattr(order, "customer_pay_amount", None)
+        if customer_paid is None:
+            customer_paid = order.amount
+        customer_service_base = max(0, int(customer_paid or 0) - urgent_fee_amount)
+
+    payout_result = calculate_one_companion_one_guard_order_payout(
+        rule_key=getattr(order, "order_rule_key", None),
+        unit_price=resolve_one_guard_unit_price(
+            getattr(order, "order_rule_key", None),
+            getattr(order, "rule_snapshot_json", None),
+        ),
+        total_amount=_order_payout_base_amount(order),
+        worker_roles=[
+            (str(assignment.worker_discord_id), str(assignment.role_type))
+            for assignment in assignments
+        ],
+        named_bonus_worker_ids=named_bonus_worker_ids,
+        customer_service_total_amount=customer_service_base,
+    )
+    if payout_result is None:
+        payout_result = calculate_order_payout(
+            total_amount=_order_payout_base_amount(order),
+            worker_discord_ids=worker_ids,
+            named_bonus_worker_ids=named_bonus_worker_ids,
+        )
+
+    # Wash urgency is an explicit 100%-worker surcharge, never part of the
+    # ordinary 80/20 salary / customer-service / store split.
+    urgent_receiver_id = worker_ids[0] if worker_ids else None
 
     overrides = {
         str(override.worker_discord_id): override
@@ -346,6 +382,11 @@ def _recalculate_web_order_payouts(db, order: WebOrder) -> None:
             note = f"手動指定分潤：{final_payout}T"
             if override.reason:
                 note += f"｜原因：{override.reason}"
+
+        if urgent_fee_amount and str(worker_payout.worker_discord_id) == urgent_receiver_id:
+            final_payout += urgent_fee_amount
+            urgency_note = f"加急 +{urgent_fee_amount}T（100% 歸接單打手，無店家／客服抽成）"
+            note = f"{note}｜{urgency_note}" if note else urgency_note
 
         db.add(
             WorkerPayout(

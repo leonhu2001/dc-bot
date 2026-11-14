@@ -4,6 +4,7 @@ import json
 from typing import Any, Callable
 
 from services.aw_collision_financials import calculate_aw_collision_financials, is_aw_collision_rule
+from services.coin_wash_urgent_policy import apply_urgent_fee
 from services.staff_internal_ammo_dump_policy import (
     calculate_internal_ammo_dump_financials,
     is_internal_ammo_dump_rule,
@@ -369,6 +370,9 @@ def _quote_preview_lines_for_self_service(
                 f"（{reason}，共同分攤，折後金額計入分潤基準）"
             )
         detail_parts.append(f"打手分潤基準 {_format_plain_amount(adjustment['payout_base_amount'])}")
+        if adjustment.get("urgent_fee_amount"):
+            detail_parts.append(f"加急 +{adjustment['urgent_fee_amount']}T（全額給接單打手，不抽成）")
+            lines.append(("加急費", f"+{adjustment['urgent_fee_amount']}T｜全額歸打手"))
         if is_internal_ammo_dump_rule(rule):
             named = selected_ammo_dump_named(data)
             lines.append(("掛名狀態", "有掛名" if named is True else "無掛名" if named is False else "等待客服勾選"))
@@ -468,7 +472,7 @@ def _format_point_hours(hours) -> str:
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
     if is_internal_ammo_dump_rule(rule):
-        return calculate_internal_ammo_dump_financials(price_result, data)
+        return apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data))
     if is_aw_collision_rule(rule):
         return calculate_aw_collision_financials(price_result, data)
 
@@ -637,7 +641,7 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
             f"｜活動後共 {actual_service_quantity}{service_unit_text}"
         )
 
-    return {
+    financials = {
         "price_formula_version": 2,
         "manual_discount_mode": "pay_rate",
         "manual_price_missing": bool(
@@ -690,6 +694,7 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
         ),
         "customer_pay_amount": customer_pay,
     }
+    return apply_urgent_fee(rule, data, financials)
 
 
 def apply_self_service_financials_to_order_data(data: dict, rule, price_result) -> dict:

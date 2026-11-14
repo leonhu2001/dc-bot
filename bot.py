@@ -1836,17 +1836,20 @@ class OrderControlView(discord.ui.View):
 
         await interaction.response.defer()
 
-        await interaction.channel.send(
-            embed=embed,
-            view=SelfServiceOrderView(
-                customer_id=customer_id,
-                channel_id=interaction.channel.id
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
-            )
+        from services.ticket_self_service_panel_idempotency import (
+            ensure_ticket_self_service_panel,
+        )
+        from services import self_service_ui_runtime as self_service_ui
+
+        await ensure_ticket_self_service_panel(
+            interaction=interaction,
+            customer_id=customer_id,
+            selections=SELF_SERVICE_ORDER_SELECTIONS,
+            bot_user_id=bot.user.id if bot.user is not None else None,
+            view_type=SelfServiceOrderView,
+            panel_embed_builder=self_service_ui.build_self_service_panel_embed,
+            remember_data=remember_order_data,
+            fallback_embed=embed,
         )
 
 # profile_direct_order_ticket_creator_v1

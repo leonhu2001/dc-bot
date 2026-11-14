@@ -82,6 +82,13 @@ def render_self_service_financial_breakdown_fields(
 
     embed.add_field(name=final_label, value=_format_plain_amount(final), inline=True)
     embed.add_field(name="打手分潤基準", value=_format_plain_amount(payout), inline=True)
+    urgent_fee = max(0, _price_int(src, "urgent_fee_amount", default=0))
+    if urgent_fee:
+        embed.add_field(
+            name="加急費",
+            value=f"+{urgent_fee:,}T（全額歸接單打手，不計入店家／客服分潤）",
+            inline=True,
+        )
     if is_internal_ammo_dump_rule(src.get("order_rule_key")) or (
         "staff_internal_ammo_named" in src
     ):

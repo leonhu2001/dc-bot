@@ -202,6 +202,8 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
 
         legacy = _is_legacy_order(order)
         full_worker_payout = is_full_worker_payout_rule(order.order_rule_key)
+        from services.coin_wash_urgent_policy import urgent_fee_from_price_snapshot
+        urgent_fee_amount = urgent_fee_from_price_snapshot(order.price_snapshot_json)
         stream_map = {} if full_worker_payout else _approved_stream_map(db, int(order_id))
         stream_override_map = (
             {} if full_worker_payout else _assignment_stream_override_map(db, int(order_id))
@@ -212,6 +214,9 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
             ).all()
         )
 
+        # Washing SKUs require exactly one receiver. Select one deterministically
+        # and do not duplicate the surcharge across multiple payout rows.
+        urgency_receiver_id = str(payouts[0].worker_discord_id) if payouts else None
         details: list[dict] = []
         for payout in payouts:
             worker_id = str(payout.worker_discord_id or "")
@@ -227,8 +232,14 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     payout.base_payout = gross
                     payout.named_bonus_rate = 0.0
                     payout.named_bonus_amount = 0
-                    payout.final_payout = gross
-                    payout.note = "特殊代肝單｜接單人員全額 100%｜無客服分潤及額外獎金"
+                    surcharge = (
+                        urgent_fee_amount if worker_id == urgency_receiver_id else 0
+                    )
+                    payout.final_payout = gross + surcharge
+                    payout.note = (
+                        "特殊代肝單｜接單人員全額 100%｜無其他額外獎金"
+                        + (f"｜加急 +{surcharge}T 全額歸打手" if surcharge else "")
+                    )
                 details.append({
                     "worker_id": worker_id,
                     "rate": 1.0,
@@ -276,6 +287,9 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
             base_payout = int(round(gross * WORKER_BASE_PAYOUT_RATE))
             named_amount = int(round(gross * (LEGACY_WORKER_NAMED_BONUS_RATE if legacy and named else WORKER_NAMED_BONUS_RATE if named else 0.0)))
             final_amount = int(round(gross * rate))
+            worker_urgent_fee = (
+                urgent_fee_amount if worker_id == urgency_receiver_id else 0
+            )
 
             manual_override = "手動指定分潤" in str(payout.note or "")
             locked = payout.payout_status == PayoutStatus.PAID.value or manual_override
@@ -284,7 +298,7 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                 payout.base_payout = base_payout
                 payout.named_bonus_rate = LEGACY_WORKER_NAMED_BONUS_RATE if legacy else WORKER_NAMED_BONUS_RATE
                 payout.named_bonus_amount = named_amount
-                payout.final_payout = final_amount
+                payout.final_payout = final_amount + worker_urgent_fee
                 payout.note = (
                     f"分潤：基礎80%"
                     + (f"＋掛名{5 if legacy else 3}%" if named else "")
@@ -292,6 +306,10 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     + ("＋前月業績達5000T 2%" if previous_bonus else "")
                     + ("＋綁店3%" if store_bound else "")
                     + f"｜前月業績 {previous_performance}T"
+                    + (
+                        f"｜加急 +{worker_urgent_fee}T 全額歸接單打手，不抽成"
+                        if worker_urgent_fee else ""
+                    )
                 )
 
             details.append({
@@ -323,15 +341,24 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     order.customer_pay_amount
                     if order.customer_pay_amount is not None else order.amount or 0
                 )
+                original_payment = max(0, customer_paid - urgent_fee_amount)
                 cs_amount = calculate_internal_ammo_dump_cs_payout(
-                    order.order_rule_key, customer_paid, payout_base
+                    order.order_rule_key,
+                    original_payment,
+                    payout_base,
                 )
-                cs_rate = cs_amount / customer_paid if customer_paid > 0 else 0.0
+                cs_rate = cs_amount / original_payment if original_payment > 0 else 0.0
             elif legacy:
                 cs_rate = LEGACY_CUSTOMER_SERVICE_GROSS_RATE
                 cs_amount = int(round(int(cs_base) * cs_rate))
             else:
                 total_worker = sum(max(0, int(row.final_payout or 0)) for row in payouts)
+                # Urgency is not part of payout_base and must not shrink the
+                # CS margin when report approval recalculates salary.
+                if urgent_fee_amount and urgency_receiver_id in {
+                    str(row.worker_discord_id) for row in payouts
+                }:
+                    total_worker = max(0, total_worker - urgent_fee_amount)
                 effective_worker_rate = min(1.0, total_worker / payout_base) if payout_base > 0 else WORKER_BASE_PAYOUT_RATE
                 raw = calculate_customer_service_payout(
                     int(cs_base),

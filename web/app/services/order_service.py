@@ -400,9 +400,14 @@ def get_worker_dispatch_payout_preview(
                 None,
             )
             if preview is not None:
+                from services.coin_wash_urgent_policy import urgent_fee_from_price_snapshot
+
+                urgent_fee = urgent_fee_from_price_snapshot(
+                    getattr(order, "price_snapshot_json", None)
+                )
                 return {
                     "label": "預估分潤",
-                    "amount": int(round(float(preview.final_payout or 0))),
+                    "amount": int(round(float(preview.final_payout or 0))) + urgent_fee,
                     "is_estimate": True,
                 }
 
@@ -569,6 +574,20 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
         resolve_one_guard_unit_price,
     )
 
+    from services.coin_wash_urgent_policy import urgent_fee_from_price_snapshot
+    from services.one_companion_one_guard_payout import is_full_worker_payout_rule
+
+    urgent_fee_amount = urgent_fee_from_price_snapshot(
+        getattr(order, "price_snapshot_json", None)
+    )
+    # Full-worker direct settlements use actual customer payment to calculate
+    # their special named/unnamed margin. Remove worker-only urgency first.
+    if is_full_worker_payout_rule(getattr(order, "order_rule_key", None)):
+        customer_paid = getattr(order, "customer_pay_amount", None)
+        if customer_paid is None:
+            customer_paid = order.amount
+        customer_service_base = max(0, int(customer_paid or 0) - urgent_fee_amount)
+
     payout_result = calculate_one_companion_one_guard_order_payout(
         rule_key=getattr(order, "order_rule_key", None),
         unit_price=resolve_one_guard_unit_price(
@@ -589,6 +608,12 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
             named_bonus_worker_ids=named_bonus_worker_ids,
             customer_service_total_amount=customer_service_base,
         )
+
+    from services.coin_wash_urgent_policy import urgent_fee_from_price_snapshot
+    urgent_fee_amount = urgent_fee_from_price_snapshot(
+        getattr(order, "price_snapshot_json", None)
+    )
+    urgent_receiver_id = str(worker_ids[0]) if worker_ids else None
 
     overrides = {
         override.worker_discord_id: override
@@ -616,6 +641,11 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
             note = f"手動指定分潤：{final_payout}T"
             if override.reason:
                 note += f"｜原因：{override.reason}"
+
+        if urgent_fee_amount and str(worker_payout.worker_discord_id) == urgent_receiver_id:
+            final_payout += urgent_fee_amount
+            urgency_note = f"加急 +{urgent_fee_amount}T（全額歸接單打手；不抽成）"
+            note = f"{note}｜{urgency_note}" if note else urgency_note
 
         db.add(
             WorkerPayout(

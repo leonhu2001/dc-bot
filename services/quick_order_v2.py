@@ -148,7 +148,8 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
             description=(
                 "**洗幣｜500M**\n"
                 "• 倒子彈：**有掛名 2,650T／單｜無掛名 3,000T／單**（由客服勾選）\n"
-                "• 撞車：**2,480T／單**\n\n"
+                "• 撞車：**2,480T／單**\n"
+                "• 洗幣加急：**+260T／單**（100% 歸接單打手，不抽成）\n\n"
                 "**AW 子彈**\n"
                 "• 代撞：**4T／發**（發數自行輸入）\n\n"
                 "請在下方選擇服務，再確認建立私人下單票口。\n"
@@ -664,7 +665,7 @@ async def _create_ticket(
         )
 
         stage = "build_order_selector_panel"
-        await ticket.send(
+        panel_message = await ticket.send(
             embed=ui.build_self_service_panel_embed(member.id, data, guild),
             view=ui.SelfServiceOrderView(
                 customer_id=member.id,
@@ -677,6 +678,8 @@ async def _create_ticket(
                 everyone=False,
             ),
         )
+        data["self_service_panel_message_id"] = panel_message.id
+        remember_order_data(ticket.id, data)
     except Exception as exc:
         if ticket is not None:
             try:
