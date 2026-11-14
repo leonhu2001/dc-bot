@@ -452,24 +452,32 @@ def _shared_special_service_copy(game: str) -> str:
     return f"{sweet_copy}\n\n{_GAME_PRICE_SECTION_DIVIDER}\n\n{teaching_copy}"
 
 
+def _game_price(rule_key: str) -> int:
+    """One price source for the Discord list, checkout, and Web storefront."""
+    from services.order_rules import ORDER_RULES
+    return int(ORDER_RULES[rule_key].price)
+
+
 def _valorant_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
-{_aligned_code_block((("NG", "每人 300T / H"), ("積分", "每人 250T / 局")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('valorant_entertain_ng')}T / H"), ("積分", f"每人 {_game_price('valorant_entertain_ranked')}T / 局")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
+
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Ascendant", "超凡陪")}
-{_aligned_code_block((("NG", "每人 330T / H"), ("積分", "每人 290T / 局")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('valorant_ascendant_ng')}T / H"), ("積分", f"每人 {_game_price('valorant_ascendant_ranked')}T / 局")))}
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Immortal", "神話陪")}
-{_aligned_code_block((("NG", "每人 350T / H"), ("積分", "每人 330T / 局")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('valorant_immortal_ng')}T / H"), ("積分", f"每人 {_game_price('valorant_immortal_ranked')}T / 局")))}
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Radiant", "輻能陪")}
-{_aligned_code_block((("NG", "每人 380T / H"), ("積分", "每人 370T / 局")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('valorant_radiant_ng')}T / H"), ("積分", f"每人 {_game_price('valorant_radiant_ranked')}T / 局")))}
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
@@ -489,22 +497,24 @@ def _valorant_price_list(interaction: discord.Interaction) -> str:
 
 def _apex_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
-{_aligned_code_block((("NG", "每人 300T / H"), ("積分", "每人 350T / H")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('apex_entertain_ng')}T / H"), ("積分", f"每人 {_game_price('apex_entertain_ranked')}T / H")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
+
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Diamond", "鑽石陪")}
-{_aligned_code_block((("NG", "每人 400T / H"), ("積分", "每人 450T / H")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('apex_diamond_ng')}T / H"), ("積分", f"每人 {_game_price('apex_diamond_ranked')}T / H")))}
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Master~1", "大師陪")}
-{_aligned_code_block((("NG", "每人 480T / H"), ("積分", "每人 530T / H")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('apex_master_ng')}T / H"), ("積分", f"每人 {_game_price('apex_master_ranked')}T / H")))}
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Predator", "頂獵陪")}
-{_aligned_code_block((("NG", "每人 580T / H"), ("積分", "每人 630T / H")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('apex_predator_ng')}T / H"), ("積分", f"每人 {_game_price('apex_predator_ranked')}T / H")))}
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
@@ -524,22 +534,24 @@ def _apex_price_list(interaction: discord.Interaction) -> str:
 
 def _lol_price_list(interaction: discord.Interaction) -> str:
     return f"""**娛樂陪**
-{_aligned_code_block((("ARAM", "每人 300T / H"), ("NG", "每人 300T / H"), ("積分", "每人 250T / 局")))}
+{_aligned_code_block((("ARAM", f"每人 {_game_price('lol_entertain_aram')}T / H"), ("NG", f"每人 {_game_price('lol_entertain_ng')}T / H"), ("積分", f"每人 {_game_price('lol_entertain_ranked')}T / 局")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
+
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Master", "大師陪")}
-{_aligned_code_block((("NG", "每人 340T / H"), ("積分", "每人 300T / 局")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('lol_master_ng')}T / H"), ("積分", f"每人 {_game_price('lol_master_ranked')}T / 局")))}
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Grandmaster", "宗師陪")}
-{_aligned_code_block((("NG", "每人 360T / H"), ("積分", "每人 300T / 局")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('lol_grandmaster_ng')}T / H"), ("積分", f"每人 {_game_price('lol_grandmaster_ranked')}T / 局")))}
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Challenger", "菁英陪")}
-{_aligned_code_block((("NG", "每人 400T / H"), ("積分", "每人 400T / 局")))}
+{_aligned_code_block((("NG", f"每人 {_game_price('lol_elite_ng')}T / H"), ("積分", f"每人 {_game_price('lol_elite_ranked')}T / 局")))}
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
@@ -559,7 +571,7 @@ def _lol_price_list(interaction: discord.Interaction) -> str:
 
 def _steam_price_list(_: discord.Interaction) -> str:
     return f"""**娛樂陪**
-{_aligned_code_block((("一般陪玩", "每人 320T / H"),))}
+{_aligned_code_block((("一般陪玩", f"每人 {_game_price('steam_play')}T / H"),))}
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
