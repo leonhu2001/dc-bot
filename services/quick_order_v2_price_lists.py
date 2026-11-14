@@ -468,16 +468,19 @@ def _valorant_price_list(interaction: discord.Interaction) -> str:
 
 {_rank_heading(interaction, "Ascendant", "超凡陪")}
 {_aligned_code_block((("NG", f"每人 {_game_price('valorant_ascendant_ng')}T / H"), ("積分", f"每人 {_game_price('valorant_ascendant_ranked')}T / 局")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Immortal", "神話陪")}
 {_aligned_code_block((("NG", f"每人 {_game_price('valorant_immortal_ng')}T / H"), ("積分", f"每人 {_game_price('valorant_immortal_ranked')}T / 局")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Radiant", "輻能陪")}
 {_aligned_code_block((("NG", f"每人 {_game_price('valorant_radiant_ng')}T / H"), ("積分", f"每人 {_game_price('valorant_radiant_ranked')}T / 局")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
@@ -505,16 +508,19 @@ def _apex_price_list(interaction: discord.Interaction) -> str:
 
 {_rank_heading(interaction, "Diamond", "鑽石陪")}
 {_aligned_code_block((("NG", f"每人 {_game_price('apex_diamond_ng')}T / H"), ("積分", f"每人 {_game_price('apex_diamond_ranked')}T / H")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Master~1", "大師陪")}
 {_aligned_code_block((("NG", f"每人 {_game_price('apex_master_ng')}T / H"), ("積分", f"每人 {_game_price('apex_master_ranked')}T / H")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Predator", "頂獵陪")}
 {_aligned_code_block((("NG", f"每人 {_game_price('apex_predator_ng')}T / H"), ("積分", f"每人 {_game_price('apex_predator_ranked')}T / H")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
@@ -542,16 +548,19 @@ def _lol_price_list(interaction: discord.Interaction) -> str:
 
 {_rank_heading(interaction, "Master", "大師陪")}
 {_aligned_code_block((("NG", f"每人 {_game_price('lol_master_ng')}T / H"), ("積分", f"每人 {_game_price('lol_master_ranked')}T / 局")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Grandmaster", "宗師陪")}
 {_aligned_code_block((("NG", f"每人 {_game_price('lol_grandmaster_ng')}T / H"), ("積分", f"每人 {_game_price('lol_grandmaster_ranked')}T / 局")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
 {_rank_heading(interaction, "Challenger", "菁英陪")}
 {_aligned_code_block((("NG", f"每人 {_game_price('lol_elite_ng')}T / H"), ("積分", f"每人 {_game_price('lol_elite_ranked')}T / 局")))}
+⚠️ **積分以白金以下為基礎價；每往上一階 +50T，請先由客服確認段位與加價。**
 
 {_GAME_PRICE_SECTION_DIVIDER}
 
