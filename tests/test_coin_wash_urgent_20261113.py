@@ -209,14 +209,14 @@ def test_obsolete_halfcoin_products_not_in_customer_catalog_or_order_item_list()
                "farm_coin_wash_car", "farm_coin_wash_ammo_dump"}
     assert retired <= CATALOG_HIDDEN_RULE_KEYS
     farm = SELF_SERVICE_ORDER_CATALOG["farm"]
-    assert "哈夫幣代洗" not in [group["label"] for group in farm]
+    assert "哈夫幣代洗" in [group["label"] for group in farm]
     assert all(
         detail["rule_key"] not in retired
         for group in farm
         for detail in group.get("details", [])
     )
-    assert not any("哈夫幣代洗" in label for label in ORDER_ITEMS_BY_CATEGORY["farm"])
-    public_wash = next(group for group in farm if group["label"] == "對外洗幣")
+    assert any("哈夫幣代洗" in label for label in ORDER_ITEMS_BY_CATEGORY["farm"])
+    public_wash = next(group for group in farm if group["label"] == "哈夫幣代洗")
     from services.order_rules import PUBLIC_COIN_WASH_PRICE_RULE_KEYS
     assert {detail["rule_key"] for detail in public_wash["details"]} == (
         PUBLIC_COIN_WASH_PRICE_RULE_KEYS
