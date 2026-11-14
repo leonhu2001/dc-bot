@@ -7,6 +7,7 @@ from services.order_rule_store import (
     get_custom_rule_definition,
 )
 from services.order_rules import (
+    AW_COLLISION_PRICING_BY_RULE,
     CATEGORY_LABELS,
     ORDER_RULES,
     SOURCE_AUTHORITY_RULE_KEYS,
@@ -36,6 +37,9 @@ CATEGORY_ORDER = [
 
 
 HIDDEN_PUBLIC_RULE_KEYS = {
+    # 已下架 120M／360M 舊代洗僅供歷史訂單使用，不能再出現在網站。
+    "farm_halfcoin_120m",
+    "farm_halfcoin_360m",
     # 造型不再作為獨立商品。
     # 前台改成賽季 3x3｜普通底下 +3000T 的附加選項。
     "farm_season_3x3_skin",
@@ -241,13 +245,26 @@ GROUP_SPECS = [
     },
 
     {
-        "key": "halfcoin",
+        "key": "coin_wash",
         "category": "farm",
-        "label": "哈夫幣代洗",
-        "selector_label": "數量",
+        "label": "洗幣服務",
+        "selector_label": "洗幣方式",
+        "description": "撞車／倒子彈由客服確認基本價格，加急另加 280T，全額歸接單打手。",
         "variants": [
-            ("farm_halfcoin_120m", "120M"),
-            ("farm_halfcoin_360m", "360M"),
+            ("farm_coin_wash_car", "撞車｜客服報價"),
+            ("farm_coin_wash_ammo_dump", "倒子彈｜客服報價"),
+        ],
+    },
+    {
+        "key": "aw_collision",
+        "category": "farm",
+        "label": "AW 代撞",
+        "selector_label": "發數級距",
+        "description": "選擇發數級距後輸入實際發數；1～100 發 5T／發、101～500 發 4.5T／發、501 發以上 4T／發，半 T 總額向上取整。",
+        "variants": [
+            ("farm_aw_collision_1_100", "1～100 發｜5T／發"),
+            ("farm_aw_collision_101_500", "101～500 發｜4.5T／發"),
+            ("farm_aw_collision_501_plus", "501 發以上｜4T／發"),
         ],
     },
 
@@ -467,6 +484,11 @@ def _variant_data(
     )
 
     quantity_price_overrides = {}
+    aw_plan = AW_COLLISION_PRICING_BY_RULE.get(rule_key)
+    if aw_plan:
+        # Actual AW amount is calculated per-tier (including half-T rates),
+        # never by simply multiplying the integer rule.price.
+        quantity_enabled = True
 
     customer_adjustments = []
 
@@ -528,11 +550,11 @@ def _variant_data(
         "rule_key": rule_key,
         "label": public_label,
         "price": price,
-        "price_text": _price_text(
-            price,
-            pricing_type,
-            unit_label,
+        "price_text": (
+            f"{aw_plan['rate_text']}T / 發"
+            if aw_plan else _price_text(price, pricing_type, unit_label)
         ),
+        "aw_rate_x2": int(aw_plan["rate_x2"]) if aw_plan else None,
         "pricing_type": pricing_type,
         "unit_label": unit_label,
         "quantity_enabled":
