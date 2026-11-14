@@ -49,12 +49,13 @@ def test_owner_price_cards_are_identical_for_dc_and_web():
     web = _catalog_dict()
     dc = {
         item["rule_key"]: item
-        for item in get_order_item_details_for_group("farm", "對外洗幣")
+        for item in get_order_item_details_for_group("farm", "哈夫幣代洗")
     }
     assert set(web) == set(dc) == set(EXPECTED)
 
     for key, expected in EXPECTED.items():
         rule = ORDER_RULES[key]
+        assert rule.label.startswith("哈夫幣代洗｜")
         assert rule.price == expected
         assert get_base_rule(key).price == expected
         assert get_allowed_role_ids(rule) == [HALFCOIN_RECEIVER_ROLE_ID]
@@ -138,4 +139,5 @@ def test_manager_override_cannot_put_old_manual_rate_back(monkeypatch):
     rule = ORDER_RULES[key]
     assert rule.price == 700
     assert rule.pricing_type == "fixed"
+    assert rule.label == "哈夫幣代洗｜撞車 100M"
     assert get_allowed_role_ids(rule) == [HALFCOIN_RECEIVER_ROLE_ID]

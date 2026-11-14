@@ -48,7 +48,9 @@ def test_public_site_has_current_wash_and_aw_but_no_retired_halfcoin():
     assert "halfcoin" not in cards
     assert "coin_wash" in full and "coin_wash" in cards
     assert "aw_collision" in full and "aw_collision" in cards
-    assert "哈夫幣代洗" not in [item["label"] for item in full.values()]
+    assert full["coin_wash"]["label"] == "哈夫幣代洗"
+    assert cards["coin_wash"]["label"] == "哈夫幣代洗"
+    assert "對外洗幣" not in [item["label"] for item in full.values()]
     assert all(
         variant["rule_key"] not in RETIRED
         for group in full.values()
@@ -86,7 +88,7 @@ def test_new_wash_product_uses_original_receiver_and_fixed_price(rule_key):
     result = build_public_quote(rule_key=rule_key, quantity=1)
     assert result["manual_quote"] is False
     assert result["base_amount"] == ORDER_RULES[rule_key].price
-    assert result["item"].startswith("對外洗幣")
+    assert result["item"].startswith("哈夫幣代洗")
 
 
 @pytest.mark.parametrize("rule_key,minimum,maximum,rate_x2,first_quote", AW_TIERS)

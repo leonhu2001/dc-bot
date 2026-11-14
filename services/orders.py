@@ -8,6 +8,7 @@ from services.order_rules import (
     CATEGORY_LABELS as RULE_CATEGORY_LABELS,
     ORDER_RULES,
     PUBLIC_COIN_WASH_VARIANTS,
+    PUBLIC_COIN_WASH_PRICE_RULE_KEYS,
     SOURCE_AUTHORITY_RULE_KEYS,
     get_rules_by_category,
 )
@@ -150,7 +151,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         },
         {"label": "部門任務", "details": [{"label": "部門任務", "value": "department", "rule_key": "farm_department_task", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {
-            "label": "對外洗幣",
+            "label": "哈夫幣代洗",
             "details": [
                 {
                     "label": f"{service_label}｜{millions}M｜{price:,}T",
@@ -477,7 +478,9 @@ def _effective_builtin_group_label(rule, fallback: str) -> str:
     # 舊 manager catalog_group_label 不能再把它們合併、改名或重新帶回
     # 單陪／雙陪；自訂商品仍照後台分組設定運作。
     rule_key = str(getattr(rule, "key", "") or "") if rule is not None else ""
-    if rule_key in CANONICAL_DETAIL_LABEL_RULE_KEYS:
+    if rule_key in CANONICAL_DETAIL_LABEL_RULE_KEYS or rule_key in PUBLIC_COIN_WASH_PRICE_RULE_KEYS:
+        # These ten live wash products must use the owner-approved group
+        # name even if a saved admin override still says 對外洗幣.
         return str(fallback)
 
     manager_label = str(
