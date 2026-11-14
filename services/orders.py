@@ -356,6 +356,8 @@ CATALOG_HIDDEN_RULE_KEYS = {
     # but must never appear as new customer-facing choices.
     "farm_halfcoin_120m",
     "farm_halfcoin_360m",
+    "farm_coin_wash_car",
+    "farm_coin_wash_ammo_dump",
     "basic_sweet_single",
     "basic_sweet_double",
     "basic_black_tide_entertain_1",
