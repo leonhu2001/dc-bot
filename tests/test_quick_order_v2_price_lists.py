@@ -170,7 +170,7 @@ def test_game_price_list_preserves_category_prices_and_rules() -> None:
         assert "指定陪玩" in sweet and "2H 以上免指定費" in sweet
         assert "500T / H" in teaching and "3H 起標" in teaching
         for other_key in ("entertainment", "technical", "sweet"):
-            assert "500T / H" not in plans[other_key]
+            assert "教學單（1 對 1）" not in plans[other_key]
 
     steam_id = int(quick.QUICK_ORDER_V2_CHANNELS["steam"])
     steam = price_lists._game_price_list_sections(interaction, steam_id)
