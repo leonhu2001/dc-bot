@@ -88,7 +88,7 @@ def test_new_wash_product_uses_original_receiver_and_fixed_price(rule_key):
     result = build_public_quote(rule_key=rule_key, quantity=1)
     assert result["manual_quote"] is False
     assert result["base_amount"] == ORDER_RULES[rule_key].price
-    assert result["item"].startswith("對外洗幣")
+    assert result["item"].startswith("哈夫幣代洗")
 
 
 @pytest.mark.parametrize("rule_key,minimum,maximum,rate_x2,first_quote", AW_TIERS)
