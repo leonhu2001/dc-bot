@@ -6,7 +6,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from services.order_rules import COIN_WASH_AW_RECEIVER_ROLE_ID
+from services.order_rules import (
+    AW_COLLISION_ORDER_RULE_KEYS,
+    AW_COLLISION_RECEIVER_ROLE_ID,
+    COIN_WASH_ORDER_RULE_KEYS,
+    HALFCOIN_RECEIVER_ROLE_ID,
+)
 from web.app.services.dispatch_assignment_eligibility import (
     cached_staff_role_ids,
     eligible_dispatch_assignees,
@@ -22,7 +27,9 @@ from web.app.services.role_catalog import (
 from web.app.services.staff_service import classify_roles
 
 
-SPECIAL_ID = "1565369317929918554"
+WASH_ID = "1565369317929918554"
+AW_ID = "1571080769407942787"
+SPECIAL_ID = WASH_ID
 OLD_ID = "1565369029005287595"
 COMPANION_ID = "1500751059239440575"
 PROTECTOR_ID = "1500234130871550004"
@@ -30,6 +37,8 @@ SPECIAL_PRODUCTS = [
     "staff_internal_ammo_dump_500m",
     "staff_internal_car_500m",
     "staff_internal_aw_collision",
+    "farm_coin_wash_car",
+    "farm_coin_wash_ammo_dump",
     "farm_halfcoin_120m",
     "farm_halfcoin_360m",
     "farm_aw_collision_1_100",
@@ -52,19 +61,24 @@ def member(role_ids, *, active=True, is_worker=False, is_companion=False, uid="1
 
 
 @pytest.mark.parametrize("rule_key", SPECIAL_PRODUCTS)
-def test_dispatch_picker_only_contains_members_with_shared_special_role(rule_key):
+def test_dispatch_picker_only_contains_members_with_matching_special_role(rule_key):
     order = SimpleNamespace(order_rule_key=rule_key, dispatch_acceptance_meta=None)
+    needed_role_id = AW_ID if rule_key in AW_COLLISION_ORDER_RULE_KEYS else WASH_ID
     members = [
         member([COMPANION_ID], is_companion=True, is_worker=True, uid="companion"),
         member([PROTECTOR_ID], is_worker=True, uid="protector"),
         member([OLD_ID], is_worker=True, uid="retired"),
-        member([SPECIAL_ID], uid="special-only"),
-        member([SPECIAL_ID, COMPANION_ID], uid="dual-role"),
-        member([SPECIAL_ID], active=False, uid="inactive"),
+        member([WASH_ID], uid="wash-only"),
+        member([AW_ID], uid="aw-only"),
+        member([AW_ID, WASH_ID], uid="both"),
+        member([needed_role_id], active=False, uid="inactive"),
         member([], is_companion=True, uid="stale-flag"),
     ]
     result = eligible_dispatch_assignees(order, members)
-    assert [x.discord_id for x in result] == ["special-only", "dual-role"]
+    assert [x.discord_id for x in result] == (
+        ["aw-only", "both"] if rule_key in AW_COLLISION_ORDER_RULE_KEYS
+        else ["wash-only", "both"]
+    )
 
 
 def test_old_dispatch_snapshot_cannot_bypass_updated_special_role_rule():
@@ -82,12 +96,14 @@ def test_old_dispatch_snapshot_cannot_bypass_updated_special_role_rule():
     assert cached_staff_role_ids(member([])) == set()
 
 
-def test_special_role_is_recognized_by_web_staff_sync_and_login():
-    assert COIN_WASH_AW_RECEIVER_ROLE_ID == SPECIAL_ID
-    assert SPECIAL_ID in RECEIVER_ROLE_IDS
-    assert ROLE_LABEL_BY_ID[SPECIAL_ID] == "幣號／代洗／AW"
-    assert can_login_dashboard([SPECIAL_ID])
-    is_cs, is_worker, is_companion = classify_roles([SPECIAL_ID])
+@pytest.mark.parametrize("role_id,label", [(WASH_ID, "洗幣"), (AW_ID, "AW")])
+def test_special_roles_are_recognized_by_web_staff_sync_and_login(role_id, label):
+    assert HALFCOIN_RECEIVER_ROLE_ID == WASH_ID
+    assert AW_COLLISION_RECEIVER_ROLE_ID == AW_ID
+    assert role_id in RECEIVER_ROLE_IDS
+    assert ROLE_LABEL_BY_ID[role_id] == label
+    assert can_login_dashboard([role_id])
+    is_cs, is_worker, is_companion = classify_roles([role_id])
     assert is_cs is False
     assert is_worker is True
     assert is_companion is False
@@ -110,14 +126,14 @@ def test_legacy_web_claim_access_uses_current_special_role_not_old_snapshot():
         active_rows=[],
         order_status="waiting_acceptance",
         user_id="special",
-        user_role_ids=[SPECIAL_ID],
+        user_role_ids=[AW_ID],
     )
     denied = evaluate_dispatch_claim_access(
         meta=meta,
         active_rows=[],
         order_status="waiting_acceptance",
         user_id="wrong",
-        user_role_ids=[OLD_ID],
+        user_role_ids=[WASH_ID],
     )
     assert permitted["allowed"] is True
     assert denied["allowed"] is False
@@ -180,3 +196,17 @@ def test_regular_dispatch_assignment_uses_ordinary_game_roles_and_no_special_bac
     )
     assert not is_eligible_dispatch_assignee(order, member([COMPANION_ID]))
     assert not is_eligible_dispatch_assignee(order, member([SPECIAL_ID]))
+
+
+def test_aw_snapshot_cannot_trick_web_picker_into_selecting_coin_wash_member():
+    order = SimpleNamespace(
+        order_rule_key="staff_internal_aw_collision",
+        dispatch_acceptance_meta={
+            "order_rule_key": "staff_internal_aw_collision",
+            "allowed_role_ids_json": json.dumps([WASH_ID]),
+            "required_game_role_ids_json": "[]",
+        },
+    )
+    assert not is_eligible_dispatch_assignee(order, member([WASH_ID]))
+    assert is_eligible_dispatch_assignee(order, member([AW_ID]))
+    assert is_eligible_dispatch_assignee(order, member([AW_ID, WASH_ID]))
