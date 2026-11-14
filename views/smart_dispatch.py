@@ -435,6 +435,31 @@ def _is_dedicated_receiver_dispatch(role_ids: Iterable[str | int]) -> bool:
     return len(normalized) == 1 and bool(normalized & _DEDICATED_RECEIVER_ROLE_IDS)
 
 
+def _reconcile_legacy_receiver_candidates(
+    plan: dict, currently_eligible_ids: set[str]
+) -> None:
+    """Prevent old AW/wash plans from notifying members of the wrong role.
+
+    Old plans persisted ranked IDs of the one previously shared group. When
+    the authoritative role changed, remove those stale recipients and include
+    all currently eligible members of the now-correct receiver group.
+    """
+    if not plan.get("receiver_roles_reconciled"):
+        return
+    current = {str(item) for item in currently_eligible_ids}
+    plan["ranked_candidate_ids"] = list(dict.fromkeys([
+        *[
+            str(item) for item in (plan.get("ranked_candidate_ids") or [])
+            if str(item) in current
+        ],
+        *sorted(current),
+    ]))
+    plan["notified_candidate_ids"] = [
+        str(item) for item in (plan.get("notified_candidate_ids") or [])
+        if str(item) in current
+    ]
+
+
 def _customer_service_role_mention(
     bot: discord.Client,
     guild: discord.Guild,
@@ -619,6 +644,9 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                             plan.get("required_game_role_ids") or []
                         ),
                     )
+                )
+                _reconcile_legacy_receiver_candidates(
+                    plan, currently_eligible_ids
                 )
                 unresolved_specified = sorted(
                     (specified_ids - accepted_ids) & currently_eligible_ids
