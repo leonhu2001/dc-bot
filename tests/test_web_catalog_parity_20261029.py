@@ -24,12 +24,12 @@ def test_web_loyalty_and_apex_copy_matches_authoritative_rules() -> None:
     assert "積分累積 15 個服務局回饋 1 局" in _web_group("lol", "lol_entertain")["description"]
     apex_master = _web_group("apex", "apex_master")
     apex_predator = _web_group("apex", "apex_predator")
-    assert order_rules.ORDER_RULES["apex_master_ng"].price == 480
-    assert order_rules.ORDER_RULES["apex_master_ranked"].price == 530
-    assert order_rules.ORDER_RULES["apex_predator_ng"].price == 580
-    assert order_rules.ORDER_RULES["apex_predator_ranked"].price == 630
-    assert "NG 480T/人/H、積分 530T/人/H" in apex_master["description"]
-    assert "NG 580T/人/H、積分 630T/人/H" in apex_predator["description"]
+    assert order_rules.ORDER_RULES["apex_master_ng"].price == 400
+    assert order_rules.ORDER_RULES["apex_master_ranked"].price == 450
+    assert order_rules.ORDER_RULES["apex_predator_ng"].price == 500
+    assert order_rules.ORDER_RULES["apex_predator_ranked"].price == 550
+    assert "NG 400T/人/H、積分 450T/人/H" in apex_master["description"]
+    assert "NG 500T/人/H、積分 550T/人/H" in apex_predator["description"]
 
 
 def test_web_manager_hides_historical_fixed_seat_rules() -> None:
