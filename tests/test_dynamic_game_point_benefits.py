@@ -151,8 +151,8 @@ def test_discord_financial_runtime_funds_three_seats_once_not_twice() -> None:
     )
 
     # Purchased service is 390 x 3 = 1170. +1H adds the same 1170 salary value
-    # across the three workers. It must not stay at one-seat 360 or double-multiply
-    # to 3240 through stacked runtime wrappers.
+    # across the three workers. It must not stay at one-seat 390 or double-multiply
+    # to 3510 through stacked runtime wrappers.
     assert result["point_service_value"] == 1170
     assert result["store_absorbed_amount"] == 1170
     assert "3 位陪玩同步加贈" in result["service_bonus_text"]
@@ -191,7 +191,7 @@ def test_discord_payment_recomputes_dynamic_cost_and_ignores_stored_snapshot(mon
     data["point_benefit_cost"] = 99999
     info = redemption._get_pending_order_point_benefit_info(data)
     assert info is not None
-    assert info["cost"] == 510
+    assert info["cost"] == 540
 
 
 def test_discord_payment_rejects_dynamic_service_reward_for_wrong_seat_count(monkeypatch) -> None:
