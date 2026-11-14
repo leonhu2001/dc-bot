@@ -7,6 +7,7 @@ import discord
 from services.order_rules import (
     CATEGORY_LABELS as RULE_CATEGORY_LABELS,
     ORDER_RULES,
+    PUBLIC_COIN_WASH_VARIANTS,
     SOURCE_AUTHORITY_RULE_KEYS,
     get_rules_by_category,
 )
@@ -151,8 +152,15 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "對外洗幣",
             "details": [
-                {"label": "撞車｜客服報價", "value": "car", "rule_key": "farm_coin_wash_car", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "倒子彈｜客服報價", "value": "ammo_dump", "rule_key": "farm_coin_wash_ammo_dump", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {
+                    "label": f"{service_label}｜{millions}M｜{price:,}T",
+                    "value": f"{key.removeprefix('farm_coin_wash_')}",
+                    "rule_key": key,
+                    "quantity_unit": "單",
+                    "min_quantity": 1,
+                    "max_quantity": 1,
+                }
+                for key, service_label, millions, price in PUBLIC_COIN_WASH_VARIANTS
             ],
         },
         {
@@ -348,6 +356,8 @@ CATALOG_HIDDEN_RULE_KEYS = {
     # but must never appear as new customer-facing choices.
     "farm_halfcoin_120m",
     "farm_halfcoin_360m",
+    "farm_coin_wash_car",
+    "farm_coin_wash_ammo_dump",
     "basic_sweet_single",
     "basic_sweet_double",
     "basic_black_tide_entertain_1",

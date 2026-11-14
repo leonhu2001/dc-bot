@@ -24,6 +24,9 @@ from services.staff_internal_ammo_dump_policy import calculate_internal_ammo_dum
         ("staff_internal_ammo_dump_500m", 260),
         ("farm_coin_wash_car", 280),
         ("farm_coin_wash_ammo_dump", 280),
+        ("farm_coin_wash_car_100m", 280),
+        ("farm_coin_wash_car_1000m", 280),
+        ("farm_coin_wash_ammo_dump_2000m", 280),
         ("farm_halfcoin_120m", 0),
         ("farm_halfcoin_360m", 0),
         ("staff_internal_aw_collision", 0),
@@ -99,6 +102,8 @@ def test_payroll_bonus_only_from_matching_snapshot():
         ("staff_internal_car_500m", 2740, 2480, 260, 0, 2740, 0),
         ("farm_coin_wash_car", 2280, 2000, 280, 100, 1880, 300),
         ("farm_coin_wash_ammo_dump", 2280, 2000, 280, 100, 1880, 300),
+        ("farm_coin_wash_car_100m", 980, 700, 280, 35, 840, 105),
+        ("farm_coin_wash_ammo_dump_100m", 1080, 800, 280, 40, 920, 120),
     ],
 )
 def test_web_salary_recalculation_and_report_preserve_entire_urgent_fee(
@@ -200,7 +205,8 @@ def test_obsolete_halfcoin_products_not_in_customer_catalog_or_order_item_list()
         ORDER_ITEMS_BY_CATEGORY,
         CATALOG_HIDDEN_RULE_KEYS,
     )
-    retired = {"farm_halfcoin_120m", "farm_halfcoin_360m"}
+    retired = {"farm_halfcoin_120m", "farm_halfcoin_360m",
+               "farm_coin_wash_car", "farm_coin_wash_ammo_dump"}
     assert retired <= CATALOG_HIDDEN_RULE_KEYS
     farm = SELF_SERVICE_ORDER_CATALOG["farm"]
     assert "哈夫幣代洗" not in [group["label"] for group in farm]
@@ -211,6 +217,7 @@ def test_obsolete_halfcoin_products_not_in_customer_catalog_or_order_item_list()
     )
     assert not any("哈夫幣代洗" in label for label in ORDER_ITEMS_BY_CATEGORY["farm"])
     public_wash = next(group for group in farm if group["label"] == "對外洗幣")
-    assert {detail["rule_key"] for detail in public_wash["details"]} == {
-        "farm_coin_wash_car", "farm_coin_wash_ammo_dump"
-    }
+    from services.order_rules import PUBLIC_COIN_WASH_PRICE_RULE_KEYS
+    assert {detail["rule_key"] for detail in public_wash["details"]} == (
+        PUBLIC_COIN_WASH_PRICE_RULE_KEYS
+    )

@@ -140,11 +140,35 @@ LOL_GAME_ROLE = ("lol_game",)
 APEX_GAME_ROLE = ("apex_game",)
 
 # 舊商品保留歷史相容性，但無論新舊都按「商品類型」強制驗證身分組。
+# 2026-11-14 owner-approved external washing cards, in millions (M) and T.
+# Both website and Discord build their selectors directly from this catalogue.
+PUBLIC_COIN_WASH_PRICES_BY_METHOD: dict[str, tuple[tuple[int, int], ...]] = {
+    "car": ((100, 700), (200, 1400), (500, 3250), (1000, 6100)),
+    "ammo_dump": ((100, 800), (200, 1500), (300, 2100),
+                  (500, 3300), (1000, 6400), (2000, 11500)),
+}
+PUBLIC_COIN_WASH_METHOD_LABELS = {"car": "撞車", "ammo_dump": "倒子彈"}
+PUBLIC_COIN_WASH_VARIANTS: tuple[tuple[str, str, int, int], ...] = tuple(
+    (f"farm_coin_wash_{method}_{millions}m",
+     PUBLIC_COIN_WASH_METHOD_LABELS[method], millions, price)
+    for method, price_tiers in PUBLIC_COIN_WASH_PRICES_BY_METHOD.items()
+    for millions, price in price_tiers
+)
+PUBLIC_COIN_WASH_PRICE_RULE_KEYS = frozenset(
+    key for key, _label, _millions, _price in PUBLIC_COIN_WASH_VARIANTS
+)
+RETIRED_PUBLIC_COIN_WASH_RULE_KEYS = frozenset({
+    "farm_halfcoin_120m", "farm_halfcoin_360m",
+    "farm_coin_wash_car", "farm_coin_wash_ammo_dump",
+})
+
+
 COIN_WASH_ORDER_RULE_KEYS = frozenset({
     "farm_halfcoin_120m",
     "farm_halfcoin_360m",
     "farm_coin_wash_car",
     "farm_coin_wash_ammo_dump",
+    *PUBLIC_COIN_WASH_PRICE_RULE_KEYS,
     "staff_internal_ammo_dump_500m",
     "staff_internal_car_500m",
 })
@@ -1156,28 +1180,37 @@ _add(OrderRule(
 
 _add(OrderRule("farm", "farm_department_task", "部門任務", "manual", 0, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_ANY_GAME_ROLE, required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False, note="客服填價格"))
 
-# Keep retired halfcoin rules only for order snapshots/history. New orders use
-# explicit external car / ammunition washing services; their base prices must
-# be quoted by CS rather than silently reusing the obsolete 120M/360M prices.
+# Retired product rules remain resolvable for historical orders only.
 for key, label, price in [
     ("farm_halfcoin_120m", "哈夫幣代洗｜120M", 1250),
     ("farm_halfcoin_360m", "哈夫幣代洗｜360M", 3400),
 ]:
     _add(OrderRule("farm", key, label, "fixed", price, allowed_roles=HALFCOIN_RECEIVER_ROLES, required_game_roles=(), required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
 
+# Keep previous manual public wash keys as historical-only aliases; new
+# checkouts use the ten price-card variants below.
 for key, label in (
-    ("farm_coin_wash_car", "對外洗幣｜撞車"),
-    ("farm_coin_wash_ammo_dump", "對外洗幣｜倒子彈"),
+    ("farm_coin_wash_car", "對外洗幣｜撞車（舊客服報價）"),
+    ("farm_coin_wash_ammo_dump", "對外洗幣｜倒子彈（舊客服報價）"),
 ):
     _add(OrderRule(
-        category="farm", key=key, label=label,
-        pricing_type="manual", price=0,
-        allowed_roles=COIN_WASH_AW_RECEIVER_ROLES, required_game_roles=(),
+        category="farm", key=key, label=label, pricing_type="manual", price=0,
+        allowed_roles=HALFCOIN_RECEIVER_ROLES, required_game_roles=(),
         required_staff_count=1, min_quantity=1, max_quantity=1,
-        allow_specify=False,
-        vip_discount_allowed=False, point_benefits_allowed=False,
-        loyalty_benefits_enabled=False,
-        note="對外洗幣：客服填寫未加急基本價格；加急另加280T並全額歸接單打手。",
+        allow_specify=False, vip_discount_allowed=False,
+        point_benefits_allowed=False, loyalty_benefits_enabled=False,
+    ))
+
+for key, service_label, millions, price in PUBLIC_COIN_WASH_VARIANTS:
+    _add(OrderRule(
+        category="farm", key=key,
+        label=f"對外洗幣｜{service_label} {millions}M",
+        pricing_type="fixed", price=price, unit_label="單",
+        allowed_roles=HALFCOIN_RECEIVER_ROLES, required_game_roles=(),
+        required_staff_count=1, min_quantity=1, max_quantity=1,
+        allow_specify=False, vip_discount_allowed=False,
+        point_benefits_allowed=False, loyalty_benefits_enabled=False,
+        note="加急另加280T；加急費全額歸實際接單打手，不進店內/客服分潤。",
     ))
 
 for key, plan in AW_COLLISION_PRICING_BY_RULE.items():
@@ -1903,6 +1936,16 @@ class EffectiveOrderRules(dict):
                     player_count_prices=dict(base.player_count_prices),
                     max_specified_count=base.max_specified_count,
                 )
+            if key in PUBLIC_COIN_WASH_PRICE_RULE_KEYS:
+                # Owner's price-card prices must not be replaced by an old
+                # manager override on either the Discord or Web checkout.
+                rule = replace(
+                    rule, price=base.price, pricing_type=base.pricing_type,
+                    unit_label=base.unit_label, min_quantity=1, max_quantity=1,
+                    catalog_group_label=base.catalog_group_label,
+                    vip_discount_allowed=False, point_benefits_allowed=False,
+                    loyalty_benefits_enabled=False,
+                )
             if key in APPROVED_GAME_PRICE_RULE_KEYS:
                 # Old database manager overrides can otherwise silently put a
                 # retired price back into Discord and the web storefront even
@@ -2059,6 +2102,10 @@ __all__ = [
     "COIN_WASH_AW_RECEIVER_ROLES",
     "COIN_WASH_AW_ORDER_RULE_KEYS",
     "COIN_WASH_ORDER_RULE_KEYS",
+    "PUBLIC_COIN_WASH_PRICES_BY_METHOD",
+    "PUBLIC_COIN_WASH_VARIANTS",
+    "PUBLIC_COIN_WASH_PRICE_RULE_KEYS",
+    "RETIRED_PUBLIC_COIN_WASH_RULE_KEYS",
     "AW_COLLISION_ORDER_RULE_KEYS",
     "ALL_ROLE_IDS",
     "ALL_ROLE_LABELS",

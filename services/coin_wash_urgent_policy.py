@@ -15,7 +15,10 @@ INTERNAL_WASH_RULE_KEYS = frozenset({
 })
 # External washing must attach only to the current car / ammo services.
 # The obsolete halfcoin 120M/360M rules are strictly historical.
-EXTERNAL_WASH_RULE_KEYS = frozenset({
+from services.order_rules import PUBLIC_COIN_WASH_PRICE_RULE_KEYS
+
+# Legacy keys are still recognized for historical snapshots and accounting.
+EXTERNAL_WASH_RULE_KEYS = PUBLIC_COIN_WASH_PRICE_RULE_KEYS | frozenset({
     "farm_coin_wash_car",
     "farm_coin_wash_ammo_dump",
 })

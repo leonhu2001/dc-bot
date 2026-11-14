@@ -13,6 +13,8 @@ from services.order_rules import (
     AW_COLLISION_RECEIVER_ROLE_ID,
     HALFCOIN_RECEIVER_ROLE_ID,
     ORDER_RULES,
+    PUBLIC_COIN_WASH_VARIANTS,
+    RETIRED_PUBLIC_COIN_WASH_RULE_KEYS,
     get_allowed_role_ids,
 )
 from web.app.services.order_groups import get_grouped_order_catalog
@@ -25,8 +27,8 @@ from web.app.services.public_checkout import build_public_quote
 
 ROOT = Path(__file__).resolve().parents[1]
 
-RETIRED = {"farm_halfcoin_120m", "farm_halfcoin_360m"}
-WASH = {"farm_coin_wash_car", "farm_coin_wash_ammo_dump"}
+RETIRED = RETIRED_PUBLIC_COIN_WASH_RULE_KEYS
+WASH = {entry[0] for entry in PUBLIC_COIN_WASH_VARIANTS}
 AW_TIERS = (
     ("farm_aw_collision_1_100", 1, 100, 10, 100),
     ("farm_aw_collision_101_500", 101, 500, 9, 455),
@@ -56,9 +58,14 @@ def test_public_site_has_current_wash_and_aw_but_no_retired_halfcoin():
 
     wash = full["coin_wash"]
     assert {v["rule_key"] for v in wash["variants"]} == WASH
-    assert wash["starting_price_text"] == "客服報價"
-    assert cards["coin_wash"]["variant_count"] == 2
-    assert all(v["pricing_type"] == "manual" for v in wash["variants"])
+    assert wash["starting_price_text"] == "700T 起"
+    assert cards["coin_wash"]["variant_count"] == 10
+    assert all(v["pricing_type"] == "fixed" for v in wash["variants"])
+    assert all(
+        any(adj["key"] == "coin_wash_urgent" and adj["amount"] == 280
+            for adj in v["customer_adjustments"])
+        for v in wash["variants"]
+    )
 
     aw = full["aw_collision"]
     assert aw["label"] == "AW 代撞"
@@ -74,10 +81,11 @@ def test_forged_retired_public_order_quote_is_rejected(rule_key):
 
 
 @pytest.mark.parametrize("rule_key", sorted(WASH))
-def test_new_wash_product_uses_original_receiver_and_manual_cs_price(rule_key):
+def test_new_wash_product_uses_original_receiver_and_fixed_price(rule_key):
     assert get_allowed_role_ids(ORDER_RULES[rule_key]) == [HALFCOIN_RECEIVER_ROLE_ID]
     result = build_public_quote(rule_key=rule_key, quantity=1)
-    assert result["manual_quote"] is True
+    assert result["manual_quote"] is False
+    assert result["base_amount"] == ORDER_RULES[rule_key].price
     assert result["item"].startswith("對外洗幣")
 
 

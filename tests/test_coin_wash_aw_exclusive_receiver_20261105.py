@@ -13,6 +13,7 @@ from services.order_rules import (
     AW_COLLISION_ORDER_RULE_KEYS,
     HALFCOIN_RECEIVER_ROLE_ID,
     ORDER_RULES,
+    PUBLIC_COIN_WASH_PRICE_RULE_KEYS,
     SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS,
     get_allowed_role_ids,
     get_base_rule,
@@ -23,7 +24,7 @@ from shared import order_acceptance
 from shared.order_state import WAITING_ACCEPTANCE
 
 
-EXPECTED_RULE_KEYS = {
+EXPECTED_RULE_KEYS = PUBLIC_COIN_WASH_PRICE_RULE_KEYS | {
     "farm_halfcoin_120m",
     "farm_halfcoin_360m",
     "farm_coin_wash_car",

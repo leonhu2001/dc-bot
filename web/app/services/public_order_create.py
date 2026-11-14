@@ -1329,7 +1329,29 @@ def persist_final_order(
     )
 
 
+    from services.coin_wash_urgent_policy import selected_urgent_fee
+
+    from services.order_rules import RETIRED_PUBLIC_COIN_WASH_RULE_KEYS
+    if str(rule.key) in RETIRED_PUBLIC_COIN_WASH_RULE_KEYS:
+        raise ValueError("這個舊商品已停止提供新訂單。")
+
+    urgent_selection = bool(
+        "coin_wash_urgent" in (payload.get("customer_adjustments") or [])
+    )
+    server_urgent_fee = selected_urgent_fee(
+        rule, {"coin_wash_urgent": urgent_selection}
+    )
+    verified_urgent_fee = int(
+        _extract_quote(preview).get("urgent_fee_amount") or 0
+    )
+    if server_urgent_fee != verified_urgent_fee:
+        raise ValueError("加急費用驗證失敗，請重新取得價格。")
+
     price_snapshot = {
+        # The payout worker reads these top-level fields. Do NOT rely on
+        # nested preview/input fields, which are ignored for security.
+        "order_rule_key": str(rule.key),
+        "urgent_fee_amount": verified_urgent_fee,
         "schema_version":
             PUBLIC_ORDER_CREATE_SCHEMA_VERSION,
 

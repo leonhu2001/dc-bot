@@ -1264,8 +1264,12 @@ def calculate_checkout_financials(
     point_service_value: int = 0,
     benefit_coupon: dict | None = None,
     benefit_service_value: int = 0,
+    urgent_fee_amount: int = 0,
 ) -> dict:
     service_amount = max(0, int(service_amount or 0))
+    # Worker-only washing urgency is charged after discounts, with no
+    # contribution to worker-percentage or store/CS payout base.
+    urgent_fee_amount = max(0, int(urgent_fee_amount or 0))
     vip_pay_rate = max(0, min(100, int(vip_pay_rate or 100)))
     specify_fee = max(0, int(specify_fee or 0))
     wallet_balance = max(0, int(wallet_balance or 0))
@@ -1307,7 +1311,7 @@ def calculate_checkout_financials(
         else 0
     )
     after_benefit = max(0, after_point - benefit_discount_amount)
-    subtotal = max(0, after_benefit + effective_specify_fee)
+    subtotal = max(0, after_benefit + effective_specify_fee + urgent_fee_amount)
     wallet_use = min(wallet_balance, subtotal) if use_wallet else 0
     remaining = max(0, subtotal - wallet_use)
 
@@ -1326,7 +1330,8 @@ def calculate_checkout_financials(
 
     return {
         "service_amount": service_amount,
-        "original_amount": service_amount,
+        "original_amount": service_amount + urgent_fee_amount,
+        "urgent_fee_amount": urgent_fee_amount,
         "vip_pay_rate": vip_pay_rate,
         "manual_discount_percent": vip_pay_rate,
         "discount_rate_percent": vip_pay_rate,
@@ -1854,12 +1859,8 @@ def build_checkout_preview(
     finance = (
         calculate_checkout_financials(
             service_amount=
-                int(
-                    quote.get(
-                        "customer_pay_amount"
-                    )
-                    or 0
-                ),
+                max(0, int(quote.get("customer_pay_amount") or 0)
+                    - int(quote.get("urgent_fee_amount") or 0)),
 
             vip_pay_rate=
                 vip_rate,
@@ -1893,6 +1894,7 @@ def build_checkout_preview(
                 bool(
                     use_wallet
                 ),
+            urgent_fee_amount=int(quote.get("urgent_fee_amount") or 0),
         )
     )
 
