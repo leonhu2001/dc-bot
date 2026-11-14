@@ -248,7 +248,7 @@ GROUP_SPECS = [
     {
         "key": "coin_wash",
         "category": "farm",
-        "label": "洗幣服務",
+        "label": "哈夫幣代洗",
         "selector_label": "洗幣方式／數量",
         "description": "撞車與倒子彈請依洗幣數量選擇價格；可選加急 +280T，額外費用全額歸接單打手。",
         "variants": [
