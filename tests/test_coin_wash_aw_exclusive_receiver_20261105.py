@@ -9,7 +9,8 @@ from services.order_rules import (
     AW_COLLISION_RECEIVER_ROLE_ID,
     COIN_WASH_AW_ORDER_RULE_KEYS,
     COIN_WASH_AW_RECEIVER_ROLE_ID,
-    COIN_WASH_AW_RECEIVER_ROLES,
+    COIN_WASH_ORDER_RULE_KEYS,
+    AW_COLLISION_ORDER_RULE_KEYS,
     HALFCOIN_RECEIVER_ROLE_ID,
     ORDER_RULES,
     SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS,
@@ -36,35 +37,35 @@ EXPECTED_RULE_KEYS = {
 }
 
 
-def test_one_shared_special_receiver_role_for_coin_wash_and_aw():
-    assert COIN_WASH_AW_RECEIVER_ROLE_ID == "1565369317929918554"
-    assert AW_COLLISION_RECEIVER_ROLE_ID == COIN_WASH_AW_RECEIVER_ROLE_ID
-    assert HALFCOIN_RECEIVER_ROLE_ID == COIN_WASH_AW_RECEIVER_ROLE_ID
+def test_separate_special_receiver_roles_for_coin_wash_and_aw():
+    assert COIN_WASH_AW_RECEIVER_ROLE_ID == "1565369317929918554"  # legacy alias: wash only
+    assert HALFCOIN_RECEIVER_ROLE_ID == "1565369317929918554"
+    assert AW_COLLISION_RECEIVER_ROLE_ID == "1571080769407942787"
+    assert AW_COLLISION_RECEIVER_ROLE_ID != HALFCOIN_RECEIVER_ROLE_ID
+    assert COIN_WASH_ORDER_RULE_KEYS.isdisjoint(AW_COLLISION_ORDER_RULE_KEYS)
     assert COIN_WASH_AW_ORDER_RULE_KEYS == EXPECTED_RULE_KEYS
     assert COIN_WASH_AW_ORDER_RULE_KEYS <= SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS
 
 
 @pytest.mark.parametrize("rule_key", sorted(EXPECTED_RULE_KEYS))
-def test_all_internal_and_external_special_products_only_allow_shared_role(rule_key):
+def test_each_product_only_allows_its_own_role_and_never_the_other(rule_key):
     rule = ORDER_RULES[rule_key]
-    assert get_allowed_role_ids(rule) == [COIN_WASH_AW_RECEIVER_ROLE_ID]
-    assert rule_role_labels(rule) == "幣號／代洗／AW"
+    is_aw = rule_key in AW_COLLISION_ORDER_RULE_KEYS
+    required = AW_COLLISION_RECEIVER_ROLE_ID if is_aw else HALFCOIN_RECEIVER_ROLE_ID
+    other = HALFCOIN_RECEIVER_ROLE_ID if is_aw else AW_COLLISION_RECEIVER_ROLE_ID
+    assert get_allowed_role_ids(rule) == [required]
+    assert rule_role_labels(rule) == ("AW" if is_aw else "洗幣")
     assert rule.required_game_roles == ()
     assert rule.required_roles == ()
-    assert role_ids_match_requirements(
-        [COIN_WASH_AW_RECEIVER_ROLE_ID],
-        get_allowed_role_ids(rule),
-    )
+    assert role_ids_match_requirements([required], get_allowed_role_ids(rule))
     for other_roles in (
+        [other],
         ["1500234130871550004"],  # protector
         ["1500751059239440575"],  # companion
         ["1565369029005287595"],  # obsolete AW receiver role
         [],
     ):
-        assert not role_ids_match_requirements(
-            other_roles,
-            get_allowed_role_ids(rule),
-        )
+        assert not role_ids_match_requirements(other_roles, get_allowed_role_ids(rule))
 
 
 @pytest.mark.parametrize(
@@ -88,18 +89,20 @@ def test_admin_override_cannot_broaden_shared_receiver_qualification(monkeypatch
     rule = ORDER_RULES[rule_key]
     assert rule.allowed_roles == get_base_rule(rule_key).allowed_roles
     assert rule.required_game_roles == ()
-    assert get_allowed_role_ids(rule) == [COIN_WASH_AW_RECEIVER_ROLE_ID]
+    required = (AW_COLLISION_RECEIVER_ROLE_ID if rule_key in AW_COLLISION_ORDER_RULE_KEYS
+                else HALFCOIN_RECEIVER_ROLE_ID)
+    assert get_allowed_role_ids(rule) == [required]
 
 
 @pytest.mark.parametrize(
     ("rule_key", "stale_snapshot_role"),
     [
-        ("staff_internal_ammo_dump_500m", "1500234130871550004"),
-        ("staff_internal_car_500m", "1500751059239440575"),
-        ("staff_internal_aw_collision", "1500234130871550004"),
-        ("farm_aw_collision_1_100", "1565369029005287595"),
-        ("farm_aw_collision_101_500", "1565369029005287595"),
-        ("farm_aw_collision_501_plus", "1565369029005287595"),
+        ("staff_internal_ammo_dump_500m", AW_COLLISION_RECEIVER_ROLE_ID),
+        ("staff_internal_car_500m", AW_COLLISION_RECEIVER_ROLE_ID),
+        ("staff_internal_aw_collision", HALFCOIN_RECEIVER_ROLE_ID),
+        ("farm_aw_collision_1_100", HALFCOIN_RECEIVER_ROLE_ID),
+        ("farm_aw_collision_101_500", HALFCOIN_RECEIVER_ROLE_ID),
+        ("farm_aw_collision_501_plus", HALFCOIN_RECEIVER_ROLE_ID),
     ],
 )
 def test_existing_dispatched_orders_reject_stale_role_even_with_old_snapshot(
@@ -154,7 +157,10 @@ def test_existing_dispatched_orders_reject_stale_role_even_with_old_snapshot(
         order_id=1,
         staff_discord_id="correct_worker",
         staff_display_name="authorized receiver",
-        staff_role_ids=[COIN_WASH_AW_RECEIVER_ROLE_ID],
+        staff_role_ids=[
+            AW_COLLISION_RECEIVER_ROLE_ID if rule_key in AW_COLLISION_ORDER_RULE_KEYS
+            else HALFCOIN_RECEIVER_ROLE_ID
+        ],
         source="discord",
     )
     assert state.accepted_count == 1

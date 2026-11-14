@@ -673,6 +673,28 @@ def create_smart_dispatch_plan(
         conn.commit()
 
 
+def _plan_select_from_sql(conn: sqlite3.Connection) -> str:
+    """Join the *live* order type when available, but tolerate legacy fixtures."""
+    if _table_exists(conn, "web_orders"):
+        columns = {
+            str(row[1]) for row in conn.execute("PRAGMA table_info(web_orders)")
+        }
+        if {"id", "order_rule_key"}.issubset(columns):
+            return (
+                "FROM smart_dispatch_notifications s "
+                "LEFT JOIN web_orders w ON w.id = s.order_id "
+            )
+    return "FROM smart_dispatch_notifications s "
+
+
+def _plan_rule_key_sql(conn: sqlite3.Connection) -> str:
+    return (
+        ", w.order_rule_key AS source_order_rule_key "
+        if "JOIN web_orders w" in _plan_select_from_sql(conn)
+        else " "
+    )
+
+
 def _row_to_plan(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
     data = dict(row)
     for key in (
@@ -685,6 +707,24 @@ def _row_to_plan(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
         "specified_dm_failed_ids_json",
     ):
         data[key.removesuffix("_json")] = _load_json_list(data.get(key))
+
+    from services.order_rules import (
+        AW_COLLISION_ORDER_RULE_KEYS,
+        AW_COLLISION_RECEIVER_ROLE_ID,
+        COIN_WASH_ORDER_RULE_KEYS,
+        HALFCOIN_RECEIVER_ROLE_ID,
+    )
+    key = str(data.get("source_order_rule_key") or "").strip()
+    expected = None
+    if key in AW_COLLISION_ORDER_RULE_KEYS:
+        expected = AW_COLLISION_RECEIVER_ROLE_ID
+    elif key in COIN_WASH_ORDER_RULE_KEYS:
+        expected = HALFCOIN_RECEIVER_ROLE_ID
+    current = set(data.get("allowed_role_ids") or [])
+    data["receiver_roles_reconciled"] = bool(expected and current != {expected})
+    if expected:
+        data["allowed_role_ids"] = [expected]
+        data["required_game_role_ids"] = []
     return data
 
 
@@ -698,12 +738,9 @@ def get_smart_dispatch_plan(
     with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
-            """
-            SELECT *
-            FROM smart_dispatch_notifications
-            WHERE order_id = ?
-            LIMIT 1
-            """,
+            "SELECT s.* " + _plan_rule_key_sql(conn)
+            + _plan_select_from_sql(conn)
+            + "WHERE s.order_id = ? LIMIT 1",
             (int(order_id),),
         ).fetchone()
 
@@ -721,13 +758,10 @@ def list_pending_smart_dispatch_plans(
     with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            """
-            SELECT *
-            FROM smart_dispatch_notifications
-            WHERE completed_at IS NULL
-            ORDER BY created_at ASC, id ASC
-            LIMIT ?
-            """,
+            "SELECT s.* " + _plan_rule_key_sql(conn)
+            + _plan_select_from_sql(conn)
+            + "WHERE s.completed_at IS NULL "
+            + "ORDER BY s.created_at ASC, s.id ASC LIMIT ?",
             (safe_limit,),
         ).fetchall()
         return [_row_to_plan(row) for row in rows]

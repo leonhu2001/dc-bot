@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from services.order_rules import COIN_WASH_AW_RECEIVER_ROLE_ID
+from services.order_rules import AW_COLLISION_RECEIVER_ROLE_ID, HALFCOIN_RECEIVER_ROLE_ID
 
 from services.game_roles import (
     GAME_ROLES,
@@ -37,7 +37,8 @@ COMPANION_ROLES = [
 ]
 
 SPECIAL_RECEIVER_ROLES = [
-    StaffRole(COIN_WASH_AW_RECEIVER_ROLE_ID, "幣號／代洗／AW", "special_receiver"),
+    StaffRole(HALFCOIN_RECEIVER_ROLE_ID, "洗幣", "special_receiver"),
+    StaffRole(AW_COLLISION_RECEIVER_ROLE_ID, "AW", "special_receiver"),
 ]
 
 RECEIVER_ROLES = PROTECTOR_ROLES + COMPANION_ROLES + SPECIAL_RECEIVER_ROLES

@@ -68,9 +68,14 @@ def test_current_special_receiver_installer_is_idempotent_and_keeps_aw_financial
     install_special_receiver_roles_20261103()
 
     assert self_service_financials.calculate_self_service_financials is before_financial
-    assert order_rules.AW_COLLISION_RECEIVER_ROLE_ID == "1565369317929918554"
+    assert order_rules.AW_COLLISION_RECEIVER_ROLE_ID == "1571080769407942787"
     assert order_rules.HALFCOIN_RECEIVER_ROLE_ID == "1565369317929918554"
     assert order_rules.SPECIAL_RECEIVER_ROLE_IDS_BY_KEY == {
-        order_rules.AW_COLLISION_RECEIVER_ROLE_KEY: "1565369317929918554",
+        order_rules.AW_COLLISION_RECEIVER_ROLE_KEY: "1571080769407942787",
         order_rules.HALFCOIN_RECEIVER_ROLE_KEY: "1565369317929918554",
     }
+
+    assert order_rules.ALL_ROLE_IDS[order_rules.AW_COLLISION_RECEIVER_ROLE_KEY] == "1571080769407942787"
+    assert order_rules.ALL_ROLE_IDS[order_rules.HALFCOIN_RECEIVER_ROLE_KEY] == "1565369317929918554"
+    assert order_rules.ALL_ROLE_LABELS[order_rules.AW_COLLISION_RECEIVER_ROLE_KEY] == "AW"
+    assert order_rules.ALL_ROLE_LABELS[order_rules.HALFCOIN_RECEIVER_ROLE_KEY] == "洗幣"

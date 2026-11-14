@@ -8,6 +8,8 @@ from services.order_credential_runtime import OrderCredentialModal, _order_requi
 from services.order_rules import (
     COIN_WASH_AW_RECEIVER_ROLE_ID,
     COIN_WASH_AW_RECEIVER_ROLES,
+    AW_COLLISION_RECEIVER_ROLE_ID,
+    AW_COLLISION_RECEIVER_ROLES,
     ORDER_RULES,
     calculate_price,
     get_allowed_role_ids,
@@ -70,7 +72,7 @@ def test_internal_500m_coin_wash_is_one_fixed_normal_order(group, rule_key, expe
     assert rule.category == INTERNAL_CATEGORY
     assert rule.allowed_roles == COIN_WASH_AW_RECEIVER_ROLES
     assert get_allowed_role_ids(rule) == [COIN_WASH_AW_RECEIVER_ROLE_ID]
-    assert rule_role_labels(rule) == "幣號／代洗／AW"
+    assert rule_role_labels(rule) == "洗幣"
     assert rule.required_roles == ()
     assert rule.required_game_roles == ()
     assert rule.min_quantity == rule.max_quantity == 1
@@ -96,9 +98,9 @@ def test_internal_aw_modal_quantity_and_exact_4t_per_round():
 
     rule = ORDER_RULES[INTERNAL_AW_RULE]
     assert rule.category == INTERNAL_CATEGORY
-    assert rule.allowed_roles == COIN_WASH_AW_RECEIVER_ROLES
-    assert get_allowed_role_ids(rule) == [COIN_WASH_AW_RECEIVER_ROLE_ID]
-    assert rule_role_labels(rule) == "幣號／代洗／AW"
+    assert rule.allowed_roles == AW_COLLISION_RECEIVER_ROLES
+    assert get_allowed_role_ids(rule) == [AW_COLLISION_RECEIVER_ROLE_ID]
+    assert rule_role_labels(rule) == "AW"
     assert rule.required_roles == ()
     assert rule.required_game_roles == ()
     assert rule.vip_discount_allowed is False
