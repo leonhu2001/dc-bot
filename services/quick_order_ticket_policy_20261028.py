@@ -3,9 +3,6 @@ from __future__ import annotations
 import discord
 
 
-_INSTALLED = False
-
-
 class QuickOrderNoticeConfirmView(discord.ui.View):
     """Explicit order-notice acknowledgement before a quick-order ticket opens."""
 
@@ -25,6 +22,7 @@ class QuickOrderNoticeConfirmView(discord.ui.View):
         self.source_channel_id = int(source_channel_id)
         self.quick_module = quick_module
         self.opening = False
+        self.opened_ticket = False
 
     @discord.ui.button(
         label="已閱讀下單須知，建立票口",
@@ -43,6 +41,13 @@ class QuickOrderNoticeConfirmView(discord.ui.View):
             )
             return
 
+        if self.opened_ticket:
+            await interaction.response.send_message(
+                "這個確認畫面已經建立過票口，請勿重複點擊。",
+                ephemeral=True,
+            )
+            return
+
         if self.opening:
             await interaction.response.send_message(
                 "票口正在建立，請勿重複點擊。",
@@ -55,14 +60,17 @@ class QuickOrderNoticeConfirmView(discord.ui.View):
         try:
             # _create_ticket owns the interaction response lifecycle and starts by
             # deferring this button interaction. Do not acknowledge it beforehand.
-            await self.quick_module._create_ticket(
+            ticket = await self.quick_module._create_ticket(
                 interaction,
                 category=self.category,
                 item_group=self.item_group,
                 source_channel_id=self.source_channel_id,
             )
+            # Preserve retry when creation failed; never reopen after success.
+            self.opened_ticket = ticket is not None
         finally:
             self.opening = False
+            button.disabled = self.opened_ticket
 
     @discord.ui.button(
         label="尚未閱讀",
@@ -135,36 +143,8 @@ async def _send_notice_confirmation(
 
 
 def install_quick_order_ticket_policy_20261028() -> None:
-    """Require notice acknowledgement without changing quick-ticket self-service UI."""
-    global _INSTALLED
-    if _INSTALLED:
-        return
-
-    from services import quick_order_v2 as quick
-
-    if not getattr(quick, "_order_notice_confirmation_installed", False):
-        async def send_confirmation(
-            interaction: discord.Interaction,
-            *,
-            category: str,
-            item_group: str,
-            source_channel_id: int,
-        ):
-            await _send_notice_confirmation(
-                interaction,
-                category=category,
-                item_group=item_group,
-                source_channel_id=source_channel_id,
-                quick_module=quick,
-            )
-
-        quick._send_confirmation = send_confirmation
-        quick._order_notice_confirmation_installed = True
-
-    # Intentionally do not wrap quick._install_ticket_patch here. The owner chose
-    # to keep quick-order tickets on their original locked-service self-service UI.
-    _INSTALLED = True
-
+    """Compatibility entrypoint: notice enforcement is owned by quick_order_v2."""
+    return None
 
 __all__ = [
     "QuickOrderNoticeConfirmView",

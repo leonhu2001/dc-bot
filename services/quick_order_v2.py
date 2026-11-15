@@ -471,43 +471,22 @@ async def _send_confirmation(
     item_group: str,
     source_channel_id: int,
 ):
-    if not isinstance(interaction.user, discord.Member):
-        await interaction.response.send_message(
-            "這個功能只能在伺服器內使用。",
-            ephemeral=True,
-        )
-        return
+    """Require explicit notice acknowledgement before opening a private ticket.
 
-    timer = category == VIP_TIMER_CATEGORY
-    quantity_instruction = (
-        "洗幣兩方案皆為固定 500M；AW 在票口內自行輸入發數。付款成立後需透過私密表單提交帳密。"
-        if category == "staff_internal"
-        else "票口內再完成剩餘規格與數量。"
-    )
-    embed = discord.Embed(
-        title="💎 VIP 自由計時｜確認下單" if timer else "🛒 確認下單",
-        description=(
-            f"**遊戲／類型：** "
-            f"{VIP_TIMER_CATEGORY_LABEL if timer else ORDER_CATEGORY_LABELS.get(category, category)}\n"
-            f"**{'起始遊戲' if timer else '服務'}：** {item_group}\n\n"
-            "按下 **確認下單** 後才會建立私人票口。\n"
-            f"{quantity_instruction}\n\n"
-            "確認下單即表示已閱讀並同意店內下單規章。"
-        ),
-        color=discord.Color.green(),
-    )
+    This is the native quick-order entrypoint, not a runtime-patched alias.
+    The notice view keeps the existing click-once protection and delegates
+    actual ticket creation to this module's _create_ticket.
+    """
+    from services import quick_order_v2 as quick
+    from services.quick_order_ticket_policy_20261028 import _send_notice_confirmation
 
-    await interaction.response.send_message(
-        embed=embed,
-        view=QuickOrderConfirmView(
-            customer_id=interaction.user.id,
-            category=category,
-            item_group=item_group,
-            source_channel_id=source_channel_id,
-        ),
-        ephemeral=True,
+    return await _send_notice_confirmation(
+        interaction,
+        category=category,
+        item_group=item_group,
+        source_channel_id=source_channel_id,
+        quick_module=quick,
     )
-
 
 def _build_order_control_view() -> discord.ui.View | None:
     """Build the normal customer-service control row at ticket creation time."""

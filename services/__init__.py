@@ -113,14 +113,9 @@ from .order_ticket_ui_policy import (
 
 _install_order_ticket_ui_policy()
 
-# Quick-order entry must explicitly confirm the customer read the order notice before
-# the ticket is created. This policy intentionally does not change the ticket's
-# original locked-service self-service layout.
-from .quick_order_ticket_policy_20261028 import (
-    install_quick_order_ticket_policy_20261028 as _install_quick_order_ticket_policy_20261028,
-)
-
-_install_quick_order_ticket_policy_20261028()
+# Quick-order notice acknowledgement now flows from quick_order_v2._send_confirmation
+# directly to QuickOrderNoticeConfirmView. No installer can replace the callback
+# with a stale confirmation message or silently bypass the notice gate.
 
 # Install the Discord shared player-count control after core benefit policies are
 # ready. Importing this patches the UI class before bot.py imports self_service_runtime.
