@@ -143,3 +143,30 @@ def test_delta_fun_category_opens_second_level_selector() -> None:
         "豪到你了嗎",
         "比翼雙飛",
     ]
+
+
+def test_one_life_clear_is_code_owned_even_with_stale_admin_override(monkeypatch) -> None:
+    from services import orders
+    from services.order_rules import get_base_rule
+
+    key = "fun_eat_yourself"
+    base = get_base_rule(key)
+    assert (base.label, base.price, base.catalog_group_label) == (
+        "一命通關", 13888, "一命通關"
+    )
+    monkeypatch.setattr(order_rules.ORDER_RULES, "_refresh_external", lambda: None)
+    monkeypatch.setattr(order_rules.ORDER_RULES, "_override_cache", {
+        key: {"payload": {
+            "label": "想吃自己打",
+            "price": 3000,
+            "catalog_group_label": "想吃自己打",
+            "allowed_roles": ["male_companion"],
+        }}
+    })
+    assert order_rules.ORDER_RULES[key] == base
+    assert orders.ORDER_RULE_KEY_BY_LABEL["想吃自己打"] == key
+    assert orders.ORDER_RULE_KEY_BY_LABEL["一命通關"] == key
+    assert [group["label"] for group in orders.SELF_SERVICE_ORDER_CATALOG["delta_desktop_fun"]
+            if any(item["rule_key"] == key for item in group["details"])] == ["一命通關"]
+    assert [group["label"] for group in order_groups.get_grouped_order_catalog("delta_desktop_fun")
+            if any(variant["rule_key"] == key for variant in group["variants"])] == ["一命通關"]
