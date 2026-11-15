@@ -369,6 +369,7 @@ DELTA_FUN_PRICE_LISTS = {
     },
     "our_love": {
         "label": "我們的愛",
+        "image": "price_lists/delta_fun_our_love.webp",
         "text": f"""**我們的愛｜固定 2 位男性護航以上**
 {_aligned_code_block((
     ("初始好感度50", f"{_approved_fun_price('fun_our_love_start_50')}｜保 2088W"),
