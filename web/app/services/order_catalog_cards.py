@@ -103,6 +103,13 @@ def _group_card_data(spec: dict) -> dict | None:
         "label": str(spec.get("label") or ""),
         "selector_label": str(spec.get("selector_label") or "方案"),
         "description": str(spec.get("description") or ""),
+        # Only code-authored price-list assets are exposed; user-controlled
+        # product introductions cannot inject external card image URLs.
+        "image_url": (
+            f"/static/{spec['image']}"
+            if str(spec.get("image") or "").startswith("price_lists/")
+            else ""
+        ),
         "starting_price": starting_price,
         "starting_price_text": starting_price_text,
         "variant_count": len(variants),
