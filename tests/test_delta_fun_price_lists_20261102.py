@@ -252,3 +252,18 @@ def test_fun_website_and_discord_catalog_match_current_price_card() -> None:
     assert "已讀亂回" not in discord_catalog
     assert price_lists.DELTA_FUN_PRICE_LISTS["watch_your_words"]["label"] == "謹言慎行"
     assert "2500T" in price_lists.DELTA_FUN_PRICE_LISTS["watch_your_words"]["text"]
+
+
+def test_source_owned_fun_rules_ignore_old_intro_override(monkeypatch) -> None:
+    from web.app.services.order_groups import _presentation_intro
+    from services import order_rule_store
+
+    # A stale intro describing the five-extraction challenge must not appear
+    # on 謹言慎行 even if the old admin row remains in audit history.
+    monkeypatch.setattr(
+        order_rule_store,
+        "get_active_override",
+        lambda rule_key: {"payload": {"intro": "五連撤才結單"}},
+    )
+    assert _presentation_intro("fun_read_no_reply") == ""
+    assert _presentation_intro("fun_eat_yourself") == ""
