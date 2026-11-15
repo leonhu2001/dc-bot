@@ -775,6 +775,11 @@ def _group_data(
                 "description",
                 "",
             ),
+        "image_url": (
+            f"/static/{spec['image']}"
+            if str(spec.get("image") or "").startswith("price_lists/")
+            else ""
+        ),
         "starting_price":
             starting_price,
         "starting_price_text":
