@@ -812,17 +812,22 @@ def _current_group_specs() -> list[dict]:
 
         for rule_key, public_label in source_spec.get("variants", []):
             rule = ORDER_RULES.get(str(rule_key))
+            # EffectiveOrderRules already rejects stale overrides for
+            # source-controlled structures. A newly manager-confirmed override
+            # must not be hidden here a SECOND time.
             manager_group_label = (
-                ""
-                if str(rule_key) in SOURCE_AUTHORITY_RULE_KEYS
-                else (
-                    str(getattr(rule, "catalog_group_label", "") or "").strip()
-                    if rule is not None
-                    else ""
-                )
+                str(getattr(rule, "catalog_group_label", "") or "").strip()
+                if rule is not None
+                else ""
             )
 
-            if not manager_group_label:
+            # The admin editor now displays the actual built-in group rather
+            # than a blank input. Publishing the SAME value must not split its
+            # variants into a duplicate card with the same second-level label.
+            if (
+                not manager_group_label
+                or manager_group_label == str(source_spec.get("label") or "")
+            ):
                 base_variants.append((str(rule_key), str(public_label)))
                 continue
 
