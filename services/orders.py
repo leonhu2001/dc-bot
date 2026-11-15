@@ -129,6 +129,33 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {"label": "豪到你了嗎", "details": [{"label": "豪到你了嗎", "value": "rich_enough", "rule_key": "fun_rich_enough", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {"label": "一命通關", "details": [{"label": "一命通關", "value": "eat_yourself", "rule_key": "fun_eat_yourself", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {
+            "label": "吃到發胖",
+            "details": [
+                {
+                    "label": f"{weight}KG紅｜保{guarantee}W｜{price:,}T",
+                    "value": f"fat_{weight}kg",
+                    "rule_key": f"fun_eat_to_fat_{weight}kg",
+                    "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
+                }
+                for weight, guarantee, price in (
+                    (10, 1888, 2888), (20, 2688, 3988), (35, 3688, 6888),
+                    (50, 6288, 12888), (100, 16888, 26888),
+                )
+            ],
+        },
+        {
+            "label": "我們的愛",
+            "details": [
+                {
+                    "label": f"初始好感度{start}｜保{guarantee}W｜{price:,}T",
+                    "value": f"love_{start}",
+                    "rule_key": f"fun_our_love_start_{start}",
+                    "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
+                }
+                for start, guarantee, price in ((50, 2088, 2888), (0, 3688, 4888))
+            ],
+        },
+        {
             "label": "魔丸娛樂嘎拉給木",
             "details": [
                 {"label": "基礎", "value": "basic", "rule_key": "fun_mawan_galagame_basic", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},

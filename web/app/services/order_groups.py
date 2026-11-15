@@ -212,6 +212,41 @@ GROUP_SPECS = [
     },
 
     {
+        "key": "eat_to_fat",
+        "category": "delta_desktop_fun",
+        "label": "吃到發胖",
+        "image": "price_lists/delta_fun_eat_to_fat.webp",
+        "selector_label": "紅色物資重量",
+        "description": (
+            "固定兩位陪玩以上。達成所選紅色物資重量及保底後結單；"
+            "非洲之心／復甦／海洋之淚各25公斤、紅卡8公斤，其餘依官方資料。"
+            "老闆須配合陪玩指揮，不聽指揮致炸單不予賠償。"
+        ),
+        "variants": [
+            ("fun_eat_to_fat_10kg", "10KG紅｜保底1888W"),
+            ("fun_eat_to_fat_20kg", "20KG紅｜保底2688W"),
+            ("fun_eat_to_fat_35kg", "35KG紅｜保底3688W"),
+            ("fun_eat_to_fat_50kg", "50KG紅｜保底6288W"),
+            ("fun_eat_to_fat_100kg", "100KG紅｜保底16888W"),
+        ],
+    },
+    {
+        "key": "our_love",
+        "category": "delta_desktop_fun",
+        "label": "我們的愛",
+        "image": "price_lists/delta_fun_our_love.webp",
+        "selector_label": "初始好感度",
+        "description": (
+            "兩位男性護航以上的專屬技術陪玩單。好感度達100結單；"
+            "摸紅、擊殺與撤離依規則加扣分；紅修不計。"
+        ),
+        "variants": [
+            ("fun_our_love_start_50", "初始50｜保底2088W"),
+            ("fun_our_love_start_0", "初始0｜保底3688W"),
+        ],
+    },
+
+    {
         "key": "galagame",
         "category": "delta_desktop_fun",
         "label": "魔丸娛樂嘎拉給木",
@@ -740,6 +775,11 @@ def _group_data(
                 "description",
                 "",
             ),
+        **(
+            {"image_url": f"/static/{spec['image']}"}
+            if str(spec.get("image") or "").startswith("price_lists/")
+            else {}
+        ),
         "starting_price":
             starting_price,
         "starting_price_text":

@@ -1061,6 +1061,70 @@ _add(OrderRule("delta_desktop_fun", "fun_read_no_reply", "謹言慎行", "fixed"
 _add(OrderRule("delta_desktop_fun", "fun_rich_enough", "豪到你了嗎", "fixed", 2000, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
 _add(OrderRule("delta_desktop_fun", "fun_eat_yourself", "一命通關", "fixed", 13888, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False, note="需連續撤離5把，且每把帶出價值皆須達1000W；撤離失敗進度歸零，未達1000W需補場，大紅可折抵1個場次。"))
 
+# 2026-11-16 趣味單｜吃到發胖：固定 2 位陪玩以上；五種紅色物資重量挑戰。
+# 每個價位是獨立固定總價，不因兩位接單打手而額外乘 2。
+_EAT_TO_FAT_PLANS = (
+    ("10kg", 2888, 1888, 10),
+    ("20kg", 3988, 2688, 20),
+    ("35kg", 6888, 3688, 35),
+    ("50kg", 12888, 6288, 50),
+    ("100kg", 26888, 16888, 100),
+)
+for _tier, _price, _guarantee, _weight in _EAT_TO_FAT_PLANS:
+    _add(OrderRule(
+        "delta_desktop_fun",
+        f"fun_eat_to_fat_{_tier}",
+        f"吃到發胖｜{_weight}KG紅",
+        "fixed",
+        _price,
+        allowed_roles=ALL_RECEIVER_ROLES,
+        required_game_roles=DELTA_DESKTOP_GAME_ROLE,
+        required_staff_count=2,
+        min_quantity=1,
+        max_quantity=1,
+        allow_specify=False,
+        note=(
+            f"保底{_guarantee}W；不摸出累積{_weight}KG紅色物資一直打。"
+            "非洲之心、復甦、海洋之淚各25公斤；紅卡8公斤，其他重量以官方數據為主。"
+            "老闆需聽從陪玩指揮；不聽指揮導致炸單無賠償。"
+        ),
+    ))
+
+
+# 2026-11-16 趣味單｜我們的愛：固定 2 位男性護航以上。
+# 「頂護」只有統一的身分組，沒有性別識別；為避免女頂護誤接，
+# 這裡以男護身分組作為可驗證的最低資格。男頂護只要同時持有男護
+# 身分組也能接單，不對純頂護推測其性別。
+_OUR_LOVE_PLANS = (
+    ("start_50", 2888, 50, 2088),
+    ("start_0", 4888, 0, 3688),
+)
+for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
+    _add(OrderRule(
+        "delta_desktop_fun",
+        f"fun_our_love_{_tier}",
+        f"我們的愛｜初始好感度{_start}",
+        "fixed",
+        _price,
+        allowed_roles=("male_protector",),
+        required_game_roles=DELTA_DESKTOP_GAME_ROLE,
+        required_staff_count=2,
+        min_protector_count=2,
+        min_quantity=1,
+        max_quantity=1,
+        allow_specify=False,
+        note=(
+            f"初始好感度{_start}；保底{_guarantee}W；好感度達100結單。"
+            "加分：陪玩擊殺1名幹員+1，摸出小紅+2，大紅/金卡/紫卡+5，"
+            "大大紅/紅卡+8，非洲之心/海洋之淚/復甦呼吸機+35，"
+            "撤離成功+5，千萬撤離額外+5。"
+            "扣分：撤離失敗-15，老闆擊殺1名幹員-3。"
+            "物品判定：小紅1-4格、大紅6格、大大紅9-12格，紅修不算。"
+            "專屬技術陪玩單；兩位接單者皆須為男性護航以上。"
+        ),
+    ))
+
+
 # 魔丸娛樂嘎拉給木
 # 固定 1 單 / 2 位 / 只允許女陪或女護
 # 可指定女陪 / 女護，指定費 0T；不使用點數福利，客服人工折扣仍走通用折扣功能。
@@ -1838,7 +1902,15 @@ SOURCE_AUTHORITY_RULE_KEYS = frozenset(
 # 已讀亂回 name or incorrectly rename that SKU to 一命通關. Never allow those
 # overrides to resurrect a duplicate storefront card or change checkout pricing;
 # keep all old override versions in SQLite for history without startup writes.
-FULL_SOURCE_AUTHORITY_RULE_KEYS = frozenset({"fun_read_no_reply", "fun_eat_yourself"})
+# Newly approved challenge cards must never be replaced by stale admin prices
+# or role restrictions; both storefronts and payroll must read these same rules.
+NEW_FUN_PRICE_CARD_RULE_KEYS = frozenset({
+    *(f"fun_eat_to_fat_{tier}" for tier, *_ in _EAT_TO_FAT_PLANS),
+    *(f"fun_our_love_{tier}" for tier, *_ in _OUR_LOVE_PLANS),
+})
+FULL_SOURCE_AUTHORITY_RULE_KEYS = frozenset({
+    "fun_read_no_reply", "fun_eat_yourself",
+}) | NEW_FUN_PRICE_CARD_RULE_KEYS
 
 # Owner-approved structural qualifications. Manager overrides may change ordinary
 # commercial fields but cannot broaden who may claim these system products.

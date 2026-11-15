@@ -280,6 +280,13 @@ DELTA_FARM_PRICE_LISTS = {
     },
 }
 
+def _approved_fun_price(rule_key: str) -> str:
+    """Use the exact owner-approved checkout rule as the Discord price source."""
+    from services.order_rules import get_rule
+
+    return f"{int(get_rule(rule_key).price):,}T"
+
+
 DELTA_FUN_PRICE_LISTS = {
     "russian_roulette": {
         "label": "俄羅斯輪盤",
@@ -337,6 +344,58 @@ DELTA_FUN_PRICE_LISTS = {
 補場期間若撤離失敗，累計場次歸零。
 
 🔴 **大紅可折抵 1 個場次**""",
+    },
+    "eat_to_fat": {
+        "label": "吃到發胖",
+        "image": "price_lists/delta_fun_eat_to_fat.webp",
+        "text": f"""**吃到發胖｜固定 2 位陪玩以上**
+{_aligned_code_block((
+    ("10KG紅", f"{_approved_fun_price('fun_eat_to_fat_10kg')}｜保 1888W"),
+    ("20KG紅", f"{_approved_fun_price('fun_eat_to_fat_20kg')}｜保 2688W"),
+    ("35KG紅", f"{_approved_fun_price('fun_eat_to_fat_35kg')}｜保 3688W"),
+    ("50KG紅", f"{_approved_fun_price('fun_eat_to_fat_50kg')}｜保 6288W"),
+    ("100KG紅", f"{_approved_fun_price('fun_eat_to_fat_100kg')}｜保 16888W"),
+))}
+🎯 **玩法規則**
+未摸出所選重量的紅色物資就持續挑戰，依方案達標結單。
+
+📌 **重量判定**
+非洲之心、復甦、海洋之淚各 **25 公斤**。
+**紅卡 8 公斤**，其他依遊戲官方數據為主。
+
+⚠️ 老闆需聽從陪玩指揮；不聽指揮導致炸單，**無賠償**。
+
+**資格**：需 2 位陪玩／護航以上接單。""",
+    },
+    "our_love": {
+        "label": "我們的愛",
+        "image": "price_lists/delta_fun_our_love.webp",
+        "text": f"""**我們的愛｜固定 2 位男性護航以上**
+{_aligned_code_block((
+    ("初始好感度50", f"{_approved_fun_price('fun_our_love_start_50')}｜保 2088W"),
+    ("初始好感度0", f"{_approved_fun_price('fun_our_love_start_0')}｜保 3688W"),
+))}
+❤️ **結單條件**：好感度達 **100**
+
+💗 **好感度增加**
+{_aligned_code_block((
+    ("陪玩擊殺 1 名幹員", "+1"),
+    ("摸出小紅", "+2"),
+    ("大紅／金卡／紫卡", "+5"),
+    ("大大紅／紅卡", "+8"),
+    ("非洲之心／海洋之淚／復甦呼吸機", "+35"),
+    ("撤離成功", "+5"),
+    ("千萬撤離額外", "+5"),
+))}
+
+💔 **好感度扣除**
+{_aligned_code_block((("撤離失敗", "-15"), ("老闆擊殺 1 名幹員", "-3")))}
+
+📌 **物品判定**
+小紅 **1～4 格**｜大紅 **6 格**｜大大紅 **9～12 格**。
+**紅修不算**。
+
+🎮 專屬技術陪玩單，需 **2 位男性護航以上** 接單。""",
     },
     "rich_enough": {
         "label": "豪到你了嗎",

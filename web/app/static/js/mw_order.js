@@ -80,6 +80,66 @@
             "mw-dialog-description"
         );
 
+    const dialogMedia =
+        document.getElementById(
+            "mw-dialog-media"
+        );
+
+    // Source-authored challenge price-list artwork is available in the Web
+    // product card and inside the modal. Never insert manager HTML or remote
+    // image URLs here; the server restricts this to /static/price_lists/.
+    function renderGroupMedia(group) {
+        if (!dialogMedia) {
+            return;
+        }
+
+        const url = String(
+            group?.image_url || ""
+        );
+
+        if (
+            url.startsWith(
+                "/static/price_lists/"
+            )
+        ) {
+            const link =
+                document.createElement("a");
+            link.className =
+                "order3-media-poster";
+            link.href = url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.setAttribute(
+                "aria-label",
+                "查看完整價目表"
+            );
+
+            const poster =
+                document.createElement("img");
+            poster.src = url;
+            poster.alt =
+                String(group.label || "") +
+                "完整價目表";
+            poster.loading = "lazy";
+            link.append(poster);
+            dialogMedia.replaceChildren(link);
+            return;
+        }
+
+        const placeholder =
+            document.createElement("div");
+        placeholder.className =
+            "order3-media-placeholder";
+        const brand =
+            document.createElement("span");
+        brand.textContent = "MOWAN";
+        const subtitle =
+            document.createElement("small");
+        subtitle.textContent = "ORDER VISUAL";
+        placeholder.append(brand, subtitle);
+        dialogMedia.replaceChildren(placeholder);
+    }
+
     const variantField =
         document.getElementById(
             "mw-variant-field"
@@ -841,6 +901,8 @@
         descriptionEl.textContent =
             group.description
             || "";
+
+        renderGroupMedia(group);
 
 
         variantLabel.textContent =
