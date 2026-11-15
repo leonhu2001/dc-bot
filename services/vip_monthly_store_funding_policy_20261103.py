@@ -34,32 +34,12 @@ def apply_vip_monthly_store_funding(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def install_vip_monthly_store_funding_policy_20261103() -> None:
-    """Install the owner-approved store-funded VIP monthly cash policy."""
-    from services import order_discounts
-    from services import self_service_financials
-
-    order_discounts.DISCOUNT_FUNDING_POLICY[
-        VIP_MONTHLY_FUNDING_SOURCE
-    ] = order_discounts.FUNDING_STORE
-
-    original = self_service_financials.calculate_self_service_financials
-    if getattr(original, "_vip_monthly_store_funding_policy_20261103", False):
-        return
-
-    def wrapped_calculate_self_service_financials(rule, price_result, data: dict) -> dict:
-        result = original(rule, price_result, data)
-        return apply_vip_monthly_store_funding(result)
-
-    wrapped_calculate_self_service_financials._vip_monthly_store_funding_policy_20261103 = True
-    self_service_financials.calculate_self_service_financials = (
-        wrapped_calculate_self_service_financials
-    )
-
+# The calculator now imports apply_vip_monthly_store_funding directly.
+# Historical code may still import this module, but startup no longer rebinds
+# self_service_financials.calculate_self_service_financials.
 
 __all__ = [
     "VIP_MONTHLY_FUNDING_SOURCE",
     "VIP_MONTHLY_FUNDING_MODE",
     "apply_vip_monthly_store_funding",
-    "install_vip_monthly_store_funding_policy_20261103",
 ]
