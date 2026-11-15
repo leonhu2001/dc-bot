@@ -42,6 +42,7 @@ from services.order_rules import (
     rule_to_override_payload,
 )
 from web.app.services.audit_trail import write_sqlite_audit_log
+from services.orders import get_source_catalog_group_label
 
 
 # main.py imports this router before the public site router. Install the live
@@ -332,8 +333,20 @@ def _presentation_intro_from_store(rule_key: str) -> str:
     return ""
 
 
+def _display_catalog_group_label(rule_key: str, rule: OrderRule) -> str:
+    """Show the effective second column, even for source-backed built-ins.
+
+    The empty stored field means 'use the group defined by the live catalog'.
+    That is NOT an empty second-level classification. Unknown older SKUs remain
+    visibly '未分組' so managers can supply a classification explicitly.
+    """
+    explicit = str(getattr(rule, "catalog_group_label", "") or "").strip()
+    return explicit or get_source_catalog_group_label(str(rule_key)) or "未分組"
+
+
 def _payload_with_presentation(rule_key: str, rule: OrderRule) -> dict:
     payload = rule_to_override_payload(rule)
+    payload["catalog_group_label"] = _display_catalog_group_label(rule_key, rule)
     payload["intro"] = _presentation_intro_from_store(rule_key)
     return payload
 
@@ -479,9 +492,7 @@ def _rule_row(key: str) -> dict:
         "key": key,
         "category": rule.category,
         "category_label": CATEGORY_LABELS.get(rule.category, rule.category),
-        "catalog_group_label": str(
-            getattr(rule, "catalog_group_label", "") or ""
-        ),
+        "catalog_group_label": _display_catalog_group_label(key, rule),
         "label": rule.label,
         "price": int(rule.price or 0),
         "pricing_type": rule.pricing_type,
