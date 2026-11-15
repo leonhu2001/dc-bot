@@ -2028,10 +2028,21 @@ async def refresh_main_service_panel() -> bool:
         message = await channel.fetch_message(
             MAIN_SERVICE_PANEL_MESSAGE_ID
         )
-        await message.edit(
-            embed=build_main_panel_embed(),
-            view=MainPanelView(),
-        )
+        # This message is an owner-approved, long-lived public announcement.
+        # Never overwrite its text, Embed, attachments or button layout on
+        # restart. The persistent callbacks are registered independently via
+        # bot.add_view(MainPanelView()) before READY.
+        # Previously we called message.edit(embed=build_main_panel_embed(),
+        # view=MainPanelView()), which reverted hand-approved Discord edits
+        # after EVERY deployment even when no related source was changed.
+        if self_user := bot.user:
+            if message.author.id != self_user.id:
+                print(
+                    "[service-lobby] panel is not authored by the bot; "
+                    "left unchanged",
+                    flush=True,
+                )
+                return False
     except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
         print(
             "[service-lobby] panel refresh failed: "
@@ -2041,7 +2052,7 @@ async def refresh_main_service_panel() -> bool:
         return False
 
     print(
-        "[service-lobby] main panel refreshed",
+        "[service-lobby] main panel verified without editing approved content",
         flush=True,
     )
     return True
