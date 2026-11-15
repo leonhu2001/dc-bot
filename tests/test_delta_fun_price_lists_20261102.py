@@ -142,6 +142,8 @@ def test_delta_fun_category_opens_second_level_selector() -> None:
         "戀與三角洲",
         "謹言慎行",
         "一命通關",
+        "吃到發胖",
+        "我們的愛",
         "豪到你了嗎",
         "比翼雙飛",
     ]
