@@ -193,12 +193,8 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # Native Quick Order selection bookkeeping; no callback rebinding.
-        from services.quick_order_v2_select_display import (
-            record_quick_order_select_action,
-        )
-
-        record_quick_order_select_action("category", self, interaction)
+        from services.quick_order_v2_select_display import record_quick_order_select_action as mark
+        mark("category", self, interaction)
         if not _require_runtime_state().can_operate_self_service_order(interaction.user, self.customer_id):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單。", ephemeral=True)
             return
@@ -296,12 +292,8 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # Native Quick Order selection bookkeeping; no callback rebinding.
-        from services.quick_order_v2_select_display import (
-            record_quick_order_select_action,
-        )
-
-        record_quick_order_select_action("item", self, interaction)
+        from services.quick_order_v2_select_display import record_quick_order_select_action as mark
+        mark("item", self, interaction)
         if not _require_runtime_state().can_operate_self_service_order(interaction.user, self.customer_id):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單項目。", ephemeral=True)
             return
@@ -397,12 +389,8 @@ class SelfServiceOrderDetailSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # Native Quick Order selection bookkeeping; no callback rebinding.
-        from services.quick_order_v2_select_display import (
-            record_quick_order_select_action,
-        )
-
-        record_quick_order_select_action("detail", self, interaction)
+        from services.quick_order_v2_select_display import record_quick_order_select_action as mark
+        mark("detail", self, interaction)
         if not _require_runtime_state().can_operate_self_service_order(interaction.user, self.customer_id):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單規格。", ephemeral=True)
             return
@@ -610,12 +598,8 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # Native Quick Order selection bookkeeping; no callback rebinding.
-        from services.quick_order_v2_select_display import (
-            record_quick_order_select_action,
-        )
-
-        record_quick_order_select_action("quantity", self, interaction)
+        from services.quick_order_v2_select_display import record_quick_order_select_action as mark
+        mark("quantity", self, interaction)
         if self._aw_collision_mode:
             from services.aw_collision_catalog import AwCollisionQuantityModal
 
