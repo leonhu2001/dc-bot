@@ -170,6 +170,8 @@ def build_self_service_panel_embed(
             + (
                 "自訂單指定不加價，所有服務價格由客服填寫。\n"
                 if data.get("order_rule_key") == "custom_custom_order"
+                else "趣味單全品項開放免費指定（0T）；指定人員仍須符合原商品職位和接單人數。\n"
+                if category == "delta_desktop_fun"
                 else "可指定的品項才會開放指定成員；2 小時以上免指定費。\n"
             )
             + (
