@@ -376,6 +376,21 @@ def _payload_from_form_base(payload: dict, form) -> dict:
         raw = str(form.get(field) or "").strip()
         payload[field] = None if raw == "" else _parse_int(raw, field=field)
 
+    # Product pricing can be per-headcount rather than a single rule.price.
+    # Without these fields, "publish succeeded" used to keep every real
+    # one-/two-/three-/four-person checkout price unchanged.
+    current_tiers = dict(payload.get("player_count_prices") or {})
+    if current_tiers:
+        updated_tiers: dict[int, int] = {}
+        for count, original_amount in current_tiers.items():
+            count_int = int(count)
+            field = f"player_count_price_{count_int}"
+            updated_tiers[count_int] = _parse_int(
+                form.get(field, original_amount),
+                field=field,
+            )
+        payload["player_count_prices"] = updated_tiers
+
     raw_required = str(form.get("required_staff_count") or "").strip()
     if raw_required == "player_count":
         payload["required_staff_count"] = "player_count"
@@ -451,6 +466,13 @@ def _validate_special_rate_rule_edit(rule_key: str, payload: dict) -> None:
             raise ValueError(
                 "AW代撞採每發級距（含4.5T），不能以一般商品售價欄修改。"
                 "目前每發費率維持原價；本頁仍可調整其他可用規則。"
+            )
+    current_rule = ORDER_RULES.get(str(rule_key))
+    if current_rule is not None and current_rule.player_count_prices:
+        if int(payload.get("price") or 0) != int(current_rule.price):
+            raise ValueError(
+                "這個商品依陪玩人數分別計價，請修改「各人數實際售價」，"
+                "不能只修改不參與計價的基礎售價。"
             )
 
 
