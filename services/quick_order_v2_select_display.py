@@ -7,10 +7,6 @@ from services import quick_order_v2 as quick
 
 
 _INSTALLED = False
-_ORIGINAL_QUANTITY_CALLBACK = None
-_ORIGINAL_DETAIL_CALLBACK = None
-_ORIGINAL_ITEM_CALLBACK = None
-_ORIGINAL_CATEGORY_CALLBACK = None
 
 _QUICK_SELECT_IDS = {
     "self_service_order_category_select",
@@ -150,91 +146,42 @@ def apply_quick_order_select_display(view: discord.ui.View, data: dict) -> None:
             child.placeholder = "請選擇類型"
 
 
-def _install_selection_markers() -> None:
-    """Track only choices that really came from a Discord interaction callback."""
-    global _ORIGINAL_QUANTITY_CALLBACK
-    global _ORIGINAL_DETAIL_CALLBACK
-    global _ORIGINAL_ITEM_CALLBACK
-    global _ORIGINAL_CATEGORY_CALLBACK
+def record_quick_order_select_action(
+    action: str,
+    component: discord.ui.Select,
+    interaction: discord.Interaction,
+) -> None:
+    """Track Quick Order choices directly from the canonical select callbacks.
 
-    from services import order_runtime as runtime
+    Four post-import callback assignments formerly lived in
+    _install_selection_markers(). Keeping the same fail-open bookkeeping here
+    means importing/reloading these modules no longer changes callback
+    identity, and the existing panel refresh logic remains unchanged.
+    """
+    try:
+        from services import order_runtime as runtime
 
-    if _ORIGINAL_QUANTITY_CALLBACK is None:
-        _ORIGINAL_QUANTITY_CALLBACK = runtime.SelfServiceOrderQuantitySelect.callback
-        original_quantity = _ORIGINAL_QUANTITY_CALLBACK
+        state = runtime._require_runtime_state()
+        data = state.order_selections.get(component.channel_id, {})
+        if not isinstance(data, dict) or not data.get("quick_order_v2"):
+            return
 
-        async def quantity_callback(self, interaction: discord.Interaction):
-            try:
-                state = runtime._require_runtime_state()
-                data = state.order_selections.get(self.channel_id, {})
-                if (
-                    isinstance(data, dict)
-                    and data.get("quick_order_v2")
-                    and state.can_operate_self_service_order(interaction.user, self.customer_id)
-                    and self.values
-                    and self.values[0] != "need_item"
-                ):
-                    data[_QUANTITY_SELECTED_KEY] = True
-            except Exception as exc:
-                _warn_marker_failure("quantity", self, exc)
-            await original_quantity(self, interaction)
+        if action in {"quantity", "detail"}:
+            if not (
+                state.can_operate_self_service_order(
+                    interaction.user, component.customer_id
+                )
+                and component.values
+                and component.values[0] != "need_item"
+            ):
+                return
 
-        runtime.SelfServiceOrderQuantitySelect.callback = quantity_callback
-
-    if _ORIGINAL_DETAIL_CALLBACK is None:
-        _ORIGINAL_DETAIL_CALLBACK = runtime.SelfServiceOrderDetailSelect.callback
-        original_detail = _ORIGINAL_DETAIL_CALLBACK
-
-        async def detail_callback(self, interaction: discord.Interaction):
-            try:
-                state = runtime._require_runtime_state()
-                data = state.order_selections.get(self.channel_id, {})
-                if (
-                    isinstance(data, dict)
-                    and data.get("quick_order_v2")
-                    and state.can_operate_self_service_order(interaction.user, self.customer_id)
-                    and self.values
-                    and self.values[0] != "need_item"
-                ):
-                    data.pop(_QUANTITY_SELECTED_KEY, None)
-            except Exception as exc:
-                _warn_marker_failure("detail", self, exc)
-            await original_detail(self, interaction)
-
-        runtime.SelfServiceOrderDetailSelect.callback = detail_callback
-
-    if _ORIGINAL_ITEM_CALLBACK is None:
-        _ORIGINAL_ITEM_CALLBACK = runtime.SelfServiceOrderItemSelect.callback
-        original_item = _ORIGINAL_ITEM_CALLBACK
-
-        async def item_callback(self, interaction: discord.Interaction):
-            try:
-                state = runtime._require_runtime_state()
-                data = state.order_selections.get(self.channel_id, {})
-                if isinstance(data, dict) and data.get("quick_order_v2"):
-                    data.pop(_QUANTITY_SELECTED_KEY, None)
-            except Exception as exc:
-                _warn_marker_failure("item", self, exc)
-            await original_item(self, interaction)
-
-        runtime.SelfServiceOrderItemSelect.callback = item_callback
-
-    if _ORIGINAL_CATEGORY_CALLBACK is None:
-        _ORIGINAL_CATEGORY_CALLBACK = runtime.SelfServiceOrderCategorySelect.callback
-        original_category = _ORIGINAL_CATEGORY_CALLBACK
-
-        async def category_callback(self, interaction: discord.Interaction):
-            try:
-                state = runtime._require_runtime_state()
-                data = state.order_selections.get(self.channel_id, {})
-                if isinstance(data, dict) and data.get("quick_order_v2"):
-                    data.pop(_QUANTITY_SELECTED_KEY, None)
-            except Exception as exc:
-                _warn_marker_failure("category", self, exc)
-            await original_category(self, interaction)
-
-        runtime.SelfServiceOrderCategorySelect.callback = category_callback
-
+        if action == "quantity":
+            data[_QUANTITY_SELECTED_KEY] = True
+        elif action in {"category", "item", "detail"}:
+            data.pop(_QUANTITY_SELECTED_KEY, None)
+    except Exception as exc:
+        _warn_marker_failure(action, component, exc)
 
 async def repair_existing_quick_order_selects(bot: commands.Bot) -> None:
     """Refresh already-open quick-order panels with the current Select display rules."""
@@ -309,8 +256,9 @@ def install_quick_order_v2_select_display(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
-    _install_selection_markers()
-
+    # Callback ownership now belongs to order_runtime's canonical Select
+    # implementations. Keep this idempotent entrypoint for startup ordering
+    # and existing repair hooks; it intentionally installs no monkey patches.
     _INSTALLED = True
     print("[quick-order-v2-select] interaction-aware select display installed", flush=True)
 
@@ -318,6 +266,7 @@ def install_quick_order_v2_select_display(bot: commands.Bot) -> None:
 __all__ = [
     "LEGACY_RESELECT_FLAG",
     "apply_quick_order_select_display",
+    "record_quick_order_select_action",
     "install_quick_order_v2_select_display",
     "repair_existing_quick_order_selects",
 ]
