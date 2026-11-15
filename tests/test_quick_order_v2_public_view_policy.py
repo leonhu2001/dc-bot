@@ -47,6 +47,22 @@ def test_all_four_game_public_views_keep_order_selector_but_remove_price_list() 
         assert not any("price_list" in custom_id for custom_id in custom_ids)
 
 
+def test_canonical_public_panel_sync_replaces_old_view_with_current_buttons() -> None:
+    source = PRODUCTION_SOURCE.read_text(encoding="utf-8")
+
+    # Old Discord panels with price-list buttons must be updated on Bot
+    # restart, not merely be absent from newly created view objects.
+    assert "view = _public_view_for_channel(channel_id)" in source
+    assert "await target.edit(" in source
+    assert "view=view" in source
+    for game in ("valorant", "lol", "apex", "steam"):
+        channel_id = quick.QUICK_ORDER_V2_CHANNELS[game]
+        view = production._public_view_for_channel(channel_id)
+        assert len(view.children) == 1
+        assert "service" in str(view.children[0].custom_id)
+        assert "price_list" not in str(view.children[0].custom_id)
+
+
 def test_static_panel_artwork_mapping_stays_in_helper_module() -> None:
     assert panel_images.panel_image_filename(
         quick.QUICK_ORDER_V2_CHANNELS["apex"]
