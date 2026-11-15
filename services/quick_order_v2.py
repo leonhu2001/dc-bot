@@ -68,6 +68,17 @@ def _marker(channel_id: int) -> str:
 
 
 def _groups(category: str) -> list[str]:
+    """Resolve current selectable groups from the canonical entrypoint.
+
+    The configured dynamic resolver protects the five 3x3 variants from splitting
+    into multiple Quick Order groups. Keep the raw-catalog fallback available for
+    early callers before setup_commands installs the catalog resolver.
+    """
+    from services import quick_order_v2_fixes as fixes
+
+    if fixes._ORIGINAL_DETAILS_RESOLVER is not None:
+        return fixes._live_groups(category)
+
     result: list[str] = []
     for value in ORDER_ITEM_GROUPS_BY_CATEGORY.get(category, []):
         text = str(value or "").strip()
