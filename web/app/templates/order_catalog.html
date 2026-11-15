@@ -95,10 +95,27 @@
                         class="order3-media"
                         data-order-image-slot="{{ group.key }}"
                     >
+                        {% if group.image_url %}
+                        <a
+                            class="order3-media-poster"
+                            href="{{ group.image_url }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="查看{{ group.label }}完整價目表"
+                        >
+                            <img
+                                src="{{ group.image_url }}"
+                                alt="{{ group.label }}趣味單完整價目表"
+                                loading="lazy"
+                                decoding="async"
+                            >
+                        </a>
+                        {% else %}
                         <div class="order3-media-placeholder">
                             <span>MOWAN</span>
                             <small>ORDER VISUAL</small>
                         </div>
+                        {% endif %}
                     </div>
                     <!-- /MW ORDER CARD IMAGE SLOT -->
 
