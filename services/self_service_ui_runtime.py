@@ -209,7 +209,36 @@ def build_self_service_panel_embed(
             specify_text = "此品項不可指定"
         embed.add_field(name="指定", value=specify_text, inline=True)
 
-    return add_self_service_quote_preview(embed, data, guild)
+    embed = add_self_service_quote_preview(embed, data, guild)
+
+    # AW modal presentation is part of this panel's own rendering logic, not
+    # a startup-installed wrapper around build_self_service_panel_embed.
+    from services.aw_collision_catalog import aw_collision_plan, is_aw_collision_rule as is_aw_rule_key
+
+    rule_key = str(data.get("order_rule_key") or "")
+    if is_aw_rule_key(rule_key):
+        confirmed = bool(data.get("aw_collision_quantity_confirmed"))
+        plan = aw_collision_plan(rule_key) or {}
+        for index, field in enumerate(list(embed.fields)):
+            if str(field.name) == "第四欄｜單數":
+                value = (
+                    f"{int(data.get('quantity') or 0)} 發"
+                    if confirmed
+                    else "尚未填寫｜請點第四欄「發數」"
+                )
+                embed.set_field_at(index, name=field.name, value=value, inline=field.inline)
+            elif str(field.name) == "訂單試算" and not confirmed:
+                embed.set_field_at(
+                    index,
+                    name=field.name,
+                    value=(
+                        f"**方案：** {plan.get('label', 'AW代撞')}\n"
+                        "**發數：** 尚未填寫\n"
+                        "請先點第四欄「發數」輸入數量，系統才會計算價格。"
+                    ),
+                    inline=False,
+                )
+    return embed
 
 # 指定陪玩 / 點數福利選擇 UI 已移至 services/self_service_selection_runtime.py
 # 客服手動價格規則由 services/self_service_financials.py 單一維護。

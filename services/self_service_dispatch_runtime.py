@@ -60,6 +60,28 @@ async def create_waiting_acceptance_order(
     """
     data = deps.order_selections.setdefault(channel_id, {})
 
+    # AW quantity must be confirmed for this exact tier before dispatch creates
+    # messages, WebOrder rows, payroll snapshots, or smart-dispatch candidates.
+    # This formerly lived in a startup wrapper around this function.
+    from services.aw_collision_catalog import (
+        is_aw_collision_rule,
+        validate_aw_quantity_for_rule,
+    )
+
+    rule_key = str(data.get("order_rule_key") or "")
+    if is_aw_collision_rule(rule_key):
+        if not data.get("aw_collision_quantity_confirmed"):
+            raise ValueError("請先在第四欄點「發數」，填寫實際要代撞的發數。")
+        if str(data.get("aw_collision_plan_key") or "") != rule_key:
+            raise ValueError(
+                "AW代撞方案與已填發數的方案不一致。請在第四欄重新填寫發數後再送出。"
+            )
+        try:
+            quantity = int(data.get("quantity"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("AW代撞發數異常，請重新填寫。") from exc
+        validate_aw_quantity_for_rule(rule_key, quantity)
+
     if data.get("dispatch_rollback_pending"):
         try:
             warnings = await cleanup_failed_self_service_dispatch(

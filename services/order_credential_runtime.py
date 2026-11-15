@@ -275,7 +275,7 @@ class OrderCredentialModal(discord.ui.Modal, title="代肝／代解登入資料"
     )
     login_note = discord.ui.TextInput(
         label="登入方式／備註（選填）",
-        placeholder="例如 Steam、Garena、Google 登入，或其他登入注意事項",
+        placeholder="例如 Steam、Garena、Google 登入、其他登入注意事項；請補充安全箱格數",
         style=discord.TextStyle.paragraph,
         required=False,
         max_length=500,

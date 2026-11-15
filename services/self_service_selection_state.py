@@ -67,6 +67,12 @@ _PRODUCT_DEPENDENT_KEYS = (
     # Urgency cannot carry across coin-wash products or into normal orders.
     "coin_wash_urgent",
     "urgent_fee_amount",
+    # AW quantity is tied to the exact 1-100 / 101-500 / 501+ tier. Switching
+    # products must clear confirmation, otherwise stale AW quantities can be sent.
+    "aw_collision_quantity_confirmed",
+    "aw_collision_plan_key",
+    "aw_collision_unit_rate",
+    "aw_collision_quantity_set_by",
 )
 
 

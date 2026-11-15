@@ -54,11 +54,9 @@ from .one_companion_one_guard_catalog import (
 
 _install_one_companion_one_guard_catalog()
 
-# AW 代撞沿用台服代肝代解分類，但需要分段單價與 Modal 發數輸入，
-# 因此集中由一個 system-owned extension 安裝，避免價格/UI 各自硬編碼。
-from .aw_collision_catalog import install_aw_collision_catalog as _install_aw_collision_catalog
-
-_install_aw_collision_catalog()
+# AW tier prices/quantity rules remain in aw_collision_catalog.py; the actual
+# panel, quantity selector, dispatch guard, state reset and credential placeholder
+# now call that policy directly from their canonical modules. No startup patch.
 
 # AW／洗幣接單身分組直接由 order_rules.py 的 canonical role maps 提供。
 # 不再在 package import 時以補丁重新寫入相同的常數與字典；
