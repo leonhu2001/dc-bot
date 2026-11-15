@@ -166,6 +166,18 @@ def ensure_loyalty_tables(bind=engine) -> None:
         _repair_entertainment_loyalty_policy_v3(conn)
         _repair_apex_entertainment_shared_scope_v4(conn)
 
+    # Existing owner-approved 15-game and companion-unit reconciliations were
+    # previously installed by replacing this function at package import time.
+    # Keep the same migration keys and idempotent logic, owned here instead.
+    from services import loyalty_benefits as loyalty
+    from services.loyalty_policy_20261023 import (
+        _sync_all_entertainment_progress,
+        _sync_existing_game_progress,
+    )
+
+    _sync_existing_game_progress(loyalty, bind)
+    _sync_all_entertainment_progress(loyalty, bind)
+
 
 def _rule_for_key(rule_key: str):
     from services.order_rules import ORDER_RULES
@@ -449,8 +461,8 @@ def preview_same_order_benefit(
 
     requested_players = max(1, int(player_count or 1))
     companion_count = _service_companion_count(rule, requested_players)
-    paid_units = float(max(0, int(quantity or 0)) * companion_count)
-    if paid_units <= 0:
+    current_units = float(max(0, int(quantity or 0)) * companion_count)
+    if current_units <= 0:
         return None
 
     ensure_loyalty_tables()
@@ -472,7 +484,19 @@ def preview_same_order_benefit(
         }).mappings().first()
         previous = float(progress_row.get("progress_units") or 0) if progress_row else 0.0
         debt_before = float(progress_row.get("debt_units") or 0) if progress_row else 0.0
-        credited_units = max(0.0, paid_units - debt_before)
+        # Only paid/active/stored orders may count before final closure.
+        # Closed units are already in progress; pending unpaid orders do not
+        # count. Keep this logic in a pure helper, not a runtime replacement.
+        from services import loyalty_benefits as loyalty
+        from services.loyalty_policy_20261023 import _open_paid_units_for_scope
+
+        open_units = _open_paid_units_for_scope(
+            loyalty,
+            conn,
+            customer_id=customer,
+            scope_key=scope,
+        )
+        credited_units = max(0.0, open_units + current_units - debt_before)
         projected_total = previous + credited_units
         earned_count = max(0, int(projected_total // threshold))
         pending_count = _pending_same_order_claim_count(
@@ -490,14 +514,16 @@ def preview_same_order_benefit(
         "id": None,
         "source": "same_order",
         "same_order": True,
-        "earned_count": available_count,
+        # At most one benefit may be used by a single order. Remaining earned
+        # units stay eligible on the next checkout rather than stacking here.
+        "earned_count": 1,
         "scope_key": scope,
         "rule_key": str(rule_key),
         "rule_label": _loyalty_display_label(rule_key, getattr(rule, "label", rule_key)),
         "pricing_type": str(policy["pricing_type"]),
         "player_count": requested_players,
         "benefit_kind": str(policy["benefit_kind"]),
-        "benefit_units": base_units * available_count,
+        "benefit_units": base_units,
         "threshold_units": threshold,
     }
     benefit["title"] = _coupon_title(benefit)
