@@ -204,7 +204,7 @@ def test_non_delta_buttons_are_retired_but_legacy_price_copy_is_preserved() -> N
             assert not any(
                 "price_list" in str(getattr(child, "custom_id", "") or "")
                 for child in price_lists.add_price_list_control(
-                    quick.QuickGameEntryView(game, channel_id), channel_id
+                    quick.QuickGameEntryView(category=game, source_channel_id=channel_id), channel_id
                 ).children
             )
             # A stale old component must not reactivate the removed price menu.
