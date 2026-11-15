@@ -890,9 +890,25 @@ def delete_web_order_by_ticket_channel(*, ticket_channel_id=None, dispatch_messa
         )
 
         db.commit()
-        return True
     except Exception:
         db.rollback()
         raise
     finally:
         db.close()
+
+    # Timer metadata is only cleaned after the WebOrder transaction commits and
+    # its SQLite connection closes. The old cross-module startup wrapper performed
+    # these exact steps outside this function; keep this non-fatal so a successful
+    # retract is never reported as a failure just because stale timer cleanup must
+    # be retried at startup.
+    try:
+        from services.vip_timer_integrity import delete_vip_timer_rows
+
+        delete_vip_timer_rows(order_id)
+    except Exception as exc:
+        print(
+            f"[vip-timer-integrity] deferred timer cleanup "
+            f"order_id={order_id}: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+    return True

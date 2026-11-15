@@ -11,7 +11,6 @@ from shared.db import SessionLocal
 from shared.models import WebOrder
 
 
-_INSTALLED = False
 _ACCOUNTING_INSTALLED = False
 _TIMER_WORKER_ISSUE_CODES = {
     "worker_payout_missing",
@@ -321,44 +320,8 @@ def install_vip_timer_accounting_integrity_guard(
 
 
 def install_vip_timer_integrity_guard() -> None:
-    """Install cross-process guards without changing timer business logic."""
-    global _INSTALLED
-    if _INSTALLED:
-        return
-
-    from shared import web_order_sync
-    from services import vip_timer_roster_payout
-
-    original_delete = web_order_sync.delete_web_order_by_ticket_channel
-
-    @wraps(original_delete)
-    def delete_with_timer_cleanup(*, ticket_channel_id=None, dispatch_message_id=None):
-        order_id = _resolve_web_order_id(
-            ticket_channel_id=ticket_channel_id,
-            dispatch_message_id=dispatch_message_id,
-        )
-        result = original_delete(
-            ticket_channel_id=ticket_channel_id,
-            dispatch_message_id=dispatch_message_id,
-        )
-        if result and order_id is not None:
-            try:
-                delete_vip_timer_rows(int(order_id))
-            except Exception as exc:
-                # The WebOrder deletion already committed. Do not turn a
-                # successful retract into a fake failure; startup reconciliation
-                # will retry orphan cleanup, and canonical detection below keeps
-                # the stale row from affecting ordinary payout logic meanwhile.
-                print(
-                    f"[vip-timer-integrity] deferred timer cleanup "
-                    f"order_id={order_id}: {type(exc).__name__}: {exc}",
-                    flush=True,
-                )
-        return result
-
-    web_order_sync.delete_web_order_by_ticket_channel = delete_with_timer_cleanup
-    vip_timer_roster_payout._is_timer_order = is_canonical_vip_timer_order
-    _INSTALLED = True
+    """No-op legacy entrypoint; WebOrder deletion and timer identity are native."""
+    return None
 
 
 __all__ = [

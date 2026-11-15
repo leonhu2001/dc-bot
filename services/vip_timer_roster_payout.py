@@ -22,17 +22,10 @@ _INSTALLED = False
 
 
 def _is_timer_order(order_id: int, db) -> bool:
-    # The web process installs the payout guard during router bootstrap, which
-    # can happen before the raw vip_timer_* tables have been created. Ordinary
-    # order payout recalculation must remain usable in that window.
-    try:
-        row = db.execute(
-            text("SELECT 1 FROM vip_timer_sessions WHERE order_id=:order_id LIMIT 1"),
-            {"order_id": int(order_id)},
-        ).first()
-    except Exception:
-        return False
-    return row is not None
+    """Only verified timer orders may use timer-roster worker accounting."""
+    from services.vip_timer_integrity import is_canonical_vip_timer_order
+
+    return is_canonical_vip_timer_order(int(order_id), db)
 
 
 def _staff_names(order_id: int, db) -> dict[str, str | None]:
