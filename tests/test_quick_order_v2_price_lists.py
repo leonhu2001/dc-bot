@@ -13,19 +13,22 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "services" / "quick_order_v2_price_lists.py"
 
 
-def test_delta_price_list_keeps_four_top_level_categories() -> None:
+def test_delta_price_list_keeps_only_three_owner_approved_top_level_categories() -> None:
     assert [item[0] for item in price_lists.DELTA_PRICE_LIST_CATEGORIES] == [
         "desktop",
         "mobile",
-        "farm",
         "fun",
     ]
     assert [item[1] for item in price_lists.DELTA_PRICE_LIST_CATEGORIES] == [
         "端遊",
         "手遊",
-        "代肝代解",
         "趣味單",
     ]
+
+    # This is a price-list UI change, not a removal of farm ordering.
+    assert "farm" not in [o.value for o in price_lists.DeltaPriceListCategorySelect().options]
+    assert len(price_lists.DeltaPriceListView(category="farm").children) == 1
+    assert "farm" in quick._GAME_ENTRY_META.get(quick.QUICK_ORDER_V2_CHANNELS["staff_internal"], ("",))[0] or "farm" in [category for _, _, category, _ in quick._DELTA_BUTTONS]
 
 
 
