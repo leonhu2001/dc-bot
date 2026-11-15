@@ -10,11 +10,14 @@ import discord
 from services import quick_order_v2 as quick
 
 
-# Only the Delta public entry panel offers an interactive price-list button.
-# Approved other-game price copy remains in this module for compatibility,
-# but must never create a public "查看價目表" control on its entry panels.
+# Keep source-owned price text available for internal previews and legacy
+# compatibility, without restoring its public entry-panel buttons.
 _PRICE_LIST_LABEL_BY_CHANNEL_ID = {
     int(quick.QUICK_ORDER_V2_CHANNELS["delta"]): "三角洲行動",
+    int(quick.QUICK_ORDER_V2_CHANNELS["valorant"]): "VALORANT",
+    int(quick.QUICK_ORDER_V2_CHANNELS["lol"]): "英雄聯盟",
+    int(quick.QUICK_ORDER_V2_CHANNELS["apex"]): "APEX",
+    int(quick.QUICK_ORDER_V2_CHANNELS["steam"]): "STEAM",
 }
 
 _ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -1063,7 +1066,13 @@ class DeltaPriceListView(discord.ui.View):
 
 
 def has_price_list(channel_id: int) -> bool:
-    return int(channel_id) in _PRICE_LIST_LABEL_BY_CHANNEL_ID
+    """Only Delta has the owner-approved public price-list entry button.
+
+    Do not derive button availability from the legacy pricing text dictionary:
+    VALORANT, LoL, APEX and STEAM keep their historical internal price copy,
+    but their public entry panels intentionally have no price-list control.
+    """
+    return int(channel_id) == int(quick.QUICK_ORDER_V2_CHANNELS["delta"])
 
 
 class QuickPriceListButton(discord.ui.Button):
