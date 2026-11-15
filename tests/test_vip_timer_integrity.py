@@ -410,6 +410,8 @@ def test_vip_timer_business_invariants_have_no_startup_function_rebinding() -> N
     roster = (root / "services" / "vip_timer_roster_payout.py").read_text(encoding="utf-8")
 
     assert "_install_vip_timer_integrity_guard()" not in init
+    # This PR must also retain the AW direct-core refactor merged as #585.
+    assert "_install_aw_collision_catalog()" not in init
     assert "web_order_sync.delete_web_order_by_ticket_channel =" not in timer
     assert "vip_timer_roster_payout._is_timer_order =" not in timer
     assert "delete_vip_timer_rows(order_id)" in web
