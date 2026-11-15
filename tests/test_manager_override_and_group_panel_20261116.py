@@ -136,7 +136,6 @@ def test_explicit_manager_approval_works_for_every_old_protected_policy(monkeypa
     cases = {
         "fun_read_no_reply": 2650,                   # previous full-source lock
         "fun_eat_to_fat_10kg": 2999,                # new challenge
-        "basic_tech_secret_single": 759,           # player-count structure
         "farm_coin_wash_car_100m": 777,             # approved wash tier
         "apex_entertain_ng": 333,                  # approved game prices
     }
@@ -152,6 +151,50 @@ def test_explicit_manager_approval_works_for_every_old_protected_policy(monkeypa
     for key, desired in cases.items():
         assert ORDER_RULES[key].price == desired, key
         assert get_base_rule(key).price != desired, key
+
+
+def test_admin_real_headcount_price_fields_update_checkout_totals(monkeypatch):
+    from starlette.datastructures import FormData
+
+    key = "basic_tech_secret_single"
+    base = get_base_rule(key)
+    assert base.player_count_prices
+    current = rule_to_override_payload(base)
+    original_tiers = dict(current["player_count_prices"])
+    rows = [
+        ("label", base.label),
+        ("catalog_group_label", "技術陪"),
+        ("pricing_type", base.pricing_type),
+        ("unit_label", base.unit_label),
+        ("note", base.note),
+        ("intro", ""),
+        ("required_staff_count", "player_count"),
+        ("price", str(base.price)),
+        ("min_quantity", str(base.min_quantity)),
+        ("min_player_count", str(base.min_player_count)),
+        ("min_protector_count", str(base.min_protector_count)),
+        ("specify_fee_default", str(base.specify_fee_default)),
+    ]
+    for role in base.allowed_roles:
+        rows.append(("allowed_roles", role))
+    for role in base.allowed_game_roles:
+        rows.append(("allowed_game_roles", role))
+    for role in base.required_game_roles:
+        rows.append(("required_game_roles", role))
+    for count, amount in original_tiers.items():
+        rows.append((f"player_count_price_{count}", str(amount + 33)))
+    form = FormData(rows)
+    updated = admin_order_rules._payload_from_form(key, form)
+
+    assert updated["player_count_prices"] == {
+        int(k): v + 33 for k, v in original_tiers.items()
+    }
+    updated["__owner_confirmed_after_canonical"] = True
+    monkeypatch.setattr(ORDER_RULES, "_refresh_external", lambda: None)
+    monkeypatch.setattr(ORDER_RULES, "_override_cache", {key: {"payload": updated}})
+    actual = ORDER_RULES[key]
+    for count, expected in updated["player_count_prices"].items():
+        assert order_rules.calculate_price(actual, quantity=1, player_count=count).total_amount == expected
 
 
 def test_manager_locked_aw_tariffs_are_not_silently_accepted():
