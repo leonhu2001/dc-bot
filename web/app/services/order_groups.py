@@ -775,10 +775,10 @@ def _group_data(
                 "description",
                 "",
             ),
-        "image_url": (
-            f"/static/{spec['image']}"
+        **(
+            {"image_url": f"/static/{spec['image']}"}
             if str(spec.get("image") or "").startswith("price_lists/")
-            else ""
+            else {}
         ),
         "starting_price":
             starting_price,
