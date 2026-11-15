@@ -64,3 +64,24 @@ def test_direct_business_rules_live_in_canonical_modules():
     assert "point_service_value = one_seat_point_service_value * funded_point_service_seats" in financials
     assert "player_count_prices" in loyalty
     assert "def _selected_unit_total" in loyalty
+
+
+def test_special_receiver_roles_are_defined_directly_not_reinstalled_at_import():
+    source = (ROOT / "services/__init__.py").read_text(encoding="utf-8")
+    rules = (ROOT / "services/order_rules.py").read_text(encoding="utf-8")
+
+    assert "install_special_receiver_roles_20261103" not in source
+    assert 'AW_COLLISION_RECEIVER_ROLE_ID = "1571080769407942787"' in rules
+    assert 'COIN_WASH_AW_RECEIVER_ROLE_ID = "1565369317929918554"' in rules
+    assert "SPECIAL_RECEIVER_ROLE_IDS_BY_KEY: dict[str, str] = {" in rules
+
+
+def test_four_delta_buttons_are_owned_by_core_view_not_startup_monkey_patch():
+    core = (ROOT / "services/quick_order_v2.py").read_text(encoding="utf-8")
+    fixes = (ROOT / "services/quick_order_v2_fixes.py").read_text(encoding="utf-8")
+
+    block = core.split("class QuickDeltaEntryView(", 1)[1].split("class QuickVipGameSelect(", 1)[0]
+    assert "for emoji, label, category, style in _DELTA_BUTTONS:" in block
+    assert "row=0," in block
+    assert "row=0 if index < 3 else 1" not in block
+    assert "quick.QuickDeltaEntryView.__init__ =" not in fixes
