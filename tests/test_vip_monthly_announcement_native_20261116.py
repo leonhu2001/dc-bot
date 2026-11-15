@@ -48,7 +48,9 @@ def test_current_month_announcement_is_native_and_uses_live_entitlements(monkeyp
     assert payload["embed"].title == "👑 2026 年 12 月 VIP 每月福利已刷新"
     assert "200T" in str(payload["embed"].to_dict())
     assert "500T" in str(payload["embed"].to_dict())
-    assert payload["allowed_mentions"].to_dict() == {}
+    assert payload["allowed_mentions"].everyone is False
+    assert payload["allowed_mentions"].users is False
+    assert payload["allowed_mentions"].roles is False
     assert marked == ["2026-12"]
 
 
