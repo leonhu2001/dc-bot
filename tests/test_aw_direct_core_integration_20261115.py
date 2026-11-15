@@ -123,7 +123,7 @@ def test_aw_core_panel_and_dispatch_are_not_runtime_rebound_by_installer() -> No
     assert "selection._PRODUCT_DEPENDENT_KEYS =" not in aw_source
     assert "AwCollisionQuantityModal(" in runtime
     assert "aw_quantity_select_kwargs" in runtime
-    assert "validate_aw_quantity_for_rule(rule_key, int(data.get" in dispatch
+    assert "validate_aw_quantity_for_rule(rule_key, quantity)" in dispatch
     assert "aw_collision_quantity_confirmed" in ui
     assert "請補充安全箱格數" in credentials
     assert inspect.iscoroutinefunction(create_waiting_acceptance_order)
