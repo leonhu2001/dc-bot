@@ -1059,7 +1059,7 @@ for key, label, price in [
 _add(OrderRule("delta_desktop_fun", "fun_lovebirds", "比翼雙飛", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_protector_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
 _add(OrderRule("delta_desktop_fun", "fun_read_no_reply", "謹言慎行", "fixed", 2500, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_protector_count=1, min_quantity=1, max_quantity=1, allow_specify=False, note="基礎保底1888W；老闆指定3個禁詞，每次說中額外保底+50W；禁詞被猜中後最多更換2次。"))
 _add(OrderRule("delta_desktop_fun", "fun_rich_enough", "豪到你了嗎", "fixed", 2000, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
-_add(OrderRule("delta_desktop_fun", "fun_eat_yourself", "一命通關", "fixed", 13888, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
+_add(OrderRule("delta_desktop_fun", "fun_eat_yourself", "一命通關", "fixed", 13888, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False, note="需連續撤離5把，且每把帶出價值皆須達1000W；撤離失敗進度歸零，未達1000W需補場，大紅可折抵1個場次。"))
 
 # 魔丸娛樂嘎拉給木
 # 固定 1 單 / 2 位 / 只允許女陪或女護
