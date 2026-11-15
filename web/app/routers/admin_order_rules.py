@@ -441,15 +441,10 @@ def _apply_fun_free_specify_policy(category: str, payload: dict) -> dict:
     return payload
 
 
-def _payload_from_form(rule_key: str, form) -> dict:
-    current = ORDER_RULES[str(rule_key)]
-    payload = _payload_from_form_base(
-        _payload_with_presentation(str(rule_key), current),
-        form,
-    )
+def _validate_special_rate_rule_edit(rule_key: str, payload: dict) -> None:
     # AW per-shot tariffs use their own half-T tiered calculator, not the
-    # generic int price field. A silent price override here would lie to
-    # owners: "publish success" while the cashier kept charging the old rate.
+    # generic int price field. Never accept "published" price changes that
+    # would leave actual billing at the old rate, including crafted requests.
     if str(rule_key) in AW_COLLISION_PRICING_BY_RULE:
         base_price = int(get_base_rule(str(rule_key)).price)
         if int(payload.get("price") or 0) != base_price:
@@ -457,6 +452,15 @@ def _payload_from_form(rule_key: str, form) -> dict:
                 "AW代撞採每發級距（含4.5T），不能以一般商品售價欄修改。"
                 "目前每發費率維持原價；本頁仍可調整其他可用規則。"
             )
+
+
+def _payload_from_form(rule_key: str, form) -> dict:
+    current = ORDER_RULES[str(rule_key)]
+    payload = _payload_from_form_base(
+        _payload_with_presentation(str(rule_key), current),
+        form,
+    )
+    _validate_special_rate_rule_edit(str(rule_key), payload)
     return _apply_fun_free_specify_policy(str(current.category), payload)
 
 
@@ -848,6 +852,7 @@ async def admin_order_rule_publish(
         if not isinstance(payload, dict):
             raise ValueError("規則預覽資料格式錯誤。")
 
+        _validate_special_rate_rule_edit(rule_key, payload)
         rule = preview_rule_override(rule_key, payload)
         before_payload = _payload_with_presentation(
             rule_key,
@@ -917,6 +922,7 @@ async def admin_order_rule_rollback(
         if target is None:
             raise ValueError("找不到可回復的版本。")
 
+        _validate_special_rate_rule_edit(rule_key, target["payload"])
         preview_rule_override(rule_key, target["payload"])
         before_payload = _payload_with_presentation(
             rule_key,
