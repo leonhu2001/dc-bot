@@ -71,7 +71,7 @@ def test_delta_fun_one_life_clear_copy_rule_and_web_catalog() -> None:
     rule = order_rules.ORDER_RULES["fun_eat_yourself"]
     assert rule.label == "一命通關"
     assert rule.price == 13888
-    assert rule.catalog_group_label == "一命通關"
+    assert rule.catalog_group_label == ""
 
     current_specs = order_groups._current_group_specs()
     matching = [
@@ -152,7 +152,7 @@ def test_one_life_clear_is_code_owned_even_with_stale_admin_override(monkeypatch
     key = "fun_eat_yourself"
     base = get_base_rule(key)
     assert (base.label, base.price, base.catalog_group_label) == (
-        "一命通關", 13888, "一命通關"
+        "一命通關", 13888, ""
     )
     monkeypatch.setattr(order_rules.ORDER_RULES, "_refresh_external", lambda: None)
     monkeypatch.setattr(order_rules.ORDER_RULES, "_override_cache", {
@@ -170,3 +170,100 @@ def test_one_life_clear_is_code_owned_even_with_stale_admin_override(monkeypatch
             if any(item["rule_key"] == key for item in group["details"])] == ["一命通關"]
     assert [group["label"] for group in order_groups.get_grouped_order_catalog("delta_desktop_fun")
             if any(variant["rule_key"] == key for variant in group["variants"])] == ["一命通關"]
+
+
+def test_old_read_no_reply_manager_override_cannot_duplicate_one_life_card(
+    monkeypatch,
+) -> None:
+    from services import orders
+    from services.order_rules import get_base_rule
+    from web.app.services import order_catalog_cards
+
+    # VPS used to show two 一命通關 13,888T cards: the second built-in fun
+    # group read_no_reply could still be renamed through a stale manager
+    # override even after one_life_clear was moved into the canonical source.
+    monkeypatch.setattr(order_rules.ORDER_RULES, "_refresh_external", lambda: None)
+    monkeypatch.setattr(
+        order_rules.ORDER_RULES,
+        "_override_cache",
+        {
+            "fun_read_no_reply": {
+                "payload": {
+                    "label": "一命通關",
+                    "price": 13888,
+                    "catalog_group_label": "一命通關",
+                }
+            },
+            "fun_eat_yourself": {
+                "payload": {
+                    "label": "想吃自己打",
+                    "price": 3000,
+                    "catalog_group_label": "想吃自己打",
+                }
+            },
+        },
+    )
+
+    assert (get_base_rule("fun_read_no_reply").label, get_base_rule("fun_read_no_reply").price) == (
+        "謹言慎行", 2500
+    )
+    assert (order_rules.ORDER_RULES["fun_read_no_reply"].label, order_rules.ORDER_RULES["fun_read_no_reply"].price) == (
+        "謹言慎行", 2500
+    )
+    assert order_rules.ORDER_RULES["fun_eat_yourself"].label == "一命通關"
+    assert order_rules.ORDER_RULES["fun_eat_yourself"].price == 13888
+
+    cards = order_catalog_cards._build_cards("delta_desktop_fun")
+    one_life = [card for card in cards if card["label"] == "一命通關"]
+    careful_words = [card for card in cards if card["label"] == "謹言慎行"]
+    assert len(one_life) == 1
+    assert one_life[0]["key"] == "eat_yourself"
+    assert one_life[0]["variant_count"] == 1
+    assert one_life[0]["starting_price"] == 13888
+    assert len(careful_words) == 1
+    assert careful_words[0]["key"] == "read_no_reply"
+    assert careful_words[0]["variant_count"] == 1
+    assert careful_words[0]["starting_price"] == 2500
+
+    assert order_catalog_cards._build_group_detail("read_no_reply")["variants"][0]["price"] == 2500
+    assert order_catalog_cards._build_group_detail("eat_yourself")["variants"][0]["price"] == 13888
+    assert orders.ORDER_RULE_KEY_BY_LABEL["已讀亂回"] == "fun_read_no_reply"
+    assert orders.ORDER_RULE_KEY_BY_LABEL["想吃自己打"] == "fun_eat_yourself"
+
+
+def test_fun_website_and_discord_catalog_match_current_price_card() -> None:
+    from services import orders
+    from web.app.services import order_catalog_cards
+
+    site = {card["label"]: card for card in order_catalog_cards._build_cards("delta_desktop_fun")}
+    # Production also has manager-created fun products (e.g. 俄羅斯輪盤),
+    # which are intentionally absent from an empty CI fixture database.
+    assert len(site) >= 5
+    assert site["謹言慎行"]["starting_price"] == 2500
+    assert site["一命通關"]["starting_price"] == 13888
+    assert "已讀亂回" not in site
+
+    discord_catalog = {
+        group["label"]: group
+        for group in orders.SELF_SERVICE_ORDER_CATALOG["delta_desktop_fun"]
+    }
+    assert "謹言慎行" in discord_catalog
+    assert "一命通關" in discord_catalog
+    assert "已讀亂回" not in discord_catalog
+    assert price_lists.DELTA_FUN_PRICE_LISTS["watch_your_words"]["label"] == "謹言慎行"
+    assert "2500T" in price_lists.DELTA_FUN_PRICE_LISTS["watch_your_words"]["text"]
+
+
+def test_source_owned_fun_rules_ignore_old_intro_override(monkeypatch) -> None:
+    from web.app.services.order_groups import _presentation_intro
+    from services import order_rule_store
+
+    # A stale intro describing the five-extraction challenge must not appear
+    # on 謹言慎行 even if the old admin row remains in audit history.
+    monkeypatch.setattr(
+        order_rule_store,
+        "get_active_override",
+        lambda rule_key: {"payload": {"intro": "五連撤才結單"}},
+    )
+    assert _presentation_intro("fun_read_no_reply") == ""
+    assert _presentation_intro("fun_eat_yourself") == ""

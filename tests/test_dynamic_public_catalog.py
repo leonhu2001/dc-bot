@@ -85,10 +85,12 @@ def test_manager_rename_updates_builtin_public_and_discord_catalogs(
         lambda: db_file,
     )
 
-    key = "fun_read_no_reply"
+    # Approved 謹言慎行 and 一命通關 are source-authoritative; a separate
+    # ordinary built-in still permits manager-controlled category/group names.
+    key = "fun_rich_enough"
     payload = rule_to_override_payload(get_base_rule(key))
-    payload["label"] = "一命通關"
-    payload["catalog_group_label"] = "一命通關"
+    payload["label"] = "豪到不行了"
+    payload["catalog_group_label"] = "豪到不行了"
 
     publish_rule_override(
         rule_key=key,
@@ -104,7 +106,7 @@ def test_manager_rename_updates_builtin_public_and_discord_catalogs(
     renamed = next(
         item
         for item in web_groups
-        if item["label"] == "一命通關"
+        if item["label"] == "豪到不行了"
     )
     variant = next(
         item
@@ -112,9 +114,9 @@ def test_manager_rename_updates_builtin_public_and_discord_catalogs(
         if item["rule_key"] == key
     )
 
-    assert variant["label"] == "一命通關"
+    assert variant["label"] == "豪到不行了"
     assert not any(
-        item["label"] == "已讀亂回"
+        item["label"] == "豪到你了嗎"
         and any(
             option["rule_key"] == key
             for option in item["variants"]
@@ -128,19 +130,19 @@ def test_manager_rename_updates_builtin_public_and_discord_catalogs(
     )
 
     discord_groups = ORDER_ITEM_GROUPS_BY_CATEGORY.get("delta_desktop_fun")
-    assert "一命通關" in discord_groups
-    assert "已讀亂回" not in discord_groups
+    assert "豪到不行了" in discord_groups
+    assert "豪到你了嗎" not in discord_groups
 
     discord_details = get_order_item_details_for_group(
         "delta_desktop_fun",
-        "一命通關",
+        "豪到不行了",
     )
     discord_variant = next(
         item
         for item in discord_details
         if item["rule_key"] == key
     )
-    assert discord_variant["label"] == "一命通關"
-    assert discord_variant["item"] == "一命通關"
+    assert discord_variant["label"] == "豪到不行了"
+    assert discord_variant["item"] == "豪到不行了"
 
     invalidate_rule_override_cache()

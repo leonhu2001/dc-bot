@@ -13,6 +13,7 @@ from services.order_rules import (
     CATEGORY_LABELS,
     ORDER_RULES,
     SOURCE_AUTHORITY_RULE_KEYS,
+    FULL_SOURCE_AUTHORITY_RULE_KEYS,
     get_allowed_role_labels,
 )
 
@@ -186,9 +187,9 @@ GROUP_SPECS = [
     {
         "key": "read_no_reply",
         "category": "delta_desktop_fun",
-        "label": "已讀亂回",
+        "label": "謹言慎行",
         "variants": [
-            ("fun_read_no_reply", "已讀亂回"),
+            ("fun_read_no_reply", "謹言慎行"),
         ],
     },
 
@@ -384,6 +385,12 @@ def _presentation_intro(rule_key: str) -> str:
     """Read customer-facing intro copy without mixing it into pricing rules."""
     key = str(rule_key or "").strip()
     if not key:
+        return ""
+
+    # These offers are wholly defined in source. A leftover manager override
+    # may still contain stale 一命通關 copy attached to 謹言慎行; do not expose
+    # its introduction as if it were approved copy for a live product.
+    if key in FULL_SOURCE_AUTHORITY_RULE_KEYS:
         return ""
 
     try:
