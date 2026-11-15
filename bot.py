@@ -1841,15 +1841,37 @@ class OrderControlView(discord.ui.View):
         )
         from services import self_service_ui_runtime as self_service_ui
 
-        await ensure_ticket_self_service_panel(
-            interaction=interaction,
-            customer_id=customer_id,
-            selections=SELF_SERVICE_ORDER_SELECTIONS,
-            bot_user_id=bot.user.id if bot.user is not None else None,
-            view_type=SelfServiceOrderView,
-            panel_embed_builder=self_service_ui.build_self_service_panel_embed,
-            remember_data=remember_order_data,
-            fallback_embed=embed,
+        try:
+            panel_message = await ensure_ticket_self_service_panel(
+                interaction=interaction,
+                customer_id=customer_id,
+                selections=SELF_SERVICE_ORDER_SELECTIONS,
+                bot_user_id=bot.user.id if bot.user is not None else None,
+                view_type=SelfServiceOrderView,
+                panel_embed_builder=self_service_ui.build_self_service_panel_embed,
+                remember_data=remember_order_data,
+                fallback_embed=embed,
+                reissue_full_selection=True,
+            )
+        except ValueError as exc:
+            await interaction.followup.send(str(exc), ephemeral=True)
+            return
+        except Exception as exc:
+            print(
+                f"[self-service-reissue] ticket={interaction.channel.id} "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            await interaction.followup.send(
+                "重發自助下單 Panel 失敗，原草稿已保留。請通知管理員查看 Bot 紀錄。",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(
+            f"✅ 已重新發送完整自助下單 Panel：{panel_message.jump_url}\n"
+            "舊商品、規格、數量與折扣已清空，請由訂單類別重新選擇。",
+            ephemeral=True,
         )
 
 # profile_direct_order_ticket_creator_v1
