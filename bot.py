@@ -2913,12 +2913,10 @@ async def on_ready():
         if await refresh_main_service_panel():
             bot._main_service_panel_refreshed = True
 
-    if (
-        not getattr(bot, "_welcome_history_refreshed", False)
-        and not getattr(bot, "_welcome_history_refresh_running", False)
-    ):
-        bot._welcome_history_refresh_running = True
-        bot.loop.create_task(_refresh_welcome_history_background())
+    # The owner-approved welcome copy must not be rewritten in historical
+    # messages on each restart. New join messages keep using the current
+    # build_welcome_embed() template. Historical refresh is intentionally
+    # manual-only; restoring it here would overwrite approved Discord edits.
 
     if not getattr(bot, "_worker_tip_confirm_views_registered", False):
         restored_worker_tip_views = 0
