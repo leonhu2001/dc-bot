@@ -75,7 +75,7 @@ class SetupCommands(commands.Cog):
             bot.loop.create_task(self._sync_member_portal_panel())
 
     async def _sync_member_portal_panel(self) -> None:
-        """Refresh the existing member portal in place after every bot restart."""
+        """Create the portal when missing; preserve its approved copy on restart."""
         await self.bot.wait_until_ready()
 
         channel = self.bot.get_channel(MEMBER_PORTAL_CHANNEL_ID)
@@ -118,11 +118,23 @@ class SetupCommands(commands.Cog):
                 )
                 action = "created"
             else:
-                await target_message.edit(
-                    embed=build_member_portal_embed(),
-                    view=MemberPortalView(),
-                )
-                action = "refreshed"
+                # The existing Discord message is the currently approved copy.
+                # Replacing it with an older built-in template on every Bot
+                # restart can silently undo owner edits. Persistent views have
+                # already been registered in __init__, so leave the message,
+                # its description and its components unchanged.
+                template = build_member_portal_embed()
+                existing = target_message.embeds[0]
+                if (
+                    existing.title != template.title
+                    or existing.description != template.description
+                ):
+                    print(
+                        "[member-portal] live copy differs from source; "
+                        "keeping existing message instead of reverting it",
+                        flush=True,
+                    )
+                action = "preserved"
         except (discord.Forbidden, discord.HTTPException) as exc:
             print(
                 f"[member-portal] panel sync failed: {type(exc).__name__}: {exc}",
