@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from services.aw_collision_financials import calculate_aw_collision_financials, is_aw_collision_rule
 from services.coin_wash_urgent_policy import apply_urgent_fee
+from services.vip_monthly_store_funding_policy_20261103 import apply_vip_monthly_store_funding
 from services.staff_internal_ammo_dump_policy import (
     calculate_internal_ammo_dump_financials,
     is_internal_ammo_dump_rule,
@@ -472,9 +473,11 @@ def _format_point_hours(hours) -> str:
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
     if is_internal_ammo_dump_rule(rule):
-        return apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data))
+        return apply_vip_monthly_store_funding(
+            apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data))
+        )
     if is_aw_collision_rule(rule):
-        return calculate_aw_collision_financials(price_result, data)
+        return apply_vip_monthly_store_funding(calculate_aw_collision_financials(price_result, data))
 
     manual_price = get_self_service_staff_price(data)
     # The VIP custom-order quote is the only chargeable base. Even persisted
@@ -694,7 +697,7 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
         ),
         "customer_pay_amount": customer_pay,
     }
-    return apply_urgent_fee(rule, data, financials)
+    return apply_vip_monthly_store_funding(apply_urgent_fee(rule, data, financials))
 
 
 def apply_self_service_financials_to_order_data(data: dict, rule, price_result) -> dict:
