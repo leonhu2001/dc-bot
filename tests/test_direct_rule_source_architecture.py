@@ -93,7 +93,9 @@ def test_one_life_clear_does_not_need_runtime_rule_or_database_patch():
     catalog = (ROOT / "services/orders.py").read_text(encoding="utf-8")
     prices = (ROOT / "services/quick_order_v2_price_lists.py").read_text(encoding="utf-8")
     assert "install_delta_fun_one_life_clear_20261102" not in source
-    assert 'FULL_SOURCE_AUTHORITY_RULE_KEYS = frozenset({"fun_read_no_reply", "fun_eat_yourself"})' in rules
+    assert 'NEW_FUN_PRICE_CARD_RULE_KEYS = frozenset({' in rules
+    assert '"fun_read_no_reply", "fun_eat_yourself"' in rules
+    assert '}) | NEW_FUN_PRICE_CARD_RULE_KEYS' in rules
     assert '"已讀亂回": "fun_read_no_reply"' in catalog
     assert '13888' in rules
     assert '"想吃自己打": "fun_eat_yourself"' in catalog
