@@ -234,119 +234,12 @@ def _open_paid_units_for_scope(loyalty, conn, *, customer_id: str, scope_key: st
 
 
 def install_loyalty_policy_20261023() -> None:
-    """Install the owner-approved entertainment loyalty policy.
+    """Legacy compatibility entrypoint.
 
-    - Hourly entertainment: 10H -> 1H.
-    - Game-based entertainment: 15 games -> 1 game.
-    - Current and already-paid active orders participate in eligibility immediately;
-      customers do not need to wait for order close before the next checkout can use
-      the accumulated service units.
-    - A single order may consume at most one loyalty reward, even if it crosses
-      multiple thresholds. Any additional earned value remains available later.
+    Actual threshold constants, idempotent schema migrations and checkout
+    preview are now owned by loyalty_benefits, not rebound on package import.
     """
-    from services import loyalty_benefits as loyalty
-
-    # Hourly policy is intentionally unchanged; multi-companion service units are
-    # already counted per companion by loyalty_benefits._service_companion_count().
-    loyalty.HOURLY_THRESHOLD = 10.0
-    loyalty.HOURLY_BONUS = 1.0
-    loyalty.GAME_THRESHOLD = _GAME_THRESHOLD
-    loyalty.GAME_BONUS = 1.0
-
-    if getattr(loyalty, "_owner_20261023_policy_installed", False):
-        return
-
-    original_ensure = loyalty.ensure_loyalty_tables
-
-    def ensure_loyalty_tables_with_owner_policy(bind=loyalty.engine) -> None:
-        original_ensure(bind)
-        _sync_existing_game_progress(loyalty, bind)
-        _sync_all_entertainment_progress(loyalty, bind)
-
-    def preview_same_order_benefit_immediate_one_per_order(
-        customer_id,
-        *,
-        rule_key: str,
-        quantity: int,
-        player_count: int = 1,
-    ):
-        """Preview immediate checkout eligibility across closed + active paid units."""
-        policy = loyalty.loyalty_policy_for_rule(rule_key)
-        rule = loyalty._rule_for_key(rule_key)
-        customer = str(customer_id or "").strip()
-        if policy is None or rule is None or not customer:
-            return None
-
-        requested_players = max(1, int(player_count or 1))
-        companion_count = loyalty._service_companion_count(rule, requested_players)
-        current_units = float(max(0, int(quantity or 0)) * companion_count)
-        if current_units <= 0:
-            return None
-
-        loyalty.ensure_loyalty_tables()
-        scope = loyalty.loyalty_scope_key(rule_key, requested_players)
-        threshold = float(policy["threshold_units"] or 0)
-        if threshold <= 0:
-            return None
-
-        with loyalty.engine.begin() as conn:
-            progress_row = conn.execute(text("""
-                SELECT progress_units, debt_units
-                FROM customer_loyalty_progress
-                WHERE customer_discord_id = :customer_id
-                  AND scope_key = :scope_key
-                LIMIT 1
-            """), {
-                "customer_id": customer,
-                "scope_key": scope,
-            }).mappings().first()
-            previous = float(progress_row.get("progress_units") or 0) if progress_row else 0.0
-            debt_before = float(progress_row.get("debt_units") or 0) if progress_row else 0.0
-            open_units = _open_paid_units_for_scope(
-                loyalty,
-                conn,
-                customer_id=customer,
-                scope_key=scope,
-            )
-            credited_units = max(0.0, open_units + current_units - debt_before)
-            projected_total = previous + credited_units
-            earned_count = max(0, int(projected_total // threshold))
-            pending_count = loyalty._pending_same_order_claim_count(
-                conn,
-                customer_id=customer,
-                scope_key=scope,
-            )
-
-        available_count = max(0, earned_count - pending_count)
-        if available_count <= 0:
-            return None
-
-        # Owner rule: regardless of how many thresholds this checkout projection
-        # crosses, this one order can consume only one loyalty reward.
-        base_units = float(policy["benefit_units"] or 0)
-        benefit = {
-            "id": None,
-            "source": "same_order",
-            "same_order": True,
-            "earned_count": 1,
-            "scope_key": scope,
-            "rule_key": str(rule_key),
-            "rule_label": loyalty._loyalty_display_label(
-                rule_key,
-                getattr(rule, "label", rule_key),
-            ),
-            "pricing_type": str(policy["pricing_type"]),
-            "player_count": requested_players,
-            "benefit_kind": str(policy["benefit_kind"]),
-            "benefit_units": base_units,
-            "threshold_units": threshold,
-        }
-        benefit["title"] = loyalty._coupon_title(benefit)
-        return benefit
-
-    loyalty.ensure_loyalty_tables = ensure_loyalty_tables_with_owner_policy
-    loyalty.preview_same_order_benefit = preview_same_order_benefit_immediate_one_per_order
-    loyalty._owner_20261023_policy_installed = True
+    return None
 
 
 __all__ = ["install_loyalty_policy_20261023"]
