@@ -215,6 +215,7 @@ GROUP_SPECS = [
         "key": "eat_to_fat",
         "category": "delta_desktop_fun",
         "label": "吃到發胖",
+        "image": "price_lists/delta_fun_eat_to_fat.webp",
         "selector_label": "紅色物資重量",
         "description": (
             "固定兩位陪玩以上。達成所選紅色物資重量及保底後結單；"
