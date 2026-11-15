@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import traceback
-
 import discord
 
 from core.discord_settings import VIP_MONTHLY_ANNOUNCEMENT_CHANNEL_ID
@@ -13,7 +11,6 @@ from services.vip_monthly_order_discount import VIP_MONTHLY_CASH_ORDER_MINIMUMS
 NOVEMBER_2026_ANNOUNCEMENT_MESSAGE_ID = 1566120120735236107
 NOVEMBER_2026_MONTH_KEY = "2026-11"
 
-_INSTALLED = False
 _NOVEMBER_RECONCILED = False
 
 
@@ -123,51 +120,8 @@ async def _reconcile_november_2026_message(bot: discord.Client, channel) -> None
 
 
 def install_vip_monthly_announcement_policy() -> None:
-    """Use current monthly entitlements for future announcements and repair Nov 2026."""
-    global _INSTALLED
-    if _INSTALLED:
-        return
-
-    from services import vip_review_runtime as runtime
-
-    async def sync_monthly_benefits_and_announce(bot: discord.Client) -> None:
-        result = runtime.sync_current_month_vip_benefits()
-        if result.get("issued_count"):
-            print(
-                "[vip-monthly] issued "
-                f"month={result['month_key']} count={result['issued_count']} "
-                f"eligible={result['eligible_customer_count']}",
-                flush=True,
-            )
-
-        channel = None
-        if not _NOVEMBER_RECONCILED:
-            try:
-                channel = await runtime._get_monthly_announcement_channel(bot)
-                await _reconcile_november_2026_message(bot, channel)
-            except Exception:
-                print(
-                    "[vip-monthly] November announcement reconciliation failed\n"
-                    f"{traceback.format_exc()}",
-                    flush=True,
-                )
-
-        if not result.get("announcement_needed"):
-            return
-
-        if channel is None:
-            channel = await runtime._get_monthly_announcement_channel(bot)
-        month = str(result.get("month_key") or "")
-        await channel.send(
-            embed=build_vip_monthly_announcement_embed(month),
-            allowed_mentions=discord.AllowedMentions.none(),
-        )
-        runtime.mark_month_announcement_sent(month)
-        print(f"[vip-monthly] announcement sent month={month}", flush=True)
-
-    runtime._sync_monthly_benefits_and_announce = sync_monthly_benefits_and_announce
-    _INSTALLED = True
-
+    """Legacy no-op: vip_review_runtime owns announcement sync directly."""
+    return None
 
 __all__ = [
     "NOVEMBER_2026_ANNOUNCEMENT_MESSAGE_ID",

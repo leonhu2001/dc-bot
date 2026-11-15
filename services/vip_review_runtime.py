@@ -484,6 +484,14 @@ async def _scan_and_notify(bot: discord.Client) -> None:
 
 
 async def _sync_monthly_benefits_and_announce(bot: discord.Client) -> None:
+    """Sync monthly benefits, repair the November post, then announce once.
+
+    This is the canonical review runtime entrypoint. Previously a package-import
+    installer replaced it at startup; source now owns the same current-entitlement
+    copy and nonfatal historical announcement reconciliation.
+    """
+    from services import vip_monthly_announcement_policy as announcement
+
     result = sync_current_month_vip_benefits()
     if result.get("issued_count"):
         print(
@@ -493,41 +501,30 @@ async def _sync_monthly_benefits_and_announce(bot: discord.Client) -> None:
             flush=True,
         )
 
+    channel = None
+    if not announcement._NOVEMBER_RECONCILED:
+        try:
+            channel = await _get_monthly_announcement_channel(bot)
+            await announcement._reconcile_november_2026_message(bot, channel)
+        except Exception:
+            print(
+                "[vip-monthly] November announcement reconciliation failed\n"
+                f"{traceback.format_exc()}",
+                flush=True,
+            )
+
     if not result.get("announcement_needed"):
         return
 
-    channel = await _get_monthly_announcement_channel(bot)
+    if channel is None:
+        channel = await _get_monthly_announcement_channel(bot)
     month = str(result.get("month_key") or "")
-    try:
-        year_text, month_text = month.split("-", 1)
-        display_month = f"{int(year_text)} 年 {int(month_text)} 月"
-    except Exception:
-        display_month = month
-
-    embed = discord.Embed(
-        title=f"👑 {display_month} VIP 每月福利已刷新",
-        description=(
-            "新月份 VIP 專屬福利次數已恢復。\n"
-            "白金以上會員可於「我的專區 → 我的福利」查看本月折現券；"
-            "黑鑽會員的每月尊享兌換也已重新開放。"
-        ),
-        color=discord.Color.gold(),
+    await channel.send(
+        embed=announcement.build_vip_monthly_announcement_embed(month),
+        allowed_mentions=discord.AllowedMentions.none(),
     )
-    embed.add_field(
-        name="每月福利規則",
-        value=(
-            "• 200T / 500T VIP 折現券依目前會員等級發放\n"
-            "• 黑鑽尊享福利每月 1 次，可二選一兌換\n"
-            "• 月度福利不累積，未使用次數不會帶到下個月"
-        ),
-        inline=False,
-    )
-    embed.set_footer(text="保級已到期、進入待審核的會員會暫停新月份福利；恢復有效後會補發當月應有福利。")
-
-    await channel.send(embed=embed)
     mark_month_announcement_sent(month)
     print(f"[vip-monthly] announcement sent month={month}", flush=True)
-
 
 async def process_vip_review_tick(bot: discord.Client) -> None:
     """Process queued staff actions immediately and throttle review scans.

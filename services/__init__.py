@@ -121,13 +121,10 @@ from .self_service_companion_count_runtime import (
 
 _install_self_service_companion_count_runtime()
 
-# Keep public VIP monthly announcements on the same current entitlement source as
-# checkout. This also repairs the already-posted 2026-11 announcement in place.
-from .vip_monthly_announcement_policy import (
-    install_vip_monthly_announcement_policy as _install_vip_monthly_announcement_policy,
-)
-
-_install_vip_monthly_announcement_policy()
+# VIP monthly announcements use the same active entitlement source as checkout.
+# The canonical vip_review_runtime directly builds current monthly copy and
+# repairs the existing November 2026 announcement in place, without rebinding
+# a background job function from this package import.
 
 # 一命通關 current name, price, and copy are defined directly in
 # order_rules.py, orders.py, quick_order_v2_price_lists.py, and the Web catalog.
