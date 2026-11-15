@@ -34,7 +34,14 @@ _FARM_3X3_RULE_KEYS = frozenset(_FARM_3X3_RULE_ORDER)
 
 def _normalized_label(value) -> str:
     """Normalize storefront labels for Discord display."""
-    text = unicodedata.normalize("NFKC", str(value or "")).translate(_X_EQUIVALENTS)
+    # Fullwidth ｜ is intentionally part of the approved internal service
+    # labels ("倒子彈｜500M", "撞車｜500M"). NFKC turns it into ASCII |, which
+    # changes the displayed Quick Order selection even though the semantic
+    # group key is identical. Normalize the separated segments, not the glyph.
+    text = "｜".join(
+        unicodedata.normalize("NFKC", segment)
+        for segment in str(value or "").split("｜")
+    ).translate(_X_EQUIVALENTS)
     cleaned: list[str] = []
     for char in text:
         category = unicodedata.category(char)
