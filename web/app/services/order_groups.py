@@ -204,9 +204,9 @@ GROUP_SPECS = [
     {
         "key": "eat_yourself",
         "category": "delta_desktop_fun",
-        "label": "想吃自己打",
+        "label": "一命通關",
         "variants": [
-            ("fun_eat_yourself", "想吃自己打"),
+            ("fun_eat_yourself", "一命通關"),
         ],
     },
 
