@@ -426,7 +426,12 @@ def _presentation_intro(rule_key: str) -> str:
     # may still contain stale 一命通關 copy attached to 謹言慎行; do not expose
     # its introduction as if it were approved copy for a live product.
     if key in FULL_SOURCE_AUTHORITY_RULE_KEYS:
-        return ""
+        # Only a NEW explicitly published manager version may supersede
+        # source-owned fun copy. Never revive stale 2026-11 intro overrides.
+        active_rule = get_active_override(key)
+        active_payload = (active_rule or {}).get("payload") or {}
+        if active_payload.get("__owner_confirmed_after_canonical") is not True:
+            return ""
 
     try:
         active = get_active_override(key)
