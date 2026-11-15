@@ -34,7 +34,14 @@ _FARM_3X3_RULE_KEYS = frozenset(_FARM_3X3_RULE_ORDER)
 
 def _normalized_label(value) -> str:
     """Normalize storefront labels for Discord display."""
-    text = unicodedata.normalize("NFKC", str(value or "")).translate(_X_EQUIVALENTS)
+    # Fullwidth ｜ is intentionally part of the approved internal service
+    # labels ("倒子彈｜500M", "撞車｜500M"). NFKC turns it into ASCII |, which
+    # changes the displayed Quick Order selection even though the semantic
+    # group key is identical. Normalize the separated segments, not the glyph.
+    text = "｜".join(
+        unicodedata.normalize("NFKC", segment)
+        for segment in str(value or "").split("｜")
+    ).translate(_X_EQUIVALENTS)
     cleaned: list[str] = []
     for char in text:
         category = unicodedata.category(char)
@@ -363,8 +370,9 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     # Public entry and ticket detail lookup use one resolver. Built-in 3x3 is
     # explicitly kept as one service with five schemes.
     _install_canonical_group_resolver()
-    quick._groups = _live_groups
 
+    # _groups() calls _live_groups() directly once the resolver is ready.
+    # Do not replace the Quick Order module's function at runtime.
     # Production owns the only active Quick Order ticket UI wrapper. Disable the
     # old core wrapper before install_quick_order_v2 runs immediately after us.
     _disable_legacy_ticket_patch()
