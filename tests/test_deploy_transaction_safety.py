@@ -62,3 +62,12 @@ def test_success_banner_only_runs_after_err_trap_is_disabled() -> None:
     trap_off = source.rindex("trap - ERR")
     success = source.index('SAFE DEPLOY SUCCESS')
     assert trap_off < success
+
+
+def test_deploy_blocks_source_reset_when_vps_has_unmerged_or_newer_commits():
+    source = _source()
+    guard = 'git merge-base --is-ancestor "$OLD_HEAD" "$TARGET"'
+    assert guard in source
+    assert source.index(guard) < source.index('git reset --hard "$TARGET"')
+    assert "unsafe downgrade or divergent history blocked" in source
+    assert "Do not reset the VPS" in source
