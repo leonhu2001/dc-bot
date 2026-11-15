@@ -370,6 +370,18 @@ fi
 
 echo "origin/main: $ORIGIN_MAIN"
 
+# Refuse to overwrite any VPS commit not already included in the target,
+# including local-only hotfixes or a VPS HEAD newer than this deployment.
+# A clean working tree is NOT proof that HEAD can safely be reset backwards.
+if ! git merge-base --is-ancestor "$OLD_HEAD" "$TARGET"; then
+    echo "ERROR: VPS HEAD is not an ancestor of target; unsafe downgrade or divergent history blocked."
+    echo "VPS HEAD: $OLD_HEAD"
+    echo "Target:   $TARGET"
+    echo "Do not reset the VPS; inspect/merge the missing commits first."
+    exit 1
+fi
+echo "PASS: target includes every commit already present on VPS"
+
 if ! git diff --quiet "$OLD_HEAD" "$TARGET" -- \
     requirements.txt \
     web/requirements-web.txt; then
