@@ -115,6 +115,10 @@ def test_native_entertainment_thresholds_and_existing_migrations_stay_stable(loy
                 text("SELECT migration_key FROM loyalty_migrations")
             ).scalars().all())
 
+    # The fixture adds web_orders after its first schema bootstrap. The first
+    # ensure following that addition legitimately applies the existing v4
+    # migration; verify idempotence only after that schema becomes available.
+    loyalty.ensure_loyalty_tables(loyalty_db)
     before = migrations()
     loyalty.ensure_loyalty_tables(loyalty_db)
     after = migrations()
