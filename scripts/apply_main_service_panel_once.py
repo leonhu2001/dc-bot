@@ -63,6 +63,44 @@ def _button_pairs(components: list[dict]) -> list[tuple[str, str]]:
     ]
 
 
+
+def _components_match(actual: list[dict], expected: list[dict]) -> bool:
+    """Compare semantic Discord controls, ignoring API-added component IDs."""
+    if len(actual) != len(expected):
+        return False
+    for actual_row, expected_row in zip(actual, expected):
+        if actual_row.get("type") != expected_row.get("type"):
+            return False
+        existing = actual_row.get("components") or []
+        proposed = expected_row.get("components") or []
+        if len(existing) != len(proposed):
+            return False
+        for old, new in zip(existing, proposed):
+            for key in ("type", "style", "label", "custom_id", "emoji"):
+                if old.get(key) != new.get(key):
+                    return False
+            if bool(old.get("disabled")) != bool(new.get("disabled")):
+                return False
+    return True
+
+
+def _existing_button_styles_match(
+    existing: list[dict], expected: list[dict]
+) -> bool:
+    """Existing buttons may have old emojis, but nothing else may drift."""
+    if len(existing) != len(expected):
+        return False
+    for existing_row, expected_row in zip(existing, expected):
+        old_buttons = existing_row.get("components") or []
+        new_buttons = expected_row.get("components") or []
+        if len(old_buttons) != len(new_buttons):
+            return False
+        for old, new in zip(old_buttons, new_buttons):
+            for key in ("type", "style", "label", "custom_id"):
+                if old.get(key) != new.get(key):
+                    return False
+    return True
+
 def _price_list_id(channels: list[dict], *, specified: int | None) -> int:
     text_channels = [
         channel for channel in channels if channel.get("type") in (0, 5)
@@ -173,8 +211,8 @@ async def _main(args: argparse.Namespace) -> None:
                 "Existing panel button IDs or labels differ from the protected "
                 "four-button layout; leave owner-approved content untouched"
             )
-        if len(current.get("components") or []) != 1:
-            raise RuntimeError("Existing panel has an unexpected component layout")
+        if not _existing_button_styles_match(current.get("components") or [], components):
+            raise RuntimeError("Existing panel button styling/layout differs; abort")
 
         channels = await _api_call(
             client, "GET", f"/guilds/{guild_id}/channels"
@@ -190,7 +228,7 @@ async def _main(args: argparse.Namespace) -> None:
         already_matches = (
             embeds[0].get("description") == embed.description
             and embeds[0].get("title") == embed.title
-            and current.get("components") == components
+            and _components_match(current.get("components") or [], components)
         )
 
         print(f"Target: channel={channel_id} message={message_id}")
@@ -221,7 +259,7 @@ async def _main(args: argparse.Namespace) -> None:
         actual_embed = (confirmed.get("embeds") or [{}])[0]
         if (
             actual_embed.get("description") != embed.description
-            or confirmed.get("components") != components
+            or not _components_match(confirmed.get("components") or [], components)
         ):
             raise RuntimeError(
                 f"POST-VERIFY FAILED. Original message backup: {backup}"
