@@ -64,6 +64,32 @@ def aw_collision_original_amount(rule_key: str | None, quantity: int) -> int:
     return (value * int(plan["rate_x2"]) + 1) // 2
 
 
+def aw_quantity_select_kwargs(data: dict[str, Any]) -> dict[str, Any]:
+    """Build AW-only select options; the canonical order runtime owns the View."""
+    quantity = data.get("quantity")
+    confirmed = bool(data.get("aw_collision_quantity_confirmed"))
+    description = (
+        f"目前 {int(quantity)} 發｜點擊可重新填寫"
+        if confirmed and quantity is not None
+        else "點擊後輸入要代撞的發數"
+    )
+    return {
+        "placeholder": "填寫發數",
+        "min_values": 1,
+        "max_values": 1,
+        "options": [
+            discord.SelectOption(
+                label="發數",
+                value="aw_collision_quantity_modal",
+                description=description[:100],
+            ),
+        ],
+        "custom_id": "self_service_order_quantity_select",
+        "row": 3,
+        "disabled": False,
+    }
+
+
 class AwCollisionQuantityModal(discord.ui.Modal, title="填寫 AW 代撞發數"):
     quantity = discord.ui.TextInput(
         label="發數",
@@ -179,6 +205,7 @@ __all__ = [
     "CREDENTIAL_NOTE_PLACEHOLDER",
     "aw_collision_original_amount",
     "aw_collision_plan",
+    "aw_quantity_select_kwargs",
     "install_aw_collision_catalog",
     "is_aw_collision_rule",
     "validate_aw_quantity_for_rule",
