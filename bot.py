@@ -490,7 +490,6 @@ from views.panels import (
 from views.welcome import (
     build_welcome_description,
     build_welcome_embed,
-    extract_welcome_member_mention,
 )
 
 from services.ticket_identity import (
@@ -2028,10 +2027,21 @@ async def refresh_main_service_panel() -> bool:
         message = await channel.fetch_message(
             MAIN_SERVICE_PANEL_MESSAGE_ID
         )
-        await message.edit(
-            embed=build_main_panel_embed(),
-            view=MainPanelView(),
-        )
+        # This message is an owner-approved, long-lived public announcement.
+        # Never overwrite its text, Embed, attachments or button layout on
+        # restart. The persistent callbacks are registered independently via
+        # bot.add_view(MainPanelView()) before READY.
+        # Previously we called message.edit(embed=build_main_panel_embed(),
+        # view=MainPanelView()), which reverted hand-approved Discord edits
+        # after EVERY deployment even when no related source was changed.
+        if self_user := bot.user:
+            if message.author.id != self_user.id:
+                print(
+                    "[service-lobby] panel is not authored by the bot; "
+                    "left unchanged",
+                    flush=True,
+                )
+                return False
     except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
         print(
             "[service-lobby] panel refresh failed: "
@@ -2041,93 +2051,11 @@ async def refresh_main_service_panel() -> bool:
         return False
 
     print(
-        "[service-lobby] main panel refreshed",
+        "[service-lobby] main panel verified without editing approved content",
         flush=True,
     )
     return True
 
-
-
-async def refresh_welcome_history() -> bool:
-    if not WELCOME_CHANNEL_ID:
-        return False
-
-    channel = bot.get_channel(WELCOME_CHANNEL_ID)
-    if not isinstance(channel, discord.TextChannel):
-        try:
-            fetched_channel = await bot.fetch_channel(WELCOME_CHANNEL_ID)
-        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-            return False
-        channel = (
-            fetched_channel
-            if isinstance(fetched_channel, discord.TextChannel)
-            else None
-        )
-
-    if channel is None or bot.user is None:
-        return False
-
-    updated = 0
-    matched = 0
-
-    try:
-        async for message in channel.history(limit=None, oldest_first=True):
-            if message.author.id != bot.user.id or not message.embeds:
-                continue
-
-            old_embed = message.embeds[0]
-            member_mention = extract_welcome_member_mention(
-                old_embed.description
-            )
-            if member_mention is None:
-                continue
-
-            matched += 1
-            avatar_url = getattr(old_embed.thumbnail, "url", None)
-            new_description = build_welcome_description(member_mention)
-
-            if old_embed.description == new_description:
-                continue
-
-            await message.edit(
-                embed=build_welcome_embed(
-                    member_mention,
-                    avatar_url=avatar_url,
-                ),
-                allowed_mentions=discord.AllowedMentions(
-                    users=False,
-                    roles=False,
-                    everyone=False,
-                ),
-            )
-            updated += 1
-    except (discord.Forbidden, discord.HTTPException) as exc:
-        print(
-            "[welcome] history refresh failed: "
-            f"{type(exc).__name__}: {exc}",
-            flush=True,
-        )
-        return False
-
-    print(
-        f"[welcome] history refreshed: matched={matched}, updated={updated}",
-        flush=True,
-    )
-    return True
-
-
-async def _refresh_welcome_history_background() -> None:
-    try:
-        if await refresh_welcome_history():
-            bot._welcome_history_refreshed = True
-    except Exception as exc:
-        print(
-            "[welcome] background history refresh failed: "
-            f"{type(exc).__name__}: {exc}",
-            flush=True,
-        )
-    finally:
-        bot._welcome_history_refresh_running = False
 
 
 # ========= Bot 事件 =========
@@ -2902,12 +2830,10 @@ async def on_ready():
         if await refresh_main_service_panel():
             bot._main_service_panel_refreshed = True
 
-    if (
-        not getattr(bot, "_welcome_history_refreshed", False)
-        and not getattr(bot, "_welcome_history_refresh_running", False)
-    ):
-        bot._welcome_history_refresh_running = True
-        bot.loop.create_task(_refresh_welcome_history_background())
+    # The owner-approved welcome copy must not be rewritten in historical
+    # messages on each restart. New join messages keep using the current
+    # build_welcome_embed() template. Historical refresh is intentionally
+    # manual-only; restoring it here would overwrite approved Discord edits.
 
     if not getattr(bot, "_worker_tip_confirm_views_registered", False):
         restored_worker_tip_views = 0

@@ -68,7 +68,7 @@ def test_welcome_history_refresh_does_not_block_critical_workers():
     assert "ensure_web_sync_event_worker_started()" in on_ready
     assert "bot.loop.create_task(smart_dispatch_escalation_loop(bot))" in on_ready
     assert "await refresh_welcome_history()" not in on_ready
-    assert "bot.loop.create_task(_refresh_welcome_history_background())" in on_ready
+    assert "bot.loop.create_task(_refresh_welcome_history_background())" not in on_ready
 
     panel_refresh = on_ready.index("await refresh_main_service_panel()")
     assert on_ready.index("ensure_payment_review_worker_started(bot)") < panel_refresh
