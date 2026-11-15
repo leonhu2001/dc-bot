@@ -1091,10 +1091,8 @@ for _tier, _price, _guarantee, _weight in _EAT_TO_FAT_PLANS:
     ))
 
 
-# 2026-11-16 趣味單｜我們的愛：固定 2 位男性護航以上。
-# 「頂護」只有統一的身分組，沒有性別識別；為避免女頂護誤接，
-# 這裡以男護身分組作為可驗證的最低資格。男頂護只要同時持有男護
-# 身分組也能接單，不對純頂護推測其性別。
+# 2026-11-16 趣味單｜我們的愛：固定 2 位護航以上。
+# 店主確認男護、女護、頂護皆可接；陪玩身分組不可接。
 _OUR_LOVE_PLANS = (
     ("start_50", 2888, 50, 2088),
     ("start_0", 4888, 0, 3688),
@@ -1106,7 +1104,7 @@ for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
         f"我們的愛｜初始好感度{_start}",
         "fixed",
         _price,
-        allowed_roles=("male_protector",),
+        allowed_roles=PROTECTOR_ROLES,
         required_game_roles=DELTA_DESKTOP_GAME_ROLE,
         required_staff_count=2,
         min_protector_count=2,
@@ -1120,7 +1118,7 @@ for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
             "撤離成功+5，千萬撤離額外+5。"
             "扣分：撤離失敗-15，老闆擊殺1名幹員-3。"
             "物品判定：小紅1-4格、大紅6格、大大紅9-12格，紅修不算。"
-            "專屬技術陪玩單；兩位接單者皆須為男性護航以上。"
+            "專屬技術陪玩單；兩位接單者皆須為男護／女護／頂護之一。"
         ),
     ))
 
