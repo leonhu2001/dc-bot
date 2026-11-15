@@ -85,3 +85,15 @@ def test_four_delta_buttons_are_owned_by_core_view_not_startup_monkey_patch():
     assert "row=0," in block
     assert "row=0 if index < 3 else 1" not in block
     assert "quick.QuickDeltaEntryView.__init__ =" not in fixes
+
+
+def test_one_life_clear_does_not_need_runtime_rule_or_database_patch():
+    source = (ROOT / "services/__init__.py").read_text(encoding="utf-8")
+    rules = (ROOT / "services/order_rules.py").read_text(encoding="utf-8")
+    catalog = (ROOT / "services/orders.py").read_text(encoding="utf-8")
+    prices = (ROOT / "services/quick_order_v2_price_lists.py").read_text(encoding="utf-8")
+    assert "install_delta_fun_one_life_clear_20261102" not in source
+    assert 'FULL_SOURCE_AUTHORITY_RULE_KEYS = frozenset({"fun_eat_yourself"})' in rules
+    assert '13888' in rules
+    assert '"想吃自己打": "fun_eat_yourself"' in catalog
+    assert '"label": "一命通關"' in prices
