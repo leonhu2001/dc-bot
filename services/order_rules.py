@@ -1989,15 +1989,25 @@ class EffectiveOrderRules(dict):
         base = self._base(key)
         self._refresh_external()
         item = self._override_cache.get(key)
-        if not item or key in FULL_SOURCE_AUTHORITY_RULE_KEYS:
+        payload = (item or {}).get("payload") or {}
+        # Previously approved source policies must continue protecting old
+        # manager overrides already saved before the latest price/qualification
+        # changes. A NEW, authenticated manager publish adds this marker, so
+        # the admin's intentional edits actually take effect in both Bot/Web.
+        # Rollback to an old unmarked version restores the source guard.
+        manager_confirmed = (
+            isinstance(payload, dict)
+            and payload.get("__owner_confirmed_after_canonical") is True
+        )
+        if not item or (key in FULL_SOURCE_AUTHORITY_RULE_KEYS and not manager_confirmed):
             return base
 
         try:
-            rule = build_rule_with_override(base, item.get("payload") or {})
+            rule = build_rule_with_override(base, payload)
 
             # 後來核准的人數結構是程式規則的一部分。舊後台 override 仍可改價、
             # 福利、分類等商務欄位，但不能把已遷移商品重新變回 fixed 單／雙陪。
-            if key in SOURCE_AUTHORITY_RULE_KEYS:
+            if key in SOURCE_AUTHORITY_RULE_KEYS and not manager_confirmed:
                 rule = replace(
                     rule,
                     catalog_group_label=base.catalog_group_label,
@@ -2013,7 +2023,7 @@ class EffectiveOrderRules(dict):
                     player_count_prices=dict(base.player_count_prices),
                     max_specified_count=base.max_specified_count,
                 )
-            if key in PUBLIC_COIN_WASH_PRICE_RULE_KEYS:
+            if key in PUBLIC_COIN_WASH_PRICE_RULE_KEYS and not manager_confirmed:
                 # Owner's price-card prices must not be replaced by an old
                 # manager override on either the Discord or Web checkout.
                 rule = replace(
@@ -2024,7 +2034,7 @@ class EffectiveOrderRules(dict):
                     vip_discount_allowed=False, point_benefits_allowed=False,
                     loyalty_benefits_enabled=False,
                 )
-            if key in APPROVED_GAME_PRICE_RULE_KEYS:
+            if key in APPROVED_GAME_PRICE_RULE_KEYS and not manager_confirmed:
                 # Old database manager overrides can otherwise silently put a
                 # retired price back into Discord and the web storefront even
                 # after the code and public price panel have been updated.
@@ -2034,7 +2044,7 @@ class EffectiveOrderRules(dict):
                     pricing_type=base.pricing_type,
                     unit_label=base.unit_label,
                 )
-            if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+            if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS and not manager_confirmed:
                 # An old manager override may still say allow_specify=False.
                 # The approved protector-or-companion designation policy is canonical.
                 rule = replace(
@@ -2051,7 +2061,7 @@ class EffectiveOrderRules(dict):
                     specify_free_min_units=2,
                     specify_free_basis="quantity",
                 )
-            if key in SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS:
+            if key in SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS and not manager_confirmed:
                 rule = replace(
                     rule,
                     allowed_roles=base.allowed_roles,
