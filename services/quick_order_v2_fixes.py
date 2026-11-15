@@ -232,20 +232,6 @@ def _disable_legacy_ticket_patch() -> None:
         quick._PATCH_INSTALLED = True
 
 
-def _delta_entry_init(self) -> None:
-    discord.ui.View.__init__(self, timeout=None)
-    for emoji, label, category, style in quick._DELTA_BUTTONS:
-        self.add_item(
-            quick.QuickDeltaCategoryButton(
-                emoji=emoji,
-                label=label,
-                category=category,
-                style=style,
-                row=0,
-            )
-        )
-
-
 async def _attach_order_control_view(channel: discord.TextChannel) -> bool:
     """Restore the same customer-service operation row used by legacy order tickets."""
     try:
@@ -382,10 +368,6 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     # Production owns the only active Quick Order ticket UI wrapper. Disable the
     # old core wrapper before install_quick_order_v2 runs immediately after us.
     _disable_legacy_ticket_patch()
-
-    # Discord supports up to five buttons per action row; keep all four Delta
-    # entry buttons on the same row instead of forcing the fourth onto row 2.
-    quick.QuickDeltaEntryView.__init__ = _delta_entry_init
 
     _INSTALLED = True
     print("[quick-order-v2-fix] fixes installed", flush=True)
