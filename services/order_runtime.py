@@ -528,6 +528,35 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         self.channel_id = channel_id
         self.selected_item = selected_item
         data = _require_runtime_state().order_selections.get(channel_id, {})
+        from services.aw_collision_catalog import is_aw_collision_rule
+
+        rule_key = str(data.get("order_rule_key") or "")
+        self._aw_collision_mode = is_aw_collision_rule(rule_key)
+        if self._aw_collision_mode:
+            quantity = data.get("quantity")
+            confirmed = bool(data.get("aw_collision_quantity_confirmed"))
+            description = (
+                f"目前 {int(quantity)} 發｜點擊可重新填寫"
+                if confirmed and quantity is not None
+                else "點擊後輸入要代撞的發數"
+            )
+            super().__init__(
+                placeholder="填寫發數",
+                min_values=1,
+                max_values=1,
+                options=[
+                    discord.SelectOption(
+                        label="發數",
+                        value="aw_collision_quantity_modal",
+                        description=description[:100],
+                    )
+                ],
+                custom_id="self_service_order_quantity_select",
+                row=3,
+                disabled=False,
+            )
+            return
+
         quantity = selected_quantity or 1
 
         if selected_item is None:
@@ -582,6 +611,27 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        if self._aw_collision_mode:
+            from services.aw_collision_catalog import AwCollisionQuantityModal
+
+            state = _require_runtime_state()
+            if not state.can_operate_self_service_order(interaction.user, self.customer_id):
+                await interaction.response.send_message(
+                    "只有開這張票口的用戶或客服可以填寫發數。",
+                    ephemeral=True,
+                )
+                return
+
+            panel_message_id = interaction.message.id if interaction.message is not None else None
+            await interaction.response.send_modal(
+                AwCollisionQuantityModal(
+                    customer_id=self.customer_id,
+                    channel_id=self.channel_id,
+                    panel_message_id=panel_message_id,
+                )
+            )
+            return
+
         if not _require_runtime_state().can_operate_self_service_order(interaction.user, self.customer_id):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單單數。", ephemeral=True)
             return
