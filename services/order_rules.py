@@ -1091,10 +1091,8 @@ for _tier, _price, _guarantee, _weight in _EAT_TO_FAT_PLANS:
     ))
 
 
-# 2026-11-16 趣味單｜我們的愛：固定 2 位男性護航以上。
-# 「頂護」只有統一的身分組，沒有性別識別；為避免女頂護誤接，
-# 這裡以男護身分組作為可驗證的最低資格。男頂護只要同時持有男護
-# 身分組也能接單，不對純頂護推測其性別。
+# 2026-11-16 趣味單｜我們的愛：固定 2 位護航以上。
+# 店主確認男護、女護、頂護皆可接；陪玩身分組不可接。
 _OUR_LOVE_PLANS = (
     ("start_50", 2888, 50, 2088),
     ("start_0", 4888, 0, 3688),
@@ -1106,7 +1104,7 @@ for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
         f"我們的愛｜初始好感度{_start}",
         "fixed",
         _price,
-        allowed_roles=("male_protector",),
+        allowed_roles=PROTECTOR_ROLES,
         required_game_roles=DELTA_DESKTOP_GAME_ROLE,
         required_staff_count=2,
         min_protector_count=2,
@@ -1120,7 +1118,7 @@ for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
             "撤離成功+5，千萬撤離額外+5。"
             "扣分：撤離失敗-15，老闆擊殺1名幹員-3。"
             "物品判定：小紅1-4格、大紅6格、大大紅9-12格，紅修不算。"
-            "專屬技術陪玩單；兩位接單者皆須為男性護航以上。"
+            "專屬技術陪玩單；兩位接單者皆須為男護／女護／頂護之一。"
         ),
     ))
 
@@ -1991,15 +1989,25 @@ class EffectiveOrderRules(dict):
         base = self._base(key)
         self._refresh_external()
         item = self._override_cache.get(key)
-        if not item or key in FULL_SOURCE_AUTHORITY_RULE_KEYS:
+        payload = (item or {}).get("payload") or {}
+        # Previously approved source policies must continue protecting old
+        # manager overrides already saved before the latest price/qualification
+        # changes. A NEW, authenticated manager publish adds this marker, so
+        # the admin's intentional edits actually take effect in both Bot/Web.
+        # Rollback to an old unmarked version restores the source guard.
+        manager_confirmed = (
+            isinstance(payload, dict)
+            and payload.get("__owner_confirmed_after_canonical") is True
+        )
+        if not item or (key in FULL_SOURCE_AUTHORITY_RULE_KEYS and not manager_confirmed):
             return base
 
         try:
-            rule = build_rule_with_override(base, item.get("payload") or {})
+            rule = build_rule_with_override(base, payload)
 
             # 後來核准的人數結構是程式規則的一部分。舊後台 override 仍可改價、
             # 福利、分類等商務欄位，但不能把已遷移商品重新變回 fixed 單／雙陪。
-            if key in SOURCE_AUTHORITY_RULE_KEYS:
+            if key in SOURCE_AUTHORITY_RULE_KEYS and not manager_confirmed:
                 rule = replace(
                     rule,
                     catalog_group_label=base.catalog_group_label,
@@ -2015,7 +2023,7 @@ class EffectiveOrderRules(dict):
                     player_count_prices=dict(base.player_count_prices),
                     max_specified_count=base.max_specified_count,
                 )
-            if key in PUBLIC_COIN_WASH_PRICE_RULE_KEYS:
+            if key in PUBLIC_COIN_WASH_PRICE_RULE_KEYS and not manager_confirmed:
                 # Owner's price-card prices must not be replaced by an old
                 # manager override on either the Discord or Web checkout.
                 rule = replace(
@@ -2026,7 +2034,7 @@ class EffectiveOrderRules(dict):
                     vip_discount_allowed=False, point_benefits_allowed=False,
                     loyalty_benefits_enabled=False,
                 )
-            if key in APPROVED_GAME_PRICE_RULE_KEYS:
+            if key in APPROVED_GAME_PRICE_RULE_KEYS and not manager_confirmed:
                 # Old database manager overrides can otherwise silently put a
                 # retired price back into Discord and the web storefront even
                 # after the code and public price panel have been updated.
@@ -2036,7 +2044,7 @@ class EffectiveOrderRules(dict):
                     pricing_type=base.pricing_type,
                     unit_label=base.unit_label,
                 )
-            if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS:
+            if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS and not manager_confirmed:
                 # An old manager override may still say allow_specify=False.
                 # The approved protector-or-companion designation policy is canonical.
                 rule = replace(
@@ -2053,7 +2061,7 @@ class EffectiveOrderRules(dict):
                     specify_free_min_units=2,
                     specify_free_basis="quantity",
                 )
-            if key in SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS:
+            if key in SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS and not manager_confirmed:
                 rule = replace(
                     rule,
                     allowed_roles=base.allowed_roles,

@@ -15,6 +15,7 @@ from services.order_rules import (
     SOURCE_AUTHORITY_RULE_KEYS,
     FULL_SOURCE_AUTHORITY_RULE_KEYS,
     get_allowed_role_labels,
+    get_base_rule,
 )
 
 
@@ -237,7 +238,7 @@ GROUP_SPECS = [
         "image": "price_lists/delta_fun_our_love.webp",
         "selector_label": "初始好感度",
         "description": (
-            "兩位男性護航以上的專屬技術陪玩單。好感度達100結單；"
+            "兩位護航以上的專屬技術陪玩單（男護／女護／頂護皆可）。好感度達100結單；"
             "摸紅、擊殺與撤離依規則加扣分；紅修不計。"
         ),
         "variants": [
@@ -426,7 +427,12 @@ def _presentation_intro(rule_key: str) -> str:
     # may still contain stale 一命通關 copy attached to 謹言慎行; do not expose
     # its introduction as if it were approved copy for a live product.
     if key in FULL_SOURCE_AUTHORITY_RULE_KEYS:
-        return ""
+        # Only a NEW explicitly published manager version may supersede
+        # source-owned fun copy. Never revive stale 2026-11 intro overrides.
+        active_rule = get_active_override(key)
+        active_payload = (active_rule or {}).get("payload") or {}
+        if active_payload.get("__owner_confirmed_after_canonical") is not True:
+            return ""
 
     try:
         active = get_active_override(key)
@@ -812,18 +818,36 @@ def _current_group_specs() -> list[dict]:
 
         for rule_key, public_label in source_spec.get("variants", []):
             rule = ORDER_RULES.get(str(rule_key))
+            # EffectiveOrderRules already rejects stale overrides for
+            # source-controlled structures. A newly manager-confirmed override
+            # must not be hidden here a SECOND time.
             manager_group_label = (
-                ""
-                if str(rule_key) in SOURCE_AUTHORITY_RULE_KEYS
-                else (
-                    str(getattr(rule, "catalog_group_label", "") or "").strip()
-                    if rule is not None
-                    else ""
-                )
+                str(getattr(rule, "catalog_group_label", "") or "").strip()
+                if rule is not None
+                else ""
             )
 
-            if not manager_group_label:
-                base_variants.append((str(rule_key), str(public_label)))
+            # The admin editor now displays the actual built-in group rather
+            # than a blank input. Publishing the SAME value must not split its
+            # variants into a duplicate card with the same second-level label.
+            if (
+                not manager_group_label
+                or manager_group_label == str(source_spec.get("label") or "")
+            ):
+                # The group name may be unchanged while the owner has renamed
+                # the individual product. Use the new effective label only
+                # when it actually differs from its source-defined name.
+                effective_variant_label = str(public_label)
+                if rule is not None:
+                    try:
+                        base_rule = get_base_rule(str(rule_key))
+                        if str(rule.label) != str(base_rule.label):
+                            effective_variant_label = str(rule.label)
+                    except KeyError:
+                        pass
+                base_variants.append(
+                    (str(rule_key), effective_variant_label)
+                )
                 continue
 
             effective_label = str(

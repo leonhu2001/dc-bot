@@ -33,6 +33,7 @@ from services.game_roles import (
 from services.order_rules import (
     CATEGORY_LABELS,
     ORDER_RULES,
+    AW_COLLISION_PRICING_BY_RULE,
     ROLE_LABELS,
     OrderRule,
     build_custom_rule,
@@ -42,6 +43,7 @@ from services.order_rules import (
     rule_to_override_payload,
 )
 from web.app.services.audit_trail import write_sqlite_audit_log
+from services.orders import get_source_catalog_group_label
 
 
 # main.py imports this router before the public site router. Install the live
@@ -332,8 +334,20 @@ def _presentation_intro_from_store(rule_key: str) -> str:
     return ""
 
 
+def _display_catalog_group_label(rule_key: str, rule: OrderRule) -> str:
+    """Show the effective second column, even for source-backed built-ins.
+
+    The empty stored field means 'use the group defined by the live catalog'.
+    That is NOT an empty second-level classification. Unknown older SKUs remain
+    visibly '未分組' so managers can supply a classification explicitly.
+    """
+    explicit = str(getattr(rule, "catalog_group_label", "") or "").strip()
+    return explicit or get_source_catalog_group_label(str(rule_key)) or "未分組"
+
+
 def _payload_with_presentation(rule_key: str, rule: OrderRule) -> dict:
     payload = rule_to_override_payload(rule)
+    payload["catalog_group_label"] = _display_catalog_group_label(rule_key, rule)
     payload["intro"] = _presentation_intro_from_store(rule_key)
     return payload
 
@@ -361,6 +375,21 @@ def _payload_from_form_base(payload: dict, form) -> dict:
     for field in OPTIONAL_INT_FIELDS:
         raw = str(form.get(field) or "").strip()
         payload[field] = None if raw == "" else _parse_int(raw, field=field)
+
+    # Product pricing can be per-headcount rather than a single rule.price.
+    # Without these fields, "publish succeeded" used to keep every real
+    # one-/two-/three-/four-person checkout price unchanged.
+    current_tiers = dict(payload.get("player_count_prices") or {})
+    if current_tiers:
+        updated_tiers: dict[int, int] = {}
+        for count, original_amount in current_tiers.items():
+            count_int = int(count)
+            field = f"player_count_price_{count_int}"
+            updated_tiers[count_int] = _parse_int(
+                form.get(field, original_amount),
+                field=field,
+            )
+        payload["player_count_prices"] = updated_tiers
 
     raw_required = str(form.get("required_staff_count") or "").strip()
     if raw_required == "player_count":
@@ -427,12 +456,33 @@ def _apply_fun_free_specify_policy(category: str, payload: dict) -> dict:
     return payload
 
 
+def _validate_special_rate_rule_edit(rule_key: str, payload: dict) -> None:
+    # AW per-shot tariffs use their own half-T tiered calculator, not the
+    # generic int price field. Never accept "published" price changes that
+    # would leave actual billing at the old rate, including crafted requests.
+    if str(rule_key) in AW_COLLISION_PRICING_BY_RULE:
+        base_price = int(get_base_rule(str(rule_key)).price)
+        if int(payload.get("price") or 0) != base_price:
+            raise ValueError(
+                "AW代撞採每發級距（含4.5T），不能以一般商品售價欄修改。"
+                "目前每發費率維持原價；本頁仍可調整其他可用規則。"
+            )
+    current_rule = ORDER_RULES.get(str(rule_key))
+    if current_rule is not None and current_rule.player_count_prices:
+        if int(payload.get("price") or 0) != int(current_rule.price):
+            raise ValueError(
+                "這個商品依陪玩人數分別計價，請修改「各人數實際售價」，"
+                "不能只修改不參與計價的基礎售價。"
+            )
+
+
 def _payload_from_form(rule_key: str, form) -> dict:
     current = ORDER_RULES[str(rule_key)]
     payload = _payload_from_form_base(
         _payload_with_presentation(str(rule_key), current),
         form,
     )
+    _validate_special_rate_rule_edit(str(rule_key), payload)
     return _apply_fun_free_specify_policy(str(current.category), payload)
 
 
@@ -479,9 +529,7 @@ def _rule_row(key: str) -> dict:
         "key": key,
         "category": rule.category,
         "category_label": CATEGORY_LABELS.get(rule.category, rule.category),
-        "catalog_group_label": str(
-            getattr(rule, "catalog_group_label", "") or ""
-        ),
+        "catalog_group_label": _display_catalog_group_label(key, rule),
         "label": rule.label,
         "price": int(rule.price or 0),
         "pricing_type": rule.pricing_type,
@@ -826,6 +874,7 @@ async def admin_order_rule_publish(
         if not isinstance(payload, dict):
             raise ValueError("規則預覽資料格式錯誤。")
 
+        _validate_special_rate_rule_edit(rule_key, payload)
         rule = preview_rule_override(rule_key, payload)
         before_payload = _payload_with_presentation(
             rule_key,
@@ -833,6 +882,10 @@ async def admin_order_rule_publish(
         )
         published_payload = rule_to_override_payload(rule)
         published_payload["intro"] = str(payload.get("intro") or "").strip()
+        # New publishes are explicit manager approvals. A versioned marker
+        # allows intentional edits to override legacy source-authority guards
+        # while OLD unmarked VPS overrides remain safely ignored.
+        published_payload["__owner_confirmed_after_canonical"] = True
 
         result = publish_rule_override(
             rule_key=rule_key,
@@ -891,6 +944,7 @@ async def admin_order_rule_rollback(
         if target is None:
             raise ValueError("找不到可回復的版本。")
 
+        _validate_special_rate_rule_edit(rule_key, target["payload"])
         preview_rule_override(rule_key, target["payload"])
         before_payload = _payload_with_presentation(
             rule_key,

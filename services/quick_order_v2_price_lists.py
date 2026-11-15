@@ -370,7 +370,7 @@ DELTA_FUN_PRICE_LISTS = {
     "our_love": {
         "label": "我們的愛",
         "image": "price_lists/delta_fun_our_love.webp",
-        "text": f"""**我們的愛｜固定 2 位男性護航以上**
+        "text": f"""**我們的愛｜固定 2 位護航以上**
 {_aligned_code_block((
     ("初始好感度50", f"{_approved_fun_price('fun_our_love_start_50')}｜保 2088W"),
     ("初始好感度0", f"{_approved_fun_price('fun_our_love_start_0')}｜保 3688W"),
@@ -395,7 +395,7 @@ DELTA_FUN_PRICE_LISTS = {
 小紅 **1～4 格**｜大紅 **6 格**｜大大紅 **9～12 格**。
 **紅修不算**。
 
-🎮 專屬技術陪玩單，需 **2 位男性護航以上** 接單。""",
+🎮 專屬技術陪玩單，需 **2 位護航以上（男護、女護、頂護皆可）** 接單。""",
     },
     "rich_enough": {
         "label": "豪到你了嗎",
@@ -849,11 +849,57 @@ def _delta_farm_embed(plan_key: str) -> discord.Embed:
     return embed
 
 
+_LIVE_FUN_PRICE_RULES = {
+    "eat_to_fat": (
+        ("fun_eat_to_fat_10kg", 2888),
+        ("fun_eat_to_fat_20kg", 3988),
+        ("fun_eat_to_fat_35kg", 6888),
+        ("fun_eat_to_fat_50kg", 12888),
+        ("fun_eat_to_fat_100kg", 26888),
+    ),
+    "our_love": (
+        ("fun_our_love_start_50", 2888),
+        ("fun_our_love_start_0", 4888),
+    ),
+}
+
+
+def _live_delta_fun_price_text(plan_key: str) -> str:
+    """Keep the Discord price list synced with manager-approved live rules.
+
+    Uploaded original posters remain archival artwork. The live text next to
+    each image is authoritative whenever an owner publishes a new price.
+    """
+    plan = DELTA_FUN_PRICE_LISTS[plan_key]
+    text = str(plan["text"])
+    if plan_key not in _LIVE_FUN_PRICE_RULES:
+        return text
+    from services.order_rules import ORDER_RULES
+
+    changed = False
+    for rule_key, original_amount in _LIVE_FUN_PRICE_RULES[plan_key]:
+        current = ORDER_RULES.get(rule_key)
+        if current is None:
+            continue
+        amount = int(current.price)
+        if amount != original_amount:
+            text = text.replace(
+                f"{original_amount:,}T", f"{amount:,}T", 1,
+            )
+            changed = True
+    if changed:
+        text += (
+            "\n\n⚠️ 目前價格已由總管更新，請以以上即時售價與結帳試算為準；"
+            "下方原始價目表圖片僅供玩法參考。"
+        )
+    return text
+
+
 def _delta_fun_embed(plan_key: str) -> discord.Embed:
     plan = DELTA_FUN_PRICE_LISTS[plan_key]
     embed = discord.Embed(
         title=f"📋 三角洲行動・趣味單・{plan['label']}",
-        description=str(plan["text"]),
+        description=_live_delta_fun_price_text(plan_key),
         color=discord.Color.blurple(),
     )
     image = str(plan.get("image") or "").strip()

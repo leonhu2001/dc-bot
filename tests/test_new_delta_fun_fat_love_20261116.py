@@ -9,6 +9,7 @@ from services import order_rules
 from services import quick_order_v2_price_lists as price_lists
 from services.order_rules import (
     ALL_RECEIVER_ROLES,
+    PROTECTOR_ROLES,
     DELTA_DESKTOP_GAME_ROLE,
     FULL_SOURCE_AUTHORITY_RULE_KEYS,
     calculate_price,
@@ -58,7 +59,7 @@ def test_eat_to_fat_exact_picture_prices_and_two_companions(
 
 
 @pytest.mark.parametrize("key,price,start,guarantee", LOVE)
-def test_our_love_exact_picture_prices_two_male_protectors_and_score(
+def test_our_love_exact_picture_prices_two_any_protectors_and_score(
     key, price, start, guarantee,
 ):
     rule = get_base_rule(key)
@@ -66,11 +67,13 @@ def test_our_love_exact_picture_prices_two_male_protectors_and_score(
     assert rule.label == f"我們的愛｜初始好感度{start}"
     assert rule.price == price
     assert rule.pricing_type == "fixed"
-    assert rule.allowed_roles == ("male_protector",)
+    assert rule.allowed_roles == PROTECTOR_ROLES
     assert rule.min_protector_count == 2
     assert rule.required_game_roles == DELTA_DESKTOP_GAME_ROLE
     assert get_required_staff_count(rule) == 2
-    assert get_allowed_role_ids(rule) == [order_rules.ROLE_IDS["male_protector"]]
+    assert get_allowed_role_ids(rule) == [
+        order_rules.ROLE_IDS[key] for key in PROTECTOR_ROLES
+    ]
     assert rule.min_quantity == rule.max_quantity == 1
     assert calculate_price(rule, quantity=1).total_amount == price
     assert f"初始好感度{start}" in rule.note
