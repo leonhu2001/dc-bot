@@ -93,25 +93,18 @@ def test_season_3x3_image_is_in_deployed_public_panel_assets() -> None:
     assert "web/app/static/order_panels" in script
 
 
-def test_delta_farm_category_opens_second_level_selector() -> None:
-    category_embed = price_lists._delta_category_embed("farm")
-    assert category_embed.description == "請選擇要查看的單子。"
-
-    view = price_lists.DeltaPriceListView(category="farm")
-    assert any(
-        isinstance(child, price_lists.DeltaFarmPriceListSelect)
-        for child in view.children
-    )
-
-    selector = next(
-        child
-        for child in view.children
-        if isinstance(child, price_lists.DeltaFarmPriceListSelect)
-    )
-    assert selector.custom_id == "quick_order_v2_delta_farm_price_list"
-    assert [option.label for option in selector.options] == [
-        "AW子彈代撞",
-        "守夜人口風琴",
-        "代解部門任務",
-        "3×3安全箱",
+def test_delta_farm_prices_remain_approved_but_category_is_not_in_price_list_ui() -> None:
+    assert [c[0] for c in price_lists.DELTA_PRICE_LIST_CATEGORIES] == [
+        "desktop", "mobile", "fun"
     ]
+    category_view = price_lists.DeltaPriceListView()
+    assert [item.value for item in category_view.children[0].options] == [
+        "desktop", "mobile", "fun"
+    ]
+    # Even a stale private farm category selection cannot regenerate its
+    # retired second-level picker. Data and actual ordering are untouched.
+    assert not any(
+        isinstance(child, price_lists.DeltaFarmPriceListSelect)
+        for child in price_lists.DeltaPriceListView(category="farm").children
+    )
+    assert len(price_lists.DELTA_FARM_PRICE_LISTS) == 4
