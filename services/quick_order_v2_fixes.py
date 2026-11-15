@@ -363,8 +363,9 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     # Public entry and ticket detail lookup use one resolver. Built-in 3x3 is
     # explicitly kept as one service with five schemes.
     _install_canonical_group_resolver()
-    quick._groups = _live_groups
 
+    # _groups() calls _live_groups() directly once the resolver is ready.
+    # Do not replace the Quick Order module's function at runtime.
     # Production owns the only active Quick Order ticket UI wrapper. Disable the
     # old core wrapper before install_quick_order_v2 runs immediately after us.
     _disable_legacy_ticket_patch()
