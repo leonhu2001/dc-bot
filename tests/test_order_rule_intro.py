@@ -58,10 +58,10 @@ def test_catalog_exposes_intro_without_replacing_card_note(
         lambda: db_file,
     )
 
-    key = "fun_read_no_reply"
+    key = "fun_rich_enough"
     payload = rule_to_override_payload(get_base_rule(key))
-    payload["label"] = "一命通關"
-    payload["catalog_group_label"] = "一命通關"
+    payload["label"] = "測試趣味挑戰"
+    payload["catalog_group_label"] = "測試趣味挑戰"
     payload["note"] = "五撤挑戰"
     payload["intro"] = "需連撤五把\n且都要吃 1000w"
 
@@ -76,7 +76,7 @@ def test_catalog_exposes_intro_without_replacing_card_note(
     invalidate_rule_override_cache()
 
     groups = get_grouped_order_catalog("delta_desktop_fun")
-    group = next(item for item in groups if item["label"] == "一命通關")
+    group = next(item for item in groups if item["label"] == "測試趣味挑戰")
     variant = next(
         item
         for item in group["variants"]
