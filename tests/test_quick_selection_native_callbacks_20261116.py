@@ -101,7 +101,7 @@ def test_four_callbacks_remain_in_canonical_module_and_no_runtime_reassignment()
         assert cls.callback.__module__ == "services.order_runtime"
 
     for action in ("category", "item", "detail", "quantity"):
-        assert f'record_quick_order_select_action("{action}", self, interaction)' in source
+        assert f'mark("{action}", self, interaction)' in source
 
     assert "def _install_selection_markers" not in helper
     assert "_ORIGINAL_QUANTITY_CALLBACK" not in helper
