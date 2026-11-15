@@ -27,14 +27,50 @@ format_customer_notes_for_ticket: Callable[[int], str] | None = None
 order_control_view_factory: Callable[[], discord.ui.View] | None = None
 
 
-def build_main_panel_embed() -> discord.Embed:
+# Owner-approved public service lobby. These IDs are the five existing public
+# Quick Order entry channels; do not point visitors at retired price-list buttons.
+SERVICE_LOBBY_GAME_CHANNELS = (
+    ("三角洲", 1562940108246753331),
+    ("特戰英豪", 1562940127976890509),
+    ("英雄聯盟", 1562940161313087498),
+    ("Steam 遊戲", 1562940249171042415),
+    ("APEX", 1562940146632888450),
+)
+SERVICE_LOBBY_ORDER_NOTICE_CHANNEL_ID = 1543738337519730768
+
+
+def build_main_panel_embed(
+    *, price_list_channel_id: int | None = None
+) -> discord.Embed:
+    """Build new service-lobby copy; never auto-overwrite the approved live post.
+
+    The price-list channel is resolved from the server when the owner runs the
+    one-time update. Without a verified channel ID, avoid inventing a mention.
+    """
+    price_list = (
+        f"<#{int(price_list_channel_id)}>"
+        if price_list_channel_id
+        else "請至伺服器的「價目表」頻道查看"
+    )
+    lines = [
+        "歡迎來到魔丸娛樂！",
+        "下單前可以先查看價目表，也可以直接前往各遊戲下單區。",
+        "",
+        "📌 **下單前先看**",
+        f"價目表：{price_list}",
+        f"下單須知：<#{SERVICE_LOBBY_ORDER_NOTICE_CHANNEL_ID}>",
+        "",
+        "🎮 **各遊戲下單區**",
+        *(f"{name}：<#{channel_id}>" for name, channel_id in SERVICE_LOBBY_GAME_CHANNELS),
+        "",
+        "**需要真人客服協助嗎？**",
+        "請按下方 **呼叫客服**，系統會建立／開啟你的私人客服票口並通知客服。",
+        "",
+        "客服服務時間：**AM 10:00－隔日 AM 2:00**",
+    ]
     return discord.Embed(
         title="魔丸娛樂｜聯絡客服",
-        description=(
-            "歡迎來到魔丸娛樂，請選擇下方需要的服務。\n"
-            "需要真人客服時可按 **🔔 呼叫客服**，系統會建立 / 開啟你的私人客服票口並通知客服。\n"
-            "客服服務時間：**AM 10:00－隔日 AM 2:00**"
-        ),
+        description="\n".join(lines),
         color=discord.Color.purple(),
     )
 
@@ -333,7 +369,6 @@ class MainPanelView(discord.ui.View):
 
     @discord.ui.button(
         label="呼叫客服",
-        emoji="🔔",
         style=discord.ButtonStyle.primary,
         custom_id="mawan_main_panel_support_call_v1",
         row=0,
@@ -343,7 +378,6 @@ class MainPanelView(discord.ui.View):
 
     @discord.ui.button(
         label="我要入職",
-        emoji="💼",
         style=discord.ButtonStyle.success,
         custom_id="mawan_main_panel_recruit_button",
         row=0,
@@ -353,7 +387,6 @@ class MainPanelView(discord.ui.View):
 
     @discord.ui.button(
         label="我要客訴",
-        emoji="⚠️",
         style=discord.ButtonStyle.danger,
         custom_id="mawan_main_panel_complaint_button",
         row=0,
@@ -363,7 +396,6 @@ class MainPanelView(discord.ui.View):
 
     @discord.ui.button(
         label="顧客意見",
-        emoji="💬",
         style=discord.ButtonStyle.secondary,
         custom_id="mawan_main_panel_feedback_button",
         row=0,
