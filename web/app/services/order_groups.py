@@ -237,7 +237,7 @@ GROUP_SPECS = [
         "image": "price_lists/delta_fun_our_love.webp",
         "selector_label": "初始好感度",
         "description": (
-            "兩位男性護航以上的專屬技術陪玩單。好感度達100結單；"
+            "兩位護航以上的專屬技術陪玩單（男護／女護／頂護皆可）。好感度達100結單；"
             "摸紅、擊殺與撤離依規則加扣分；紅修不計。"
         ),
         "variants": [
