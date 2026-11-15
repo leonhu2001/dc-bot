@@ -340,3 +340,77 @@ def test_product_change_clears_stale_vip_timer_draft_flags():
 
     assert "vip_timer_order" not in data
     assert "vip_timer_source_category" not in data
+
+
+def test_native_timer_roster_detection_rejects_stale_session_without_timer_identity(
+    tmp_path, monkeypatch,
+):
+    from services import vip_timer_roster_payout as roster
+
+    _, Local = _db(tmp_path, monkeypatch)
+    _add_order(
+        Local,
+        order_id=267,
+        category="通用單",
+        item="甜蜜雙陪",
+    )
+    db = Local()
+    try:
+        assert roster._is_timer_order(267, db) is False
+        assert _timer_row_count(Local, "vip_timer_sessions", 267) == 1
+    finally:
+        db.close()
+
+
+def test_web_order_delete_is_committed_even_when_timer_cleanup_fails(
+    tmp_path, monkeypatch,
+):
+    from services import loyalty_benefits, vip_monthly_benefits
+
+    _, Local = _db(tmp_path, monkeypatch)
+    _add_order(
+        Local,
+        order_id=268,
+        ticket_channel_id="ticket-268",
+        category="VIP 自由計時",
+        item="自由計時｜甜蜜雙陪",
+        note="VIP_TIMER｜initial_rule=basic_sweet_double_any｜先玩後付",
+    )
+    monkeypatch.setattr(loyalty_benefits, "release_coupon_for_order", lambda order_id: None)
+    monkeypatch.setattr(
+        vip_monthly_benefits,
+        "release_cash_benefits_for_channel",
+        lambda ticket_channel_id: None,
+    )
+
+    def fail_cleanup(order_id):
+        raise RuntimeError("busy")
+
+    monkeypatch.setattr(integrity, "delete_vip_timer_rows", fail_cleanup)
+    assert web_order_sync.delete_web_order_by_ticket_channel(
+        ticket_channel_id="ticket-268",
+    ) is True
+    db = Local()
+    try:
+        assert db.get(WebOrder, 268) is None
+    finally:
+        db.close()
+    # A deferred timer row never resurrects the deleted order or causes the
+    # deletion API to falsely report failure; explicit repair remains available.
+    assert _timer_row_count(Local, "vip_timer_sessions", 268) == 1
+
+
+def test_vip_timer_business_invariants_have_no_startup_function_rebinding() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    init = (root / "services" / "__init__.py").read_text(encoding="utf-8")
+    timer = (root / "services" / "vip_timer_integrity.py").read_text(encoding="utf-8")
+    web = (root / "shared" / "web_order_sync.py").read_text(encoding="utf-8")
+    roster = (root / "services" / "vip_timer_roster_payout.py").read_text(encoding="utf-8")
+
+    assert "_install_vip_timer_integrity_guard()" not in init
+    assert "web_order_sync.delete_web_order_by_ticket_channel =" not in timer
+    assert "vip_timer_roster_payout._is_timer_order =" not in timer
+    assert "delete_vip_timer_rows(order_id)" in web
+    assert "is_canonical_vip_timer_order(int(order_id), db)" in roster
