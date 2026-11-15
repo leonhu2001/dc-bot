@@ -365,6 +365,33 @@ def rule_to_override_payload(rule: OrderRule) -> dict[str, Any]:
     return payload
 
 
+def enforce_delta_fun_free_specify(rule: OrderRule) -> OrderRule:
+    """Canonical policy for every active Delta desktop fun order.
+
+    Every fun order can designate eligible staff, without a surcharge. This is
+    applied to source rules, manager-created rules and DB overrides; it does NOT
+    broaden staff eligibility, change paid prices, or relax headcount rules.
+    """
+    if str(rule.category) != "delta_desktop_fun":
+        return rule
+
+    staff_count = (
+        int(rule.max_player_count or rule.min_player_count or 1)
+        if rule.required_staff_count == "player_count"
+        else int(rule.required_staff_count)
+    )
+    staff_count = max(1, staff_count)
+    return replace(
+        rule,
+        allow_specify=True,
+        max_specified_count=staff_count,
+        specify_fee_default=0,
+        specify_fee_by_role={role: 0 for role in rule.allowed_roles},
+        specify_fee_by_game_role={role: 0 for role in rule.allowed_game_roles},
+        specify_free_min_units=None,
+    )
+
+
 def build_rule_with_override(
     base_rule: OrderRule,
     payload: dict[str, Any] | None,
@@ -406,7 +433,7 @@ def build_rule_with_override(
             staff_adjustments={},
             staff_adjustment_labels={},
         )
-    return rule
+    return enforce_delta_fun_free_specify(rule)
 
 
 def build_custom_rule(
@@ -620,7 +647,9 @@ ORDER_RULES: dict[str, OrderRule] = {}
 def _add(rule: OrderRule) -> None:
     if rule.key in ORDER_RULES:
         raise RuntimeError(f"duplicated order rule key: {rule.key}")
-    ORDER_RULES[rule.key] = rule
+    # This applies to ALL source-defined fun SKUs, including future additions,
+    # not just selected rule keys that happen to be in today's catalog.
+    ORDER_RULES[rule.key] = enforce_delta_fun_free_specify(rule)
 
 
 # ========= 基礎單 =========
@@ -2078,6 +2107,7 @@ class EffectiveOrderRules(dict):
             if SWEET_COMPANION_ROLE_KEY in tuple(base.required_roles):
                 rule = replace(rule, required_roles=base.required_roles)
 
+            rule = enforce_delta_fun_free_specify(rule)
             validate_rule_definition(key, rule)
             return rule
         except Exception:
