@@ -186,9 +186,9 @@ GROUP_SPECS = [
     {
         "key": "read_no_reply",
         "category": "delta_desktop_fun",
-        "label": "已讀亂回",
+        "label": "謹言慎行",
         "variants": [
-            ("fun_read_no_reply", "已讀亂回"),
+            ("fun_read_no_reply", "謹言慎行"),
         ],
     },
 
