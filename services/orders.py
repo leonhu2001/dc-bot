@@ -507,11 +507,9 @@ def _effective_builtin_group_label(rule, fallback: str) -> str:
     # 舊 manager catalog_group_label 不能再把它們合併、改名或重新帶回
     # 單陪／雙陪；自訂商品仍照後台分組設定運作。
     rule_key = str(getattr(rule, "key", "") or "") if rule is not None else ""
-    if rule_key in CANONICAL_DETAIL_LABEL_RULE_KEYS or rule_key in PUBLIC_COIN_WASH_PRICE_RULE_KEYS:
-        # These ten live wash products must use the owner-approved group
-        # name even if a saved admin override still says 對外洗幣.
-        return str(fallback)
-
+    # SourceAuthority is already enforced by EffectiveOrderRules: stale
+    # unmarked manager overrides do not reach this helper. New manager-approved
+    # versions are effective and must be allowed to rename the second column.
     manager_label = str(
         getattr(rule, "catalog_group_label", "")
         or ""
@@ -572,6 +570,31 @@ ORDER_ITEM_GROUPS_BY_CATEGORY = DynamicOrderItemGroups({
     category: [group["label"] for group in groups]
     for category, groups in SELF_SERVICE_ORDER_CATALOG.items()
 })
+
+
+def get_source_catalog_group_label(rule_key: str) -> str:
+    """Return the built-in second-level label shown by the live DC catalog.
+
+    The underlying OrderRule.catalog_group_label is intentionally empty for most
+    built-ins, meaning *use the catalog's second column*, not 'no group'.
+    Admin editors must show that actual effective group rather than a blank.
+    """
+    key = str(rule_key or "").strip()
+    if not key:
+        return ""
+
+    # Prioritize customer-facing categories; historical mirrors 'basic'/'fun'
+    # can contain the same key, but should not supply a retired grouping.
+    categories = (
+        *SELF_SERVICE_ACTIVE_CATEGORIES,
+        *(item for item in SELF_SERVICE_ORDER_CATALOG if item not in SELF_SERVICE_ACTIVE_CATEGORIES),
+    )
+    for category in categories:
+        for group in SELF_SERVICE_ORDER_CATALOG.get(category, []):
+            if any(str(d.get("rule_key") or "") == key for d in group.get("details", [])):
+                return str(group.get("label") or "").strip()
+
+    return ""
 
 
 def get_order_item_group_label(item_label: str | None) -> str | None:
