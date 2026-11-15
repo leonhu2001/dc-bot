@@ -175,6 +175,13 @@ def test_admin_real_headcount_price_fields_update_checkout_totals(monkeypatch):
         ("min_protector_count", str(base.min_protector_count)),
         ("specify_fee_default", str(base.specify_fee_default)),
     ]
+    for flag in admin_order_rules.BOOL_FIELDS:
+        if bool(getattr(base, flag, False)):
+            rows.append((flag, "on"))
+    for field in admin_order_rules.OPTIONAL_INT_FIELDS:
+        value = getattr(base, field, None)
+        if value is not None:
+            rows.append((field, str(value)))
     for role in base.allowed_roles:
         rows.append(("allowed_roles", role))
     for role in base.allowed_game_roles:
@@ -219,7 +226,9 @@ def test_website_and_discord_fun_list_use_live_post_publish_pricing(monkeypatch)
     assert ORDER_RULES[key].price == 3997
     embed = price_lists._delta_fun_embed("eat_to_fat")
     assert "3,997T" in embed.description
-    assert "2,888T" not in embed.description
+    import re
+    assert re.search(r"10KG紅\s+3,997T", embed.description)
+    assert re.search(r"10KG紅\s+2,888T", embed.description) is None
     assert "原始價目表圖片僅供玩法參考" in embed.description
 
 
