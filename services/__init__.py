@@ -89,14 +89,9 @@ from .benefit_runtime_integration import install_root_benefit_integrations as _i
 
 _install_benefits()
 
-# 2026-11-03 owner correction: VIP monthly cash vouchers are paid entirely by the
-# store. Keep ordinary fixed discounts and point-cash funding unchanged; only the
-# explicit VIP monthly cash amount is restored to the worker payout basis.
-from .vip_monthly_store_funding_policy_20261103 import (
-    install_vip_monthly_store_funding_policy_20261103 as _install_vip_monthly_store_funding_policy_20261103,
-)
-
-_install_vip_monthly_store_funding_policy_20261103()
+# VIP monthly cash vouchers remain fully store-funded. The canonical
+# self_service_financials.calculate_self_service_financials function now calls
+# that funding policy directly, instead of installing a startup finance wrapper.
 
 # User-facing checkout copy must describe the same funding policy as the actual
 # payroll calculation. Install after benefit integration so wrappers see the
