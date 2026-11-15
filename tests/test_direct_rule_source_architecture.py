@@ -97,3 +97,12 @@ def test_one_life_clear_does_not_need_runtime_rule_or_database_patch():
     assert '13888' in rules
     assert '"想吃自己打": "fun_eat_yourself"' in catalog
     assert '"label": "一命通關"' in prices
+
+
+def test_vip_monthly_store_funding_is_called_by_core_financials_without_wrapper():
+    init = (ROOT / "services/__init__.py").read_text(encoding="utf-8")
+    finance = (ROOT / "services/self_service_financials.py").read_text(encoding="utf-8")
+    policy = (ROOT / "services/vip_monthly_store_funding_policy_20261103.py").read_text(encoding="utf-8")
+    assert "install_vip_monthly_store_funding_policy_20261103" not in init
+    assert "return apply_vip_monthly_store_funding(apply_urgent_fee(rule, data, financials))" in finance
+    assert "self_service_financials.calculate_self_service_financials =" not in policy
