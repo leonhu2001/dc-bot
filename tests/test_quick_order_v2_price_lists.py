@@ -13,19 +13,22 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "services" / "quick_order_v2_price_lists.py"
 
 
-def test_delta_price_list_keeps_four_top_level_categories() -> None:
+def test_delta_price_list_keeps_only_three_owner_approved_top_level_categories() -> None:
     assert [item[0] for item in price_lists.DELTA_PRICE_LIST_CATEGORIES] == [
         "desktop",
         "mobile",
-        "farm",
         "fun",
     ]
     assert [item[1] for item in price_lists.DELTA_PRICE_LIST_CATEGORIES] == [
         "端遊",
         "手遊",
-        "代肝代解",
         "趣味單",
     ]
+
+    # This is a price-list UI change, not a removal of farm ordering.
+    assert "farm" not in [o.value for o in price_lists.DeltaPriceListCategorySelect().options]
+    assert len(price_lists.DeltaPriceListView(category="farm").children) == 1
+    assert "farm" in [category for _, _, category, _ in quick._DELTA_BUTTONS]
 
 
 
@@ -182,52 +185,37 @@ def test_game_price_list_preserves_category_prices_and_rules() -> None:
     assert all("教學單" not in p for p in steam.values())
 
 
-def test_non_delta_button_opens_private_dropdown_then_switches_selected_page() -> None:
+def test_non_delta_buttons_are_retired_but_legacy_price_copy_is_preserved() -> None:
     class Response:
         def __init__(self) -> None:
-            self.deferred: list[dict] = []
+            self.messages: list[dict] = []
 
-        async def defer(self, **kwargs) -> None:
-            self.deferred.append(kwargs)
+        async def send_message(self, content: str, **kwargs) -> None:
+            self.messages.append({"content": content, **kwargs})
 
     class Interaction:
         def __init__(self) -> None:
-            self.guild = None
             self.response = Response()
-            self.messages: list[dict] = []
-
-        async def edit_original_response(self, **kwargs) -> None:
-            self.messages.append(kwargs)
 
     async def verify() -> None:
         for game in ("apex", "lol", "valorant", "steam"):
             channel_id = int(quick.QUICK_ORDER_V2_CHANNELS[game])
-            interaction = Interaction()
-            button = price_lists.QuickPriceListButton(channel_id)
-    
-            await button.callback(interaction)
-            assert interaction.response.deferred == [{"ephemeral": True, "thinking": True}]
-            assert len(interaction.messages) == 1
-            root = interaction.messages[0]
-            assert "請選擇" in root["embed"].description
-            view = root["view"]
-            assert isinstance(view, price_lists.GamePriceListView)
-            assert len(view.children[0].options) == (2 if game == "steam" else 4)
-    
-            key = "sweet" if game == "steam" else "technical"
-            select = view.children[0]
-            select._values = [key]
-            await select.callback(interaction)
-            assert interaction.response.deferred[-1] == {}
-            displayed = interaction.messages[-1]
-            assert isinstance(displayed["view"], price_lists.GamePriceListView)
-            assert displayed["embed"].description == (
-                price_lists._game_price_list_sections(interaction, channel_id)[key]
+            assert price_lists.has_price_list(channel_id) is False
+            assert not any(
+                "price_list" in str(getattr(child, "custom_id", "") or "")
+                for child in price_lists.add_price_list_control(
+                    quick.QuickGameEntryView(category=game, source_channel_id=channel_id), channel_id
+                ).children
             )
-            assert [o.value for o in displayed["view"].children[0].options if o.default] == [key]
+            # A stale old component must not reactivate the removed price menu.
+            interaction = Interaction()
+            await price_lists.QuickPriceListButton(channel_id).callback(interaction)
+            assert interaction.response.messages == [{
+                "content": "此入口已移除「查看價目表」，請從下單選單選擇服務。",
+                "ephemeral": True,
+            }]
 
     asyncio.run(verify())
-
 
 def test_game_price_list_keeps_selected_option_checked() -> None:
     for game in ("valorant", "lol", "apex"):
@@ -259,14 +247,13 @@ def test_shared_special_offers_follow_existing_game_price_lists() -> None:
     assert len(steam) <= 4096
 
 
-def test_public_price_list_acks_before_loading_content() -> None:
+def test_only_delta_public_price_list_acks_and_opens_current_category_selector() -> None:
     source = SOURCE.read_text(encoding="utf-8")
     callback = source.split("class QuickPriceListButton(", 1)[1]
     assert "await interaction.response.defer(ephemeral=True, thinking=True)" in callback
-    assert "await interaction.edit_original_response(" in callback
-    assert callback.index("await interaction.response.defer(") < callback.index("_game_root_embed(")
-    assert "view=GamePriceListView(self.source_channel_id)" in callback
-
+    assert "view=DeltaPriceListView()" in callback
+    assert "view=GamePriceListView(self.source_channel_id)" not in callback
+    assert 'self.source_channel_id != int(quick.QUICK_ORDER_V2_CHANNELS["delta"])' in callback
 
 def test_delta_mobile_price_list_has_only_approved_seven_order_types() -> None:
     labels = [
@@ -364,6 +351,10 @@ def test_delta_price_list_button_routes_to_selector_without_changing_other_games
     delta_channel = int(quick.QUICK_ORDER_V2_CHANNELS["delta"])
 
     assert price_lists.has_price_list(delta_channel)
+    assert all(
+        not price_lists.has_price_list(quick.QUICK_ORDER_V2_CHANNELS[game])
+        for game in ("valorant", "lol", "apex", "steam")
+    )
     assert "DeltaPriceListCategorySelect" in source
     assert "DeltaDesktopPriceListSelect" in source
     assert 'custom_id="quick_order_v2_delta_desktop_price_list"' in source

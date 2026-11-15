@@ -150,11 +150,13 @@ def _public_view_for_channel(channel_id: int) -> discord.ui.View:
         return quick.QuickVipEntryView()
 
     category, _ = quick._GAME_ENTRY_META[channel_id]
-    view = quick.QuickGameEntryView(
+    # The owner removed public "查看價目表" from VALORANT/LoL/APEX/STEAM.
+    # Build the actual game entry view without adding a price-list button here,
+    # so future changes to legacy pricing helpers cannot re-enable it.
+    return quick.QuickGameEntryView(
         category=category,
         source_channel_id=channel_id,
     )
-    return add_price_list_control(view, channel_id)
 
 
 async def _clean_ensure_panel(bot: commands.Bot, channel_id: int) -> None:

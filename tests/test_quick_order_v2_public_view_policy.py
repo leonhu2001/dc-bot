@@ -36,13 +36,31 @@ def test_delta_public_view_is_final_on_first_build() -> None:
     assert {getattr(child, "row", None) for child in delta_buttons} == {0}
 
 
-def test_game_public_view_contains_service_and_price_list_without_factory_patch() -> None:
-    channel_id = quick.QUICK_ORDER_V2_CHANNELS["apex"]
-    view = production._public_view_for_channel(channel_id)
-    custom_ids = _custom_ids(view)
+def test_all_four_game_public_views_keep_order_selector_but_remove_price_list() -> None:
+    for game in ("valorant", "lol", "apex", "steam"):
+        channel_id = quick.QUICK_ORDER_V2_CHANNELS[game]
+        view = production._public_view_for_channel(channel_id)
+        custom_ids = _custom_ids(view)
 
-    assert "quick_order_v2_service_apex" in custom_ids
-    assert f"quick_order_v2_price_list_{channel_id}" in custom_ids
+        assert f"quick_order_v2_service_{game}" in custom_ids
+        assert f"quick_order_v2_price_list_{channel_id}" not in custom_ids
+        assert not any("price_list" in custom_id for custom_id in custom_ids)
+
+
+def test_canonical_public_panel_sync_replaces_old_view_with_current_buttons() -> None:
+    source = PRODUCTION_SOURCE.read_text(encoding="utf-8")
+
+    # Old Discord panels with price-list buttons must be updated on Bot
+    # restart, not merely be absent from newly created view objects.
+    assert "view = _public_view_for_channel(channel_id)" in source
+    assert "await target.edit(" in source
+    assert "view=view" in source
+    for game in ("valorant", "lol", "apex", "steam"):
+        channel_id = quick.QUICK_ORDER_V2_CHANNELS[game]
+        view = production._public_view_for_channel(channel_id)
+        assert len(view.children) == 1
+        assert "service" in str(view.children[0].custom_id)
+        assert "price_list" not in str(view.children[0].custom_id)
 
 
 def test_static_panel_artwork_mapping_stays_in_helper_module() -> None:
