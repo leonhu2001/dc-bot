@@ -370,7 +370,7 @@ DELTA_FUN_PRICE_LISTS = {
     "our_love": {
         "label": "我們的愛",
         "image": "price_lists/delta_fun_our_love.webp",
-        "text": f"""**我們的愛｜固定 2 位男性護航以上**
+        "text": f"""**我們的愛｜固定 2 位護航以上**
 {_aligned_code_block((
     ("初始好感度50", f"{_approved_fun_price('fun_our_love_start_50')}｜保 2088W"),
     ("初始好感度0", f"{_approved_fun_price('fun_our_love_start_0')}｜保 3688W"),
@@ -395,7 +395,7 @@ DELTA_FUN_PRICE_LISTS = {
 小紅 **1～4 格**｜大紅 **6 格**｜大大紅 **9～12 格**。
 **紅修不算**。
 
-🎮 專屬技術陪玩單，需 **2 位男性護航以上** 接單。""",
+🎮 專屬技術陪玩單，需 **2 位護航以上（男護、女護、頂護皆可）** 接單。""",
     },
     "rich_enough": {
         "label": "豪到你了嗎",
