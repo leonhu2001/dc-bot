@@ -28,7 +28,7 @@ def test_delta_price_list_keeps_only_three_owner_approved_top_level_categories()
     # This is a price-list UI change, not a removal of farm ordering.
     assert "farm" not in [o.value for o in price_lists.DeltaPriceListCategorySelect().options]
     assert len(price_lists.DeltaPriceListView(category="farm").children) == 1
-    assert "farm" in quick._GAME_ENTRY_META.get(quick.QUICK_ORDER_V2_CHANNELS["staff_internal"], ("",))[0] or "farm" in [category for _, _, category, _ in quick._DELTA_BUTTONS]
+    assert "farm" in [category for _, _, category, _ in quick._DELTA_BUTTONS]
 
 
 
