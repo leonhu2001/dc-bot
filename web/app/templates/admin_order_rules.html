@@ -347,7 +347,20 @@
                     <div class="rule-form-grid rule-form-grid--4">
                         <label class="rule-field rule-field--wide"><span>商品名稱（第三欄）</span><input name="label" value="{{ payload.get('label', '') }}" required></label>
                         <label class="rule-field rule-field--wide"><span>第二層分類（第二欄）</span><input name="catalog_group_label" maxlength="100" value="{{ payload.get('catalog_group_label', '') }}" placeholder="例如：陪解"></label>
-                        <label class="rule-field"><span>售價</span><input name="price" type="number" min="0" value="{{ payload.get('price', 0) }}" {% if selected_key.startswith('farm_aw_collision_') %}readonly aria-describedby="mw-aw-rate-note"{% endif %} required>{% if selected_key.startswith('farm_aw_collision_') %}<small id="mw-aw-rate-note">AW 依單發級距計價（含 4.5T／發），不能用整數售價欄修改；其他商品規則仍可編輯。</small>{% endif %}</label>
+                        <label class="rule-field"><span>售價{% if payload.get('player_count_prices') %}（基礎展示值）{% endif %}</span><input name="price" type="number" min="0" value="{{ payload.get('price', 0) }}" {% if selected_key.startswith('farm_aw_collision_') or payload.get('player_count_prices') %}readonly{% endif %} required>{% if selected_key.startswith('farm_aw_collision_') %}<small>AW 依單發級距計價（含 4.5T／發），不能用整數售價欄修改；其他商品規則仍可編輯。</small>{% elif payload.get('player_count_prices') %}<small>本商品真正使用下方各人數價目計費，請修改下方對應人數，不要改這個展示值。</small>{% endif %}</label>
+                        {% if payload.get('player_count_prices') %}
+                        <div class="rule-field rule-field--wide">
+                            <span>各人數實際售價（整張訂單／每個計價單位）</span>
+                            <div class="rule-form-grid rule-form-grid--4">
+                                {% for count, amount in payload.get('player_count_prices', {})|dictsort %}
+                                <label class="rule-field">
+                                    <span>{{ count }} 位陪玩</span>
+                                    <input type="number" name="player_count_price_{{ count }}" value="{{ amount }}" min="0" step="1" required>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
                         <label class="rule-field"><span>計價方式</span><select name="pricing_type">{% for value, label in pricing_types %}<option value="{{ value }}" {% if payload.get('pricing_type') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
                         <label class="rule-field"><span>單位</span><input name="unit_label" value="{{ payload.get('unit_label', '單') }}"></label>
                         <label class="rule-field"><span>需要人數</span><input name="required_staff_count" value="{{ payload.get('required_staff_count', 1) }}" placeholder="1 / 2 / player_count"></label>
