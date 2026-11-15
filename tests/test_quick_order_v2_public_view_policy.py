@@ -36,13 +36,15 @@ def test_delta_public_view_is_final_on_first_build() -> None:
     assert {getattr(child, "row", None) for child in delta_buttons} == {0}
 
 
-def test_game_public_view_contains_service_and_price_list_without_factory_patch() -> None:
-    channel_id = quick.QUICK_ORDER_V2_CHANNELS["apex"]
-    view = production._public_view_for_channel(channel_id)
-    custom_ids = _custom_ids(view)
+def test_all_four_game_public_views_keep_order_selector_but_remove_price_list() -> None:
+    for game in ("valorant", "lol", "apex", "steam"):
+        channel_id = quick.QUICK_ORDER_V2_CHANNELS[game]
+        view = production._public_view_for_channel(channel_id)
+        custom_ids = _custom_ids(view)
 
-    assert "quick_order_v2_service_apex" in custom_ids
-    assert f"quick_order_v2_price_list_{channel_id}" in custom_ids
+        assert f"quick_order_v2_service_{game}" in custom_ids
+        assert f"quick_order_v2_price_list_{channel_id}" not in custom_ids
+        assert not any("price_list" in custom_id for custom_id in custom_ids)
 
 
 def test_static_panel_artwork_mapping_stays_in_helper_module() -> None:
