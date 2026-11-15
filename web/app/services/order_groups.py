@@ -15,6 +15,7 @@ from services.order_rules import (
     SOURCE_AUTHORITY_RULE_KEYS,
     FULL_SOURCE_AUTHORITY_RULE_KEYS,
     get_allowed_role_labels,
+    get_base_rule,
 )
 
 
@@ -833,7 +834,20 @@ def _current_group_specs() -> list[dict]:
                 not manager_group_label
                 or manager_group_label == str(source_spec.get("label") or "")
             ):
-                base_variants.append((str(rule_key), str(public_label)))
+                # The group name may be unchanged while the owner has renamed
+                # the individual product. Use the new effective label only
+                # when it actually differs from its source-defined name.
+                effective_variant_label = str(public_label)
+                if rule is not None:
+                    try:
+                        base_rule = get_base_rule(str(rule_key))
+                        if str(rule.label) != str(base_rule.label):
+                            effective_variant_label = str(rule.label)
+                    except KeyError:
+                        pass
+                base_variants.append(
+                    (str(rule_key), effective_variant_label)
+                )
                 continue
 
             effective_label = str(
