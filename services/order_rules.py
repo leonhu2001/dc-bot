@@ -1059,7 +1059,7 @@ for key, label, price in [
 _add(OrderRule("delta_desktop_fun", "fun_lovebirds", "比翼雙飛", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_protector_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
 _add(OrderRule("delta_desktop_fun", "fun_read_no_reply", "已讀亂回", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_protector_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
 _add(OrderRule("delta_desktop_fun", "fun_rich_enough", "豪到你了嗎", "fixed", 2000, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
-_add(OrderRule("delta_desktop_fun", "fun_eat_yourself", "想吃自己打", "fixed", 3000, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
+_add(OrderRule("delta_desktop_fun", "fun_eat_yourself", "一命通關", "fixed", 13888, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False, catalog_group_label="一命通關"))
 
 # 魔丸娛樂嘎拉給木
 # 固定 1 單 / 2 位 / 只允許女陪或女護
@@ -1833,6 +1833,11 @@ SOURCE_AUTHORITY_RULE_KEYS = frozenset(
     if bool(rule.player_count_enabled) and key != "custom_custom_order"
 )
 
+# Owner-approved 一命通關 is a fully code-owned product. Before this refactor a
+# startup installer forcibly reset its database override; the canonical resolver
+# now ignores old overrides without mutating the manager audit/version history.
+FULL_SOURCE_AUTHORITY_RULE_KEYS = frozenset({"fun_eat_yourself"})
+
 # Owner-approved structural qualifications. Manager overrides may change ordinary
 # commercial fields but cannot broaden who may claim these system products.
 SOURCE_AUTHORITY_QUALIFICATION_RULE_KEYS = COIN_WASH_AW_ORDER_RULE_KEYS
@@ -1912,7 +1917,7 @@ class EffectiveOrderRules(dict):
         base = self._base(key)
         self._refresh_external()
         item = self._override_cache.get(key)
-        if not item:
+        if not item or key in FULL_SOURCE_AUTHORITY_RULE_KEYS:
             return base
 
         try:

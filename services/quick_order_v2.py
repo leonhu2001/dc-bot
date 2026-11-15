@@ -287,14 +287,14 @@ class QuickDeltaCategoryButton(discord.ui.Button):
 class QuickDeltaEntryView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        for index, (emoji, label, category, style) in enumerate(_DELTA_BUTTONS):
+        for emoji, label, category, style in _DELTA_BUTTONS:
             self.add_item(
                 QuickDeltaCategoryButton(
                     emoji=emoji,
                     label=label,
                     category=category,
                     style=style,
-                    row=0 if index < 3 else 1,
+                    row=0,
                 )
             )
 

@@ -60,13 +60,9 @@ from .aw_collision_catalog import install_aw_collision_catalog as _install_aw_co
 
 _install_aw_collision_catalog()
 
-# AW 與哈夫幣各自只保留目前正式的接單身分組。已刪除的舊 AW 身分組
-# 不再保留 alias / fallback，避免歷史資格重新進入接單判斷。
-from .special_receiver_roles_20261103 import (
-    install_special_receiver_roles_20261103 as _install_special_receiver_roles_20261103,
-)
-
-_install_special_receiver_roles_20261103()
+# AW／洗幣接單身分組直接由 order_rules.py 的 canonical role maps 提供。
+# 不再在 package import 時以補丁重新寫入相同的常數與字典；
+# 歷史訂單仍於接單邊界依當前 rule key 重新驗證資格。
 
 # The legacy Black Diamond monthly free-choice benefit has been retired. Install
 # this before monthly-benefit integration so both Web and Discord read the same
@@ -93,14 +89,9 @@ from .benefit_runtime_integration import install_root_benefit_integrations as _i
 
 _install_benefits()
 
-# 2026-11-03 owner correction: VIP monthly cash vouchers are paid entirely by the
-# store. Keep ordinary fixed discounts and point-cash funding unchanged; only the
-# explicit VIP monthly cash amount is restored to the worker payout basis.
-from .vip_monthly_store_funding_policy_20261103 import (
-    install_vip_monthly_store_funding_policy_20261103 as _install_vip_monthly_store_funding_policy_20261103,
-)
-
-_install_vip_monthly_store_funding_policy_20261103()
+# VIP monthly cash vouchers remain fully store-funded. The canonical
+# self_service_financials.calculate_self_service_financials function now calls
+# that funding policy directly, instead of installing a startup finance wrapper.
 
 # User-facing checkout copy must describe the same funding policy as the actual
 # payroll calculation. Install after benefit integration so wrappers see the
@@ -153,13 +144,7 @@ from .vip_monthly_announcement_policy import (
 
 _install_vip_monthly_announcement_policy()
 
-# 2026-11-02 owner correction: this desktop fun order is named 一命通關, costs
-# 13888T, and must use the owner-provided challenge copy. The old display name stays
-# resolver-only for historical orders; active manager overrides are reset so Web,
-# Discord checkout, price lists and 商品與規則 all agree.
-from .delta_fun_one_life_clear_20261102 import (
-    install_delta_fun_one_life_clear_20261102 as _install_delta_fun_one_life_clear_20261102,
-)
-
-_install_delta_fun_one_life_clear_20261102()
+# 一命通關 current name, price, and copy are defined directly in
+# order_rules.py, orders.py, quick_order_v2_price_lists.py, and the Web catalog.
+# Historical 想吃自己打 is a resolver-only alias; no startup override reset.
 _order_rules.validate_rules()
