@@ -60,13 +60,9 @@ from .aw_collision_catalog import install_aw_collision_catalog as _install_aw_co
 
 _install_aw_collision_catalog()
 
-# AW 與哈夫幣各自只保留目前正式的接單身分組。已刪除的舊 AW 身分組
-# 不再保留 alias / fallback，避免歷史資格重新進入接單判斷。
-from .special_receiver_roles_20261103 import (
-    install_special_receiver_roles_20261103 as _install_special_receiver_roles_20261103,
-)
-
-_install_special_receiver_roles_20261103()
+# AW／洗幣接單身分組直接由 order_rules.py 的 canonical role maps 提供。
+# 不再在 package import 時以補丁重新寫入相同的常數與字典；
+# 歷史訂單仍於接單邊界依當前 rule key 重新驗證資格。
 
 # The legacy Black Diamond monthly free-choice benefit has been retired. Install
 # this before monthly-benefit integration so both Web and Discord read the same
