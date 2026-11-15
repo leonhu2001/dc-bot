@@ -33,6 +33,7 @@ from services.game_roles import (
 from services.order_rules import (
     CATEGORY_LABELS,
     ORDER_RULES,
+    AW_COLLISION_PRICING_BY_RULE,
     ROLE_LABELS,
     OrderRule,
     build_custom_rule,
@@ -446,6 +447,16 @@ def _payload_from_form(rule_key: str, form) -> dict:
         _payload_with_presentation(str(rule_key), current),
         form,
     )
+    # AW per-shot tariffs use their own half-T tiered calculator, not the
+    # generic int price field. A silent price override here would lie to
+    # owners: "publish success" while the cashier kept charging the old rate.
+    if str(rule_key) in AW_COLLISION_PRICING_BY_RULE:
+        base_price = int(get_base_rule(str(rule_key)).price)
+        if int(payload.get("price") or 0) != base_price:
+            raise ValueError(
+                "AW代撞採每發級距（含4.5T），不能以一般商品售價欄修改。"
+                "目前每發費率維持原價；本頁仍可調整其他可用規則。"
+            )
     return _apply_fun_free_specify_policy(str(current.category), payload)
 
 
