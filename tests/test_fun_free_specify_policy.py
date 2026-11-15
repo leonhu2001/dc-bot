@@ -36,7 +36,7 @@ def test_fun_order_can_publish_with_zero_specify_fee():
     assert result.total_amount == result.base_amount
 
 
-def test_fun_order_keeps_explicit_paid_role_fee_and_fills_only_missing_roles():
+def test_fun_order_overrides_previous_paid_role_fee_with_owner_approved_free_specify():
     key = "fun_read_no_reply"
     payload = rule_to_override_payload(get_base_rule(key))
     payload["allow_specify"] = True
@@ -46,7 +46,7 @@ def test_fun_order_keeps_explicit_paid_role_fee_and_fills_only_missing_roles():
 
     normalized = _apply_fun_free_specify_policy("delta_desktop_fun", payload)
 
-    assert normalized["specify_fee_by_role"]["top_protector"] == 100
+    assert normalized["specify_fee_by_role"]["top_protector"] == 0
     assert normalized["specify_fee_by_role"]["female_protector"] == 0
     assert normalized["specify_fee_by_role"]["male_protector"] == 0
 
