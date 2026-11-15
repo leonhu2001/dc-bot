@@ -905,6 +905,9 @@ def _delta_fun_embed(plan_key: str) -> discord.Embed:
     image = str(plan.get("image") or "").strip()
     if image:
         embed.set_image(url=_static_asset_url(image))
+    embed.set_footer(
+        text="全系列可免費指定符合資格的接單人員｜指定費 0T｜各單原有職位與人數限制不變"
+    )
     return embed
 
 

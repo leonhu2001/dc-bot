@@ -12,12 +12,20 @@ IMAGE_SOURCE = ROOT / "services" / "quick_order_v2_panel_images.py"
 SETUP_SOURCE = ROOT / "cogs" / "setup_commands.py"
 
 
-def test_legacy_core_ticket_wrapper_is_disabled_before_quick_install() -> None:
-    source = FIX_SOURCE.read_text(encoding="utf-8")
+def test_legacy_core_ticket_wrapper_is_removed_not_disabled_at_runtime() -> None:
+    fixes_source = FIX_SOURCE.read_text(encoding="utf-8")
+    quick_source = (ROOT / "services/quick_order_v2.py").read_text(encoding="utf-8")
 
-    assert "def _disable_legacy_ticket_patch" in source
-    assert "quick._PATCH_INSTALLED = True" in source
-    assert "_disable_legacy_ticket_patch()" in source
+    assert "def _disable_legacy_ticket_patch" not in fixes_source
+    assert "quick._PATCH_INSTALLED = True" not in fixes_source
+    assert "def _install_ticket_patch" not in quick_source
+    assert "_install_ticket_patch()" not in quick_source
+    assert "ui.SelfServiceOrderView.__init__ =" not in quick_source
+    assert "runtime.build_self_service_panel_embed =" not in quick_source
+    # Public persistent views are still registered by core after the
+    # production view factory has been installed.
+    assert "def install_quick_order_v2(bot:" in quick_source
+    assert "bot.add_view(_view_for_channel(channel_id))" in quick_source
 
 
 def test_select_display_is_a_pure_view_mutator_not_another_view_wrapper() -> None:

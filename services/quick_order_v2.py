@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import traceback
 
 import discord
@@ -33,9 +32,6 @@ QUICK_ORDER_V2_CHANNELS = {
 CUSTOMER_CATEGORY_ID = config_int("CUSTOMER_CATEGORY_ID", 1483895536938651809)
 CUSTOMER_ROLE_ID = config_int("CUSTOMER_ROLE_ID", 1482084782031638548)
 _PANEL_MARKER_PREFIX = "quick-order-v2"
-_PATCH_INSTALLED = False
-_ORIGINAL_VIEW_INIT = None
-_ORIGINAL_PANEL_BUILDER = None
 VIP_TIMER_CUSTOM_ORDER_VALUE = "__vip_timer_custom_order__"
 
 _GAME_ENTRY_META = {
@@ -706,101 +702,6 @@ async def _create_ticket(
     return ticket
 
 
-def _install_ticket_patch() -> None:
-    global _PATCH_INSTALLED, _ORIGINAL_VIEW_INIT, _ORIGINAL_PANEL_BUILDER
-    if _PATCH_INSTALLED:
-        return
-
-    from services import order_runtime
-    from services import self_service_runtime as runtime
-    from services import self_service_selection_runtime as selection_runtime
-    from services import self_service_ui_runtime as ui
-
-    _ORIGINAL_VIEW_INIT = ui.SelfServiceOrderView.__init__
-    _ORIGINAL_PANEL_BUILDER = runtime.build_self_service_panel_embed
-
-    def quick_view_init(
-        self,
-        customer_id: int,
-        channel_id: int,
-        selected_category: str | None = None,
-    ):
-        _ORIGINAL_VIEW_INIT(self, customer_id, channel_id, selected_category)
-        data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
-        if not data.get("quick_order_v2"):
-            return
-
-        for child in list(self.children):
-            if getattr(child, "custom_id", None) in {
-                "self_service_order_category_select",
-                "self_service_order_item_select",
-            }:
-                self.remove_item(child)
-
-        is_timer = str(data.get("category") or "") == VIP_TIMER_CATEGORY
-        for child in self.children:
-            if getattr(child, "custom_id", None) == "self_service_order_detail_select":
-                child.placeholder = (
-                    "選擇起始玩法"
-                    if is_timer
-                    else "請選擇規格／陪玩人數"
-                )
-
-    def quick_panel_builder(
-        customer_id: int,
-        data: dict,
-        guild: discord.Guild | None = None,
-    ):
-        embed = _ORIGINAL_PANEL_BUILDER(customer_id, data, guild)
-        if (
-            not data.get("quick_order_v2")
-            or str(data.get("category") or "") == VIP_TIMER_CATEGORY
-        ):
-            return embed
-
-        category = str(data.get("category") or "")
-        group = str(data.get("item_group") or "尚未選擇")
-        embed.title = "自助下單"
-        embed.description = (
-            f"下單用戶：<@{customer_id}>\n\n"
-            f"已選服務：**{group}**\n"
-            "請完成規格／陪玩人數與時長／數量。\n"
-            "送出後先進入等待接單，人數滿後才開放付款。"
-        )
-
-        for index, name in enumerate(("遊戲", "服務", "規格", "數量")):
-            if index >= len(embed.fields):
-                break
-            field = embed.fields[index]
-            embed.set_field_at(
-                index,
-                name=name,
-                value=field.value,
-                inline=field.inline,
-            )
-
-        embed.remove_footer()
-        return embed
-
-    ui.SelfServiceOrderView.__init__ = quick_view_init
-    ui.build_self_service_panel_embed = quick_panel_builder
-    runtime.build_self_service_panel_embed = quick_panel_builder
-    selection_runtime.build_self_service_panel_embed = quick_panel_builder
-
-    state = getattr(order_runtime, "_RUNTIME_STATE", None)
-    if state is not None:
-        try:
-            order_runtime._RUNTIME_STATE = replace(
-                state,
-                self_service_panel_embed_builder=quick_panel_builder,
-            )
-        except Exception:
-            pass
-
-    _PATCH_INSTALLED = True
-    print("[quick-order-v2] ticket patch installed", flush=True)
-
-
 def _view_for_channel(channel_id: int) -> discord.ui.View:
     if channel_id == QUICK_ORDER_V2_CHANNELS["delta"]:
         return QuickDeltaEntryView()
@@ -866,8 +767,6 @@ async def ensure_quick_order_v2_panels(bot: commands.Bot) -> None:
 
 
 def install_quick_order_v2(bot: commands.Bot) -> None:
-    _install_ticket_patch()
-
     if not getattr(bot, "_quick_order_v2_views_registered", False):
         for channel_id in QUICK_ORDER_V2_CHANNELS.values():
             bot.add_view(_view_for_channel(channel_id))

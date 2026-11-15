@@ -225,20 +225,6 @@ def _install_canonical_group_resolver() -> None:
     selection_state.get_order_item_details_for_group = _canonical_details
 
 
-def _disable_legacy_ticket_patch() -> None:
-    """Keep the old core ticket wrapper from stacking under production policy.
-
-    setup_commands installs fixes before quick_order_v2. Marking the legacy patch as
-    already handled means install_quick_order_v2 still registers persistent views and
-    panel tasks, while production remains the sole owner of Quick Order ticket UI.
-    """
-    if (
-        getattr(quick, "_ORIGINAL_VIEW_INIT", None) is None
-        and getattr(quick, "_ORIGINAL_PANEL_BUILDER", None) is None
-    ):
-        quick._PATCH_INSTALLED = True
-
-
 async def _attach_order_control_view(channel: discord.TextChannel) -> bool:
     """Restore the same customer-service operation row used by legacy order tickets."""
     try:
@@ -371,11 +357,9 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     # explicitly kept as one service with five schemes.
     _install_canonical_group_resolver()
 
-    # _groups() calls _live_groups() directly once the resolver is ready.
-    # Do not replace the Quick Order module's function at runtime.
-    # Production owns the only active Quick Order ticket UI wrapper. Disable the
-    # old core wrapper before install_quick_order_v2 runs immediately after us.
-    _disable_legacy_ticket_patch()
+    # The legacy Quick Order ticket UI wrapper is removed from core; the
+    # production module remains the single registered view/panel owner.
+    # _groups() uses _live_groups() directly without replacing a callback.
 
     _INSTALLED = True
     print("[quick-order-v2-fix] fixes installed", flush=True)

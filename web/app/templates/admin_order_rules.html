@@ -374,7 +374,7 @@
                     <div class="rule-form-grid rule-form-grid--4">
                         <label class="rule-field"><span>最少數量</span><input name="min_quantity" type="number" min="1" value="{{ payload.get('min_quantity', 1) }}"></label>
                         <label class="rule-field"><span>最多數量</span><input name="max_quantity" type="number" min="1" value="{{ '' if payload.get('max_quantity') is none else payload.get('max_quantity') }}"></label>
-                        <label class="rule-field"><span>預設指定費</span><input name="specify_fee_default" type="number" min="0" value="{{ payload.get('specify_fee_default', 0) }}"></label>
+                        <label class="rule-field"><span>預設指定費</span><input name="specify_fee_default" type="number" min="0" value="{{ payload.get('specify_fee_default', 0) }}" {% if selected_rule.category == 'delta_desktop_fun' %}readonly aria-label="趣味單固定免費指定"{% endif %}></label>
                         <label class="rule-field"><span>最多指定人數</span><input name="max_specified_count" type="number" min="0" value="{{ '' if payload.get('max_specified_count') is none else payload.get('max_specified_count') }}"></label>
                         <label class="rule-field"><span>免指定費門檻</span><input name="specify_free_min_units" type="number" min="0" value="{{ '' if payload.get('specify_free_min_units') is none else payload.get('specify_free_min_units') }}"></label>
                         <label class="rule-field"><span>最少玩家數</span><input name="min_player_count" type="number" min="1" value="{{ payload.get('min_player_count', 1) }}"></label>
@@ -388,7 +388,7 @@
                         <div><h3>會員與功能</h3><p class="muted-text">這些開關彼此獨立，不會互相連動。</p></div>
                     </div>
                     <div class="rule-toggle-grid">
-                        <label><input type="checkbox" name="allow_specify" {% if payload.get('allow_specify') %}checked{% endif %}><span>開放指定</span></label>
+                        <label><input type="checkbox" name="allow_specify" {% if payload.get('allow_specify') or selected_rule.category == 'delta_desktop_fun' %}checked{% endif %} {% if selected_rule.category == 'delta_desktop_fun' %}disabled{% endif %}><span>開放指定{% if selected_rule.category == 'delta_desktop_fun' %}（趣味單固定免費）{% endif %}</span></label>
                         <label><input type="checkbox" name="player_count_enabled" {% if payload.get('player_count_enabled') %}checked{% endif %}><span>可選人數</span></label>
                         <label><input type="checkbox" name="price_multiply_player_count" {% if payload.get('price_multiply_player_count') %}checked{% endif %}><span>價格 × 人數</span></label>
                         <label><input type="checkbox" name="vip_discount_allowed" {% if payload.get('vip_discount_allowed', True) %}checked{% endif %}><span>套用 VIP 折扣</span></label>
