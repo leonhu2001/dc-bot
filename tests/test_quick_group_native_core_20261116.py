@@ -46,3 +46,10 @@ def test_quick_group_resolver_no_longer_monkey_patches_quick_module():
     # Keep the separate catalog resolver startup patch in place for now; its
     # cross-module consumers will be migrated in a future dedicated change.
     assert "_install_canonical_group_resolver()" in fixes_source
+
+
+def test_internal_service_labels_keep_original_fullwidth_separator(monkeypatch):
+    assert fixes._normalized_label("倒子彈｜500M") == "倒子彈｜500M"
+    assert fixes._normalized_label("撞車｜500M") == "撞車｜500M"
+    # Identity resolution still treats different separators as equivalent.
+    assert fixes._normalized_key("倒子彈|500M") == fixes._normalized_key("倒子彈｜500M")
