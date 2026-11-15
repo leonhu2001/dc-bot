@@ -347,6 +347,7 @@ DELTA_FUN_PRICE_LISTS = {
     },
     "eat_to_fat": {
         "label": "吃到發胖",
+        "image": "price_lists/delta_fun_eat_to_fat.webp",
         "text": f"""**吃到發胖｜固定 2 位陪玩以上**
 {_aligned_code_block((
     ("10KG紅", f"{_approved_fun_price('fun_eat_to_fat_10kg')}｜保 1888W"),
