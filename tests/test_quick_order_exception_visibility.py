@@ -33,7 +33,10 @@ def test_quick_order_runtime_has_no_silent_broad_exception_handlers() -> None:
 
 def test_quick_order_select_marker_failures_are_logged() -> None:
     source = Path("services/quick_order_v2_select_display.py").read_text(encoding="utf-8")
+    runtime = Path("services/order_runtime.py").read_text(encoding="utf-8")
 
     assert "[quick-order-v2-select] marker update failed" in source
+    assert "except Exception as exc:" in source
+    assert "_warn_marker_failure(action, component, exc)" in source
     for action in ("quantity", "detail", "item", "category"):
-        assert f'_warn_marker_failure("{action}"' in source
+        assert f'mark("{action}", self, interaction)' in runtime
