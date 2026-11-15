@@ -2028,10 +2028,24 @@ async def refresh_main_service_panel() -> bool:
         message = await channel.fetch_message(
             MAIN_SERVICE_PANEL_MESSAGE_ID
         )
-        await message.edit(
-            embed=build_main_panel_embed(),
-            view=MainPanelView(),
-        )
+        # Do not call message.edit() during startup. The owner may have
+        # approved a newer caption/arrangement directly in Discord that has
+        # not been committed to our older build_main_panel_embed() template.
+        # Overwriting it on every deploy caused the service lobby to revert.
+        # MainPanelView is already registered persistently in setup_hook,
+        # so the existing buttons do not require a message edit to work.
+        current_embed = message.embeds[0] if message.embeds else None
+        template_embed = build_main_panel_embed()
+        if (
+            current_embed is None
+            or current_embed.title != template_embed.title
+            or current_embed.description != template_embed.description
+        ):
+            print(
+                "[service-lobby] live panel differs from source template; "
+                "preserving the existing Discord copy (no auto-edit)",
+                flush=True,
+            )
     except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
         print(
             "[service-lobby] panel refresh failed: "
@@ -2041,7 +2055,7 @@ async def refresh_main_service_panel() -> bool:
         return False
 
     print(
-        "[service-lobby] main panel refreshed",
+        "[service-lobby] main panel verified without editing",
         flush=True,
     )
     return True
