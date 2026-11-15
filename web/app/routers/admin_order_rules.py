@@ -428,33 +428,32 @@ def _payload_from_form_base(payload: dict, form) -> dict:
 
 
 def _apply_fun_free_specify_policy(category: str, payload: dict) -> dict:
-    """Allow fun orders to publish with an explicit 0T specify fee.
+    """Enforce the same 0T Delta fun designation policy as OrderRule core.
 
-    The core rule validator intentionally requires every selectable role to have
-    a known fee when specifying is enabled. Fun orders are the exception: 0T is
-    a valid business rule, so persist explicit zero-fee entries instead of
-    weakening validation for every other product category.
+    No opt-out via an unchecked checkbox or a legacy 100T override. Preserve
+    product-specific eligible roles and the required number of staff.
     """
     payload = dict(payload)
-    if (
-        str(category) != "delta_desktop_fun"
-        or not payload.get("allow_specify")
-        or int(payload.get("specify_fee_default") or 0) > 0
-    ):
+    if str(category) != "delta_desktop_fun":
         return payload
 
-    role_fees = dict(payload.get("specify_fee_by_role") or {})
-    for role_key in payload.get("allowed_roles") or []:
-        role_fees.setdefault(str(role_key), 0)
-    payload["specify_fee_by_role"] = role_fees
-
-    game_role_fees = dict(payload.get("specify_fee_by_game_role") or {})
-    for role_key in payload.get("allowed_game_roles") or []:
-        game_role_fees.setdefault(str(role_key), 0)
-    payload["specify_fee_by_game_role"] = game_role_fees
-
+    needed = payload.get("required_staff_count", 1)
+    maximum = (
+        payload.get("max_player_count") or payload.get("min_player_count") or 1
+        if needed == "player_count"
+        else needed
+    )
+    payload["allow_specify"] = True
+    payload["max_specified_count"] = max(1, int(maximum))
+    payload["specify_fee_default"] = 0
+    payload["specify_fee_by_role"] = {
+        str(role): 0 for role in payload.get("allowed_roles") or []
+    }
+    payload["specify_fee_by_game_role"] = {
+        str(role): 0 for role in payload.get("allowed_game_roles") or []
+    }
+    payload["specify_free_min_units"] = None
     return payload
-
 
 def _validate_special_rate_rule_edit(rule_key: str, payload: dict) -> None:
     # AW per-shot tariffs use their own half-T tiered calculator, not the
