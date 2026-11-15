@@ -833,6 +833,10 @@ async def admin_order_rule_publish(
         )
         published_payload = rule_to_override_payload(rule)
         published_payload["intro"] = str(payload.get("intro") or "").strip()
+        # New publishes are explicit manager approvals. A versioned marker
+        # allows intentional edits to override legacy source-authority guards
+        # while OLD unmarked VPS overrides remain safely ignored.
+        published_payload["__owner_confirmed_after_canonical"] = True
 
         result = publish_rule_override(
             rule_key=rule_key,
