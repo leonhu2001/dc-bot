@@ -2063,72 +2063,18 @@ async def refresh_main_service_panel() -> bool:
 
 
 async def refresh_welcome_history() -> bool:
-    if not WELCOME_CHANNEL_ID:
-        return False
+    """Preserve previously posted welcome messages after every restart.
 
-    channel = bot.get_channel(WELCOME_CHANNEL_ID)
-    if not isinstance(channel, discord.TextChannel):
-        try:
-            fetched_channel = await bot.fetch_channel(WELCOME_CHANNEL_ID)
-        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-            return False
-        channel = (
-            fetched_channel
-            if isinstance(fetched_channel, discord.TextChannel)
-            else None
-        )
-
-    if channel is None or bot.user is None:
-        return False
-
-    updated = 0
-    matched = 0
-
-    try:
-        async for message in channel.history(limit=None, oldest_first=True):
-            if message.author.id != bot.user.id or not message.embeds:
-                continue
-
-            old_embed = message.embeds[0]
-            member_mention = extract_welcome_member_mention(
-                old_embed.description
-            )
-            if member_mention is None:
-                continue
-
-            matched += 1
-            avatar_url = getattr(old_embed.thumbnail, "url", None)
-            new_description = build_welcome_description(member_mention)
-
-            if old_embed.description == new_description:
-                continue
-
-            await message.edit(
-                embed=build_welcome_embed(
-                    member_mention,
-                    avatar_url=avatar_url,
-                ),
-                allowed_mentions=discord.AllowedMentions(
-                    users=False,
-                    roles=False,
-                    everyone=False,
-                ),
-            )
-            updated += 1
-    except (discord.Forbidden, discord.HTTPException) as exc:
-        print(
-            "[welcome] history refresh failed: "
-            f"{type(exc).__name__}: {exc}",
-            flush=True,
-        )
-        return False
-
+    Old behavior iterated over the entire welcome channel and replaced
+    existing embeds with the latest template. Previously approved wording
+    can differ between posts; a restart must not rewrite historical content.
+    New joins still use the current canonical build_welcome_embed() path.
+    """
     print(
-        f"[welcome] history refreshed: matched={matched}, updated={updated}",
+        "[welcome] historical posts preserved; automatic rewrite disabled",
         flush=True,
     )
     return True
-
 
 async def _refresh_welcome_history_background() -> None:
     try:
