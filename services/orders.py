@@ -127,7 +127,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {"label": "比翼雙飛", "details": [{"label": "比翼雙飛", "value": "lovebirds", "rule_key": "fun_lovebirds", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {"label": "已讀亂回", "details": [{"label": "已讀亂回", "value": "read_no_reply", "rule_key": "fun_read_no_reply", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {"label": "豪到你了嗎", "details": [{"label": "豪到你了嗎", "value": "rich_enough", "rule_key": "fun_rich_enough", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
-        {"label": "想吃自己打", "details": [{"label": "想吃自己打", "value": "eat_yourself", "rule_key": "fun_eat_yourself", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
+        {"label": "一命通關", "details": [{"label": "一命通關", "value": "eat_yourself", "rule_key": "fun_eat_yourself", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {
             "label": "魔丸娛樂嘎拉給木",
             "details": [
@@ -390,6 +390,7 @@ ORDER_RULE_KEY_BY_LABEL = {
 
 # 舊版顯示名稱別名，確保未結舊單即使沒有 order_rule_key 仍可被找回。
 ORDER_RULE_KEY_BY_LABEL.update({
+    "想吃自己打": "fun_eat_yourself",
     "絕巴四幻神賭單｜賭縱橫": "basic_exbar_gamble_zongheng",
     "絕巴四幻神賭單｜賭淚冠": "basic_exbar_gamble_leiguan",
     "絕巴四幻神賭單｜賭測距儀": "basic_exbar_gamble_rangefinder",
