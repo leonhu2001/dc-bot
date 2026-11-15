@@ -172,8 +172,10 @@ def test_legacy_sweet_rules_do_not_gain_new_runtime_requirement() -> None:
 def test_quick_order_notice_installed_without_replacing_locked_ticket_patch() -> None:
     from services import quick_order_v2 as quick
 
-    assert quick._order_notice_confirmation_installed is True
-    assert quick._send_confirmation.__module__ == "services.quick_order_ticket_policy_20261028"
+    # The approved notice gate now lives directly in the canonical quick-order
+    # entrypoint; no startup replacement/installed flag is required.
+    assert quick._send_confirmation.__module__ == "services.quick_order_v2"
+    assert "_send_notice_confirmation" in quick._send_confirmation.__code__.co_names
     assert quick._install_ticket_patch.__module__ == "services.quick_order_v2"
     assert not getattr(quick, "_unified_ticket_patch_wrapper_installed", False)
 
