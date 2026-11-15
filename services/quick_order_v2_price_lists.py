@@ -10,12 +10,11 @@ import discord
 from services import quick_order_v2 as quick
 
 
+# Only the Delta public entry panel offers an interactive price-list button.
+# Approved other-game price copy remains in this module for compatibility,
+# but must never create a public "查看價目表" control on its entry panels.
 _PRICE_LIST_LABEL_BY_CHANNEL_ID = {
     int(quick.QUICK_ORDER_V2_CHANNELS["delta"]): "三角洲行動",
-    int(quick.QUICK_ORDER_V2_CHANNELS["valorant"]): "VALORANT",
-    int(quick.QUICK_ORDER_V2_CHANNELS["lol"]): "英雄聯盟",
-    int(quick.QUICK_ORDER_V2_CHANNELS["apex"]): "APEX",
-    int(quick.QUICK_ORDER_V2_CHANNELS["steam"]): "STEAM",
 }
 
 _ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -59,7 +58,6 @@ def _static_asset_url(relative_path: str) -> str:
 DELTA_PRICE_LIST_CATEGORIES = (
     ("desktop", "端遊", "🖥️"),
     ("mobile", "手遊", "📱"),
-    ("farm", "代肝代解", "🛠️"),
     ("fun", "趣味單", "🎉"),
 )
 
@@ -808,7 +806,7 @@ def _delta_category_embed(category: str) -> discord.Embed:
     label = _delta_category_label(category)
     description = (
         "請選擇要查看的單子。"
-        if category in {"desktop", "mobile", "farm", "fun"}
+        if category in {"desktop", "mobile", "fun"}
         else "此分類價目表內容整理中。"
     )
     return discord.Embed(
@@ -1057,8 +1055,9 @@ class DeltaPriceListView(discord.ui.View):
             self.add_item(DeltaDesktopPriceListSelect(selected=desktop_plan))
         elif category == "mobile":
             self.add_item(DeltaMobilePriceListSelect(selected=mobile_plan))
-        elif category == "farm":
-            self.add_item(DeltaFarmPriceListSelect(selected=farm_plan))
+        # Deliberately no "farm" branch: 代肝代解 orders are unchanged and
+        # still selectable from the main Delta order panel, but removed from
+        # the customer-facing "查看價目表" selector by owner request.
         elif category == "fun":
             self.add_item(DeltaFunPriceListSelect(selected=fun_plan))
 
@@ -1079,19 +1078,21 @@ class QuickPriceListButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        # Removed public game price buttons are not reactivated even if a
+        # Discord client still holds an old persistent custom-id component.
+        # Only Delta's public price selector remains supported.
+        if self.source_channel_id != int(quick.QUICK_ORDER_V2_CHANNELS["delta"]):
+            await interaction.response.send_message(
+                "此入口已移除「查看價目表」，請從下單選單選擇服務。",
+                ephemeral=True,
+            )
+            return
         # Acknowledge promptly to avoid the Discord "未及時回應" banner.
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            if self.source_channel_id == int(quick.QUICK_ORDER_V2_CHANNELS["delta"]):
-                await interaction.edit_original_response(
-                    embed=_delta_root_embed(),
-                    view=DeltaPriceListView(),
-                )
-                return
-
             await interaction.edit_original_response(
-                embed=_game_root_embed(self.source_channel_id),
-                view=GamePriceListView(self.source_channel_id),
+                embed=_delta_root_embed(),
+                view=DeltaPriceListView(),
             )
         except Exception as exc:
             print(
