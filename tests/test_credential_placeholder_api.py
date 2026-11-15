@@ -16,8 +16,10 @@ def test_credential_placeholder_api_updates_named_field():
         credentials.set_order_credential_note_placeholder(original or "登入方式／備註")
 
 
-def test_aw_catalog_uses_public_credential_api_not_deprecated_label_introspection():
+def test_aw_credential_placeholder_is_defined_directly_in_modal_not_by_startup_patch():
     source = (ROOT / "services" / "aw_collision_catalog.py").read_text(encoding="utf-8")
-    assert "set_order_credential_note_placeholder" in source
-    assert 'getattr(item, "label"' not in source
+    credential_source = (ROOT / "services" / "order_credential_runtime.py").read_text(encoding="utf-8")
+    assert "set_order_credential_note_placeholder" not in source
+    assert "請補充安全箱格數" in credential_source
+    assert "請補充安全箱格數" in str(credentials.OrderCredentialModal.login_note.placeholder)
     assert "__modal_children_items__" not in source
