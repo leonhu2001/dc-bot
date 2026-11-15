@@ -77,11 +77,10 @@ async def create_waiting_acceptance_order(
                 "AW代撞方案與已填發數的方案不一致。請在第四欄重新填寫發數後再送出。"
             )
         try:
-            validate_aw_quantity_for_rule(rule_key, int(data.get("quantity")))
+            quantity = int(data.get("quantity"))
         except (TypeError, ValueError) as exc:
-            if isinstance(exc, ValueError) and str(exc):
-                raise ValueError(str(exc)) from exc
             raise ValueError("AW代撞發數異常，請重新填寫。") from exc
+        validate_aw_quantity_for_rule(rule_key, quantity)
 
     if data.get("dispatch_rollback_pending"):
         try:
