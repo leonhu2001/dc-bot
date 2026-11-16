@@ -148,3 +148,32 @@ def test_other_games_and_special_services_unchanged():
         ("farm_season_3x3_normal", 1, 5500),
     ):
         assert calculate_price(get_rule(key), quantity=1, player_count=count).total_amount == expected
+
+
+def test_web_product_card_copy_tracks_latest_source_prices_guarantees():
+    groups = {
+        item["label"]: item
+        for item in get_grouped_order_catalog("delta_desktop_basic")
+    }
+    expected = {
+        "娛樂陪": ("350T/H", "650T/H", "10小時", "+100T"),
+        "一陪一護": ("800T/H", "900T/H", "8殺", "7殺"),
+        "體驗單": ("500T/單", "850W", "1000T/單", "1888W", "每週", "每月"),
+        "技術陪": ("450T/H", "850T/H", "500T/H", "950T/H", "777W", "850W"),
+        "絕巴技術陪": ("1000T/H", "850w", "600w+2沙色保險", "4沙色保險"),
+        "賭約單": ("1200T/單", "800W", "1500T/單", "1000W", "2400T/單", "1200W"),
+        "油鍋單": ("3000T/單", "2000W", "2000T/單", "1688W", "4500T/單", "3688W"),
+    }
+    for group_name, fragments in expected.items():
+        content = groups[group_name]["description"].replace(",", "").replace(" ", "")
+        for fragment in fragments:
+            assert fragment.replace(",", "").replace(" ", "") in content, (group_name, fragment)
+
+
+def test_updated_exbar_does_not_modify_fixed_price_or_hourly_specification():
+    rule = get_rule("basic_exbar_tech")
+    assert rule.price == 1000
+    assert rule.pricing_type == "hourly"
+    assert rule.allow_specify is True
+    assert rule.specify_free_min_units == 2
+    assert "850w / 600w + 2 沙色保險 / 4 沙色保險" in rule.note
