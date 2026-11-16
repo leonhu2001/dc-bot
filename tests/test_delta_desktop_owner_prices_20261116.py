@@ -95,8 +95,8 @@ def test_web_and_discord_share_new_trial_selector_and_keep_legacy_aliases():
     dc = get_order_item_details_for_group("delta_desktop_basic", "體驗單")
     web = next(group for group in get_grouped_order_catalog("delta_desktop_basic")
                if group["key"] == "trial")
-    assert [r["label"] for r in dc] == ["普通｜850w", "尊爵｜1888w"]
-    assert [r["label"] for r in web["variants"]] == ["普通｜850w", "尊爵｜1888w"]
+    assert [r["label"] for r in dc] == ["普通體驗單｜500T（保底850W）", "尊爵體驗單｜1000T（保底1888W）"]
+    assert [r["label"] for r in web["variants"]] == ["普通體驗單｜500T（保底850W）", "尊爵體驗單｜1000T（保底1888W）"]
     from services.orders import ORDER_RULE_KEY_BY_LABEL
     assert ORDER_RULE_KEY_BY_LABEL["體驗單 850w"] == "basic_trial_500"
     assert ORDER_RULE_KEY_BY_LABEL["體驗單 888w"] == "basic_trial_500"
@@ -226,3 +226,44 @@ def test_other_image_price_cards_remain_untouched():
     for group, phrases in expected.items():
         for phrase in phrases:
             assert phrase in DELTA_DESKTOP_PRICE_LISTS[group]["text"], (group, phrase)
+
+def test_trial_and_oil_approved_guarantee_labels_parity():
+    from services.orders import ORDER_RULE_KEY_BY_LABEL
+
+    approved = {
+        "體驗單": (
+            ("basic_trial_500", "普通體驗單｜500T（保底850W）", 500),
+            ("basic_trial_1000", "尊爵體驗單｜1000T（保底1888W）", 1000),
+        ),
+        "油鍋單": (
+            ("basic_oil_fuel", "火箭燃油（保底2000W）", 3000),
+            ("basic_oil_satellite", "GTI衛星通信天線（保底1688W）", 2000),
+            ("basic_oil_all", "全包（保底3688W）", 4500),
+        ),
+    }
+    web = {g["label"]: g for g in get_grouped_order_catalog("delta_desktop_basic")}
+    for group, expectations in approved.items():
+        dc = get_order_item_details_for_group("delta_desktop_basic", group)
+        actual_web = web[group]["variants"]
+        assert [(v["rule_key"], v["label"]) for v in dc] == [
+            (key, label) for key, label, amount in expectations
+        ]
+        assert [(v["rule_key"], v["label"], v["price"]) for v in actual_web] == list(expectations)
+        for key, label, amount in expectations:
+            assert calculate_price(get_rule(key), quantity=1).total_amount == amount
+            assert ORDER_RULE_KEY_BY_LABEL[get_rule(key).label] == key
+    assert "500T（保底850W）" in DELTA_DESKTOP_PRICE_LISTS["trial"]["text"]
+    assert "1000T（保底1888W）" in DELTA_DESKTOP_PRICE_LISTS["trial"]["text"]
+    for name in ("火箭燃油（保底2000W）", "GTI衛星通信天線（保底1688W）", "全包（保底3688W）"):
+        assert name in DELTA_DESKTOP_PRICE_LISTS["oil"]["text"]
+
+
+def test_fixed_guarantee_label_tracks_authorized_effective_price_and_note():
+    from dataclasses import replace
+    from services.delta_desktop_guarantee_labels import fixed_guarantee_display_label
+
+    rule = get_base_rule("basic_trial_500")
+    revised = replace(rule, price=555, note="普通體驗單｜900W 保底｜每週限一次")
+    assert fixed_guarantee_display_label(rule.key, revised, "普通") == "普通體驗單｜555T（保底900W）"
+    absent = replace(rule, note="待確認")
+    assert fixed_guarantee_display_label(rule.key, absent, "普通") == "普通"
