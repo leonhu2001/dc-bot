@@ -1213,7 +1213,7 @@ _add(OrderRule(
         "loss_cover": 500,
     },
     staff_adjustment_labels={
-        "skin": "外觀",
+        "skin": "造型",
         "loss_cover": "包損耗",
     },
 ))
@@ -1222,7 +1222,7 @@ _add(OrderRule("farm", "farm_season_3x3_skin", "賽季3x3｜造型", "fixed", 30
 _add(OrderRule(
     "farm",
     "farm_season_3x3_dc_skin",
-    "3×3安全箱＋外觀",
+    "3×3安全箱＋造型",
     "fixed",
     8000,
     allowed_roles=ALL_RECEIVER_ROLES,
@@ -1250,7 +1250,7 @@ _add(OrderRule(
 _add(OrderRule(
     "farm",
     "farm_season_3x3_dc_skin_loss",
-    "3×3安全箱＋外觀＋包損",
+    "3×3安全箱＋造型＋包損",
     "fixed",
     8500,
     allowed_roles=ALL_RECEIVER_ROLES,
