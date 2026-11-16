@@ -105,21 +105,33 @@ def test_safe_one_time_service_panel_update_never_loses_buttons():
     assert not _existing_button_styles_match(changed, original)
 
 
-def test_price_list_link_resolution_never_guesses_ambiguous_channel():
-    channels = [
-        {"id": "100", "name": "端遊價目表", "type": 0},
-        {"id": "200", "name": "價目表", "type": 0},
-        {"id": "300", "name": "其他資訊", "type": 0},
-    ]
-    assert _price_list_id(channels, specified=None) == 200
-    assert _price_list_id(channels, specified=100) == 100
+def test_price_list_link_is_exactly_the_approved_owner_discord_url():
+    from views.panels import SERVICE_LOBBY_PRICE_LIST_CHANNEL_ID
+
+    approved = 1569412217269395597
+    guild_id = 1129474191226306672
+    assert SERVICE_LOBBY_PRICE_LIST_CHANNEL_ID == approved
+    assert (
+        f"https://discord.com/channels/{guild_id}/{approved}"
+        == "https://discord.com/channels/1129474191226306672/1569412217269395597"
+    )
+    assert _price_list_id(specified=None) == approved
+    assert _price_list_id(specified=approved) == approved
+    assert f"價目表：<#{approved}>" in build_main_panel_embed().description
 
     import pytest
-    with pytest.raises(RuntimeError, match="無法唯一辨認"):
-        _price_list_id(channels[:1] + [{"id": "400", "name": "手遊價目表", "type": 0}],
-                       specified=None)
-    with pytest.raises(RuntimeError, match="不存在"):
-        _price_list_id(channels, specified=999)
+    with pytest.raises(RuntimeError, match="與店主核准的"):
+        _price_list_id(specified=999)
+
+
+def test_one_time_updater_does_not_enumerate_non_thread_guild_channels():
+    source = (ROOT / "scripts/apply_main_service_panel_once.py").read_text(
+        encoding="utf-8"
+    )
+    assert '"/guilds/{guild_id}/channels"' not in source
+    assert 'client, "GET", f"/guilds/{guild_id}/channels"' not in source
+    assert "price_id = _price_list_id(specified=args.price_list_channel_id)" in source
+    assert "if not args.apply:" in source
 
 
 def test_manual_update_not_called_by_bot_startup_or_implicit_script_import():
