@@ -716,7 +716,8 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
             key: data[key] for key in _SETTLED_FINANCIAL_KEYS
             if key in data and data[key] is not None
         })
-        return result
+        from services.self_service_promotion_integration import apply_promotion_funding_snapshot
+        return apply_promotion_funding_snapshot(result)
     if data.get("selected_vip_monthly_benefit_id") not in (None, ""):
         from services.self_service_vip_monthly_ux import _current_original_service_amount
         prepared = dict(data)
@@ -724,7 +725,10 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
             rule, prepared, price_result=price_result,
         )
         data = prepared
-    return _calculate_self_service_financials_unsettled(rule, price_result, data)
+    from services.self_service_promotion_integration import apply_promotion_funding_snapshot
+    return apply_promotion_funding_snapshot(
+        _calculate_self_service_financials_unsettled(rule, price_result, data)
+    )
 
 
 def apply_self_service_financials_to_order_data(data: dict, rule, price_result) -> dict:
