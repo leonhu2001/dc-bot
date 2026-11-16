@@ -777,11 +777,14 @@ def _group_data(
                 "selector_label",
                 "方案",
             ),
-        "description":
-            spec.get(
-                "description",
-                "",
-            ),
+        "description": __import__(
+            "web.app.services.delta_desktop_price_copy", fromlist=["render_delta_desktop_group_copy"]
+        ).render_delta_desktop_group_copy(
+            category=str(spec.get("category") or ""),
+            label=str(spec.get("label") or ""),
+            description=str(spec.get("description") or ""),
+            variants=variants,
+        ),
         **(
             {"image_url": f"/static/{spec['image']}"}
             if str(spec.get("image") or "").startswith(("price_lists/", "order_panels/"))
