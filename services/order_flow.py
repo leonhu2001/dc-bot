@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import discord
 
-from services.order_product_status import install_discord_catalog_guards
 from services.rewards import format_t_amount
 
 
-# bot.py imports services.orders before services.order_flow. Installing here lets
-# us update the already-imported self-service catalog bindings in place, while
-# keeping product availability backed by the shared Web/Bot SQLite database.
-install_discord_catalog_guards()
+# Product availability is enforced directly by services.orders and
+# services.self_service_runtime. No import-order-dependent guard is installed.
 
 
 def get_payment_method_info(method: str | None) -> str | None:
