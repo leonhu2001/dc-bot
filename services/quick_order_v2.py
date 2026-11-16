@@ -13,10 +13,17 @@ from services.ticket_identity import build_ticket_channel_name
 from services.vip_timer import VIP_TIMER_CATEGORY, VIP_TIMER_CATEGORY_LABEL
 from services.vip_timer_game_compat import resolve_vip_timer_game_label
 from services.vip_timer_self_service import (
-    assert_vip_timer_self_service_eligible,
     prepare_vip_timer_draft,
     refresh_vip_timer_self_service_catalog,
 )
+
+
+def assert_vip_timer_self_service_eligible(customer_id, *, check_open_order=True):
+    """Live eligibility at source; tests and integrations retain this call API."""
+    from services import vip_timer_self_service
+    return vip_timer_self_service.assert_vip_timer_self_service_eligible(
+        customer_id, check_open_order=check_open_order,
+    )
 
 
 QUICK_ORDER_V2_CHANNELS = {
@@ -517,8 +524,7 @@ async def _create_ticket(
 
     if category == VIP_TIMER_CATEGORY:
         try:
-            from services import vip_timer_self_service as vip_source
-            vip_source.assert_vip_timer_self_service_eligible(
+            assert_vip_timer_self_service_eligible(
                 member.id,
                 check_open_order=True,
             )
