@@ -34,6 +34,8 @@ from services.order_rules import (
     DELTA_DESKTOP_APPROVAL_REVISION_MARKER,
     DELTA_ENTERTAINMENT_RULE_KEYS,
     DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER,
+    BLACK_TIDE_APPROVAL_REVISION_MARKER,
+    BLACK_TIDE_SOURCE_RULE_KEYS,
     CATEGORY_LABELS,
     ORDER_RULES,
     AW_COLLISION_PRICING_BY_RULE,
@@ -891,6 +893,8 @@ async def admin_order_rule_publish(
             published_payload[DELTA_DESKTOP_APPROVAL_REVISION_MARKER] = True
             if rule_key in DELTA_ENTERTAINMENT_RULE_KEYS:
                 published_payload[DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER] = True
+        if rule_key in BLACK_TIDE_SOURCE_RULE_KEYS:
+            published_payload[BLACK_TIDE_APPROVAL_REVISION_MARKER] = True
 
         result = publish_rule_override(
             rule_key=rule_key,
