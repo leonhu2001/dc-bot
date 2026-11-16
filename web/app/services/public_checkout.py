@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any
 
 from services.order_product_status import StatusAwareHiddenRuleKeys
@@ -35,26 +34,12 @@ PUBLIC_ROLE_LABELS = {
 }
 
 
-SEASON_NORMAL_PRICE = 4000
-
-SEASON_CONTRACT_UNIT_PRICE = 600
-
-SEASON_CONTRACT_MAX = 7
+# All S12 box and contract prices come from services.order_rules.
+# Never shadow the canonical 5,500T base with an independent Web price.
+# The booking -500T is NOT a customer adjustment; CS records the ordinary
+# shared fixed discount manually in the Discord ticket.
 
 APEX_RANKED_SURCHARGE_PER_HOUR_PER_PLAYER = 50
-
-
-
-SEASON_NORMAL_ADJUSTMENTS = {
-    "skin": 2500,
-    "loss_cover": 500,
-}
-
-
-SEASON_NORMAL_ADJUSTMENT_LABELS = {
-    "skin": "造型",
-    "loss_cover": "包損耗",
-}
 
 
 CUSTOMER_FORBIDDEN_ADJUSTMENTS = {
@@ -129,86 +114,13 @@ def _public_role_label(
     )
 
 
-def _get_public_rule(
-    rule_key: str,
-):
-    source_rule = (
-        ORDER_RULES.get(
-            rule_key
-        )
-    )
+def _get_public_rule(rule_key: str):
+    """Use the same effective, owner-approved S12 rules as Discord."""
+    rule = ORDER_RULES.get(rule_key)
+    if rule is None:
+        raise ValueError("找不到這個商品方案。")
+    return rule
 
-    if source_rule is None:
-
-        raise ValueError(
-            "找不到這個商品方案。"
-        )
-
-
-    # --------------------------------------------------------
-    # 賽季 3x3 公開網站新規格
-    #
-    # 用 dataclasses.replace 建立一次性副本。
-    # 不修改全域 ORDER_RULES。
-    # 不影響 Discord Bot runtime。
-    # --------------------------------------------------------
-
-    if (
-        rule_key
-        == "farm_season_3x3_normal"
-    ):
-
-        return replace(
-            source_rule,
-
-            pricing_type="fixed",
-
-            price=
-                SEASON_NORMAL_PRICE,
-
-            min_quantity=1,
-
-            max_quantity=1,
-
-            staff_adjustments=
-                dict(
-                    SEASON_NORMAL_ADJUSTMENTS
-                ),
-
-            staff_adjustment_labels=
-                dict(
-                    SEASON_NORMAL_ADJUSTMENT_LABELS
-                ),
-        )
-
-
-    if (
-        rule_key
-        == "farm_season_3x3_contract"
-    ):
-
-        return replace(
-            source_rule,
-
-            pricing_type="unit",
-
-            price=
-                SEASON_CONTRACT_UNIT_PRICE,
-
-            unit_label="個",
-
-            min_quantity=1,
-
-            max_quantity=
-                SEASON_CONTRACT_MAX,
-
-            staff_adjustments={},
-
-            staff_adjustment_labels={},
-        )
-
-
-    return source_rule
 
 
 def build_public_quote(
@@ -259,10 +171,8 @@ def build_public_quote(
 
 
     if (
-        rule_key
-        == "farm_season_3x3_contract"
-        and quantity_value
-        > SEASON_CONTRACT_MAX
+        rule_key == "farm_season_3x3_contract"
+        and quantity_value > int(rule.max_quantity or 7)
     ):
 
         raise ValueError(
@@ -330,17 +240,10 @@ def build_public_quote(
         and not rule_key.endswith("_ranked")
     )
 
-    if (
-        rule_key
-        == "farm_season_3x3_normal"
-    ):
-
+    if rule_key == "farm_season_3x3_normal":
         unknown = [
-            key
-            for key
-            in price_adjustments
-            if key not in
-            SEASON_NORMAL_ADJUSTMENTS
+            key for key in price_adjustments
+            if key not in (rule.staff_adjustments or {})
         ]
 
 
