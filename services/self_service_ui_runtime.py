@@ -240,7 +240,13 @@ def build_self_service_panel_embed(
                     ),
                     inline=False,
                 )
-    return embed
+    # Production Quick Order copy is a pure formatter called by the
+    # canonical UI builder, not a function installed at runtime.
+    from services.quick_order_v2_production import (
+        decorate_production_ticket_embed,
+    )
+
+    return decorate_production_ticket_embed(embed, customer_id, data, guild)
 
 # 指定陪玩 / 點數福利選擇 UI 已移至 services/self_service_selection_runtime.py
 # 客服手動價格規則由 services/self_service_financials.py 單一維護。
@@ -1375,5 +1381,15 @@ class SelfServiceOrderView(_BaseSelfServiceOrderView):
                 submit.row = 4
                 submit.disabled = True
                 self.add_item(submit)
+
+        # Apply production quick-ticket layout only after all companion-count
+        # controls have been built. This previously ran in a patched __init__.
+        from services.quick_order_v2_production import (
+            apply_production_ticket_view_policy,
+        )
+
+        apply_production_ticket_view_policy(
+            self, customer_id, channel_id, selected_category,
+        )
 
 
