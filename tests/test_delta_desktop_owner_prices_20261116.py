@@ -206,6 +206,7 @@ def test_future_authorized_entertainment_price_update_still_possible(monkeypatch
     payload = rule_to_override_payload(get_base_rule(key))
     payload["player_count_prices"] = {"1": 325, "2": 605}
     payload["price"] = 325
+    payload["__owner_confirmed_after_canonical"] = True
     payload[DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER] = True
     monkeypatch.setattr(ORDER_RULES, "_refresh_external", lambda: None)
     monkeypatch.setattr(ORDER_RULES, "_override_cache", {key: {"payload": payload}})
