@@ -1656,6 +1656,11 @@ for (
 # guarantees. Legacy manager overrides may set unrelated business fields, but
 # must not silently revive obsolete price/guarantee values at checkout.
 # Never include mobile variants, historic single/double keys or fun orders.
+# A NEW publish from the Web rule manager after this revision sets this marker.
+# The older generic approval flag is not proof that a price was approved after
+# the owner's 2026-11-16 changes.
+DELTA_DESKTOP_APPROVAL_REVISION_MARKER = "__owner_confirmed_delta_desktop_20261116"
+
 APPROVED_DELTA_DESKTOP_RULE_KEYS = frozenset({
     "basic_entertain_single",
     "basic_entertain_female_single",
@@ -2107,16 +2112,37 @@ class EffectiveOrderRules(dict):
                     pricing_type=base.pricing_type,
                     unit_label=base.unit_label,
                 )
-            if key in APPROVED_DELTA_DESKTOP_RULE_KEYS and not manager_confirmed:
-                # Source-owned price and fulfilment guarantees protect the
-                # latest approved card against stale, persisted admin edits.
+            delta_revision_confirmed = (
+                key in APPROVED_DELTA_DESKTOP_RULE_KEYS
+                and payload.get(DELTA_DESKTOP_APPROVAL_REVISION_MARKER) is True
+            )
+            if key in APPROVED_DELTA_DESKTOP_RULE_KEYS and not delta_revision_confirmed:
+                # An old manager publish may carry the GENERIC approval flag.
+                # The latest 2026-11-16 owner-approved price, headcount,
+                # discounts and guarantee prevail until a NEW Delta-specific
+                # manager publish explicitly replaces that policy.
                 rule = replace(
                     rule,
                     price=base.price,
                     pricing_type=base.pricing_type,
                     unit_label=base.unit_label,
+                    required_staff_count=base.required_staff_count,
+                    player_count_enabled=base.player_count_enabled,
+                    min_player_count=base.min_player_count,
+                    max_player_count=base.max_player_count,
+                    price_multiply_player_count=base.price_multiply_player_count,
                     player_count_prices=dict(base.player_count_prices),
                     note=base.note,
+                    vip_discount_allowed=base.vip_discount_allowed,
+                    point_benefits_allowed=base.point_benefits_allowed,
+                    loyalty_benefits_enabled=base.loyalty_benefits_enabled,
+                    allow_specify=base.allow_specify,
+                    max_specified_count=base.max_specified_count,
+                    specify_fee_default=base.specify_fee_default,
+                    specify_fee_by_role=dict(base.specify_fee_by_role),
+                    specify_fee_by_game_role=dict(base.specify_fee_by_game_role),
+                    specify_free_min_units=base.specify_free_min_units,
+                    specify_free_basis=base.specify_free_basis,
                 )
             if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS and not manager_confirmed:
                 # An old manager override may still say allow_specify=False.
