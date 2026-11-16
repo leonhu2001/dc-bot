@@ -25,14 +25,16 @@ def test_quick_order_groups_read_native_source_without_runtime_patch(monkeypatch
     assert [item.label for item in quick._options("farm")] == ["賽季3x3", "其他服務"]
 
 
-def test_fixed_farm_3x3_group_is_one_five_variant_service():
+def test_fixed_farm_3x3_group_preserves_two_active_service_options():
     groups = orders.get_live_order_item_groups("farm")
     assert groups.count("賽季3x3") == 1
     assert "命運契約" not in groups
     details = orders.get_order_item_details_for_group("farm", "賽季3x3")
-    assert [detail["rule_key"] for detail in details] == list(
-        orders._FARM_3X3_RULE_ORDER
-    )
+    # Five historical price rules remain available, but the current public
+    # selector exposes only normal and contract. Extras use adjustments.
+    assert [detail["rule_key"] for detail in details] == [
+        "farm_season_3x3_normal", "farm_season_3x3_contract",
+    ]
 
 
 def test_discord_and_web_import_same_unpatched_resolver():
@@ -67,4 +69,4 @@ def test_semantically_equal_group_labels_resolve_same_detail_keys():
         assert [
             detail["rule_key"]
             for detail in orders.get_order_item_details_for_group(category, label)
-        ] == list(orders._FARM_3X3_RULE_ORDER)
+        ] == ["farm_season_3x3_normal", "farm_season_3x3_contract"]
