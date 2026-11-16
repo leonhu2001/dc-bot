@@ -6,6 +6,7 @@ import unicodedata
 import discord
 
 from services.order_product_status import is_order_product_active
+from services.delta_desktop_guarantee_labels import fixed_guarantee_display_label
 
 from services.order_rules import (
     CATEGORY_LABELS as RULE_CATEGORY_LABELS,
@@ -87,8 +88,8 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "體驗單",
             "details": [
-                {"label": "普通｜850w", "value": "850w", "rule_key": "basic_trial_500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "尊爵｜1888w", "value": "1888w", "rule_key": "basic_trial_1000", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "普通體驗單｜500T（保底850W）", "value": "850w", "rule_key": "basic_trial_500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "尊爵體驗單｜1000T（保底1888W）", "value": "1888w", "rule_key": "basic_trial_1000", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
         {
@@ -102,9 +103,9 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "油鍋單",
             "details": [
-                {"label": "火箭燃油", "value": "fuel", "rule_key": "basic_oil_fuel", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "GTI衛星通信天線", "value": "satellite", "rule_key": "basic_oil_satellite", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "全包", "value": "all", "rule_key": "basic_oil_all", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "火箭燃油（保底2000W）", "value": "fuel", "rule_key": "basic_oil_fuel", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "GTI衛星通信天線（保底1688W）", "value": "satellite", "rule_key": "basic_oil_satellite", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "全包（保底3688W）", "value": "all", "rule_key": "basic_oil_all", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
     ],
@@ -712,6 +713,12 @@ def _get_order_item_details_for_group_exact(category: str | None, group_label: s
             ):
                 item["label"] = str(getattr(rule, "label", "") or item.get("label") or "")
 
+            # Guarantee text is a visible option, not an identity migration.
+            # Keep item/rule keys stable for old tickets and checkout.
+            if rule is not None:
+                item["label"] = fixed_guarantee_display_label(
+                    key, rule, str(item.get("label") or "")
+                )
             item["item"] = str(
                 getattr(rule, "label", "")
                 or item.get("label")
