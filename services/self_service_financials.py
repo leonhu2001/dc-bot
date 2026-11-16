@@ -154,7 +154,6 @@ def add_self_service_financial_breakdown_fields(
     src: dict,
     final_label="顧客應付",
 ):
-    # Public API preserved for Discord and web order consumers.
     from services.self_service_financial_breakdown_display import (
         render_self_service_financial_breakdown_fields,
     )
@@ -447,7 +446,6 @@ def _quote_preview_lines_raw(
 def _quote_preview_lines_for_self_service(
     data: dict, guild: discord.Guild | None = None
 ) -> list[tuple[str, str]]:
-    """Canonical, funding-accurate Bot/Web quote preview without monkey patch."""
     from services.self_service_financial_copy import (
         _VIP_MONTHLY_COPY,
         _promotion_funding,
@@ -509,8 +507,6 @@ def _calculate_self_service_financials_unsettled(rule, price_result, data: dict)
         return apply_vip_monthly_store_funding(calculate_aw_collision_financials(price_result, data))
 
     manual_price = get_self_service_staff_price(data)
-    # The VIP custom-order quote is the only chargeable base. Even persisted
-    # legacy price results may not add a specify fee to a staff-entered price.
     is_custom_order = str(getattr(rule, "key", "") or "") == "custom_custom_order"
     specify_before = (
         0 if is_custom_order else max(0, int(getattr(price_result, "specify_fee", 0) or 0))
@@ -621,8 +617,6 @@ def _calculate_self_service_financials_unsettled(rule, price_result, data: dict)
             )
     point_service_value = one_seat_point_service_value * funded_point_service_seats
 
-    # Waived specify fees were never collected, so they are not payout/store value.
-    # Current seat-aware service rewards, however, fund every selected seat directly.
     payout_base = allocation.payout_base_amount + point_service_value
     customer_pay = max(0, allocation.customer_pay_amount - benefit_discount_amount)
     notes: list[str] = []
@@ -730,12 +724,6 @@ def _calculate_self_service_financials_unsettled(rule, price_result, data: dict)
 
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
-    """Use settled Web checkout snapshots directly, preserving paid benefits.
-
-    When a Website order has reserved its benefit, Discord must NOT try to
-    reserve it a second time. This policy formerly lived in a startup wrapper;
-    it is now owned by the finance calculator itself.
-    """
     if not bool(data.get("website_finance_settled")):
         return _calculate_self_service_financials_unsettled(rule, price_result, data)
 
