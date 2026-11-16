@@ -34,6 +34,9 @@ def test_rule_override_publish_rollback_and_reset(tmp_path, monkeypatch):
     payload_v1 = rule_to_override_payload(base)
     payload_v1["price"] = int(base.price) + 11
     payload_v1["label"] = base.label + " 測試"
+    # An explicit new manager-approved publish is allowed to change price;
+    # stale, unconfirmed overrides remain protected by the new source policy.
+    payload_v1["__owner_confirmed_after_canonical"] = True
 
     preview_rule_override(key, payload_v1)
     first = publish_rule_override(
