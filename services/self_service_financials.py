@@ -293,7 +293,7 @@ def apply_manual_price_adjustment_to_order_data(data: dict, base_amount: int) ->
     return adjustment
 
 
-def _quote_preview_lines_for_self_service(
+def _quote_preview_lines_raw(
     data: dict,
     guild: discord.Guild | None = None,
 ) -> list[tuple[str, str]]:
@@ -444,6 +444,35 @@ def _quote_preview_lines_for_self_service(
     return lines
 
 
+def _quote_preview_lines_for_self_service(
+    data: dict, guild: discord.Guild | None = None
+) -> list[tuple[str, str]]:
+    """Canonical, funding-accurate Bot/Web quote preview without monkey patch."""
+    from services.self_service_financial_copy import (
+        _VIP_MONTHLY_COPY,
+        _promotion_funding,
+        _rewrite_quote_text,
+        _vip_monthly_display,
+    )
+
+    rows = _quote_preview_lines_raw(data, guild)
+    funding = _promotion_funding(data)
+    result = [
+        (name, _rewrite_quote_text(str(value or ""), promotion_funding=funding))
+        for name, value in rows
+    ]
+    vip_monthly = _vip_monthly_display(data)
+    if vip_monthly and not any(name == "VIP 月券" for name, _ in result):
+        title, amount = vip_monthly
+        result.append(
+            (
+                "VIP 月券",
+                f"{title}｜-{_format_plain_amount(amount)}｜{_VIP_MONTHLY_COPY}",
+            )
+        )
+    return result
+
+
 def add_self_service_quote_preview(
     embed: discord.Embed,
     data: dict,
@@ -471,7 +500,7 @@ def _format_point_hours(hours) -> str:
     return f"{value:g}H"
 
 
-def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
+def _calculate_self_service_financials_unsettled(rule, price_result, data: dict) -> dict:
     if is_internal_ammo_dump_rule(rule):
         return apply_vip_monthly_store_funding(
             apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data))
@@ -698,6 +727,35 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
         "customer_pay_amount": customer_pay,
     }
     return apply_vip_monthly_store_funding(apply_urgent_fee(rule, data, financials))
+
+
+def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
+    """Use settled Web checkout snapshots directly, preserving paid benefits.
+
+    When a Website order has reserved its benefit, Discord must NOT try to
+    reserve it a second time. This policy formerly lived in a startup wrapper;
+    it is now owned by the finance calculator itself.
+    """
+    if not bool(data.get("website_finance_settled")):
+        return _calculate_self_service_financials_unsettled(rule, price_result, data)
+
+    from services.self_service_financial_copy import _SETTLED_FINANCIAL_KEYS
+
+    safe_data = dict(data)
+    for key in (
+        "selected_point_benefit_key",
+        "selected_vip_monthly_benefit_id",
+        "selected_benefit_coupon_id",
+    ):
+        safe_data.pop(key, None)
+
+    result = _calculate_self_service_financials_unsettled(
+        rule, price_result, safe_data
+    )
+    for key in _SETTLED_FINANCIAL_KEYS:
+        if key in data and data.get(key) is not None:
+            result[key] = data.get(key)
+    return result
 
 
 def apply_self_service_financials_to_order_data(data: dict, rule, price_result) -> dict:
