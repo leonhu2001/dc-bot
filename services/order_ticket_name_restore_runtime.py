@@ -35,7 +35,7 @@ _GAME_LABELS = {
 
 
 def _topic_customer_id(channel: discord.TextChannel) -> int | None:
-    for part in str(channel.topic or "").split(";"):
+    for part in str(getattr(channel, "topic", None) or "").split(";"):
         if "=" not in part:
             continue
         key, value = part.split("=", 1)
@@ -49,7 +49,7 @@ def _topic_customer_id(channel: discord.TextChannel) -> int | None:
 
 
 def _is_quick_order_ticket(channel: discord.TextChannel, data: dict) -> bool:
-    return bool(data.get("quick_order_v2")) or "quick_order_v2=1" in str(channel.topic or "")
+    return bool(data.get("quick_order_v2")) or "quick_order_v2=1" in str(getattr(channel, "topic", None) or "")
 
 
 def _status_from_simplified_name(name: str) -> str:
