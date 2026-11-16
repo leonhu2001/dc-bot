@@ -267,9 +267,10 @@ GROUP_SPECS = [
         "category": "farm",
         "label": "賽季 3×3",
         "selector_label": "方案",
-        "description": "賽季3x3可加購造型或包損耗；命運契約依數量計價。",
+        "image": "order_panels/delta_farm_3x3.png",
+        "description": "S12｜3×3安全箱 5,500T；安全箱＋外觀 8,000T（外觀 +2,500T）；包損 +500T；命運契約 600T／個。下單前請自備 3,000W 哈夫幣；安全箱約 3～5 天，命運契約開啟後約 1～2 天結單。賽前預約 -500T 由客服於 DC 手動設定固定折扣（共同分擔），不提供客人自行選擇。",
         "variants": [
-            ("farm_season_3x3_normal", "賽季3x3"),
+            ("farm_season_3x3_normal", "3×3安全箱"),
             ("farm_season_3x3_contract", "命運契約"),
         ],
     },
@@ -560,17 +561,16 @@ def _variant_data(
         min_quantity = 1
         max_quantity = 1
 
+        # DC and Web read the same effective Rule. Early-booking remains a
+        # staff-only shared fixed discount, never a customer-selected extra.
         customer_adjustments = [
             {
-                "key": "skin",
-                "label": "造型",
-                "amount": 2500,
-            },
-            {
-                "key": "loss_cover",
-                "label": "包損耗",
-                "amount": 500,
-            },
+                "key": key,
+                "label": str(rule.staff_adjustment_labels.get(key) or key),
+                "amount": int(amount),
+            }
+            for key, amount in (rule.staff_adjustments or {}).items()
+            if key in {"skin", "loss_cover"}
         ]
 
     elif (
@@ -784,7 +784,7 @@ def _group_data(
             ),
         **(
             {"image_url": f"/static/{spec['image']}"}
-            if str(spec.get("image") or "").startswith("price_lists/")
+            if str(spec.get("image") or "").startswith(("price_lists/", "order_panels/"))
             else {}
         ),
         "starting_price":
