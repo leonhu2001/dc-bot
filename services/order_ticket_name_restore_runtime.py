@@ -195,7 +195,14 @@ def _play_labels(data: dict) -> list[str]:
 
 
 def _order_prefix(data: dict, status: str = "active") -> str:
-    parts = [_legacy_prefix(status), _game_label(data), *_play_labels(data)]
+    from services.order_ticket_ui_policy import _is_paid_active_order
+
+    prefix = _legacy_prefix(status)
+    # A genuinely paid active ticket is named 訂單; a prepayment draft is 下單.
+    # This was previously installed by rebinding _order_prefix after startup.
+    if status == "active" and _is_paid_active_order(data):
+        prefix = "訂單"
+    parts = [prefix, _game_label(data), *_play_labels(data)]
     return "-".join(str(part).strip() for part in parts if str(part).strip())
 
 
