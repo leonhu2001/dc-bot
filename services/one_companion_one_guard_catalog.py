@@ -29,7 +29,7 @@ _RULE_SPECS = (
         "delta_desktop_basic",
         "basic_one_companion_one_guard_topsecret",
         "一陪一護〈端遊〉｜絕密",
-        850,
+        900,
         DELTA_DESKTOP_GAME_ROLE,
         "topsecret",
         "絕密",
