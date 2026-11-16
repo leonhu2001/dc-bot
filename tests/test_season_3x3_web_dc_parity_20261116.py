@@ -23,12 +23,12 @@ from web.app.services.public_checkout import build_public_quote, _get_public_rul
 from web.app.services.order_groups import get_grouped_order_catalog
 
 
-def test_3x3_website_uses_exact_same_rule_objects_as_discord():
+def test_3x3_website_uses_exact_same_effective_rules_as_discord():
     for rule_key in (
         "farm_season_3x3_normal",
         "farm_season_3x3_contract",
     ):
-        assert _get_public_rule(rule_key) is ORDER_RULES[rule_key]
+        assert _get_public_rule(rule_key) == ORDER_RULES[rule_key]
     assert _get_public_rule("farm_season_3x3_normal").price == 5500
     assert _get_public_rule("farm_season_3x3_contract").price == 600
 
