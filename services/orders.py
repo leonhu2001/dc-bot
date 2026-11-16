@@ -87,7 +87,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "體驗單",
             "details": [
-                {"label": "普通｜850w", "value": "850w", "rule_key": "basic_trial_500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "普通｜888w", "value": "888w", "rule_key": "basic_trial_500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "尊爵｜1888w", "value": "1888w", "rule_key": "basic_trial_1000", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
@@ -440,6 +440,8 @@ ORDER_RULE_KEY_BY_LABEL.update({
     "體驗單 1000": "basic_trial_1000",
     "體驗單 777w": "basic_trial_500",
     "體驗單 850w": "basic_trial_500",
+    "體驗單 888w": "basic_trial_500",
+    "體驗單 普通888w": "basic_trial_500",
     "體驗單 普通850w": "basic_trial_500",
     "體驗單 1688w": "basic_trial_1000",
     "體驗單 1888w": "basic_trial_1000",
