@@ -462,6 +462,25 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
             row=0,
         )
 
+        # Show each monthly voucher's real minimum spend at view construction.
+        from services.self_service_vip_monthly_ux import (
+            _current_original_service_amount, _monthly_benefit_by_id,
+            _monthly_status, _option_description,
+        )
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(parent_view.channel_id, {})
+        original = _current_original_service_amount(parent_view.rule, data)
+        for option in self.options:
+            value = str(getattr(option, "value", "") or "")
+            if not value.startswith("vip_monthly:"):
+                continue
+            benefit = _monthly_benefit_by_id(
+                parent_view.available_vip_monthly_benefits, value.split(":", 1)[1],
+            )
+            if benefit is not None:
+                option.description = _truncate_select_text(
+                    _option_description(_monthly_status(benefit, original_amount=original))
+                )
+
     async def callback(self, interaction: discord.Interaction):
         view = self.view
 
@@ -471,6 +490,34 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
 
         selected = self.values[0]
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(view.channel_id, {})
+
+        # Recheck the live monthly voucher and original service threshold before
+        # clearing or replacing any existing benefit selection.
+        if selected.startswith("vip_monthly:"):
+            from services.self_service_vip_monthly_ux import (
+                _current_original_service_amount, _monthly_benefit_by_id,
+                _monthly_requirement_text, _monthly_status,
+            )
+            from services.vip_monthly_benefits import list_available_cash_benefits
+            benefit = _monthly_benefit_by_id(
+                list_available_cash_benefits(view.customer_id),
+                selected.split(":", 1)[1],
+            )
+            if benefit is None:
+                await interaction.response.send_message(
+                    "這張 VIP 每月折現券已使用、已保留或已失效，請重新開啟福利選單。",
+                    ephemeral=True,
+                )
+                return
+            original = _current_original_service_amount(
+                view.rule, data, guild=interaction.guild,
+            )
+            status = _monthly_status(benefit, original_amount=original)
+            if not bool(status.get("eligible")):
+                await interaction.response.send_message(
+                    _monthly_requirement_text(status), ephemeral=True,
+                )
+                return
 
         clear_keys = (
             "selected_point_benefit_key",
@@ -655,13 +702,39 @@ class SelfServicePointBenefitView(discord.ui.View):
         elif benefit:
             selected_text = f"{benefit['cost']} 點｜{benefit['name']}"
 
-        return (
+        message = (
             f"請選擇這張單要使用的點數福利或會員福利券。\n"
             f"目前可用點數：{self.point_balance} 點\n"
             f"可用福利券：{len(self.available_vip_monthly_benefits) + len(self.available_coupons) + (1 if self.available_same_order_benefit else 0)} 張\n"
             f"目前選擇：{selected_text}\n\n"
             "同張訂單只能擇一；福利券會在訂單建立時先保留，結單後正式核銷。"
         )
+
+        if not self.available_vip_monthly_benefits:
+            return message
+        from services.self_service_vip_monthly_ux import (
+            _current_original_service_amount, _monthly_requirement_text,
+            _monthly_status,
+        )
+        import re
+        original = _current_original_service_amount(self.rule, data)
+        statuses = [
+            _monthly_status(item, original_amount=original)
+            for item in self.available_vip_monthly_benefits
+        ]
+        other = len(self.available_coupons) + (
+            1 if self.available_same_order_benefit else 0
+        )
+        eligible = sum(bool(status.get("eligible")) for status in statuses)
+        message = re.sub(
+            r"可用福利券:\d+ 張",
+            f"本單可用福利券：{eligible + other} 張\n持有福利券：{len(statuses) + other} 張",
+            message, count=1,
+        )
+        requirements = "\n".join(
+            f"・{_monthly_requirement_text(status)}" for status in statuses
+        )
+        return f"{message}\n\nVIP 月券使用門檻：\n{requirements}"
 
     async def refresh_source_panel(self, interaction: discord.Interaction):
         data = SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id, {})
