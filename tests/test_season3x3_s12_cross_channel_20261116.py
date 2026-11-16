@@ -60,14 +60,14 @@ def test_public_card_shows_new_image_and_owner_terms_but_no_booking_choice():
     assert group["image_url"] == "/static/order_panels/delta_farm_3x3.png"
     assert "5,500T" in group["description"]
     assert "8,000T" in group["description"]
-    assert "外觀" in group["description"]
+    assert "造型" in group["description"]
     assert "客服" in group["description"]
     variant = next(v for v in group["variants"] if v["rule_key"] == "farm_season_3x3_normal")
     assert variant["price"] == 5500
     assert variant["label"] == "3×3安全箱"
     extras = {item["key"]: item for item in variant["customer_adjustments"]}
     assert set(extras) == {"skin", "loss_cover"}
-    assert extras["skin"] == {"key": "skin", "label": "外觀", "amount": 2500}
+    assert extras["skin"] == {"key": "skin", "label": "造型", "amount": 2500}
     assert extras["loss_cover"]["amount"] == 500
     assert "early_booking" not in extras
 
