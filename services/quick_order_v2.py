@@ -7,7 +7,7 @@ from discord.ext import commands
 
 from core.config import config_int
 from core.database import remember_order_data
-from services.orders import ORDER_CATEGORY_LABELS, ORDER_ITEM_GROUPS_BY_CATEGORY
+from services.orders import ORDER_CATEGORY_LABELS, get_live_order_item_groups
 from services.rewards import format_customer_notes_for_ticket
 from services.ticket_identity import build_ticket_channel_name
 from services.vip_timer import VIP_TIMER_CATEGORY, VIP_TIMER_CATEGORY_LABEL
@@ -64,23 +64,10 @@ def _marker(channel_id: int) -> str:
 
 
 def _groups(category: str) -> list[str]:
-    """Resolve current selectable groups from the canonical entrypoint.
-
-    The configured dynamic resolver protects the five 3x3 variants from splitting
-    into multiple Quick Order groups. Keep the raw-catalog fallback available for
-    early callers before setup_commands installs the catalog resolver.
-    """
-    from services import quick_order_v2_fixes as fixes
-
-    if fixes._ORIGINAL_DETAILS_RESOLVER is not None:
-        return fixes._live_groups(category)
-
-    result: list[str] = []
-    for value in ORDER_ITEM_GROUPS_BY_CATEGORY.get(category, []):
-        text = str(value or "").strip()
-        if text and text not in result:
-            result.append(text)
-    return result
+    """Resolve live groups from the canonical Bot/Web catalog, without patches."""
+    if str(category) == str(VIP_TIMER_CATEGORY):
+        refresh_vip_timer_self_service_catalog()
+    return get_live_order_item_groups(category)
 
 
 def _options(category: str) -> list[discord.SelectOption]:
