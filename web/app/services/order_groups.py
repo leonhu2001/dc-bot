@@ -268,7 +268,7 @@ GROUP_SPECS = [
         "label": "賽季 3×3",
         "selector_label": "方案",
         "image": "order_panels/delta_farm_3x3.png",
-        "description": "S12｜3×3安全箱 5,500T；外觀加購 2,500T；包損 +500T；命運契約 600T／個。賽前預約折扣由客服於 DC 手動扣除 500T。",
+        "description": "S12｜3×3安全箱 5,500T；安全箱＋外觀 8,000T（外觀 +2,500T）；包損 +500T；命運契約 600T／個。賽前預約 -500T 由客服於 DC 手動設定固定折扣（共同分擔），不提供客人自行選擇。",
         "variants": [
             ("farm_season_3x3_normal", "3×3安全箱"),
             ("farm_season_3x3_contract", "命運契約"),
