@@ -611,6 +611,26 @@ def list_applicable_coupons(
         row["title"] = _coupon_title(row)
         row["expires_at_text"] = _coupon_expiry_text(row.get("expires_at"))
         result.append(row)
+    # Include active issued promotions in the same picker without rebinding
+    # list_applicable_coupons during Bot startup.
+    from services import promotion_benefits as promotion
+    from services.self_service_promotion_integration import _category_for_rule_key
+    category = _category_for_rule_key(rule_key)
+    for item in promotion.list_issued_benefits(customer_discord_id=customer_id):
+        if (str(item.get("status") or "") != promotion.ACTIVE
+                or int(item.get("remaining_uses") or 0) <= 0):
+            continue
+        decorated = promotion._decorate_issued(item)
+        rules = decorated.get("rules") or {}
+        scope_type = str(rules.get("scope_type") or "all")
+        if scope_type == "category" and not category:
+            continue
+        if not promotion._scope_allowed(
+            rules, rule_key=str(rule_key or ""), category=category,
+        ):
+            continue
+        decorated["summary"] = promotion.benefit_note(decorated)
+        result.append(decorated)
     return result
 
 
@@ -724,8 +744,13 @@ def reserve_coupon_in_session(
     rule_key: str,
     player_count: int = 1,
 ) -> None:
-    # Schema is initialized at application/bot startup. Avoid opening a second
-    # SQLite write transaction while this Session already owns the order transaction.
+    from services import promotion_benefits as promotion
+    if promotion.decode_selection_id(coupon_id) is not None:
+        from services.promotion_benefit_lifecycle import reserve_in_session
+        return reserve_in_session(
+            db, selection_id=coupon_id,
+            customer_discord_id=customer_id, order_id=order_id,
+        )
     scope = loyalty_scope_key(rule_key, player_count)
     result = db.execute(text("""
         UPDATE customer_benefit_coupons
@@ -787,7 +812,9 @@ def release_coupon_for_order(order_id: int) -> int:
             WHERE reserved_order_id = :order_id
               AND status = 'reserved'
         """), {"order_id": int(order_id), "now": now})
-        return int(result.rowcount or 0)
+        own_count = int(result.rowcount or 0)
+    from services.promotion_benefit_lifecycle import release_for_order
+    return own_count + int(release_for_order(order_id) or 0)
 
 
 def redeem_coupon_for_order(order_id: int) -> int:
@@ -805,7 +832,9 @@ def redeem_coupon_for_order(order_id: int) -> int:
             "order_id": int(order_id),
             "redeemed_at": now,
         })
-        return int(result.rowcount or 0)
+        own_count = int(result.rowcount or 0)
+    from services.promotion_benefit_lifecycle import redeem_for_order
+    return own_count + int(redeem_for_order(order_id) or 0)
 
 
 def _event_time_as_taipei(row: dict[str, Any]) -> datetime | None:
