@@ -595,7 +595,7 @@ def test_delta_desktop_and_mobile_pricing_are_separate():
     assert ORDER_RULES["basic_mobile_tech_secret_single"].price == 380
     assert ORDER_RULES["basic_mobile_tech_topsecret_single"].price == 420
     assert ORDER_RULES["basic_exbar_tech"].price == 1000
-    assert ORDER_RULES["basic_exbar_tech"].note == "保底三選一：800w / 500w + 2 沙色保險 / 4 沙色保險"
+    assert ORDER_RULES["basic_exbar_tech"].note == "保底三選一：850w / 600w + 2 沙色保險 / 4 沙色保險"
 
     assert not hasattr(services, "_RULE_UPDATES")
 
@@ -741,10 +741,10 @@ def test_storefront_business_values_are_direct_rules():
         "basic_sweet_double_any": ("hourly", 1314, "H"),
         "basic_trial_500": ("fixed", 500, "單"),
         "basic_trial_1000": ("fixed", 1000, "單"),
-        "basic_bet_1000": ("fixed", 1300, "單"),
-        "basic_bet_1500": ("fixed", 1800, "單"),
-        "basic_bet_2500": ("fixed", 2500, "單"),
-        "basic_oil_fuel": ("fixed", 2800, "單"),
+        "basic_bet_1000": ("fixed", 1200, "單"),
+        "basic_bet_1500": ("fixed", 1500, "單"),
+        "basic_bet_2500": ("fixed", 2400, "單"),
+        "basic_oil_fuel": ("fixed", 3000, "單"),
         "basic_oil_satellite": ("fixed", 2000, "單"),
         "basic_oil_all": ("fixed", 4500, "單"),
         "steam_play": ("hourly", 350, "H"),
