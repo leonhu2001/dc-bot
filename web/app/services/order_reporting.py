@@ -591,10 +591,14 @@ def list_reports_for_review(
     status_filter: str | None = None,
     keyword: str | None = None,
     limit: int = 250,
+    offset: int = 0,
 ) -> list[dict]:
     ensure_order_reporting_tables()
     where_status = ""
-    params: dict[str, Any] = {"limit": max(1, min(int(limit), 500))}
+    params: dict[str, Any] = {
+        "limit": max(1, min(int(limit), 500)),
+        "offset": max(0, int(offset)),
+    }
 
     if status_filter in REPORT_STATUSES:
         where_status = " AND COALESCE(r.status, 'approved') = :status_filter"
@@ -620,12 +624,23 @@ def list_reports_for_review(
         """
         params["keyword"] = f"%{keyword_text}%"
 
+    # A submitted pending report must never silently disappear when a
+    # separate order-status transition changes the parent from closed.
+    # Such anomalies are visible but cannot be approved until reconciled.
+    where_order = (
+        " AND (LOWER(TRIM(COALESCE(o.status, ''))) = 'closed'"
+        " OR r.status = 'pending')"
+        if status_filter in {None, "", "actionable", REPORT_STATUS_PENDING}
+        else " AND LOWER(TRIM(COALESCE(o.status, ''))) = 'closed'"
+    )
+
     with engine.begin() as conn:
         rows = conn.execute(
             text(
                 """
                 SELECT
                     o.id,
+                    o.status AS order_status,
                     o.bot_order_no,
                     o.customer_display_name,
                     o.category,
@@ -645,21 +660,25 @@ def list_reports_for_review(
                     ) AS worker_names
                 FROM web_orders o
                 LEFT JOIN order_reports r ON r.order_id = o.id
-                WHERE LOWER(TRIM(COALESCE(o.status, ''))) = 'closed'
+                WHERE 1=1
                 """
+                + where_order
                 + where_status
                 + where_keyword
                 + """
                 ORDER BY
                     CASE COALESCE(r.status, 'approved')
-                        WHEN 'missing' THEN 0
-                        WHEN 'pending' THEN 1
+                        WHEN 'pending' THEN 0
+                        WHEN 'missing' THEN 1
                         WHEN 'changes_requested' THEN 2
                         ELSE 3
                     END,
-                    COALESCE(o.closed_at, o.updated_at, o.created_at) DESC,
+                    CASE WHEN r.status = 'pending'
+                        THEN COALESCE(r.submitted_at, o.closed_at, o.updated_at, o.created_at)
+                        ELSE COALESCE(o.closed_at, o.updated_at, o.created_at)
+                    END DESC,
                     o.id DESC
-                LIMIT :limit
+                LIMIT :limit OFFSET :offset
                 """
             ),
             params,
