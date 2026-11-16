@@ -1199,7 +1199,7 @@ SEASON_3X3_EARLY_BOOKING_DISCOUNT_SOURCE = "manual_fixed"
 _add(OrderRule(
     "farm",
     "farm_season_3x3_normal",
-    "賽季3x3",
+    "3×3安全箱",
     "fixed",
     5500,
     allowed_roles=ALL_RECEIVER_ROLES,
@@ -1213,7 +1213,7 @@ _add(OrderRule(
         "loss_cover": 500,
     },
     staff_adjustment_labels={
-        "skin": "造型",
+        "skin": "外觀",
         "loss_cover": "包損耗",
     },
 ))
@@ -1222,7 +1222,7 @@ _add(OrderRule("farm", "farm_season_3x3_skin", "賽季3x3｜造型", "fixed", 30
 _add(OrderRule(
     "farm",
     "farm_season_3x3_dc_skin",
-    "賽季3x3+造型",
+    "3×3安全箱＋外觀",
     "fixed",
     8000,
     allowed_roles=ALL_RECEIVER_ROLES,
@@ -1236,7 +1236,7 @@ _add(OrderRule(
 _add(OrderRule(
     "farm",
     "farm_season_3x3_dc_loss",
-    "賽季3x3包損耗",
+    "3×3安全箱＋包損",
     "fixed",
     6000,
     allowed_roles=ALL_RECEIVER_ROLES,
@@ -1250,7 +1250,7 @@ _add(OrderRule(
 _add(OrderRule(
     "farm",
     "farm_season_3x3_dc_skin_loss",
-    "賽季3x3+造型包損耗",
+    "3×3安全箱＋外觀＋包損",
     "fixed",
     8500,
     allowed_roles=ALL_RECEIVER_ROLES,
@@ -1944,6 +1944,11 @@ NEW_FUN_PRICE_CARD_RULE_KEYS = frozenset({
 })
 FULL_SOURCE_AUTHORITY_RULE_KEYS = frozenset({
     "fun_read_no_reply", "fun_eat_yourself",
+    # S12 3×3 latest approved price card: ignore preexisting manager overrides
+    # while permitting explicit, newly confirmed changes in the rule manager.
+    "farm_season_3x3_normal", "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_loss", "farm_season_3x3_dc_skin_loss",
+    "farm_season_3x3_contract",
 }) | NEW_FUN_PRICE_CARD_RULE_KEYS
 
 # Owner-approved structural qualifications. Manager overrides may change ordinary
