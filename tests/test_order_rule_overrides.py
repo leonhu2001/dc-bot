@@ -37,6 +37,8 @@ def test_rule_override_publish_rollback_and_reset(tmp_path, monkeypatch):
     # An explicit new manager-approved publish is allowed to change price;
     # stale, unconfirmed overrides remain protected by the new source policy.
     payload_v1["__owner_confirmed_after_canonical"] = True
+    from services.order_rules import DELTA_DESKTOP_APPROVAL_REVISION_MARKER
+    payload_v1[DELTA_DESKTOP_APPROVAL_REVISION_MARKER] = True
 
     preview_rule_override(key, payload_v1)
     first = publish_rule_override(
