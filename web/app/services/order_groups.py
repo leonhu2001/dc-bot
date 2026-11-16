@@ -267,9 +267,9 @@ GROUP_SPECS = [
         "category": "farm",
         "label": "賽季 3×3",
         "selector_label": "方案",
-        "description": "賽季3x3可加購造型或包損耗；命運契約依數量計價。",
+        "description": "S12｜3×3安全箱 5,500T；外觀加購 2,500T；包損 +500T；命運契約 600T／個。賽前預約折扣由客服於 DC 手動扣除 500T。",
         "variants": [
-            ("farm_season_3x3_normal", "賽季3x3"),
+            ("farm_season_3x3_normal", "3×3安全箱"),
             ("farm_season_3x3_contract", "命運契約"),
         ],
     },
@@ -560,17 +560,17 @@ def _variant_data(
         min_quantity = 1
         max_quantity = 1
 
+        # The Web selection options and actual quote MUST read the same
+        # effective rule. Booking is intentionally excluded: only DC support
+        # enters its shared fixed 500T discount after verifying eligibility.
         customer_adjustments = [
             {
-                "key": "skin",
-                "label": "造型",
-                "amount": 2500,
-            },
-            {
-                "key": "loss_cover",
-                "label": "包損耗",
-                "amount": 500,
-            },
+                "key": key,
+                "label": str(rule.staff_adjustment_labels.get(key) or key),
+                "amount": int(amount),
+            }
+            for key, amount in (rule.staff_adjustments or {}).items()
+            if key in {"skin", "loss_cover"}
         ]
 
     elif (
