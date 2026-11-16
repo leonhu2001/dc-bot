@@ -87,7 +87,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "體驗單",
             "details": [
-                {"label": "普通｜888w", "value": "888w", "rule_key": "basic_trial_500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "普通｜850w", "value": "850w", "rule_key": "basic_trial_500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "尊爵｜1888w", "value": "1888w", "rule_key": "basic_trial_1000", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
