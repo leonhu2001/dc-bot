@@ -333,203 +333,172 @@ class CoinWashUrgentButton(discord.ui.Button):
         )
 
 
-def _install_ticket_ui_policy() -> None:
-    """Install the single active Quick Order ticket UI policy."""
-    global _BASE_PANEL_BUILDER, _BASE_VIEW_INIT
-    if _BASE_PANEL_BUILDER is not None or _BASE_VIEW_INIT is not None:
-        return
-
+def apply_production_ticket_view_policy(
+    self,
+    customer_id: int,
+    channel_id: int,
+    selected_category: str | None = None,
+):
     from core.database import remember_order_data
-    from services import order_runtime
-    from services import self_service_runtime as runtime
-    from services import self_service_selection_runtime as selection_runtime
     from services import self_service_ui_runtime as ui
     from services.order_rules import ORDER_RULES
-    from services.order_ticket_ui_policy import install_payment_finalize_rename_policy
     from services.orders import get_self_service_quantity_meta
 
-    _BASE_PANEL_BUILDER = runtime.build_self_service_panel_embed
-    _BASE_VIEW_INIT = ui.SelfServiceOrderView.__init__
-    base_builder = _BASE_PANEL_BUILDER
-    base_view_init = _BASE_VIEW_INIT
+    data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+    if not isinstance(data, dict) or not data.get("quick_order_v2"):
+        return
 
-    def ticket_view_init(
-        self,
-        customer_id: int,
-        channel_id: int,
-        selected_category: str | None = None,
-    ):
-        base_view_init(self, customer_id, channel_id, selected_category)
-        data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
-        if not isinstance(data, dict) or not data.get("quick_order_v2"):
-            return
-
-        # Customer-service re-dispatch intentionally constructs the view without a
-        # fixed category. Persist that mode once so every later refresh keeps the
-        # original four selectors instead of falling back to the compact quick UI.
-        if selected_category is None and not data.get(LEGACY_RESELECT_FLAG):
-            data[LEGACY_RESELECT_FLAG] = True
-            try:
-                remember_order_data(channel_id, data)
-            except Exception as exc:
-                print(
-                    f"[quick-order-v2] persist classic re-dispatch mode failed "
-                    f"channel={channel_id}: {type(exc).__name__}: {exc}",
-                    flush=True,
-                )
-
-        if data.get(LEGACY_RESELECT_FLAG):
-            apply_quick_order_select_display(self, data)
-            return
-
-        category = str(data.get("category") or "")
-        is_timer = category == quick.VIP_TIMER_CATEGORY
-        is_farm = category in {"farm", "staff_internal"}
-        item = str(data.get("item") or "").strip()
-        rule_key = str(data.get("order_rule_key") or "").strip()
-        rule = ORDER_RULES.get(rule_key)
-
-        for child in list(self.children):
-            if getattr(child, "custom_id", None) in {
-                "self_service_order_category_select",
-                "self_service_order_item_select",
-            }:
-                self.remove_item(child)
-
-        for child in list(self.children):
-            custom_id = getattr(child, "custom_id", None)
-
-            if custom_id == "self_service_order_detail_select":
-                child.placeholder = (
-                    "選擇起始玩法"
-                    if is_timer
-                    else "請選擇方案"
-                    if is_farm
-                    else "請選擇規格／陪玩人數"
-                )
-
-                if is_farm and hasattr(child, "options"):
-                    options = list(child.options)
-                    if any(
-                        str(getattr(option, "value", "")) in _FARM_3X3_DETAIL_ORDER
-                        for option in options
-                    ):
-                        options.sort(
-                            key=lambda option: _FARM_3X3_DETAIL_ORDER.get(
-                                str(getattr(option, "value", "")),
-                                99,
-                            )
-                        )
-                        child.options.clear()
-                        child.options.extend(options)
-
-                    if item and len(options) <= 1:
-                        self.remove_item(child)
-
-            elif is_farm and custom_id == "self_service_order_quantity_select":
-                if not item:
-                    self.remove_item(child)
-                    continue
-
-                meta = get_self_service_quantity_meta(
-                    data.get("category"),
-                    data.get("item_group"),
-                    data.get("item_detail_value"),
-                )
-                if meta and int(meta.get("min") or 1) == int(meta.get("max") or 1):
-                    self.remove_item(child)
-                else:
-                    child.placeholder = "請選擇數量"
-
-            elif is_farm and custom_id == "self_service_order_specified_staff_button":
-                self.remove_item(child)
-
-            elif is_farm and custom_id in {
-                "self_service_order_point_benefit_button",
-                "self_service_order_staff_discount_coupon_button",
-            }:
-                if not item or category == "staff_internal":
-                    self.remove_item(child)
-
-            elif is_farm and custom_id == "self_service_order_staff_price_button":
-                if not item or rule is None or str(getattr(rule, "pricing_type", "")) != "manual":
-                    self.remove_item(child)
-
-            elif is_farm and custom_id == "self_service_order_go_payment_button" and not item:
-                child.disabled = True
-
-        apply_quick_order_select_display(self, data)
-        from services.coin_wash_urgent_policy import urgent_fee_for_rule
-        urgent_fee = urgent_fee_for_rule(rule_key)
-        if urgent_fee:
-            self.add_item(CoinWashUrgentButton(
-                customer_id=customer_id,
-                channel_id=channel_id,
-                fee=urgent_fee,
-                selected=data.get("coin_wash_urgent") is True,
-            ))
-        if rule_key == "staff_internal_aw_collision":
-            for child in self.children:
-                if getattr(child, "custom_id", None) == "self_service_order_quantity_select":
-                    child.placeholder = "點此填寫 AW 發數"
-
-    def ticket_panel_builder(
-        customer_id: int,
-        data: dict,
-        guild: discord.Guild | None = None,
-    ) -> discord.Embed:
-        embed = base_builder(customer_id, data, guild)
-        if (
-            not isinstance(data, dict)
-            or not data.get("quick_order_v2")
-            or data.get(LEGACY_RESELECT_FLAG)
-            or str(data.get("category") or "") == quick.VIP_TIMER_CATEGORY
-        ):
-            return embed
-
-        category = str(data.get("category") or "")
-        group = str(data.get("item_group") or "尚未選擇")
-        embed.title = f"🛒 {quick.ORDER_CATEGORY_LABELS.get(category, category)}"
-        embed.description = (
-            f"下單用戶：<@{customer_id}>\n\n"
-            f"已選服務：**{group}**\n"
-            "請完成下方選項。"
-        )
-
-        for index, name in enumerate(("遊戲", "服務", "規格", "數量")):
-            if index >= len(embed.fields):
-                break
-            field = embed.fields[index]
-            embed.set_field_at(
-                index,
-                name=name,
-                value=field.value,
-                inline=field.inline,
-            )
-
-        embed.remove_footer()
-        return embed
-
-    ui.SelfServiceOrderView.__init__ = ticket_view_init
-    ui.build_self_service_panel_embed = ticket_panel_builder
-    runtime.build_self_service_panel_embed = ticket_panel_builder
-    selection_runtime.build_self_service_panel_embed = ticket_panel_builder
-
-    state = getattr(order_runtime, "_RUNTIME_STATE", None)
-    if state is not None:
+    # Customer-service re-dispatch intentionally constructs the view without a
+    # fixed category. Persist that mode once so every later refresh keeps the
+    # original four selectors instead of falling back to the compact quick UI.
+    if selected_category is None and not data.get(LEGACY_RESELECT_FLAG):
+        data[LEGACY_RESELECT_FLAG] = True
         try:
-            order_runtime._RUNTIME_STATE = replace(
-                state,
-                self_service_panel_embed_builder=ticket_panel_builder,
-            )
+            remember_order_data(channel_id, data)
         except Exception as exc:
             print(
-                f"[quick-order-v2] runtime panel builder refresh failed: "
-                f"{type(exc).__name__}: {exc}",
+                f"[quick-order-v2] persist classic re-dispatch mode failed "
+                f"channel={channel_id}: {type(exc).__name__}: {exc}",
                 flush=True,
             )
 
-    install_payment_finalize_rename_policy(order_runtime)
+    if data.get(LEGACY_RESELECT_FLAG):
+        apply_quick_order_select_display(self, data)
+        return
+
+    category = str(data.get("category") or "")
+    is_timer = category == quick.VIP_TIMER_CATEGORY
+    is_farm = category in {"farm", "staff_internal"}
+    item = str(data.get("item") or "").strip()
+    rule_key = str(data.get("order_rule_key") or "").strip()
+    rule = ORDER_RULES.get(rule_key)
+
+    for child in list(self.children):
+        if getattr(child, "custom_id", None) in {
+            "self_service_order_category_select",
+            "self_service_order_item_select",
+        }:
+            self.remove_item(child)
+
+    for child in list(self.children):
+        custom_id = getattr(child, "custom_id", None)
+
+        if custom_id == "self_service_order_detail_select":
+            child.placeholder = (
+                "選擇起始玩法"
+                if is_timer
+                else "請選擇方案"
+                if is_farm
+                else "請選擇規格／陪玩人數"
+            )
+
+            if is_farm and hasattr(child, "options"):
+                options = list(child.options)
+                if any(
+                    str(getattr(option, "value", "")) in _FARM_3X3_DETAIL_ORDER
+                    for option in options
+                ):
+                    options.sort(
+                        key=lambda option: _FARM_3X3_DETAIL_ORDER.get(
+                            str(getattr(option, "value", "")),
+                            99,
+                        )
+                    )
+                    child.options.clear()
+                    child.options.extend(options)
+
+                if item and len(options) <= 1:
+                    self.remove_item(child)
+
+        elif is_farm and custom_id == "self_service_order_quantity_select":
+            if not item:
+                self.remove_item(child)
+                continue
+
+            meta = get_self_service_quantity_meta(
+                data.get("category"),
+                data.get("item_group"),
+                data.get("item_detail_value"),
+            )
+            if meta and int(meta.get("min") or 1) == int(meta.get("max") or 1):
+                self.remove_item(child)
+            else:
+                child.placeholder = "請選擇數量"
+
+        elif is_farm and custom_id == "self_service_order_specified_staff_button":
+            self.remove_item(child)
+
+        elif is_farm and custom_id in {
+            "self_service_order_point_benefit_button",
+            "self_service_order_staff_discount_coupon_button",
+        }:
+            if not item or category == "staff_internal":
+                self.remove_item(child)
+
+        elif is_farm and custom_id == "self_service_order_staff_price_button":
+            if not item or rule is None or str(getattr(rule, "pricing_type", "")) != "manual":
+                self.remove_item(child)
+
+        elif is_farm and custom_id == "self_service_order_go_payment_button" and not item:
+            child.disabled = True
+
+    apply_quick_order_select_display(self, data)
+    from services.coin_wash_urgent_policy import urgent_fee_for_rule
+    urgent_fee = urgent_fee_for_rule(rule_key)
+    if urgent_fee:
+        self.add_item(CoinWashUrgentButton(
+            customer_id=customer_id,
+            channel_id=channel_id,
+            fee=urgent_fee,
+            selected=data.get("coin_wash_urgent") is True,
+        ))
+    if rule_key == "staff_internal_aw_collision":
+        for child in self.children:
+            if getattr(child, "custom_id", None) == "self_service_order_quantity_select":
+                child.placeholder = "點此填寫 AW 發數"
+
+
+def decorate_production_ticket_embed(
+    embed: discord.Embed,
+    customer_id: int,
+    data: dict,
+    guild: discord.Guild | None = None,
+) -> discord.Embed:
+    if (
+        not isinstance(data, dict)
+        or not data.get("quick_order_v2")
+        or data.get(LEGACY_RESELECT_FLAG)
+        or str(data.get("category") or "") == quick.VIP_TIMER_CATEGORY
+    ):
+        return embed
+
+    category = str(data.get("category") or "")
+    group = str(data.get("item_group") or "尚未選擇")
+    embed.title = f"🛒 {quick.ORDER_CATEGORY_LABELS.get(category, category)}"
+    embed.description = (
+        f"下單用戶：<@{customer_id}>\n\n"
+        f"已選服務：**{group}**\n"
+        "請完成下方選項。"
+    )
+
+    for index, name in enumerate(("遊戲", "服務", "規格", "數量")):
+        if index >= len(embed.fields):
+            break
+        field = embed.fields[index]
+        embed.set_field_at(
+            index,
+            name=name,
+            value=field.value,
+            inline=field.inline,
+        )
+
+    embed.remove_footer()
+    return embed
+
+
+def _install_ticket_ui_policy() -> None:
+    """Compatibility hook: core UI calls production presentation natively."""
+    return None
 
 
 def install_quick_order_v2_production(bot: commands.Bot) -> None:
@@ -537,13 +506,8 @@ def install_quick_order_v2_production(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
-    # Setup installs production before quick_order_v2 core. That makes the first
-    # persistent-view registration use the final public factory instead of adding
-    # another set of views later as a compatibility patch.
-    quick.assert_vip_timer_self_service_eligible = _live_vip_timer_eligibility
-    quick._view_for_channel = _public_view_for_channel
-    quick._ensure_panel = _clean_ensure_panel
-
+    # Core Quick Order and UI call the final presentation functions at source.
+    # Production setup does not replace their functions or class constructors.
     _install_ticket_ui_policy()
 
     _INSTALLED = True
