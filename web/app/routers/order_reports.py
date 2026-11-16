@@ -246,6 +246,7 @@ async def order_report_review_index(
     request: Request,
     status: str | None = "actionable",
     q: str | None = None,
+    page: int = 1,
     message: str | None = None,
     error: str | None = None,
 ):
@@ -265,10 +266,24 @@ async def order_report_review_index(
             status_code=403,
         )
 
-    reports = list_reports_for_review(
+    current_page = max(1, min(int(page), 100_000))
+    page_size = 250
+    rows = list_reports_for_review(
         status_filter=status,
         keyword=q,
+        limit=page_size + 1,
+        offset=(current_page - 1) * page_size,
     )
+    has_more = len(rows) > page_size
+    reports = rows[:page_size]
+
+    def _review_page_url(number: int) -> str:
+        return "/dispatch/reports/review?" + urlencode({
+            "status": status or "actionable",
+            "q": q or "",
+            "page": number,
+        })
+
     return templates.TemplateResponse(
         request=request,
         name="order_report_review.html",
@@ -281,6 +296,9 @@ async def order_report_review_index(
             "status_labels": STATUS_LABELS,
             "support_can_manage": True,
             "pending_report_review_count": count_pending_review_reports(),
+            "page": current_page,
+            "previous_page_url": _review_page_url(current_page - 1) if current_page > 1 else "",
+            "next_page_url": _review_page_url(current_page + 1) if has_more else "",
             "message": message,
             "error": error,
         },
