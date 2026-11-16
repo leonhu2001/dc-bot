@@ -772,10 +772,10 @@ for category, prefix, display, game_roles in [
     ("delta_desktop_basic", "basic_entertain", "娛樂陪〈端遊〉", DELTA_DESKTOP_GAME_ROLE),
     ("delta_mobile_basic", "basic_mobile_entertain", "娛樂陪〈手遊〉", DELTA_MOBILE_GAME_ROLE),
 ]:
-    desktop_prices = {1: 350, 2: 650} if category == "delta_desktop_basic" else {1: 320, 2: 600}
-    _add_delta_entertain_rule(category=category, key=f"{prefix}_single", label=f"{display}｜不限", allowed_roles=COMPANION_ROLES, game_roles=game_roles, prices=desktop_prices)
-    _add_delta_entertain_rule(category=category, key=f"{prefix}_female_single", label=f"{display}｜女陪", allowed_roles=("female_companion",), game_roles=game_roles, prices=desktop_prices)
-    _add_delta_entertain_rule(category=category, key=f"{prefix}_male_single", label=f"{display}｜男陪", allowed_roles=("male_companion",), game_roles=game_roles, prices=desktop_prices)
+    entertain_prices = {1: 320, 2: 600}  # Owner retained earlier rates for BOTH Delta platforms.
+    _add_delta_entertain_rule(category=category, key=f"{prefix}_single", label=f"{display}｜不限", allowed_roles=COMPANION_ROLES, game_roles=game_roles, prices=entertain_prices)
+    _add_delta_entertain_rule(category=category, key=f"{prefix}_female_single", label=f"{display}｜女陪", allowed_roles=("female_companion",), game_roles=game_roles, prices=entertain_prices)
+    _add_delta_entertain_rule(category=category, key=f"{prefix}_male_single", label=f"{display}｜男陪", allowed_roles=("male_companion",), game_roles=game_roles, prices=entertain_prices)
 
     # 歷史 fixed-double keys 不再出現在新 catalog。
     for suffix, text, roles in (
@@ -1661,6 +1661,15 @@ for (
 # the owner's 2026-11-16 changes.
 DELTA_DESKTOP_APPROVAL_REVISION_MARKER = "__owner_confirmed_delta_desktop_image_final_20261116"
 
+# Entertainment is explicitly exempt from the 2026-11-16 image's price rise.
+# Only a NEW manager publish after this freeze can deliberately change 320/600.
+DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER = "__owner_confirmed_delta_entertain_320_600_20261116"
+DELTA_ENTERTAINMENT_RULE_KEYS = frozenset({
+    "basic_entertain_single",
+    "basic_entertain_female_single",
+    "basic_entertain_male_single",
+})
+
 APPROVED_DELTA_DESKTOP_RULE_KEYS = frozenset({
     "basic_exbar_tech",
     "basic_entertain_single",
@@ -2113,9 +2122,14 @@ class EffectiveOrderRules(dict):
                     pricing_type=base.pricing_type,
                     unit_label=base.unit_label,
                 )
+            approval_revision = (
+                DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER
+                if key in DELTA_ENTERTAINMENT_RULE_KEYS
+                else DELTA_DESKTOP_APPROVAL_REVISION_MARKER
+            )
             delta_revision_confirmed = (
                 key in APPROVED_DELTA_DESKTOP_RULE_KEYS
-                and payload.get(DELTA_DESKTOP_APPROVAL_REVISION_MARKER) is True
+                and payload.get(approval_revision) is True
             )
             if key in APPROVED_DELTA_DESKTOP_RULE_KEYS and not delta_revision_confirmed:
                 # An old manager publish may carry the GENERIC approval flag.

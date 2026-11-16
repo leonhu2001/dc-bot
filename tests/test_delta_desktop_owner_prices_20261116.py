@@ -11,6 +11,8 @@ import pytest
 from services.order_rules import (
     APPROVED_DELTA_DESKTOP_RULE_KEYS,
     DELTA_DESKTOP_APPROVAL_REVISION_MARKER,
+    DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER,
+    DELTA_ENTERTAINMENT_RULE_KEYS,
     ORDER_RULES,
     calculate_price,
     get_base_rule,
@@ -24,10 +26,10 @@ from web.app.services.order_groups import get_grouped_order_catalog
 
 @pytest.mark.parametrize("key,count,amount", [
     ("basic_exbar_tech", 1, 1000),
-    ("basic_entertain_single", 1, 350),
-    ("basic_entertain_single", 2, 650),
-    ("basic_entertain_female_single", 1, 350),
-    ("basic_entertain_male_single", 2, 650),
+    ("basic_entertain_single", 1, 320),
+    ("basic_entertain_single", 2, 600),
+    ("basic_entertain_female_single", 1, 320),
+    ("basic_entertain_male_single", 2, 600),
     ("basic_one_companion_one_guard_secret", 1, 800),
     ("basic_one_companion_one_guard_topsecret", 1, 900),
     ("basic_tech_secret_single", 1, 450),
@@ -73,7 +75,7 @@ def test_contractual_guarantees_live_in_source_rules(key, guarantee):
 def test_approved_dc_price_list_matches_all_six_offers():
     plans = DELTA_DESKTOP_PRICE_LISTS
     for offer, terms in {
-        "entertainment": ("350T / H", "650T / H", "10 小時", "+100T"),
+        "entertainment": ("320T / H", "600T / H", "10 小時", "+100T"),
         "one_guard": ("800T / H", "900T / H", "8 殺", "7 殺", "2H"),
         "babel_technical": ("1000T / H", "850W", "600W + 2 沙保", "4 沙保"),
         "trial": ("500T", "850W", "1000T", "1888W", "每週", "每月", "打手選圖"),
@@ -156,7 +158,7 @@ def test_web_product_card_copy_tracks_latest_source_prices_guarantees():
         for item in get_grouped_order_catalog("delta_desktop_basic")
     }
     expected = {
-        "娛樂陪": ("350T/H", "650T/H", "10小時", "+100T"),
+        "娛樂陪": ("320T/H", "600T/H", "10小時", "+100T"),
         "一陪一護": ("800T/H", "900T/H", "8殺", "7殺"),
         "體驗單": ("500T/單", "850W", "1000T/單", "1888W", "每週", "每月"),
         "技術陪": ("450T/H", "850T/H", "500T/H", "950T/H", "777W", "850W"),
@@ -177,3 +179,50 @@ def test_updated_exbar_does_not_modify_fixed_price_or_hourly_specification():
     assert rule.allow_specify is True
     assert rule.specify_free_min_units == 2
     assert "850w / 600w + 2 沙色保險 / 4 沙色保險" in rule.note
+
+
+@pytest.mark.parametrize("key", sorted(DELTA_ENTERTAINMENT_RULE_KEYS))
+def test_entertainment_unchanged_old_price_even_with_prior_image_approval(monkeypatch, key):
+    """An already-approved 350/650 override may NOT undo the later hold."""
+    base = get_base_rule(key)
+    payload = rule_to_override_payload(base)
+    payload["player_count_prices"] = {"1": 350, "2": 650}
+    payload["price"] = 350
+    payload["__owner_confirmed_after_canonical"] = True
+    payload[DELTA_DESKTOP_APPROVAL_REVISION_MARKER] = True
+    monkeypatch.setattr(ORDER_RULES, "_refresh_external", lambda: None)
+    monkeypatch.setattr(ORDER_RULES, "_override_cache", {key: {"payload": payload}})
+
+    rule = ORDER_RULES[key]
+    assert calculate_price(rule, quantity=1, player_count=1).total_amount == 320
+    assert calculate_price(rule, quantity=1, player_count=2).total_amount == 600
+    assert rule.specify_fee_default == 100
+    assert rule.specify_free_min_units == 2
+    assert rule.loyalty_benefits_enabled is True
+
+
+def test_future_authorized_entertainment_price_update_still_possible(monkeypatch):
+    key = "basic_entertain_single"
+    payload = rule_to_override_payload(get_base_rule(key))
+    payload["player_count_prices"] = {"1": 325, "2": 605}
+    payload["price"] = 325
+    payload["__owner_confirmed_after_canonical"] = True
+    payload[DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER] = True
+    monkeypatch.setattr(ORDER_RULES, "_refresh_external", lambda: None)
+    monkeypatch.setattr(ORDER_RULES, "_override_cache", {key: {"payload": payload}})
+    assert calculate_price(ORDER_RULES[key], quantity=1, player_count=1).total_amount == 325
+    assert calculate_price(ORDER_RULES[key], quantity=1, player_count=2).total_amount == 605
+
+
+def test_other_image_price_cards_remain_untouched():
+    expected = {
+        "one_guard": ("800T / H", "900T / H"),
+        "technical": ("450T / H", "850T / H", "500T / H", "950T / H"),
+        "trial": ("500T", "850W", "1000T", "1888W"),
+        "bet": ("1200T", "1500T", "2400T"),
+        "oil": ("3000T", "2000T", "4500T", "3688W"),
+        "babel_technical": ("1000T / H", "850W", "600W + 2 沙保"),
+    }
+    for group, phrases in expected.items():
+        for phrase in phrases:
+            assert phrase in DELTA_DESKTOP_PRICE_LISTS[group]["text"], (group, phrase)
