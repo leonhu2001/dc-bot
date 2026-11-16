@@ -446,26 +446,8 @@ def _quote_preview_lines_raw(
 def _quote_preview_lines_for_self_service(
     data: dict, guild: discord.Guild | None = None
 ) -> list[tuple[str, str]]:
-    from services.self_service_financial_copy import (
-        _promotion_funding,
-        _rewrite_quote_text,
-        _vip_monthly_display,
-    )
-
-    rows = _quote_preview_lines_raw(data, guild)
-    funding = _promotion_funding(data)
-    result = [
-        (name, _rewrite_quote_text(str(value or ""), promotion_funding=funding))
-        for name, value in rows
-    ]
-    vip_monthly = _vip_monthly_display(data)
-    if vip_monthly:
-        from services.self_service_vip_monthly_ux import merge_vip_monthly_into_quote_rows
-        title, amount = vip_monthly
-        return merge_vip_monthly_into_quote_rows(
-            result, title=title, amount_text=_format_plain_amount(amount),
-        )
-    return result
+    from services.self_service_financial_copy import render_quote_rows
+    return render_quote_rows(_quote_preview_lines_raw(data, guild), data)
 
 
 def add_self_service_quote_preview(
