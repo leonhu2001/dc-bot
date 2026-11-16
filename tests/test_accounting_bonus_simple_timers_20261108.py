@@ -25,7 +25,16 @@ def test_both_previous_month_bonus_note_formats_are_recognized(bonus_note):
     ("apex", "hourly", True),
     ("valorant", "hourly", True),
     ("lol", "game", False),
-    ("delta_desktop_basic", "hourly", False),
+    ("delta_desktop_basic", "hourly", True),
+    ("delta_mobile_basic", "hourly", True),
+    ("basic", "hourly", True),
+    ("farm", "hourly", True),
+    ("delta_desktop_fun", "hourly", False),
+    ("fun", "hourly", False),
+    ("staff_internal", "hourly", False),
+    ("custom", "hourly", False),
+    ("delta_desktop_basic", "fixed", False),
+    ("delta_mobile_basic", "game", False),
     ("vip_timer", "hourly", False),
 ])
 def test_hourly_clock_scope_uses_actual_rule_category_and_rate(
