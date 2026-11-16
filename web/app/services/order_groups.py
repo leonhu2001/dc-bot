@@ -83,6 +83,18 @@ GROUP_SPECS = [
     },
 
     {
+        "key": "one_guard",
+        "category": "delta_desktop_basic",
+        "label": "一陪一護",
+        "selector_label": "難度",
+        "description": "每單一位陪玩搭配至少一位護航；機密／絕密可選，指定每位 +100T，2H 以上免指定費。",
+        "variants": [
+            ("basic_one_companion_one_guard_secret", "機密"),
+            ("basic_one_companion_one_guard_topsecret", "絕密"),
+        ],
+    },
+
+    {
         "key": "tech_play",
         "category": "delta_desktop_basic",
         "label": "技術陪",
