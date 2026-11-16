@@ -268,7 +268,7 @@ def _season_3x3_approved_price_copy() -> str:
         "**三角洲行動 S12｜3×3安全箱**\n"
         f"安全箱 {base}T｜安全箱＋外觀 {base + skin_fee}T\n"
         f"包損＋{loss_fee}T｜命運契約 {int(contract.price)}T／個\n"
-        "下單前請自備 3000W 哈夫幣；安全箱約 3～5 天，命運契約開啟後約 1～2 天結單。\\n"
+        "下單前請自備 3000W 哈夫幣；安全箱約 3～5 天，命運契約開啟後約 1～2 天結單。\n"
         f"賽前提前預約 −{SEASON_3X3_EARLY_BOOKING_DISCOUNT_AMOUNT}T"
         "（由客服手動設定共同分擔的固定折扣；客人無需勾選）\n"
         "詳細規則請見下圖。"
