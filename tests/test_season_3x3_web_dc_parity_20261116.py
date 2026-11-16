@@ -52,10 +52,10 @@ def test_3x3_dc_and_web_total_parity(selected_adjustments, expected_total):
     assert quote["base_amount"] == int(rule.price)
     assert quote["original_amount"] == expected_total
     assert quote["customer_pay_amount"] == expected_total
-    assert "造型" not in str(quote["customer_adjustments"])
+    assert "外觀" not in str(quote["customer_adjustments"])
     if "skin" in selected_adjustments:
         assert any(
-            part["key"] == "skin" and part["label"] == "外觀"
+            part["key"] == "skin" and part["label"] == "造型"
             for part in quote["customer_adjustments"]
         )
 
@@ -96,16 +96,16 @@ def test_reservation_is_only_a_manual_shared_cash_discount_not_customer_option()
         assert result.store_absorbed_amount == 0
 
 
-def test_price_list_uses_wai_guan_and_explicit_staff_only_reservation_copy():
+def test_price_list_uses_zao_xing_and_explicit_staff_only_reservation_copy():
     text = DELTA_FARM_PRICE_LISTS["safe_box_3x3"]["text"]
     assert "安全箱 5500T" in text
-    assert "安全箱＋外觀 8000T" in text
+    assert "安全箱＋造型 8000T" in text
     assert "包損＋500T" in text
     assert "命運契約 600T／個" in text
     assert "賽前提前預約 −500T" in text
     assert "客服手動" in text
     assert "共同分擔" in text
-    assert "造型" not in text
+    assert "外觀" not in text
     assert "\\n" not in text  # actual linebreaks, not literal escaped slashes
 
 

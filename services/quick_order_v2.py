@@ -13,10 +13,17 @@ from services.ticket_identity import build_ticket_channel_name
 from services.vip_timer import VIP_TIMER_CATEGORY, VIP_TIMER_CATEGORY_LABEL
 from services.vip_timer_game_compat import resolve_vip_timer_game_label
 from services.vip_timer_self_service import (
-    assert_vip_timer_self_service_eligible,
     prepare_vip_timer_draft,
     refresh_vip_timer_self_service_catalog,
 )
+
+
+def assert_vip_timer_self_service_eligible(customer_id, *, check_open_order=True):
+    """Live eligibility at source; tests and integrations retain this call API."""
+    from services import vip_timer_self_service
+    return vip_timer_self_service.assert_vip_timer_self_service_eligible(
+        customer_id, check_open_order=check_open_order,
+    )
 
 
 QUICK_ORDER_V2_CHANNELS = {
@@ -681,6 +688,22 @@ async def _create_ticket(
         )
         return None
 
+    # Rich game/service naming now lives in this canonical creation path,
+    # rather than a post-startup replacement of _create_ticket.
+    try:
+        from services.order_ticket_name_restore_runtime import (
+            _rename_quick_ticket_from_data,
+        )
+        await _rename_quick_ticket_from_data(
+            ticket, data, status="active", member=member,
+        )
+    except Exception as exc:
+        print(
+            f"[quick-order-v2] informative ticket name failed: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
     await interaction.edit_original_response(
         content=f"✅ 票口已建立：{ticket.mention}",
         embed=None,
@@ -690,61 +713,17 @@ async def _create_ticket(
 
 
 def _view_for_channel(channel_id: int) -> discord.ui.View:
-    if channel_id == QUICK_ORDER_V2_CHANNELS["delta"]:
-        return QuickDeltaEntryView()
-    if channel_id == QUICK_ORDER_V2_CHANNELS["vip_timer"]:
-        return QuickVipEntryView()
+    """Owner-approved public controls resolved directly at the core entrypoint."""
+    from services.quick_order_v2_production import _public_view_for_channel
 
-    category, _ = _GAME_ENTRY_META[channel_id]
-    return QuickGameEntryView(
-        category=category,
-        source_channel_id=channel_id,
-    )
+    return _public_view_for_channel(int(channel_id))
 
 
 async def _ensure_panel(bot: commands.Bot, channel_id: int) -> None:
-    channel = bot.get_channel(channel_id)
-    if not isinstance(channel, discord.TextChannel):
-        try:
-            fetched = await bot.fetch_channel(channel_id)
-            channel = fetched if isinstance(fetched, discord.TextChannel) else None
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            channel = None
+    """Update existing public panel using canonical production copy and artwork."""
+    from services.quick_order_v2_production import _clean_ensure_panel
 
-    if not isinstance(channel, discord.TextChannel):
-        print(
-            f"[quick-order-v2] channel not found: {channel_id}",
-            flush=True,
-        )
-        return
-
-    target: discord.Message | None = None
-    try:
-        async for message in channel.history(limit=50):
-            if bot.user is not None and message.author.id != bot.user.id:
-                continue
-            if any(
-                str(getattr(embed.footer, "text", "") or "") == _marker(channel_id)
-                for embed in message.embeds
-            ):
-                target = message
-                break
-    except (discord.Forbidden, discord.HTTPException):
-        pass
-
-    try:
-        view = _view_for_channel(channel_id)
-        embed = build_entry_embed(channel_id)
-        if target is None:
-            await channel.send(embed=embed, view=view)
-        else:
-            await target.edit(embed=embed, view=view)
-    except (discord.Forbidden, discord.HTTPException) as exc:
-        print(
-            f"[quick-order-v2] panel sync failed {channel_id}: "
-            f"{type(exc).__name__}: {exc}",
-            flush=True,
-        )
+    await _clean_ensure_panel(bot, int(channel_id))
 
 
 async def ensure_quick_order_v2_panels(bot: commands.Bot) -> None:

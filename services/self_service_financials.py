@@ -154,7 +154,6 @@ def add_self_service_financial_breakdown_fields(
     src: dict,
     final_label="顧客應付",
 ):
-    # Public API preserved for Discord and web order consumers.
     from services.self_service_financial_breakdown_display import (
         render_self_service_financial_breakdown_fields,
     )
@@ -293,7 +292,7 @@ def apply_manual_price_adjustment_to_order_data(data: dict, base_amount: int) ->
     return adjustment
 
 
-def _quote_preview_lines_for_self_service(
+def _quote_preview_lines_raw(
     data: dict,
     guild: discord.Guild | None = None,
 ) -> list[tuple[str, str]]:
@@ -444,6 +443,13 @@ def _quote_preview_lines_for_self_service(
     return lines
 
 
+def _quote_preview_lines_for_self_service(
+    data: dict, guild: discord.Guild | None = None
+) -> list[tuple[str, str]]:
+    from services.self_service_financial_copy import render_quote_rows
+    return render_quote_rows(_quote_preview_lines_raw(data, guild), data)
+
+
 def add_self_service_quote_preview(
     embed: discord.Embed,
     data: dict,
@@ -471,7 +477,7 @@ def _format_point_hours(hours) -> str:
     return f"{value:g}H"
 
 
-def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
+def _calculate_self_service_financials_unsettled(rule, price_result, data: dict) -> dict:
     if is_internal_ammo_dump_rule(rule):
         return apply_vip_monthly_store_funding(
             apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data))
@@ -480,8 +486,6 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
         return apply_vip_monthly_store_funding(calculate_aw_collision_financials(price_result, data))
 
     manual_price = get_self_service_staff_price(data)
-    # The VIP custom-order quote is the only chargeable base. Even persisted
-    # legacy price results may not add a specify fee to a staff-entered price.
     is_custom_order = str(getattr(rule, "key", "") or "") == "custom_custom_order"
     specify_before = (
         0 if is_custom_order else max(0, int(getattr(price_result, "specify_fee", 0) or 0))
@@ -592,8 +596,6 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
             )
     point_service_value = one_seat_point_service_value * funded_point_service_seats
 
-    # Waived specify fees were never collected, so they are not payout/store value.
-    # Current seat-aware service rewards, however, fund every selected seat directly.
     payout_base = allocation.payout_base_amount + point_service_value
     customer_pay = max(0, allocation.customer_pay_amount - benefit_discount_amount)
     notes: list[str] = []
@@ -698,6 +700,34 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
         "customer_pay_amount": customer_pay,
     }
     return apply_vip_monthly_store_funding(apply_urgent_fee(rule, data, financials))
+
+
+def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
+    if data.get("website_finance_settled"):
+        from services.self_service_financial_copy import _SETTLED_FINANCIAL_KEYS
+        safe = dict(data)
+        for key in ("selected_point_benefit_key",
+                    "selected_vip_monthly_benefit_id",
+                    "selected_benefit_coupon_id"):
+            safe.pop(key, None)
+        result = _calculate_self_service_financials_unsettled(rule, price_result, safe)
+        result.update({
+            key: data[key] for key in _SETTLED_FINANCIAL_KEYS
+            if key in data and data[key] is not None
+        })
+        from services.self_service_promotion_integration import apply_promotion_funding_snapshot
+        return apply_promotion_funding_snapshot(result)
+    if data.get("selected_vip_monthly_benefit_id") not in (None, ""):
+        from services.self_service_vip_monthly_ux import _current_original_service_amount
+        prepared = dict(data)
+        prepared["service_original_amount"] = _current_original_service_amount(
+            rule, prepared, price_result=price_result,
+        )
+        data = prepared
+    from services.self_service_promotion_integration import apply_promotion_funding_snapshot
+    return apply_promotion_funding_snapshot(
+        _calculate_self_service_financials_unsettled(rule, price_result, data)
+    )
 
 
 def apply_self_service_financials_to_order_data(data: dict, rule, price_result) -> dict:

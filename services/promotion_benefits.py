@@ -613,30 +613,15 @@ def benefit_note(benefit: dict[str, Any] | None) -> str:
 
 
 def reserve_issued_benefit_in_session(
-    db,
-    *,
-    selection_id: int | str,
-    customer_discord_id: str | int,
+    db, *, selection_id: int | str, customer_discord_id: str | int,
     order_id: int,
 ) -> None:
-    issued_id = decode_selection_id(selection_id)
-    if issued_id is None:
-        raise ValueError("福利券識別碼錯誤。")
-    now = _now_text()
-    result = db.execute(
-        __import__("sqlalchemy").text(
-            """
-            UPDATE promotion_issued_benefits
-            SET status='reserved', reserved_order_id=?
-            WHERE id=? AND customer_discord_id=? AND status='active'
-              AND remaining_uses > 0
-              AND (expires_at IS NULL OR expires_at > ?)
-            """.replace("?", ":p", 1)
-        )
+    """Reserve in the caller's transaction via the canonical lifecycle."""
+    from services.promotion_benefit_lifecycle import reserve_in_session
+    return reserve_in_session(
+        db, selection_id=selection_id,
+        customer_discord_id=customer_discord_id, order_id=order_id,
     )
-    # The SQLAlchemy Session path uses named parameters below; keep sqlite SQL
-    # out of the transaction to avoid a second writer. Re-run with proper text.
-    raise RuntimeError("unreachable")
 
 
 def reserve_in_sqlalchemy_session(

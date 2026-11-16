@@ -173,9 +173,9 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             "label": "賽季3x3",
             "details": [
                 {"label": "3×3安全箱", "value": "season_3x3", "rule_key": "farm_season_3x3_normal", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "3×3安全箱＋外觀", "value": "season_3x3_skin", "rule_key": "farm_season_3x3_dc_skin", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "3×3安全箱＋造型", "value": "season_3x3_skin", "rule_key": "farm_season_3x3_dc_skin", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "3×3安全箱＋包損", "value": "season_3x3_loss", "rule_key": "farm_season_3x3_dc_loss", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "3×3安全箱＋外觀＋包損", "value": "season_3x3_skin_loss", "rule_key": "farm_season_3x3_dc_skin_loss", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "3×3安全箱＋造型＋包損", "value": "season_3x3_skin_loss", "rule_key": "farm_season_3x3_dc_skin_loss", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "命運契約", "value": "season_contract", "rule_key": "farm_season_3x3_contract", "quantity_unit": "個", "min_quantity": 1, "max_quantity": 7},
             ],
         },

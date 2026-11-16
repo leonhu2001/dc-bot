@@ -200,4 +200,5 @@ def test_no_legacy_quick_ticket_patch_to_stack_on_production():
     assert "def _install_ticket_patch" not in quick_source
     assert "_PATCH_INSTALLED" not in quick_source
     assert "def _disable_legacy_ticket_patch" not in fix_source
-    assert production.count("ui.SelfServiceOrderView.__init__ =") == 1
+    assert "ui.SelfServiceOrderView.__init__ =" not in production
+    assert "apply_production_ticket_view_policy" in production

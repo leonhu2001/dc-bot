@@ -462,6 +462,11 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
             row=0,
         )
 
+        from services.self_service_vip_monthly_ux import (
+            apply_vip_monthly_option_descriptions,
+        )
+        apply_vip_monthly_option_descriptions(self, parent_view)
+
     async def callback(self, interaction: discord.Interaction):
         view = self.view
 
@@ -471,6 +476,14 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
 
         selected = self.values[0]
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(view.channel_id, {})
+
+        from services.self_service_vip_monthly_ux import (
+            monthly_selection_error,
+        )
+        error = monthly_selection_error(view, selected, data, interaction.guild)
+        if error:
+            await interaction.response.send_message(error, ephemeral=True)
+            return
 
         clear_keys = (
             "selected_point_benefit_key",
@@ -611,9 +624,7 @@ class SelfServicePointBenefitView(discord.ui.View):
             if not allowed:
                 continue
 
-            # Adapt first so dynamic formal-product pricing is authoritative before
-            # comparing against the customer's balance. The previous runtime wrapper
-            # existed only to repair this ordering after import.
+            # Adapt point costs before checking the customer's balance.
             merged = dict(item)
             merged.update(spec)
             merged = _adapt_order_point_benefit_for_rule(
@@ -655,13 +666,8 @@ class SelfServicePointBenefitView(discord.ui.View):
         elif benefit:
             selected_text = f"{benefit['cost']} 點｜{benefit['name']}"
 
-        return (
-            f"請選擇這張單要使用的點數福利或會員福利券。\n"
-            f"目前可用點數：{self.point_balance} 點\n"
-            f"可用福利券：{len(self.available_vip_monthly_benefits) + len(self.available_coupons) + (1 if self.available_same_order_benefit else 0)} 張\n"
-            f"目前選擇：{selected_text}\n\n"
-            "同張訂單只能擇一；福利券會在訂單建立時先保留，結單後正式核銷。"
-        )
+        from services.self_service_vip_monthly_ux import render_vip_monthly_message
+        return render_vip_monthly_message(self, data, selected_text)
 
     async def refresh_source_panel(self, interaction: discord.Interaction):
         data = SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id, {})

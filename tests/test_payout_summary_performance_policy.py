@@ -130,3 +130,66 @@ def test_dual_role_employee_is_one_row_with_one_performance_total():
     # Same month-wide performance appears in each source status but is not doubled.
     assert row["performance_total"] == 6200
     assert {item["role"] for item in row["items"]} == {"陪玩", "客服"}
+
+
+def test_paid_chicken_leg_tip_is_salary_but_not_performance(tmp_path):
+    db_file = tmp_path / "tips_performance.db"
+    conn = sqlite3.connect(db_file)
+    try:
+        conn.executescript("""
+            CREATE TABLE web_orders (
+                id INTEGER PRIMARY KEY,
+                status TEXT,
+                closed_at TEXT,
+                updated_at TEXT,
+                created_at TEXT
+            );
+            CREATE TABLE worker_payouts (
+                id INTEGER PRIMARY KEY, order_id INTEGER,
+                worker_discord_id TEXT, final_payout REAL
+            );
+            CREATE TABLE worker_tips (
+                id INTEGER PRIMARY KEY, order_id INTEGER,
+                worker_discord_id TEXT, payment_status TEXT, amount INTEGER
+            );
+        """)
+        conn.execute("INSERT INTO web_orders VALUES (1, 'closed', '2026-11-10', '', '')")
+        conn.execute("INSERT INTO worker_payouts VALUES (1,1,'staff-1',4850)")
+        conn.execute("INSERT INTO worker_tips VALUES (1,1,'staff-1','paid',500)")
+        conn.commit()
+        # Employee salary remains 4,850 + 500, and the paid tip is not
+        # deleted or changed by the sales-performance function.
+        assert conn.execute(
+            "SELECT SUM(amount) FROM worker_tips WHERE worker_discord_id='staff-1'"
+        ).fetchone()[0] == 500
+    finally:
+        conn.close()
+
+    performance = build_worker_performance_map(str(db_file), month="2026-11")
+    assert performance == {"staff-1": 4850}
+    assert not performance_progress(performance["staff-1"])["reached"]
+
+    with sqlite3.connect(db_file) as conn:
+        assert conn.execute("SELECT amount FROM worker_tips").fetchone()[0] == 500
+
+
+def test_previous_month_bonus_basis_excludes_tips_without_querying_tip_table():
+    from datetime import datetime, timezone
+    from web.app.services.worker_bonus_payout import previous_month_performance
+
+    class WageOnlyDb:
+        def __init__(self):
+            self.calls = 0
+
+        def scalar(self, stmt):
+            self.calls += 1
+            return 4850
+
+        def connection(self):
+            raise AssertionError("tips must not be fetched for business performance")
+
+    db = WageOnlyDb()
+    assert previous_month_performance(
+        db, "staff-1", now=datetime(2026, 12, 8, tzinfo=timezone.utc)
+    ) == 4850
+    assert db.calls == 1

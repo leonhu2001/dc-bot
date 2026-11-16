@@ -68,180 +68,96 @@ def _category_for_rule_key(rule_key: str) -> str:
         return ""
 
 
-def install_self_service_promotion_integration() -> None:
-    """Make web-issued promotion benefits selectable and payable in Discord checkout."""
-    global _INSTALLED
-    if _INSTALLED:
-        return
-
-    from services import loyalty_benefits as loyalty
+def resolve_promotion_loyalty_discount(
+    *, data: dict, rule, point_benefit_selected: bool,
+    vip_monthly_selected: bool, available_service_amount: int,
+) -> dict:
+    """Resolve an issued promotion in the canonical benefit calculation."""
     from services import promotion_benefits as promotion
     from services import self_service_financials as financials
-    from services import self_service_loyalty_discount as loyalty_discount
 
-    if not hasattr(loyalty, "_promotion_original_list_applicable_coupons"):
-        loyalty._promotion_original_list_applicable_coupons = loyalty.list_applicable_coupons
-
-        def list_applicable_coupons(customer_id, *, rule_key: str, player_count: int = 1):
-            rows = list(
-                loyalty._promotion_original_list_applicable_coupons(
-                    customer_id,
-                    rule_key=rule_key,
-                    player_count=player_count,
-                )
-            )
-            category = _category_for_rule_key(rule_key)
-            for item in promotion.list_issued_benefits(customer_discord_id=customer_id):
-                if str(item.get("status") or "") != promotion.ACTIVE:
-                    continue
-                if int(item.get("remaining_uses") or 0) <= 0:
-                    continue
-                decorated = promotion._decorate_issued(item)
-                rules = decorated.get("rules") or {}
-                scope_type = str(rules.get("scope_type") or "all")
-                if scope_type == "category" and not category:
-                    # Unknown/dynamic rule: do not advertise a category-restricted
-                    # benefit unless we can prove the category matches. Final
-                    # checkout validation remains authoritative as well.
-                    continue
-                if not promotion._scope_allowed(
-                    rules,
-                    rule_key=str(rule_key or ""),
-                    category=category,
-                ):
-                    continue
-                decorated["summary"] = promotion.benefit_note(decorated)
-                rows.append(decorated)
-            return rows
-
-        loyalty.list_applicable_coupons = list_applicable_coupons
-
-    if not hasattr(loyalty_discount, "_promotion_original_resolve_self_service_loyalty_discount"):
-        loyalty_discount._promotion_original_resolve_self_service_loyalty_discount = (
-            loyalty_discount.resolve_self_service_loyalty_discount
+    selected_id = data.get("selected_benefit_coupon_id")
+    if point_benefit_selected or vip_monthly_selected:
+        raise ValueError("優惠福利、VIP 每月福利券與點數福利同張訂單只能擇一使用。")
+    customer_id = data.get("customer_id")
+    if not customer_id:
+        raise ValueError("找不到會員資料，無法使用這張優惠福利。")
+    original = _original_service_amount(rule, data, available_service_amount)
+    try:
+        rate, _reason, source, _vip_level = (
+            financials._resolve_self_service_discount_rate(rule, data)
         )
+        vip_active = source == "vip" and float(rate) < 100
+    except Exception:
+        vip_active = False
+    benefit = promotion.get_applicable_issued_benefit(
+        selected_id,
+        customer_discord_id=customer_id,
+        rule_key=str(getattr(rule, "key", "") or ""),
+        category=str(getattr(rule, "category", "") or ""),
+        original_service_amount=original,
+        vip_discount_active=vip_active,
+        point_selected=False,
+    )
+    if benefit is None:
+        raise ValueError("這張優惠福利已使用、已保留，或目前訂單未達使用條件。")
 
-        def resolve_self_service_loyalty_discount(
-            *,
-            data: dict,
-            rule,
-            point_benefit_selected: bool,
-            vip_monthly_selected: bool,
-            available_service_amount: int,
-            to_int,
-        ):
-            selected_id = data.get("selected_benefit_coupon_id")
-            if promotion.decode_selection_id(selected_id) is None:
-                return loyalty_discount._promotion_original_resolve_self_service_loyalty_discount(
-                    data=data,
-                    rule=rule,
-                    point_benefit_selected=point_benefit_selected,
-                    vip_monthly_selected=vip_monthly_selected,
-                    available_service_amount=available_service_amount,
-                    to_int=to_int,
-                )
-            if point_benefit_selected or vip_monthly_selected:
-                raise ValueError("優惠福利、VIP 每月福利券與點數福利同張訂單只能擇一使用。")
+    specify_fee = max(
+        0, int(data.get("effective_specify_fee")
+               or data.get("specified_fee_before_waiver") or 0),
+    )
+    quantity = max(1, int(data.get("quantity") or 1))
+    player_count = max(1, int(data.get("player_count") or 1))
+    try:
+        from services.order_rules import get_required_staff_count
+        staff_count = max(1, int(get_required_staff_count(rule, player_count) or 1))
+    except Exception:
+        staff_count = player_count
 
-            customer_id = data.get("customer_id")
-            if not customer_id:
-                raise ValueError("找不到會員資料，無法使用這張優惠福利。")
-            original = _original_service_amount(rule, data, available_service_amount)
+    discount = promotion.calculate_discount_amount(
+        benefit,
+        service_amount_after_percent=max(0, int(available_service_amount or 0)),
+        original_service_amount=original,
+        specify_fee=specify_fee,
+        quantity=quantity,
+        staff_count=staff_count,
+    )
+    return {
+        "coupon": benefit,
+        "coupon_id": int(selected_id),
+        "coupon_title": str(benefit.get("title") or "優惠福利"),
+        "service_note": promotion.benefit_note(benefit),
+        "service_value": 0,
+        "discount_amount": int(discount),
+    }
 
-            try:
-                rate, _reason, discount_source, _vip_level = (
-                    financials._resolve_self_service_discount_rate(rule, data)
-                )
-                vip_discount_active = discount_source == "vip" and float(rate) < 100
-            except Exception:
-                vip_discount_active = False
 
-            benefit = promotion.get_applicable_issued_benefit(
-                selected_id,
-                customer_discord_id=customer_id,
-                rule_key=str(getattr(rule, "key", "") or ""),
-                category=str(getattr(rule, "category", "") or ""),
-                original_service_amount=original,
-                vip_discount_active=vip_discount_active,
-                point_selected=False,
-            )
-            if benefit is None:
-                raise ValueError("這張優惠福利已使用、已保留，或目前訂單未達使用條件。")
+def apply_promotion_funding_snapshot(result: dict) -> dict:
+    """Persist exact promotion funding without touching other discounts."""
+    from services import promotion_benefits as promotion
 
-            specify_fee = max(
-                0,
-                int(
-                    data.get("effective_specify_fee")
-                    or data.get("specified_fee_before_waiver")
-                    or 0
-                ),
-            )
-            quantity = max(1, int(data.get("quantity") or 1))
-            player_count = max(1, int(data.get("player_count") or 1))
-            try:
-                from services.order_rules import get_required_staff_count
+    benefit = result.get("benefit_coupon")
+    if not isinstance(benefit, dict) or benefit.get("source") != "promotion":
+        return result
+    result = dict(result)
+    discount = max(0, int(result.get("benefit_discount_amount") or 0))
+    result["promotion_benefit_id"] = int(benefit.get("issued_benefit_id") or 0)
+    result["promotion_discount_amount"] = discount
+    funding = str(benefit.get("funding") or promotion.FUNDING_STORE)
+    result["promotion_funding"] = funding
+    result["promotion_rules_snapshot"] = dict(benefit.get("rules") or {})
+    result["benefit_service_value"] = 0
+    if funding == FUNDING_SHARED and discount > 0:
+        result["payout_base_amount"] = max(
+            0, int(result.get("payout_base_amount") or 0) - discount,
+        )
+        result["store_absorbed_amount"] = max(
+            0, int(result.get("store_absorbed_amount") or 0) - discount,
+        )
+    return result
 
-                staff_count = max(1, int(get_required_staff_count(rule, player_count) or 1))
-            except Exception:
-                staff_count = player_count
 
-            discount = promotion.calculate_discount_amount(
-                benefit,
-                service_amount_after_percent=max(0, int(available_service_amount or 0)),
-                original_service_amount=original,
-                specify_fee=specify_fee,
-                quantity=quantity,
-                staff_count=staff_count,
-            )
-            return {
-                "coupon": benefit,
-                "coupon_id": int(selected_id),
-                "coupon_title": str(benefit.get("title") or "優惠福利"),
-                "service_note": promotion.benefit_note(benefit),
-                # Promotion effects waive part of the service already being
-                # purchased. They are not an *extra* gifted service unit, so they
-                # must not be removed from the CS payroll basis later.
-                "service_value": 0,
-                "discount_amount": int(discount),
-            }
-
-        loyalty_discount.resolve_self_service_loyalty_discount = resolve_self_service_loyalty_discount
-
-    if not hasattr(financials, "_promotion_original_calculate_self_service_financials"):
-        financials._promotion_original_calculate_self_service_financials = financials.calculate_self_service_financials
-
-        def calculate_self_service_financials(rule, price_result, data: dict):
-            result = financials._promotion_original_calculate_self_service_financials(rule, price_result, data)
-            benefit = result.get("benefit_coupon")
-            if not isinstance(benefit, dict) or str(benefit.get("source") or "") != "promotion":
-                return result
-
-            discount = max(0, int(result.get("benefit_discount_amount") or 0))
-            issued_id = int(benefit.get("issued_benefit_id") or 0)
-            funding = str(benefit.get("funding") or promotion.FUNDING_STORE)
-
-            # Persist an explicit promotion snapshot marker so lifecycle balance
-            # coupons can deduct exactly what this order consumed on redemption.
-            result["promotion_benefit_id"] = issued_id
-            result["promotion_discount_amount"] = discount
-            result["promotion_funding"] = funding
-            result["promotion_rules_snapshot"] = dict(benefit.get("rules") or {})
-            result["benefit_service_value"] = 0
-
-            if funding == FUNDING_SHARED and discount > 0:
-                # Shared benefit affects customer payment and payout basis once at
-                # order level. The base financial engine initially treats member
-                # benefits as store-funded, so reverse only that subsidy.
-                result["payout_base_amount"] = max(
-                    0,
-                    int(result.get("payout_base_amount") or 0) - discount,
-                )
-                result["store_absorbed_amount"] = max(
-                    0,
-                    int(result.get("store_absorbed_amount") or 0) - discount,
-                )
-            return result
-
-        financials.calculate_self_service_financials = calculate_self_service_financials
-
+def install_self_service_promotion_integration() -> None:
+    """Compatibility hook; issued coupons are resolved at source."""
+    global _INSTALLED
     _INSTALLED = True

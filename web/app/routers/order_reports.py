@@ -25,6 +25,7 @@ from web.app.services.order_reporting import (
     reset_order_report_reminders,
     review_order_report,
     send_pending_order_report_reminders,
+    send_pending_order_report_review_notifications,
     submit_order_report,
 )
 from web.app.services.worker_bonus_payout import apply_approved_report_worker_bonuses
@@ -524,6 +525,19 @@ async def order_report_submit(request: Request, order_id: int):
         return _redirect(
             f"/dispatch/reports/{order_id}",
             error=str(exc),
+        )
+
+    # Submission has committed the pending transition and durable outbox row.
+    # Attempt delivery immediately; the existing periodic report loop retries
+    # transient Discord failures without making the actual report fail.
+    try:
+        await send_pending_order_report_review_notifications(
+            order_id=int(order_id), limit=1
+        )
+    except Exception as exc:
+        print(
+            f"[order-report-review-notification] {type(exc).__name__}: {exc}",
+            flush=True,
         )
 
     return _redirect(

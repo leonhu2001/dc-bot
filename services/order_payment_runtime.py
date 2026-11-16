@@ -410,8 +410,6 @@ async def finalize_accepted_pending_payment(
             except discord.HTTPException:
                 pass
 
-        await rename_ticket_channel(interaction.channel, item, member=customer_member)
-
         payment_channel_id = _to_int(data.get("payment_channel_id"), interaction.channel.id) or interaction.channel.id
         payment_message_id = _to_int(data.get("payment_message_id"))
         payment_channel = guild.get_channel(payment_channel_id)
@@ -469,6 +467,18 @@ async def finalize_accepted_pending_payment(
             data["payment_review_finalized_id"] = int(data["payment_review_id"])
         remember_order_data(channel_id, data)
         save_bot_data()
+
+        # Only AFTER a successful payment/status promotion can the ticket
+        # become 訂單-[遊戲]-[服務]; never rename a pending review as paid.
+        from services.order_ticket_name_restore_runtime import (
+            resolve_order_ticket_prefix,
+        )
+        payment_prefix = resolve_order_ticket_prefix(
+            interaction.channel, item, data,
+        )
+        await rename_ticket_channel(
+            interaction.channel, payment_prefix, member=customer_member,
+        )
 
         if _order_requires_credentials(data):
             try:

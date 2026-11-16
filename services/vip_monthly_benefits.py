@@ -508,7 +508,12 @@ def sync_current_month_vip_benefits(
         ).fetchone()
         announcement_needed = bool(state is not None and not state["announced_at"])
 
+    from services.vip_monthly_cash_policy import ensure_current_month_cash_entitlements
+    cash = ensure_current_month_cash_entitlements(
+        now=current, web_db=web_db, bot_db=bot_db,
+    )
     return {
+        "cash_policy": cash,
         "month_key": month,
         "issued_count": issued,
         "revoked_count": revoked,
@@ -667,8 +672,12 @@ def get_customer_vip_monthly_snapshot(
             and str(black_row.get("status")) == AVAILABLE
         ),
         "recent_spend": int(activity["recent_spend"]),
-        "recent_spend_required": int(activity["required_spend"]),
-        "monthly_spend_eligible": bool(activity["eligible"]),
+        "recent_spend_required": (
+            int(activity["required_spend"]) if black_entitled else 0
+        ),
+        "monthly_spend_eligible": (
+            bool(activity["eligible"]) if black_entitled else True
+        ),
         "monthly_activity_policy_active": bool(activity["policy_active"]),
     }
 
@@ -794,6 +803,10 @@ def _can_restore_reserved_benefit(
     benefit_key = str(row["benefit_key"] or "")
     if benefit_key not in tier_keys:
         return False
+    # Cash vouchers have no recent-spend gate. The Black Diamond free
+    # service keeps its own activity requirement.
+    if benefit_key in (MONTHLY_COUPON_200, MONTHLY_COUPON_500):
+        return not bool(member_status.get("is_due"))
     if _issued_before_activity_policy(row["issued_at"]):
         return True
     activity = _single_customer_activity_status(

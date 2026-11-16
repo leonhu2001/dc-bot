@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import sys
 
 
 _INSTALLED = False
@@ -154,142 +153,29 @@ def _rewrite_quote_text(value: str, *, promotion_funding: str | None) -> str:
     return _rewrite_standard_discount_text(text)
 
 
-def _bind_runtime_alias(name: str, value) -> None:
-    runtime = sys.modules.get("services.self_service_runtime")
-    if runtime is not None:
-        setattr(runtime, name, value)
-
-
 def install_self_service_financial_copy_policy() -> None:
-    """Keep checkout copy and settled Web order snapshots consistent everywhere."""
+    """Compatibility hook: financials and breakdown display own their rules.
+
+    Previously rebinding already-imported functions could undo newer approved
+    discount policies. Native implementations now apply shared/store funding,
+    settled checkout snapshots and VIP displays directly.
+    """
     global _INSTALLED
-    if _INSTALLED:
-        return
-
-    from services import self_service_financials as financials
-
-    if not hasattr(financials, "_settled_snapshot_original_calculate"):
-        financials._settled_snapshot_original_calculate = (
-            financials.calculate_self_service_financials
-        )
-
-        def calculate_self_service_financials(rule, price_result, data: dict):
-            if not bool(data.get("website_finance_settled")):
-                return financials._settled_snapshot_original_calculate(
-                    rule,
-                    price_result,
-                    data,
-                )
-
-            # Web checkout already validated/reserved its benefit. Re-querying a
-            # now-reserved coupon in Discord can make a valid settled order look
-            # unavailable, so calculate structure without redeemable selectors and
-            # overlay the authoritative saved checkout snapshot afterwards.
-            safe_data = dict(data)
-            for key in (
-                "selected_point_benefit_key",
-                "selected_vip_monthly_benefit_id",
-                "selected_benefit_coupon_id",
-            ):
-                safe_data.pop(key, None)
-
-            result = financials._settled_snapshot_original_calculate(
-                rule,
-                price_result,
-                safe_data,
-            )
-            for key in _SETTLED_FINANCIAL_KEYS:
-                if key in data and data.get(key) is not None:
-                    result[key] = data.get(key)
-            return result
-
-        financials.calculate_self_service_financials = calculate_self_service_financials
-        _bind_runtime_alias(
-            "calculate_self_service_financials",
-            calculate_self_service_financials,
-        )
-
-    if not hasattr(financials, "_funding_copy_original_add_breakdown"):
-        financials._funding_copy_original_add_breakdown = (
-            financials.add_self_service_financial_breakdown_fields
-        )
-
-        def add_self_service_financial_breakdown_fields(embed, src, final_label="顧客應付"):
-            result = financials._funding_copy_original_add_breakdown(
-                embed,
-                src,
-                final_label=final_label,
-            )
-            for index, field in enumerate(list(result.fields)):
-                if field.name not in {"固定折扣", "點數折價"}:
-                    continue
-                rewritten = _rewrite_standard_discount_text(str(field.value or ""))
-                if rewritten != str(field.value or ""):
-                    result.set_field_at(
-                        index,
-                        name=field.name,
-                        value=rewritten,
-                        inline=field.inline,
-                    )
-
-            vip_monthly = _vip_monthly_display(dict(src or {}))
-            if vip_monthly and not any(field.name == "VIP 月券" for field in result.fields):
-                title, amount = vip_monthly
-                result.add_field(
-                    name="VIP 月券",
-                    value=(
-                        f"{title}\n-{financials._format_plain_amount(amount)}\n"
-                        f"{_VIP_MONTHLY_COPY}"
-                    ),
-                    inline=False,
-                )
-            return result
-
-        financials.add_self_service_financial_breakdown_fields = (
-            add_self_service_financial_breakdown_fields
-        )
-        _bind_runtime_alias(
-            "add_self_service_financial_breakdown_fields",
-            add_self_service_financial_breakdown_fields,
-        )
-
-    if not hasattr(financials, "_funding_copy_original_quote_lines"):
-        financials._funding_copy_original_quote_lines = (
-            financials._quote_preview_lines_for_self_service
-        )
-
-        def quote_preview_lines(data: dict, guild=None):
-            rows = financials._funding_copy_original_quote_lines(data, guild)
-            promotion_funding = _promotion_funding(data)
-            rewritten_rows = [
-                (
-                    name,
-                    _rewrite_quote_text(
-                        str(value or ""),
-                        promotion_funding=promotion_funding,
-                    ),
-                )
-                for name, value in rows
-            ]
-
-            vip_monthly = _vip_monthly_display(data)
-            if vip_monthly and not any(name == "VIP 月券" for name, _ in rewritten_rows):
-                title, amount = vip_monthly
-                rewritten_rows.append(
-                    (
-                        "VIP 月券",
-                        (
-                            f"{title}｜-{financials._format_plain_amount(amount)}｜"
-                            f"{_VIP_MONTHLY_COPY}"
-                        ),
-                    )
-                )
-            return rewritten_rows
-
-        financials._quote_preview_lines_for_self_service = quote_preview_lines
-        _bind_runtime_alias(
-            "_quote_preview_lines_for_self_service",
-            quote_preview_lines,
-        )
-
     _INSTALLED = True
+
+
+def render_quote_rows(rows: list[tuple[str, str]], data: dict) -> list[tuple[str, str]]:
+    """Funding-aware source formatter; no runtime patch and no finance mutation."""
+    funding = _promotion_funding(data)
+    rendered = [
+        (name, _rewrite_quote_text(str(value or ""), promotion_funding=funding))
+        for name, value in rows
+    ]
+    monthly = _vip_monthly_display(data)
+    if monthly:
+        from services.self_service_vip_monthly_ux import merge_vip_monthly_into_quote_rows
+        title, amount = monthly
+        return merge_vip_monthly_into_quote_rows(
+            rendered, title=title, amount_text=f"{int(amount):,}",
+        )
+    return rendered

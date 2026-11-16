@@ -69,8 +69,9 @@ def test_production_owns_public_factory_and_panel_sync() -> None:
 
     assert "def _public_view_for_channel" in source
     assert "class _PublicDeltaCategoryButton" in source
-    assert "quick._view_for_channel = _public_view_for_channel" in source
-    assert "quick._ensure_panel = _clean_ensure_panel" in source
+    assert "quick._view_for_channel = _public_view_for_channel" not in source
+    assert "quick._ensure_panel = _clean_ensure_panel" not in source
+    assert "return _public_view_for_channel(int(channel_id))" in (ROOT / "services/quick_order_v2.py").read_text(encoding="utf-8")
     assert "quick.build_entry_embed =" not in source
     assert "add_price_list_control" in source
     assert "panel_image_url" in source
@@ -79,7 +80,8 @@ def test_production_owns_public_factory_and_panel_sync() -> None:
 def test_production_is_single_ticket_view_owner() -> None:
     source = PRODUCTION_SOURCE.read_text(encoding="utf-8")
 
-    assert source.count("ui.SelfServiceOrderView.__init__ =") == 1
+    assert "ui.SelfServiceOrderView.__init__ =" not in source
+    assert "def apply_production_ticket_view_policy" in source
     assert "apply_quick_order_select_display(self, data)" in source
 
 

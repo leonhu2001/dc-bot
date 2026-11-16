@@ -41,9 +41,9 @@ def test_fixed_farm_3x3_group_offers_four_boxes_and_contract():
     ]
     assert [detail["label"] for detail in details] == [
         "3×3安全箱",
-        "3×3安全箱＋外觀",
+        "3×3安全箱＋造型",
         "3×3安全箱＋包損",
-        "3×3安全箱＋外觀＋包損",
+        "3×3安全箱＋造型＋包損",
         "命運契約",
     ]
 

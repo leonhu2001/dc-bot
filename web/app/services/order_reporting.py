@@ -53,6 +53,11 @@ STREAM_URL_MAX_LENGTH = 500
 REMINDER_MAX_ATTEMPTS = 3
 REMINDER_LOOP_SECONDS = 30
 
+# Owner-approved CS notification destination. A pending REPORT (not a payment
+# review) triggers a durable notice on each new submission/resubmission.
+PENDING_REPORT_REVIEW_CHANNEL_ID = 1502040302649872394
+REVIEW_NOTIFICATION_MAX_ATTEMPTS = 5
+
 metadata = MetaData()
 
 order_reports = Table(
@@ -128,6 +133,25 @@ order_report_reminders = Table(
     ),
 )
 
+
+
+order_report_review_notifications = Table(
+    "order_report_review_notifications",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("report_id", Integer, nullable=False, index=True),
+    Column("order_id", Integer, nullable=False, index=True),
+    Column("submitted_at", DateTime, nullable=False),
+    Column("status", String(24), nullable=False, default="pending", index=True),
+    Column("attempts", Integer, nullable=False, default=0),
+    Column("last_error", Text, nullable=True),
+    Column("sent_at", DateTime, nullable=True),
+    Column("created_at", DateTime, nullable=False),
+    Column("updated_at", DateTime, nullable=False),
+    UniqueConstraint(
+        "report_id", "submitted_at", name="uq_report_review_notification_revision"
+    ),
+)
 
 def _now() -> datetime:
     return datetime.now(TAIPEI_TZ).replace(tzinfo=None)
@@ -433,6 +457,19 @@ def ensure_order_reporting_tables(bind: Engine = engine) -> None:
                 "now": now,
                 "stale_before": now - timedelta(minutes=10),
             },
+        )
+
+    # A web worker may restart between claiming and sending a notification.
+    # Recover only aged leases, without resetting already-sent notices.
+    with bind.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE order_report_review_notifications
+                SET status = 'pending', updated_at = :now
+                WHERE status = 'processing'
+                  AND updated_at < :stale_before
+            """),
+            {"now": _now(), "stale_before": _now() - timedelta(minutes=10)},
         )
 
     _install_sqlite_triggers(bind)
@@ -816,6 +853,28 @@ def _write_report_audit(
     )
 
 
+def _enqueue_pending_review_notice(
+    conn,
+    *,
+    report_id: int,
+    order_id: int,
+    submitted_at: datetime,
+) -> None:
+    """Atomically persist one notice per successful pending-state transition."""
+    now = _now()
+    conn.execute(
+        order_report_review_notifications.insert().values(
+            report_id=int(report_id),
+            order_id=int(order_id),
+            submitted_at=submitted_at,
+            status="pending",
+            attempts=0,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+
+
 def submit_order_report(
     *,
     order_id: int,
@@ -885,6 +944,7 @@ def submit_order_report(
 
         report_id = int(order["report_id"])
         before = _report_snapshot(conn, report_id)
+        submitted_at = _now()
         conn.execute(
             order_reports.update()
             .where(order_reports.c.id == report_id)
@@ -896,7 +956,7 @@ def submit_order_report(
                 note=note_text,
                 submitted_by_discord_id=worker_id,
                 submitted_by_display_name=_display_name(user),
-                submitted_at=_now(),
+                submitted_at=submitted_at,
                 reviewed_by_discord_id=None,
                 reviewed_by_display_name=None,
                 reviewed_at=None,
@@ -935,6 +995,12 @@ def submit_order_report(
             actor=user,
             before=before,
             after=after,
+        )
+        _enqueue_pending_review_notice(
+            conn,
+            report_id=report_id,
+            order_id=int(order_id),
+            submitted_at=submitted_at,
         )
 
 
@@ -1353,10 +1419,148 @@ async def send_pending_order_report_reminders(
     return result
 
 
+def _claim_pending_review_notifications(
+    *, limit: int = 20, order_id: int | None = None
+) -> list[dict]:
+    """Claim notices that still match the latest pending submission."""
+    ensure_order_reporting_tables(engine)
+    claimed: list[dict] = []
+    params: dict[str, Any] = {
+        "max_attempts": REVIEW_NOTIFICATION_MAX_ATTEMPTS,
+        "limit": max(1, min(50, int(limit))),
+    }
+    filter_sql = ""
+    if order_id is not None:
+        params["order_id"] = int(order_id)
+        filter_sql = " AND n.order_id = :order_id"
+
+    with engine.begin() as conn:
+        candidates = conn.execute(
+            text("""
+                SELECT n.id, n.report_id, n.order_id, n.submitted_at,
+                       o.bot_order_no, o.customer_display_name, o.item,
+                       r.submitted_by_display_name, r.note
+                FROM order_report_review_notifications n
+                JOIN order_reports r ON r.id = n.report_id
+                JOIN web_orders o ON o.id = n.order_id
+                WHERE n.status IN ('pending', 'failed')
+                  AND n.attempts < :max_attempts
+                  AND r.status = 'pending'
+                  AND r.submitted_at = n.submitted_at
+            """ + filter_sql + " ORDER BY n.id ASC LIMIT :limit"),
+            params,
+        ).mappings().all()
+
+        for row in candidates:
+            result = conn.execute(
+                text("""
+                    UPDATE order_report_review_notifications
+                    SET status='processing', attempts=attempts + 1,
+                        updated_at=:now
+                    WHERE id=:id AND status IN ('pending', 'failed')
+                """),
+                {"id": int(row["id"]), "now": _now()},
+            )
+            if int(result.rowcount or 0) == 1:
+                claimed.append(dict(row))
+    return claimed
+
+
+def _finish_review_notification(
+    notice_id: int, *, success: bool, error: str | None = None
+) -> None:
+    with engine.begin() as conn:
+        conn.execute(
+            order_report_review_notifications.update()
+            .where(order_report_review_notifications.c.id == int(notice_id))
+            .values(
+                status="sent" if success else "failed",
+                last_error=None if success else _trimmed(error, 800),
+                sent_at=_now() if success else None,
+                updated_at=_now(),
+            )
+        )
+
+
+def _pending_review_notice_payload(notice: Mapping[str, Any]) -> dict:
+    order_id = int(notice["order_id"])
+    report_url = f"{_public_base_url()}/dispatch/reports/review/{order_id}"
+    order_no = str(notice.get("bot_order_no") or f"WEB-{order_id}")
+    customer = str(notice.get("customer_display_name") or "未紀錄")
+    item = str(notice.get("item") or "未紀錄")
+    author = str(notice.get("submitted_by_display_name") or "未紀錄")
+    return {
+        "content": (
+            "📋 **報單待審核**\n"
+            f"訂單：{order_no}\n"
+            f"老闆：{customer}\n"
+            f"單別：{item}\n"
+            f"填報人：{author}\n"
+            "報單已送出，請客服至網頁審核。"
+        ),
+        "components": [{
+            "type": 1,
+            "components": [{
+                "type": 2,
+                "style": 5,
+                "label": "前往報單審核",
+                "url": report_url,
+            }],
+        }],
+        # Never ping everyone/roles/users from untrusted report display names.
+        "allowed_mentions": {"parse": []},
+        # Discord prevents duplicate messages with the same nonce for a short
+        # window if a request succeeds but its HTTP response is lost.
+        "nonce": f"report-review-{int(notice['id'])}",
+        "enforce_nonce": True,
+    }
+
+
+async def _send_pending_review_notice(
+    client: httpx.AsyncClient, notice: Mapping[str, Any]
+) -> None:
+    token = str(config.DISCORD_BOT_TOKEN or "").strip()
+    if not token:
+        raise RuntimeError("DISCORD_BOT_TOKEN 未設定")
+    response = await client.post(
+        f"https://discord.com/api/v10/channels/{PENDING_REPORT_REVIEW_CHANNEL_ID}/messages",
+        headers={
+            "Authorization": f"Bot {token}",
+            "Content-Type": "application/json",
+        },
+        json=_pending_review_notice_payload(notice),
+    )
+    response.raise_for_status()
+
+
+async def send_pending_order_report_review_notifications(
+    *, limit: int = 20, order_id: int | None = None
+) -> dict[str, int]:
+    notices = _claim_pending_review_notifications(limit=limit, order_id=order_id)
+    result = {"claimed": len(notices), "sent": 0, "failed": 0}
+    if not notices:
+        return result
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for notice in notices:
+            try:
+                await _send_pending_review_notice(client, notice)
+            except Exception as exc:
+                result["failed"] += 1
+                _finish_review_notification(
+                    int(notice["id"]), success=False,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+            else:
+                result["sent"] += 1
+                _finish_review_notification(int(notice["id"]), success=True)
+    return result
+
+
 async def order_report_reminder_loop() -> None:
     while True:
         try:
             await send_pending_order_report_reminders(limit=20)
+            await send_pending_order_report_review_notifications(limit=20)
         except asyncio.CancelledError:
             raise
         except Exception as exc:

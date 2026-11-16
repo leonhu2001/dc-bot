@@ -70,7 +70,10 @@ def render_self_service_financial_breakdown_fields(
     if point_cash:
         embed.add_field(
             name="點數折價",
-            value=f"-{_format_plain_amount(point_cash)}\n店內吸收，不扣打手分潤",
+            value=(
+                f"-{_format_plain_amount(point_cash)}"
+                "\n共同分攤，折後金額計入分潤基準"
+            ),
             inline=True,
         )
     if specify_before:
@@ -133,6 +136,24 @@ def render_self_service_financial_breakdown_fields(
     service_promotion_text = str(src.get("service_promotion_text") or "").strip()
     if service_promotion_text:
         embed.add_field(name="活動加贈", value=service_promotion_text, inline=False)
+    # VIP monthly cash is the exceptional store-funded discount; do not
+    # overwrite the worker/CS payout basis. Render it from canonical src data.
+    from services.self_service_financial_copy import (
+        _VIP_MONTHLY_COPY,
+        _vip_monthly_display,
+    )
+
+    vip_monthly = _vip_monthly_display(src)
+    if vip_monthly and not any(field.name == "VIP 月券" for field in embed.fields):
+        title, amount = vip_monthly
+        embed.add_field(
+            name="VIP 月券",
+            value=(
+                f"{title}\n-{_format_plain_amount(amount)}\n"
+                f"{_VIP_MONTHLY_COPY}"
+            ),
+            inline=False,
+        )
     return embed
 
 
