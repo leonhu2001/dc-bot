@@ -721,35 +721,28 @@ def _calculate_self_service_financials_unsettled(rule, price_result, data: dict)
 
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
-    if not bool(data.get("website_finance_settled")):
-        if data.get("selected_vip_monthly_benefit_id") not in (None, ""):
-            from services.self_service_vip_monthly_ux import _current_original_service_amount
-            prepared = dict(data)
-            prepared["service_original_amount"] = _current_original_service_amount(
-                rule, prepared, price_result=price_result,
-            )
-            return _calculate_self_service_financials_unsettled(
-                rule, price_result, prepared,
-            )
-        return _calculate_self_service_financials_unsettled(rule, price_result, data)
-
-    from services.self_service_financial_copy import _SETTLED_FINANCIAL_KEYS
-
-    safe_data = dict(data)
-    for key in (
-        "selected_point_benefit_key",
-        "selected_vip_monthly_benefit_id",
-        "selected_benefit_coupon_id",
-    ):
-        safe_data.pop(key, None)
-
-    result = _calculate_self_service_financials_unsettled(
-        rule, price_result, safe_data
-    )
-    for key in _SETTLED_FINANCIAL_KEYS:
-        if key in data and data.get(key) is not None:
-            result[key] = data.get(key)
-    return result
+    settled = bool(data.get("website_finance_settled"))
+    if settled:
+        from services.self_service_financial_copy import _SETTLED_FINANCIAL_KEYS
+        safe = dict(data)
+        for key in ("selected_point_benefit_key",
+                    "selected_vip_monthly_benefit_id",
+                    "selected_benefit_coupon_id"):
+            safe.pop(key, None)
+        result = _calculate_self_service_financials_unsettled(rule, price_result, safe)
+        result.update({
+            key: data[key] for key in _SETTLED_FINANCIAL_KEYS
+            if key in data and data[key] is not None
+        })
+        return result
+    if data.get("selected_vip_monthly_benefit_id") not in (None, ""):
+        from services.self_service_vip_monthly_ux import _current_original_service_amount
+        prepared = dict(data)
+        prepared["service_original_amount"] = _current_original_service_amount(
+            rule, prepared, price_result=price_result,
+        )
+        data = prepared
+    return _calculate_self_service_financials_unsettled(rule, price_result, data)
 
 
 def apply_self_service_financials_to_order_data(data: dict, rule, price_result) -> dict:
