@@ -53,7 +53,7 @@ def test_delta_desktop_price_list_prices_and_rules_match_approved_copy() -> None
     expected = {
         "entertainment": ("320T / H", "600T / H", "10 小時", "1 小時券", "+100T", "不保撤"),
         "one_guard": ("800T / H", "900T / H", "8 殺", "7 殺", "+100T"),
-        "black_tide": ("320T / H", "300T / H", "400T / H", "380T / H", "30 分鐘券"),
+        "black_tide": ("350T / H", "325T / H", "450T / H", "425T / H", "2～5 人", "1H 折價券", "+100T", "2H 以上免指定費"),
         "sweet": ("520T / H", "1314T / H", "專屬暱稱", "管理層", "+100T"),
         "trial": ("500T", "850W", "1000T", "1888W", "金級以上", "打手選圖"),
         "technical": ("450T / H", "850T / H", "500T / H", "950T / H", "777W", "850W", "7 殺", "+100T"),
