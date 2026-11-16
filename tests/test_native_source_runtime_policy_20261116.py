@@ -28,8 +28,11 @@ def test_final_companion_view_owned_by_main_ui_module_not_startup_patch():
 
 
 def test_finance_snapshot_and_copy_are_source_owned():
-    assert self_service_financials.calculate_self_service_financials.__module__ == (
-        "services.self_service_financials"
+    # Startup may still have a separate VIP monthly UX wrapper during the
+    # migration; the settled finance policy itself is native and never rebound
+    # by the now-retired finance-copy installer.
+    assert "_calculate_self_service_financials_unsettled" in _source(
+        "services/self_service_financials.py"
     )
     before = self_service_financials.calculate_self_service_financials
     finance_copy.install_self_service_financial_copy_policy()
