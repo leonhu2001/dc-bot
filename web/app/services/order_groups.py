@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from web.app.services.delta_desktop_price_copy import render_delta_desktop_group_copy
+from services.delta_desktop_guarantee_labels import fixed_guarantee_display_label
 
 from services.order_rule_store import (
     get_active_override,
@@ -162,9 +163,9 @@ GROUP_SPECS = [
         "label": "油鍋單",
         "selector_label": "方案",
         "variants": [
-            ("basic_oil_fuel", "火箭燃油"),
-            ("basic_oil_satellite", "GTI 衛星通訊天線"),
-            ("basic_oil_all", "全包"),
+            ("basic_oil_fuel", "火箭燃油（保底2000W）"),
+            ("basic_oil_satellite", "GTI衛星通信天線（保底1688W）"),
+            ("basic_oil_all", "全包（保底3688W）"),
         ],
     },
 
@@ -186,8 +187,8 @@ GROUP_SPECS = [
         "label": "體驗單",
         "selector_label": "方案",
         "variants": [
-            ("basic_trial_500", "普通｜850w"),
-            ("basic_trial_1000", "尊爵｜1888w"),
+            ("basic_trial_500", "普通體驗單｜500T（保底850W）"),
+            ("basic_trial_1000", "尊爵體驗單｜1000T（保底1888W）"),
         ],
     },
 
@@ -608,12 +609,8 @@ def _variant_data(
             f"{int(rule.required_staff_count)} 位"
         )
 
-    # Built-in trial variants are source-authoritative. Old 777W/888W
-    # manager labels must not reappear in the live Web catalog.
-    if rule_key == "basic_trial_500":
-        public_label = "普通｜850w"
-    elif rule_key == "basic_trial_1000":
-        public_label = "尊爵｜1888w"
+    # Render the live guarantee and price, rather than a stale literal label.
+    public_label = fixed_guarantee_display_label(rule_key, rule, public_label)
 
     return {
         "rule_key": rule_key,

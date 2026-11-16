@@ -57,8 +57,8 @@ def test_fixed_desktop_price_notes_and_order_quoting(key, price, text):
 def test_new_trial_policy_no_vip_or_points_and_correct_names():
     details = get_order_item_details_for_group("delta_desktop_basic", "體驗單")
     assert [(item["label"], item["rule_key"]) for item in details] == [
-        ("普通｜850w", "basic_trial_500"),
-        ("尊爵｜1888w", "basic_trial_1000"),
+        ("普通體驗單｜500T（保底850W）", "basic_trial_500"),
+        ("尊爵體驗單｜1000T（保底1888W）", "basic_trial_1000"),
     ]
     for item in details:
         rule = get_rule(item["rule_key"])
@@ -82,5 +82,5 @@ def test_service_copies_match_guarantees_and_no_old_rates():
     assert "850W 保底" in text_by_key["technical"]
     assert "普通體驗單不卡底" not in text_by_key["trial"]
     assert "打手選圖（絕密）" in text_by_key["bet"]
-    assert "GTI 衛星通信天線" in text_by_key["oil"]
+    assert "GTI衛星通信天線（保底1688W）" in text_by_key["oil"]
     assert "3688W" in text_by_key["oil"]
