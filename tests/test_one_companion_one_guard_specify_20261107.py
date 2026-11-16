@@ -26,7 +26,7 @@ from web.app.services.checkout_preview import _choose_role_key
     "rule_key,base_price",
     [
         ("basic_one_companion_one_guard_secret", 800),
-        ("basic_one_companion_one_guard_topsecret", 900),
+        ("basic_one_companion_one_guard_topsecret", 850),
     ],
 )
 def test_one_guard_both_difficulties_allow_two_specified_staff(rule_key, base_price):

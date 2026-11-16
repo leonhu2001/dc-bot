@@ -197,6 +197,7 @@ def test_admin_real_headcount_price_fields_update_checkout_totals(monkeypatch):
         int(k): v + 33 for k, v in original_tiers.items()
     }
     updated["__owner_confirmed_after_canonical"] = True
+    updated[order_rules.DELTA_DESKTOP_APPROVAL_REVISION_MARKER] = True
     monkeypatch.setattr(ORDER_RULES, "_refresh_external", lambda: None)
     monkeypatch.setattr(ORDER_RULES, "_override_cache", {key: {"payload": updated}})
     actual = ORDER_RULES[key]
