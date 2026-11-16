@@ -681,6 +681,22 @@ async def _create_ticket(
         )
         return None
 
+    # Rich game/service naming now lives in this canonical creation path,
+    # rather than a post-startup replacement of _create_ticket.
+    try:
+        from services.order_ticket_name_restore_runtime import (
+            _rename_quick_ticket_from_data,
+        )
+        await _rename_quick_ticket_from_data(
+            ticket, data, status="active", member=member,
+        )
+    except Exception as exc:
+        print(
+            f"[quick-order-v2] informative ticket name failed: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
     await interaction.edit_original_response(
         content=f"✅ 票口已建立：{ticket.mention}",
         embed=None,
