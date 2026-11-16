@@ -134,7 +134,7 @@ def test_deliberate_new_manager_price_update_is_not_blocked(monkeypatch):
 def test_other_games_and_special_services_unchanged():
     for key, count, expected in (
         ("basic_mobile_entertain_single", 2, 600),
-        ("basic_mobile_tech_secret_single", 2, 760),
+        # Mobile tech SKUs were intentionally retired; do not resurrect them.
         ("basic_black_tide_entertain", 1, 320),
         ("farm_season_3x3_normal", 1, 5500),
     ):
