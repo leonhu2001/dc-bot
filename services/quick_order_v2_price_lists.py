@@ -252,6 +252,28 @@ DELTA_MOBILE_PRICE_LISTS = {
     },
 }
 
+def _season_3x3_approved_price_copy() -> str:
+    """Derive published season prices from the same rules used by DC/Web quote."""
+    from services.order_rules import (
+        SEASON_3X3_EARLY_BOOKING_DISCOUNT_AMOUNT,
+        get_rule,
+    )
+
+    regular = get_rule("farm_season_3x3_normal")
+    contract = get_rule("farm_season_3x3_contract")
+    base = int(regular.price)
+    skin_fee = int(regular.staff_adjustments["skin"])
+    loss_fee = int(regular.staff_adjustments["loss_cover"])
+    return (
+        "**三角洲行動 S12｜3×3安全箱**\\n"
+        f"安全箱 {base}T｜安全箱＋造型 {base + skin_fee}T\\n"
+        f"包損＋{loss_fee}T｜命運契約 {int(contract.price)}T／個\\n"
+        f"賽前提前預約 −{SEASON_3X3_EARLY_BOOKING_DISCOUNT_AMOUNT}T"
+        "（由客服手動設定共同分擔的固定折扣；客人無需勾選）\\n"
+        "詳細規則請見下圖。"
+    )
+
+
 DELTA_FARM_PRICE_LISTS = {
     "aw_collision": {
         "label": "AW子彈代撞",
@@ -276,7 +298,7 @@ DELTA_FARM_PRICE_LISTS = {
     },
     "safe_box_3x3": {
         "label": "3×3安全箱",
-        "text": "**三角洲行動 S12｜3×3安全箱**\n安全箱 5500T｜安全箱＋外觀 8000T\n包損＋500T｜賽前預約 −500T｜命運契約 600T／個\n詳細規則請見下圖。",
+        "text": _season_3x3_approved_price_copy(),
         "image": _DELTA_FARM_3X3_ASSET,
     },
 }
