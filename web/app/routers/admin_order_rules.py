@@ -13,7 +13,6 @@ from fastapi.templating import Jinja2Templates
 from services.order_product_status import (
     ensure_order_product_status_store,
     get_order_product_status,
-    install_web_catalog_guards,
     set_order_product_active,
 )
 from services.order_rule_store import (
@@ -46,10 +45,7 @@ from web.app.services.audit_trail import write_sqlite_audit_log
 from services.orders import get_source_catalog_group_label
 
 
-# main.py imports this router before the public site router. Install the live
-# availability guards here so the public catalog/quote helpers that site.py
-# imports afterwards already respect manager-controlled product status.
-install_web_catalog_guards()
+# Public catalog and checkout now enforce product availability natively.
 
 router = APIRouter(tags=["admin-order-rules"])
 
