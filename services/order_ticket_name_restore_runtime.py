@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import re
 
 import discord
@@ -17,7 +16,6 @@ from services.ticket_identity import build_ticket_channel_name
 
 CUSTOMER_CATEGORY_ID = config_int("CUSTOMER_CATEGORY_ID", 1483895536938651809)
 _SIMPLIFIED_NAME_RE = re.compile(r"^[🟢🟡🟠⚫🔴⚪][・┃]客服中心$")
-_ORIGINAL_QUICK_CREATE_TICKET = None
 
 _GAME_LABELS = {
     "delta_desktop_basic": "三角洲端遊",
@@ -249,120 +247,28 @@ async def _rename_quick_ticket_from_data(
         )
 
 
-def _install_quick_create_ticket_patch() -> bool:
-    global _ORIGINAL_QUICK_CREATE_TICKET
-    if _ORIGINAL_QUICK_CREATE_TICKET is not None:
-        return True
+def resolve_order_ticket_prefix(
+    channel: discord.TextChannel | None,
+    prefix: str,
+    data: dict | None,
+) -> str:
+    """Resolve approved game/service naming at the canonical rename call site.
 
-    try:
-        from services import quick_order_v2 as quick
-        from services import self_service_ui_runtime as ui
-
-        original = quick._create_ticket
-        _ORIGINAL_QUICK_CREATE_TICKET = original
-
-        async def informative_quick_create_ticket(
-            interaction: discord.Interaction,
-            *,
-            category: str,
-            item_group: str,
-            source_channel_id: int,
-        ) -> discord.TextChannel | None:
-            ticket = await original(
-                interaction,
-                category=category,
-                item_group=item_group,
-                source_channel_id=source_channel_id,
-            )
-            if isinstance(ticket, discord.TextChannel):
-                data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(ticket.id, {})
-                if isinstance(data, dict):
-                    await _rename_quick_ticket_from_data(
-                        ticket,
-                        data,
-                        status="active",
-                        member=interaction.user if isinstance(interaction.user, discord.Member) else None,
-                    )
-            return ticket
-
-        quick._create_ticket = informative_quick_create_ticket
-        return True
-    except Exception as exc:
-        print(
-            f"[order-ticket-name] cannot install quick-create wrapper: "
-            f"{type(exc).__name__}: {exc}",
-            flush=True,
-        )
-        return False
+    No module assignment or replacement of another service's callback is
+    permitted. This function is called by Quick Order, store, and payment
+    transitions directly, preserving existing legacy prefixes and snapshots.
+    """
+    requested = str(prefix or "")
+    if not isinstance(channel, discord.TextChannel):
+        return requested
+    saved = _merge_claim_fallback(channel.id, data if isinstance(data, dict) else {})
+    if _is_quick_order_ticket(channel, saved):
+        return _order_prefix(saved, _requested_status(requested, saved))
+    if requested.startswith("存單"):
+        return _stored_prefix(saved)
+    return requested
 
 
-def _install_store_renamer_patch() -> bool:
-    """Keep game + service/detail in every quick-order rename and stored order."""
-    try:
-        from services import order_payment_runtime, order_runtime
-
-        state = getattr(order_runtime, "_RUNTIME_STATE", None)
-        if state is None:
-            return False
-
-        existing_wrapper = getattr(order_runtime, "_rich_store_ticket_renamer", None)
-        if getattr(order_runtime, "_rich_store_ticket_renamer_installed", False):
-            if callable(existing_wrapper):
-                # Payment finalization owns a separate runtime callback. Keep it
-                # on the same context-aware renamer so a raw item such as 單陪
-                # cannot overwrite the rich quick-ticket name after payment.
-                order_payment_runtime.rename_ticket_channel = existing_wrapper
-            return True
-
-        original = state.ticket_channel_renamer
-
-        async def rich_ticket_channel_renamer(
-            channel,
-            prefix: str,
-            member=None,
-            *,
-            display_name: str | None = None,
-        ) -> None:
-            effective_prefix = str(prefix or "")
-            if isinstance(channel, discord.TextChannel):
-                data = state.order_selections.get(channel.id, {})
-                if not isinstance(data, dict):
-                    data = {}
-                data = _merge_claim_fallback(channel.id, data)
-
-                if _is_quick_order_ticket(channel, data):
-                    effective_prefix = _order_prefix(
-                        data,
-                        _requested_status(effective_prefix, data),
-                    )
-                elif effective_prefix.startswith("存單"):
-                    effective_prefix = _stored_prefix(data)
-
-            await original(
-                channel,
-                effective_prefix,
-                member=member,
-                display_name=display_name,
-            )
-
-        order_runtime._RUNTIME_STATE = replace(
-            state,
-            ticket_channel_renamer=rich_ticket_channel_renamer,
-        )
-        order_runtime._rich_store_ticket_renamer = rich_ticket_channel_renamer
-        order_runtime._rich_store_ticket_renamer_installed = True
-        # order_payment_runtime is configured independently from order_runtime.
-        # Without this assignment, payment completion renames the ticket again
-        # from its raw item label and can erase the game/service prefix.
-        order_payment_runtime.rename_ticket_channel = rich_ticket_channel_renamer
-        return True
-    except Exception as exc:
-        print(
-            f"[order-ticket-name] cannot install stored-name wrapper: "
-            f"{type(exc).__name__}: {exc}",
-            flush=True,
-        )
-        return False
 
 
 async def restore_unintentionally_simplified_order_ticket_names(
@@ -370,9 +276,6 @@ async def restore_unintentionally_simplified_order_ticket_names(
 ) -> None:
     """Repair simplified names, enrich quick tickets, and preserve stored-ticket detail."""
     await bot.wait_until_ready()
-    _install_store_renamer_patch()
-    _install_quick_create_ticket_patch()
-
     category = bot.get_channel(CUSTOMER_CATEGORY_ID)
     if not isinstance(category, discord.CategoryChannel):
         try:
@@ -457,8 +360,8 @@ async def restore_unintentionally_simplified_order_ticket_names(
 
 
 def install_order_ticket_name_restore(bot: commands.Bot) -> None:
-    _install_store_renamer_patch()
-    _install_quick_create_ticket_patch()
+    # Compatibility startup hook: never monkey-patch Quick Order creation,
+    # order_runtime state, or the payment renamer.
     if getattr(bot, "_order_ticket_name_restore_started", False):
         return
     bot._order_ticket_name_restore_started = True
@@ -468,4 +371,5 @@ def install_order_ticket_name_restore(bot: commands.Bot) -> None:
 __all__ = [
     "install_order_ticket_name_restore",
     "restore_unintentionally_simplified_order_ticket_names",
+    "resolve_order_ticket_prefix",
 ]
