@@ -11,6 +11,8 @@ import pytest
 from services.order_rules import (
     APPROVED_DELTA_DESKTOP_RULE_KEYS,
     DELTA_DESKTOP_APPROVAL_REVISION_MARKER,
+    DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER,
+    DELTA_ENTERTAINMENT_RULE_KEYS,
     ORDER_RULES,
     calculate_price,
     get_base_rule,
@@ -177,3 +179,49 @@ def test_updated_exbar_does_not_modify_fixed_price_or_hourly_specification():
     assert rule.allow_specify is True
     assert rule.specify_free_min_units == 2
     assert "850w / 600w + 2 沙色保險 / 4 沙色保險" in rule.note
+
+
+@pytest.mark.parametrize("key", sorted(DELTA_ENTERTAINMENT_RULE_KEYS))
+def test_entertainment_unchanged_old_price_even_with_prior_image_approval(monkeypatch, key):
+    """An already-approved 350/650 override may NOT undo the later hold."""
+    base = get_base_rule(key)
+    payload = rule_to_override_payload(base)
+    payload["player_count_prices"] = {"1": 350, "2": 650}
+    payload["price"] = 350
+    payload["__owner_confirmed_after_canonical"] = True
+    payload[DELTA_DESKTOP_APPROVAL_REVISION_MARKER] = True
+    monkeypatch.setattr(ORDER_RULES, "_refresh_external", lambda: None)
+    monkeypatch.setattr(ORDER_RULES, "_override_cache", {key: {"payload": payload}})
+
+    rule = ORDER_RULES[key]
+    assert calculate_price(rule, quantity=1, player_count=1).total_amount == 320
+    assert calculate_price(rule, quantity=1, player_count=2).total_amount == 600
+    assert rule.specify_fee_default == 100
+    assert rule.specify_free_min_units == 2
+    assert rule.loyalty_benefits_enabled is True
+
+
+def test_future_authorized_entertainment_price_update_still_possible(monkeypatch):
+    key = "basic_entertain_single"
+    payload = rule_to_override_payload(get_base_rule(key))
+    payload["player_count_prices"] = {"1": 325, "2": 605}
+    payload["price"] = 325
+    payload[DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER] = True
+    monkeypatch.setattr(ORDER_RULES, "_refresh_external", lambda: None)
+    monkeypatch.setattr(ORDER_RULES, "_override_cache", {key: {"payload": payload}})
+    assert calculate_price(ORDER_RULES[key], quantity=1, player_count=1).total_amount == 325
+    assert calculate_price(ORDER_RULES[key], quantity=1, player_count=2).total_amount == 605
+
+
+def test_other_image_price_cards_remain_untouched():
+    expected = {
+        "one_guard": ("800T / H", "900T / H"),
+        "technical": ("450T / H", "850T / H", "500T / H", "950T / H"),
+        "trial": ("500T", "850W", "1000T", "1888W"),
+        "bet": ("1200T", "1500T", "2400T"),
+        "oil": ("3000T", "2000T", "4500T", "3688W"),
+        "babel_technical": ("1000T / H", "850W", "600W + 2 沙保"),
+    }
+    for group, phrases in expected.items():
+        for phrase in phrases:
+            assert phrase in DELTA_DESKTOP_PRICE_LISTS[group]["text"], (group, phrase)
