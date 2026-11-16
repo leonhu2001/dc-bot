@@ -703,8 +703,7 @@ def _calculate_self_service_financials_unsettled(rule, price_result, data: dict)
 
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
-    settled = bool(data.get("website_finance_settled"))
-    if settled:
+    if data.get("website_finance_settled"):
         from services.self_service_financial_copy import _SETTLED_FINANCIAL_KEYS
         safe = dict(data)
         for key in ("selected_point_benefit_key",
