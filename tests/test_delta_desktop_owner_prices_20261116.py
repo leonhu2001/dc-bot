@@ -24,10 +24,10 @@ from web.app.services.order_groups import get_grouped_order_catalog
 
 @pytest.mark.parametrize("key,count,amount", [
     ("basic_exbar_tech", 1, 1000),
-    ("basic_entertain_single", 1, 350),
-    ("basic_entertain_single", 2, 650),
-    ("basic_entertain_female_single", 1, 350),
-    ("basic_entertain_male_single", 2, 650),
+    ("basic_entertain_single", 1, 320),
+    ("basic_entertain_single", 2, 600),
+    ("basic_entertain_female_single", 1, 320),
+    ("basic_entertain_male_single", 2, 600),
     ("basic_one_companion_one_guard_secret", 1, 800),
     ("basic_one_companion_one_guard_topsecret", 1, 900),
     ("basic_tech_secret_single", 1, 450),
@@ -73,7 +73,7 @@ def test_contractual_guarantees_live_in_source_rules(key, guarantee):
 def test_approved_dc_price_list_matches_all_six_offers():
     plans = DELTA_DESKTOP_PRICE_LISTS
     for offer, terms in {
-        "entertainment": ("350T / H", "650T / H", "10 小時", "+100T"),
+        "entertainment": ("320T / H", "600T / H", "10 小時", "+100T"),
         "one_guard": ("800T / H", "900T / H", "8 殺", "7 殺", "2H"),
         "babel_technical": ("1000T / H", "850W", "600W + 2 沙保", "4 沙保"),
         "trial": ("500T", "850W", "1000T", "1888W", "每週", "每月", "打手選圖"),
@@ -156,7 +156,7 @@ def test_web_product_card_copy_tracks_latest_source_prices_guarantees():
         for item in get_grouped_order_catalog("delta_desktop_basic")
     }
     expected = {
-        "娛樂陪": ("350T/H", "650T/H", "10小時", "+100T"),
+        "娛樂陪": ("320T/H", "600T/H", "10小時", "+100T"),
         "一陪一護": ("800T/H", "900T/H", "8殺", "7殺"),
         "體驗單": ("500T/單", "850W", "1000T/單", "1888W", "每週", "每月"),
         "技術陪": ("450T/H", "850T/H", "500T/H", "950T/H", "777W", "850W"),
