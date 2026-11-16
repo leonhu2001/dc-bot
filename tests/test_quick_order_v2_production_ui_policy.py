@@ -18,8 +18,10 @@ def test_production_uses_one_ticket_ui_policy_instead_of_nested_wrappers() -> No
     assert "def _install_farm_ticket_ui" not in source
     assert "quick._ORIGINAL_PANEL_BUILDER" not in source
     assert "quick._ORIGINAL_VIEW_INIT" not in source
-    assert source.count("ui.SelfServiceOrderView.__init__ =") == 1
-    assert source.count("ui.build_self_service_panel_embed =") == 1
+    assert "ui.SelfServiceOrderView.__init__ =" not in source
+    assert "ui.build_self_service_panel_embed =" not in source
+    assert "def apply_production_ticket_view_policy" in source
+    assert "def decorate_production_ticket_embed" in source
     assert "apply_quick_order_select_display(self, data)" in source
 
 
@@ -67,4 +69,6 @@ def test_production_owns_live_vip_gate_for_quick_order() -> None:
     source = PRODUCTION_SOURCE.read_text(encoding="utf-8")
 
     assert "def _live_vip_timer_eligibility" in source
-    assert "quick.assert_vip_timer_self_service_eligible = _live_vip_timer_eligibility" in source
+    assert "quick.assert_vip_timer_self_service_eligible = _live_vip_timer_eligibility" not in source
+    core = (ROOT / "services/quick_order_v2.py").read_text(encoding="utf-8")
+    assert "def assert_vip_timer_self_service_eligible(" in core
