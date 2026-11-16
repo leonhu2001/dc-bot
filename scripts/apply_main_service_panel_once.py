@@ -101,28 +101,22 @@ def _existing_button_styles_match(
                     return False
     return True
 
-def _price_list_id(channels: list[dict], *, specified: int | None) -> int:
-    text_channels = [
-        channel for channel in channels if channel.get("type") in (0, 5)
-    ]
-    if specified:
-        if not any(int(c.get("id") or 0) == specified for c in text_channels):
-            raise RuntimeError(f"指定的價目表頻道 {specified} 不存在或不是文字頻道")
-        return specified
+def _price_list_id(*, specified: int | None) -> int:
+    """Use the exact Discord channel/thread URL supplied by the owner.
 
-    exact = [c for c in text_channels if str(c.get("name") or "") == "價目表"]
-    candidates = exact or [
-        c for c in text_channels if "價目表" in str(c.get("name") or "")
-    ]
-    if len(candidates) != 1:
-        description = ", ".join(
-            f"{c.get('name')} ({c.get('id')})" for c in candidates
-        ) or "無"
+    /guilds/{guild_id}/channels omits thread channels and some entry types,
+    so absence from that listing is NOT evidence the provided link is invalid.
+    Keep this one-time updater locked to the approved destination.
+    """
+    from views.panels import SERVICE_LOBBY_PRICE_LIST_CHANNEL_ID
+
+    approved = SERVICE_LOBBY_PRICE_LIST_CHANNEL_ID
+    if specified is not None and specified != approved:
         raise RuntimeError(
-            f"無法唯一辨認價目表頻道：{description}。"
-            "請使用 --price-list-channel-id 指定，避免產生錯誤連結。"
+            f"指定的價目表頻道 {specified} 與店主核准的 {approved} 不符；"
+            "停止更新以避免改錯連結"
         )
-    return int(candidates[0]["id"])
+    return approved
 
 
 async def _api_call(
@@ -171,6 +165,11 @@ async def _main(args: argparse.Namespace) -> None:
     )
     if not all((guild_id, channel_id, message_id)):
         raise RuntimeError("Panel guild/channel/message IDs must be nonzero")
+    if guild_id != DEFAULT_GUILD_ID:
+        raise RuntimeError(
+            f"Configured guild {guild_id} does not match the owner-approved "
+            f"Discord link's guild {DEFAULT_GUILD_ID}"
+        )
 
     view = MainPanelView()
     components = view.to_components()
@@ -214,12 +213,9 @@ async def _main(args: argparse.Namespace) -> None:
         if not _existing_button_styles_match(current.get("components") or [], components):
             raise RuntimeError("Existing panel button styling/layout differs; abort")
 
-        channels = await _api_call(
-            client, "GET", f"/guilds/{guild_id}/channels"
-        )
-        price_id = _price_list_id(
-            channels, specified=args.price_list_channel_id
-        )
+        # Exact approved Discord URL already pins the destination. Do not
+        # enumerate guild channels: a valid forum thread is absent there.
+        price_id = _price_list_id(specified=args.price_list_channel_id)
         embed = build_main_panel_embed(price_list_channel_id=price_id)
         if len(embed.description or "") > 4096:
             raise RuntimeError("Embed description exceeds Discord size limit")
@@ -274,6 +270,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--price-list-channel-id", type=int,
-        help="Optional exact channel ID if multiple channels contain 價目表",
+        help="Optional exact ID; must match the owner-approved Discord URL",
     )
     asyncio.run(_main(parser.parse_args()))
