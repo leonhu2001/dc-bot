@@ -9,7 +9,12 @@ from web.app.services import order_reporting as reporting
 
 
 def _notification_db():
-    bind = create_engine("sqlite:///:memory:")
+    from sqlalchemy.pool import StaticPool
+    bind = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     with bind.begin() as conn:
         conn.execute(text("""
             CREATE TABLE web_orders (
