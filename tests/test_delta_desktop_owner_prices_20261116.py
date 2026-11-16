@@ -23,22 +23,23 @@ from web.app.services.order_groups import get_grouped_order_catalog
 
 
 @pytest.mark.parametrize("key,count,amount", [
+    ("basic_exbar_tech", 1, 1000),
     ("basic_entertain_single", 1, 350),
     ("basic_entertain_single", 2, 650),
     ("basic_entertain_female_single", 1, 350),
     ("basic_entertain_male_single", 2, 650),
     ("basic_one_companion_one_guard_secret", 1, 800),
-    ("basic_one_companion_one_guard_topsecret", 1, 850),
+    ("basic_one_companion_one_guard_topsecret", 1, 900),
     ("basic_tech_secret_single", 1, 450),
-    ("basic_tech_secret_single", 2, 800),
+    ("basic_tech_secret_single", 2, 850),
     ("basic_tech_topsecret_single", 1, 500),
-    ("basic_tech_topsecret_single", 2, 900),
+    ("basic_tech_topsecret_single", 2, 950),
     ("basic_trial_500", 1, 500),
     ("basic_trial_1000", 1, 1000),
-    ("basic_bet_1000", 1, 1300),
-    ("basic_bet_1500", 1, 1800),
-    ("basic_bet_2500", 1, 2500),
-    ("basic_oil_fuel", 1, 2800),
+    ("basic_bet_1000", 1, 1200),
+    ("basic_bet_1500", 1, 1500),
+    ("basic_bet_2500", 1, 2400),
+    ("basic_oil_fuel", 1, 3000),
     ("basic_oil_satellite", 1, 2000),
     ("basic_oil_all", 1, 4500),
 ])
@@ -50,7 +51,9 @@ def test_owner_prices_use_authoritative_quote_engine(key, count, amount):
 
 
 @pytest.mark.parametrize("key,guarantee", [
-    ("basic_trial_500", "888W"),
+    ("basic_exbar_tech", "850W"),
+    ("basic_exbar_tech", "600W + 2"),
+    ("basic_trial_500", "850W"),
     ("basic_trial_1000", "1888W"),
     ("basic_tech_secret_single", "777W"),
     ("basic_tech_topsecret_single", "850W"),
@@ -60,8 +63,8 @@ def test_owner_prices_use_authoritative_quote_engine(key, count, amount):
     ("basic_bet_1500", "1000W"),
     ("basic_bet_2500", "1200W"),
     ("basic_oil_fuel", "2000W"),
-    ("basic_oil_satellite", "1500W"),
-    ("basic_oil_all", "3500W"),
+    ("basic_oil_satellite", "1688W"),
+    ("basic_oil_all", "3688W"),
 ])
 def test_contractual_guarantees_live_in_source_rules(key, guarantee):
     assert guarantee.replace(" ", "").lower() in get_rule(key).note.replace(" ", "").lower()
@@ -71,26 +74,27 @@ def test_approved_dc_price_list_matches_all_six_offers():
     plans = DELTA_DESKTOP_PRICE_LISTS
     for offer, terms in {
         "entertainment": ("350T / H", "650T / H", "10 小時", "+100T"),
-        "one_guard": ("800T / H", "850T / H", "8 殺", "7 殺", "2H"),
-        "trial": ("500T", "888W", "1000T", "1888W", "每週", "每月", "打手選圖"),
-        "technical": ("450T / H", "800T / H", "500T / H", "900T / H", "777W", "850W"),
-        "bet": ("1300T", "800W", "1800T", "1000W", "2500T", "1200W"),
-        "oil": ("2800T", "2000W", "2000T", "1500W", "4500T", "3500W"),
+        "one_guard": ("800T / H", "900T / H", "8 殺", "7 殺", "2H"),
+        "babel_technical": ("1000T / H", "850W", "600W + 2 沙保", "4 沙保"),
+        "trial": ("500T", "850W", "1000T", "1888W", "每週", "每月", "打手選圖"),
+        "technical": ("450T / H", "850T / H", "500T / H", "950T / H", "777W", "850W"),
+        "bet": ("1200T", "800W", "1500T", "1000W", "2400T", "1200W"),
+        "oil": ("3000T", "2000W", "2000T", "1688W", "4500T", "3688W"),
     }.items():
         for term in terms:
             assert term in plans[offer]["text"], (offer, term)
-    assert "900T / H" not in plans["one_guard"]["text"]
-    assert "950T / H" not in plans["technical"]["text"]
-    assert "850W" not in plans["trial"]["text"]
-    assert "3688W" not in plans["oil"]["text"]
+    assert "850T / H" not in plans["one_guard"]["text"]
+    assert "800T / H" not in plans["technical"]["text"]
+    assert "500T　保底 888W" not in plans["trial"]["text"]
+    assert "3500W" not in plans["oil"]["text"]
 
 
 def test_web_and_discord_share_new_trial_selector_and_keep_legacy_aliases():
     dc = get_order_item_details_for_group("delta_desktop_basic", "體驗單")
     web = next(group for group in get_grouped_order_catalog("delta_desktop_basic")
                if group["key"] == "trial")
-    assert [r["label"] for r in dc] == ["普通｜888w", "尊爵｜1888w"]
-    assert [r["label"] for r in web["variants"]] == ["普通｜888w", "尊爵｜1888w"]
+    assert [r["label"] for r in dc] == ["普通｜850w", "尊爵｜1888w"]
+    assert [r["label"] for r in web["variants"]] == ["普通｜850w", "尊爵｜1888w"]
     from services.orders import ORDER_RULE_KEY_BY_LABEL
     assert ORDER_RULE_KEY_BY_LABEL["體驗單 850w"] == "basic_trial_500"
     assert ORDER_RULE_KEY_BY_LABEL["體驗單 888w"] == "basic_trial_500"
@@ -98,7 +102,7 @@ def test_web_and_discord_share_new_trial_selector_and_keep_legacy_aliases():
 
 def test_manager_stale_overrides_cannot_restore_old_prices_or_guarantees(monkeypatch):
     keys = (
-        "basic_tech_secret_single", "basic_trial_500",
+        "basic_exbar_tech", "basic_tech_secret_single", "basic_trial_500",
         "basic_oil_satellite", "basic_bet_2500",
         "basic_one_companion_one_guard_topsecret",
     )
@@ -108,6 +112,7 @@ def test_manager_stale_overrides_cannot_restore_old_prices_or_guarantees(monkeyp
         payload["price"] = 13
         payload["note"] = "舊保底 777W"
         payload["__owner_confirmed_after_canonical"] = True
+        payload["__owner_confirmed_delta_desktop_20261116"] = True
         if payload.get("player_count_prices"):
             payload["player_count_prices"] = {"1": 13, "2": 14}
         versions[key] = {"payload": payload}
@@ -120,6 +125,7 @@ def test_manager_stale_overrides_cannot_restore_old_prices_or_guarantees(monkeyp
         assert live.price == base.price
         assert live.player_count_prices == base.player_count_prices
         assert live.note == base.note
+        assert live.specify_fee_by_role == base.specify_fee_by_role
 
 
 def test_deliberate_new_manager_price_update_is_not_blocked(monkeypatch):
@@ -142,3 +148,32 @@ def test_other_games_and_special_services_unchanged():
         ("farm_season_3x3_normal", 1, 5500),
     ):
         assert calculate_price(get_rule(key), quantity=1, player_count=count).total_amount == expected
+
+
+def test_web_product_card_copy_tracks_latest_source_prices_guarantees():
+    groups = {
+        item["label"]: item
+        for item in get_grouped_order_catalog("delta_desktop_basic")
+    }
+    expected = {
+        "娛樂陪": ("350T/H", "650T/H", "10小時", "+100T"),
+        "一陪一護": ("800T/H", "900T/H", "8殺", "7殺"),
+        "體驗單": ("500T/單", "850W", "1000T/單", "1888W", "每週", "每月"),
+        "技術陪": ("450T/H", "850T/H", "500T/H", "950T/H", "777W", "850W"),
+        "絕巴技術陪": ("1000T/H", "850w", "600w+2沙色保險", "4沙色保險"),
+        "賭約單": ("1200T/單", "800W", "1500T/單", "1000W", "2400T/單", "1200W"),
+        "油鍋單": ("3000T/單", "2000W", "2000T/單", "1688W", "4500T/單", "3688W"),
+    }
+    for group_name, fragments in expected.items():
+        content = groups[group_name]["description"].replace(",", "").replace(" ", "")
+        for fragment in fragments:
+            assert fragment.replace(",", "").replace(" ", "") in content, (group_name, fragment)
+
+
+def test_updated_exbar_does_not_modify_fixed_price_or_hourly_specification():
+    rule = get_rule("basic_exbar_tech")
+    assert rule.price == 1000
+    assert rule.pricing_type == "hourly"
+    assert rule.allow_specify is True
+    assert rule.specify_free_min_units == 2
+    assert "850w / 600w + 2 沙色保險 / 4 沙色保險" in rule.note

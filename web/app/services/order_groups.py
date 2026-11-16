@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from web.app.services.delta_desktop_price_copy import render_delta_desktop_group_copy
+
 from services.order_rule_store import (
     get_active_override,
     get_custom_rule_definition,
@@ -77,6 +79,18 @@ GROUP_SPECS = [
         "label": "絕巴技術陪",
         "variants": [
             ("basic_exbar_tech", "絕巴技術陪"),
+        ],
+    },
+
+    {
+        "key": "one_guard",
+        "category": "delta_desktop_basic",
+        "label": "一陪一護",
+        "selector_label": "難度",
+        "description": "每單由 2 位接單者服務，至少 1 位護航，另一位可為護航或陪玩；指定每位 +100T，2H 以上免指定費。",
+        "variants": [
+            ("basic_one_companion_one_guard_secret", "機密"),
+            ("basic_one_companion_one_guard_topsecret", "絕密"),
         ],
     },
 
@@ -172,7 +186,7 @@ GROUP_SPECS = [
         "label": "體驗單",
         "selector_label": "方案",
         "variants": [
-            ("basic_trial_500", "普通｜888w"),
+            ("basic_trial_500", "普通｜850w"),
             ("basic_trial_1000", "尊爵｜1888w"),
         ],
     },
@@ -594,10 +608,10 @@ def _variant_data(
             f"{int(rule.required_staff_count)} 位"
         )
 
-    # Built-in trial variants are source-authoritative. Old 777W/850W
+    # Built-in trial variants are source-authoritative. Old 777W/888W
     # manager labels must not reappear in the live Web catalog.
     if rule_key == "basic_trial_500":
-        public_label = "普通｜888w"
+        public_label = "普通｜850w"
     elif rule_key == "basic_trial_1000":
         public_label = "尊爵｜1888w"
 
@@ -777,11 +791,12 @@ def _group_data(
                 "selector_label",
                 "方案",
             ),
-        "description":
-            spec.get(
-                "description",
-                "",
-            ),
+        "description": render_delta_desktop_group_copy(
+            category=str(spec.get("category") or ""),
+            label=str(spec.get("label") or ""),
+            description=str(spec.get("description") or ""),
+            variants=variants,
+        ),
         **(
             {"image_url": f"/static/{spec['image']}"}
             if str(spec.get("image") or "").startswith(("price_lists/", "order_panels/"))
