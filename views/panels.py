@@ -36,6 +36,9 @@ SERVICE_LOBBY_GAME_CHANNELS = (
     ("Steam 遊戲", 1562940249171042415),
     ("APEX", 1562940146632888450),
 )
+# Confirmed by the owner from the exact Discord URL; this may be a thread,
+# forum, or otherwise non-text channel and therefore absent from guild channels.
+SERVICE_LOBBY_PRICE_LIST_CHANNEL_ID = 1569412217269395597
 SERVICE_LOBBY_ORDER_NOTICE_CHANNEL_ID = 1543738337519730768
 
 
@@ -44,13 +47,14 @@ def build_main_panel_embed(
 ) -> discord.Embed:
     """Build new service-lobby copy; never auto-overwrite the approved live post.
 
-    The price-list channel is resolved from the server when the owner runs the
-    one-time update. Without a verified channel ID, avoid inventing a mention.
+    Price list points to an exact owner-supplied Discord link. Updating the
+    existing public post remains a separate, explicit one-time operation.
     """
+    # Resolve to the owner-approved Discord destination by default. Never
+    # guess it from channel names/types: thread channels are not in the guild's
+    # regular channel listing.
     price_list = (
-        f"<#{int(price_list_channel_id)}>"
-        if price_list_channel_id
-        else "請至伺服器的「價目表」頻道查看"
+        f"<#{int(price_list_channel_id or SERVICE_LOBBY_PRICE_LIST_CHANNEL_ID)}>"
     )
     lines = [
         "歡迎來到魔丸娛樂！",
