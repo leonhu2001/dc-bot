@@ -108,13 +108,13 @@ def test_black_tide_uses_formal_one_seat_price_instead_of_nonlinear_checkout_tot
     benefit = _benefit("entertain_double_service_large")
 
     assert uses_dynamic_service_point_cost(rule, benefit)
-    # 黑潮雙陪本體是非線性總價 600，但點數服務福利要用單陪正式價 320
-    # 計算：320 / 2 * 0.9 = 144 -> 單席進位 150，再乘 2 席 = 300。
+    # 黑潮雙陪是非線性總價 650T，點數福利使用正式單陪 350T。
+    # 350 / 2 * 0.9 = 157.5 -> 單席進位 160，再乘 2 席 = 320。
     assert calculate_service_bonus_point_cost(
         rule=rule,
         benefit=benefit,
         player_count=2,
-    ) == 300
+    ) == 320
     assert int(benefit["cost"]) == 280
 
 

@@ -137,22 +137,22 @@ def test_delta_catalog_shows_type_only_and_keeps_old_single_selector_value():
         assert all("player_count" not in item for item in group["details"])
 
 
-def test_black_tide_and_steam_use_explicit_one_to_four_price_tables():
+def test_black_tide_five_and_steam_four_price_tables():
     black_entertain = ORDER_RULES["basic_black_tide_entertain"]
     black_tech = ORDER_RULES["basic_black_tide_tech"]
     steam = ORDER_RULES["steam_play"]
-    assert get_player_count_price_table(black_entertain) == {1: 320, 2: 600, 3: 900, 4: 1200}
-    assert get_player_count_price_table(black_tech) == {1: 400, 2: 760, 3: 1140, 4: 1520}
+    assert get_player_count_price_table(black_entertain) == {1: 350, 2: 650, 3: 975, 4: 1300, 5: 1625}
+    assert get_player_count_price_table(black_tech) == {1: 450, 2: 850, 3: 1275, 4: 1700, 5: 2125}
     assert get_player_count_price_table(steam) == {1: 350, 2: 700, 3: 1050, 4: 1400}
 
-    assert [calculate_price(black_entertain, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [320, 600, 900, 1200]
-    assert [calculate_price(black_tech, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [400, 760, 1140, 1520]
+    assert [calculate_price(black_entertain, quantity=1, player_count=count).base_amount for count in range(1, 6)] == [350, 650, 975, 1300, 1625]
+    assert [calculate_price(black_tech, quantity=1, player_count=count).base_amount for count in range(1, 6)] == [450, 850, 1275, 1700, 2125]
     assert [calculate_price(steam, quantity=1, player_count=count).base_amount for count in range(1, 5)] == [350, 700, 1050, 1400]
 
     for rule in (black_entertain, black_tech):
         assert rule.required_staff_count == "player_count"
         assert rule.player_count_enabled is True
-        assert get_rule_player_count_bounds(rule) == (1, 4, 1, True)
+        assert get_rule_player_count_bounds(rule) == (1, 5, 1, True)
 
     black_group = _group("delta_desktop_basic", "黑潮爆破")
     assert [item["label"] for item in black_group["details"]] == ["娛樂陪", "技術陪"]

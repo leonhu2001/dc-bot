@@ -146,7 +146,7 @@ def test_other_games_and_special_services_unchanged():
     for key, count, expected in (
         ("basic_mobile_entertain_single", 2, 600),
         # Mobile tech SKUs were intentionally retired; do not resurrect them.
-        ("basic_black_tide_entertain", 1, 320),
+        ("basic_black_tide_entertain", 1, 350),
         ("farm_season_3x3_normal", 1, 5500),
     ):
         assert calculate_price(get_rule(key), quantity=1, player_count=count).total_amount == expected

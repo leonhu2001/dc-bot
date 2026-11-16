@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""A display-only, staff-operated clock for non-Delta hourly orders.
+"""A display-only, staff-operated clock for game hourly orders.
 
 No charges, payout, report, VIP timer, or order status are calculated here.
 Clock state is persisted in web_dashboard.db so restarts cannot reset elapsed time.
@@ -18,7 +18,13 @@ from services.order_rules import get_rule
 
 ROOT = Path(__file__).resolve().parents[1]
 DATABASE = ROOT / "web_dashboard.db"
-SUPPORTED_GAMES = frozenset({"lol", "apex", "valorant", "steam"})
+# Delta: cover all ordinary desktop/mobile hourly products, including Black Tide
+# and legacy hourly tickets. Exclude all fun, internal wash and VIP timer SKUs.
+SUPPORTED_GAMES = frozenset({
+    "lol", "apex", "valorant", "steam",
+    "delta_desktop_basic", "delta_mobile_basic", "basic", "farm",
+})
+DELTA_FUN_CATEGORIES = frozenset({"delta_desktop_fun", "fun"})
 ACTIVE_TICKET_STATUSES = frozenset({
     "pending_cs_dispatch", "waiting_acceptance", "accepted_pending_pay", "active",
 })
@@ -26,12 +32,18 @@ TERMINAL_STATUSES = frozenset({"closed", "cancelled", "canceled", "stored"})
 FOOTER_PREFIX = "SIMPLE-HOURLY-TIMER:"
 
 def eligible_hourly_rule(rule_key: str, rule_snapshot_json: str | None = None) -> bool:
-    """Only four named games, explicitly priced hourly; never Delta or VIP."""
+    """Only real hourly game orders; no Delta fun, VIP, or manual services."""
     try:
         rule = get_rule(str(rule_key or ""))
     except (KeyError, ValueError):
         return False
-    if rule.category not in SUPPORTED_GAMES:
+    category = str(getattr(rule, "category", "") or "")
+    if category in DELTA_FUN_CATEGORIES or category not in SUPPORTED_GAMES:
+        return False
+    if (
+        str(getattr(rule, "catalog_group_label", "") or "").strip() == "趣味單"
+        or str(getattr(rule, "key", "") or "").startswith("fun_")
+    ):
         return False
     if str(rule.pricing_type) != "hourly":
         return False
@@ -247,7 +259,7 @@ def _eligible_orders() -> list[dict]:
             "FROM web_orders WHERE status IN "
             "('pending_cs_dispatch','waiting_acceptance','accepted_pending_pay','active') "
             "AND ticket_channel_id IS NOT NULL "
-            "AND ticket_channel_id!='' ORDER BY id DESC LIMIT 200"
+            "AND ticket_channel_id!='' ORDER BY id DESC"
         ).fetchall()
     return [
         dict(o) for o in orders

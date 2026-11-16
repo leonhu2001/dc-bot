@@ -365,7 +365,7 @@ def test_black_tide_discord_catalog_has_only_service_type_then_count() -> None:
         assert rule.required_staff_count == "player_count"
         assert rule.player_count_enabled is True
         assert rule.min_player_count == 1
-        assert rule.max_player_count == 4
+        assert rule.max_player_count == 5
 
 
 def test_black_tide_web_catalog_has_only_two_canonical_variants() -> None:
@@ -381,4 +381,4 @@ def test_black_tide_web_catalog_has_only_two_canonical_variants() -> None:
         "basic_black_tide_tech",
     ]
     assert all(item["player_count_enabled"] for item in group["variants"])
-    assert all(item["max_player_count"] == 4 for item in group["variants"])
+    assert all(item["max_player_count"] == 5 for item in group["variants"])

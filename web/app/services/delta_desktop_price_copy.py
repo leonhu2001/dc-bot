@@ -14,10 +14,46 @@ VISIBLE_DESKTOP_GROUPS = frozenset({
 })
 
 
+def _black_tide_live_description() -> str:
+    lines = []
+    for key, title in (
+        ("basic_black_tide_entertain", "娛樂陪"),
+        ("basic_black_tide_tech", "技術陪"),
+    ):
+        rule = ORDER_RULES.get(key)
+        if rule is None:
+            continue
+        prices = dict(rule.player_count_prices or {})
+        single = int(prices.get(1, rule.price))
+        multi = int(prices.get(2, 0)) // 2
+        limit = int(rule.max_player_count or 1)
+        lines.append(
+            f"{title}：單陪 {single}T/H，多陪每人 {multi}T/H（2～{limit} 人）"
+        )
+
+    if not lines:
+        return ""
+    entertainment = ORDER_RULES.get("basic_black_tide_entertain")
+    technical = ORDER_RULES.get("basic_black_tide_tech")
+    if entertainment is not None and technical is not None and (
+        entertainment.loyalty_benefits_enabled
+        and technical.loyalty_benefits_enabled
+    ):
+        lines.append("累積 10H 送 1H 折價券")
+    if entertainment is not None and entertainment.allow_specify:
+        fee = int(entertainment.specify_fee_default or 0)
+        lines.append(f"指定每位 +{fee}T")
+        if entertainment.specify_free_min_units:
+            lines.append(f"{int(entertainment.specify_free_min_units)}H 以上免指定費")
+    return "；".join(lines)
+
+
 def render_delta_desktop_group_copy(
     *, category: str, label: str, description: str,
     variants: list[dict],
 ) -> str:
+    if category == "delta_desktop_basic" and label == "黑潮爆破":
+        return _black_tide_live_description() or description
     if category != "delta_desktop_basic" or label not in VISIBLE_DESKTOP_GROUPS:
         return description
 
