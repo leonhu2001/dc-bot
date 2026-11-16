@@ -267,6 +267,7 @@ GROUP_SPECS = [
         "category": "farm",
         "label": "賽季 3×3",
         "selector_label": "方案",
+        "image": "order_panels/delta_farm_3x3.png",
         "description": "S12｜3×3安全箱 5,500T；外觀加購 2,500T；包損 +500T；命運契約 600T／個。賽前預約折扣由客服於 DC 手動扣除 500T。",
         "variants": [
             ("farm_season_3x3_normal", "3×3安全箱"),
@@ -784,7 +785,7 @@ def _group_data(
             ),
         **(
             {"image_url": f"/static/{spec['image']}"}
-            if str(spec.get("image") or "").startswith("price_lists/")
+            if str(spec.get("image") or "").startswith(("price_lists/", "order_panels/"))
             else {}
         ),
         "starting_price":
