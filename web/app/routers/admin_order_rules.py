@@ -30,6 +30,8 @@ from services.game_roles import (
     GAME_RANK_ROLES,
 )
 from services.order_rules import (
+    APPROVED_DELTA_DESKTOP_RULE_KEYS,
+    DELTA_DESKTOP_APPROVAL_REVISION_MARKER,
     CATEGORY_LABELS,
     ORDER_RULES,
     AW_COLLISION_PRICING_BY_RULE,
@@ -881,6 +883,10 @@ async def admin_order_rule_publish(
         # allows intentional edits to override legacy source-authority guards
         # while OLD unmarked VPS overrides remain safely ignored.
         published_payload["__owner_confirmed_after_canonical"] = True
+        if rule_key in APPROVED_DELTA_DESKTOP_RULE_KEYS:
+            # Only a NEW authenticated publish receives the latest Delta
+            # approval revision; pre-deployment manager overrides stay stale.
+            published_payload[DELTA_DESKTOP_APPROVAL_REVISION_MARKER] = True
 
         result = publish_rule_override(
             rule_key=rule_key,
