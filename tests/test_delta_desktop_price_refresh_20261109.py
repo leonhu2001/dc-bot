@@ -15,11 +15,11 @@ from services.self_service_point_benefit_policy import check_order_point_benefit
     ("basic_entertain_female_single", 1, 350),
     ("basic_entertain_male_single", 2, 650),
     ("basic_tech_secret_single", 1, 450),
-    ("basic_tech_secret_single", 2, 850),
+    ("basic_tech_secret_single", 2, 800),
     ("basic_tech_topsecret_single", 1, 500),
-    ("basic_tech_topsecret_single", 2, 950),
+    ("basic_tech_topsecret_single", 2, 900),
     ("basic_one_companion_one_guard_secret", 1, 800),
-    ("basic_one_companion_one_guard_topsecret", 1, 900),
+    ("basic_one_companion_one_guard_topsecret", 1, 850),
 ])
 def test_desktop_pricing_shared_by_discord_and_web(key, count, amount):
     rule = get_rule(key)
@@ -39,14 +39,14 @@ def test_mobile_prices_not_affected(key, old_mobile_price, players):
 
 
 @pytest.mark.parametrize("key, price, text", [
-    ("basic_trial_500", 500, "850W"),
+    ("basic_trial_500", 500, "888W"),
     ("basic_trial_1000", 1000, "1888W"),
-    ("basic_bet_1000", 1200, "800W"),
-    ("basic_bet_1500", 1500, "1000W"),
-    ("basic_bet_2500", 2400, "1200W"),
-    ("basic_oil_fuel", 3000, "2000W"),
-    ("basic_oil_satellite", 2000, "1688W"),
-    ("basic_oil_all", 4500, "3688W"),
+    ("basic_bet_1000", 1300, "800W"),
+    ("basic_bet_1500", 1800, "1000W"),
+    ("basic_bet_2500", 2500, "1200W"),
+    ("basic_oil_fuel", 2800, "2000W"),
+    ("basic_oil_satellite", 2000, "1500W"),
+    ("basic_oil_all", 4500, "3500W"),
 ])
 def test_fixed_desktop_price_notes_and_order_quoting(key, price, text):
     rule = get_rule(key)
@@ -57,7 +57,7 @@ def test_fixed_desktop_price_notes_and_order_quoting(key, price, text):
 def test_new_trial_policy_no_vip_or_points_and_correct_names():
     details = get_order_item_details_for_group("delta_desktop_basic", "體驗單")
     assert [(item["label"], item["rule_key"]) for item in details] == [
-        ("普通｜850w", "basic_trial_500"),
+        ("普通｜888w", "basic_trial_500"),
         ("尊爵｜1888w", "basic_trial_1000"),
     ]
     for item in details:
@@ -83,4 +83,4 @@ def test_service_copies_match_guarantees_and_no_old_rates():
     assert "普通體驗單不卡底" in text_by_key["trial"]
     assert "打手選圖（絕密）" in text_by_key["bet"]
     assert "GTI 衛星通信天線" in text_by_key["oil"]
-    assert "3688W" in text_by_key["oil"]
+    assert "3500W" in text_by_key["oil"]
