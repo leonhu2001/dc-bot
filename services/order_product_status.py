@@ -223,234 +223,27 @@ class StatusAwareHiddenRuleKeys(set):
         )
 
 
-def _available_public_categories():
-    from services.order_rules import CATEGORY_LABELS
-    from web.app.services import order_groups
-
-    groups = order_groups.get_grouped_order_catalog("all")
-    available = {
-        str(group.get("category") or "")
-        for group in groups
-        if str(group.get("category") or "")
-    }
-    result = [{"key": "all", "label": "全部"}]
-    for category in order_groups.CATEGORY_ORDER:
-        if category not in available:
-            continue
-        result.append(
-            {
-                "key": category,
-                "label": CATEGORY_LABELS.get(category, category),
-            }
-        )
-    return result
-
-
 def install_web_catalog_guards() -> None:
-    """Install live availability checks before the site router imports helpers."""
+    """Compatibility entrypoint: native public modules own their guards.
+
+    Web catalog/checkout import StatusAwareHiddenRuleKeys directly, and
+    categories are derived from the active catalog. Never rewrite module
+    globals or functions when the admin router is imported.
+    """
     global _WEB_GUARDS_INSTALLED
-    if _WEB_GUARDS_INSTALLED:
-        return
-
-    try:
-        from web.app.services import order_groups
-
-        order_groups.HIDDEN_PUBLIC_RULE_KEYS = StatusAwareHiddenRuleKeys(
-            order_groups.HIDDEN_PUBLIC_RULE_KEYS
-        )
-        order_groups.get_public_order_categories = _available_public_categories
-
-        from web.app.services import public_checkout
-
-        public_checkout.PUBLIC_DISABLED_RULE_KEYS = StatusAwareHiddenRuleKeys(
-            public_checkout.PUBLIC_DISABLED_RULE_KEYS
-        )
-    except Exception:
-        return
-
     _WEB_GUARDS_INSTALLED = True
 
 
-def _guarded_discord_details(
-    category: str | None,
-    group_label: str | None,
-) -> list[dict]:
-    from services.order_product_status import is_order_product_active
-
-    if category is None or group_label is None:
-        return []
-
-    category_text = str(category)
-    group_text = str(group_label)
-    result: list[dict] = []
-
-    # This function's code object is installed onto services.orders at runtime.
-    # Resolve the effective manager-controlled group/name there as well, otherwise
-    # the live availability guard would silently restore the old hard-coded label.
-    for group in SELF_SERVICE_ORDER_CATALOG.get(category_text, []):
-        fallback_label = str(group.get("label") or "")
-        for detail in group.get("details", []):
-            item = dict(detail)
-            rule_key = str(item.get("rule_key") or "").strip()
-            if (
-                not rule_key
-                or rule_key in CATALOG_HIDDEN_RULE_KEYS
-                or not is_order_product_active(rule_key)
-            ):
-                continue
-
-            rule = ORDER_RULES.get(rule_key)
-            if rule is None:
-                continue
-
-            effective_group = _effective_builtin_group_label(
-                rule,
-                fallback_label,
-            )
-            if effective_group != group_text:
-                continue
-
-            manager_group_label = str(
-                getattr(rule, "catalog_group_label", "") or ""
-            ).strip()
-            if manager_group_label:
-                item["label"] = str(
-                    getattr(rule, "label", "")
-                    or item.get("label")
-                    or ""
-                )
-
-            item["item"] = str(
-                getattr(rule, "label", "")
-                or item.get("label")
-                or ""
-            )
-            result.append(item)
-
-    for rule_key in _dynamic_admin_rule_keys(category_text):
-        if (
-            rule_key in CATALOG_HIDDEN_RULE_KEYS
-            or not is_order_product_active(rule_key)
-        ):
-            continue
-        rule = ORDER_RULES.get(rule_key)
-        if rule is None:
-            continue
-        if _dynamic_admin_group_label(rule) != group_text:
-            continue
-        result.append(_dynamic_admin_detail(rule))
-
-    return result
-
-
-def _guarded_dynamic_group_get(self, category, default=None):
-    category_text = str(category or "")
-    catalog_groups = SELF_SERVICE_ORDER_CATALOG.get(category_text, [])
-    candidate_labels: list[str] = []
-
-    if catalog_groups:
-        for group in catalog_groups:
-            fallback_label = str(group.get("label") or "")
-            details = list(group.get("details", []))
-
-            if (
-                not details
-                and fallback_label
-                and fallback_label not in candidate_labels
-            ):
-                candidate_labels.append(fallback_label)
-
-            for detail in details:
-                rule = ORDER_RULES.get(str(detail.get("rule_key") or ""))
-                label = (
-                    _effective_builtin_group_label(rule, fallback_label)
-                    if rule is not None
-                    else fallback_label
-                )
-                if label and label not in candidate_labels:
-                    candidate_labels.append(label)
-    else:
-        candidate_labels = list(dict.get(self, category, default or []))
-
-    for group_label in _dynamic_admin_group_labels(category_text):
-        if group_label not in candidate_labels:
-            candidate_labels.append(group_label)
-
-    result = []
-    for group_label in candidate_labels:
-        if get_order_item_details_for_group(category_text, group_label):
-            result.append(group_label)
-    return result
-
-
-def _guarded_self_service_rule(data: dict):
-    from services.order_product_status import is_order_product_active
-    from services.order_rules import ORDER_RULES, get_rule
-    from services.orders import ORDER_RULE_KEY_BY_LABEL
-
-    rule_key = str(data.get("order_rule_key") or "").strip()
-    if rule_key:
-        if not is_order_product_active(rule_key):
-            raise ValueError("這個商品目前已下架，請重新選擇品項。")
-        try:
-            return get_rule(rule_key)
-        except Exception:
-            pass
-
-    item_text = str(data.get("item") or "").strip()
-    alias_rule_key = ORDER_RULE_KEY_BY_LABEL.get(item_text)
-    if alias_rule_key:
-        if not is_order_product_active(str(alias_rule_key)):
-            raise ValueError("這個商品目前已下架，請重新選擇品項。")
-        try:
-            rule = get_rule(alias_rule_key)
-            data["order_rule_key"] = rule.key
-            return rule
-        except Exception:
-            pass
-
-    for rule in ORDER_RULES.values():
-        if str(rule.label) != item_text:
-            continue
-        if not is_order_product_active(str(rule.key)):
-            raise ValueError("這個商品目前已下架，請重新選擇品項。")
-        data["order_rule_key"] = rule.key
-        return rule
-
-    raise ValueError("找不到這個訂單項目的規則，請重新選擇品項。")
-
 
 def install_discord_catalog_guards() -> None:
-    """Patch imported catalog bindings in place so the running bot stays live."""
+    """Compatibility entrypoint: native catalog and submit guard are active.
+
+    These guards are now source-owned by services.orders and
+    services.self_service_runtime. In particular, NEVER assign a function
+    __code__: doing so silently overwrites approved catalog/checkout logic and
+    makes behavior depend on import/test order.
+    """
     global _DISCORD_GUARDS_INSTALLED
-    if _DISCORD_GUARDS_INSTALLED:
-        return
-
-    try:
-        from services import orders
-
-        orders.CATALOG_HIDDEN_RULE_KEYS = StatusAwareHiddenRuleKeys(
-            orders.CATALOG_HIDDEN_RULE_KEYS
-        )
-        orders.get_order_item_details_for_group.__code__ = (
-            _guarded_discord_details.__code__
-        )
-        orders.DynamicOrderItemGroups.get.__code__ = (
-            _guarded_dynamic_group_get.__code__
-        )
-
-        # self_service_runtime is imported before services.orders in bot.py.
-        # Replacing the code object also updates the function binding already
-        # imported into bot.py, so an already-selected product cannot be
-        # submitted after a manager takes it offline.
-        from services import self_service_runtime
-
-        self_service_runtime._get_rule_from_self_service_data.__code__ = (
-            _guarded_self_service_rule.__code__
-        )
-    except Exception:
-        return
-
     _DISCORD_GUARDS_INSTALLED = True
 
 

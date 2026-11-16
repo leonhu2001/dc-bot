@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from typing import Callable, Any
+import unicodedata
 
 import discord
+
+from services.order_product_status import is_order_product_active
 
 from services.order_rules import (
     CATEGORY_LABELS as RULE_CATEGORY_LABELS,
@@ -558,7 +561,12 @@ class DynamicOrderItemGroups(dict):
         for group_label in _dynamic_admin_group_labels(category_text):
             if group_label not in base:
                 base.append(group_label)
-        return base
+        # Product availability is checked natively; no patching this method's
+        # __code__ after modules have imported it.
+        return [
+            group_label for group_label in base
+            if _get_order_item_details_for_group_exact(category_text, group_label)
+        ]
 
     def __getitem__(self, category):
         if not super().__contains__(category):
@@ -654,7 +662,7 @@ def _dynamic_admin_detail(rule) -> dict:
     }
 
 
-def get_order_item_details_for_group(category: str | None, group_label: str | None) -> list[dict]:
+def _get_order_item_details_for_group_exact(category: str | None, group_label: str | None) -> list[dict]:
     if category is None or group_label is None:
         return []
 
@@ -669,7 +677,14 @@ def get_order_item_details_for_group(category: str | None, group_label: str | No
         fallback_label = str(group.get("label") or "")
         for detail in group.get("details", []):
             item = dict(detail)
-            rule = ORDER_RULES.get(str(item.get("rule_key") or ""))
+            key = str(item.get("rule_key") or "")
+            if (
+                not key
+                or key in CATALOG_HIDDEN_RULE_KEYS
+                or not is_order_product_active(key)
+            ):
+                continue
+            rule = ORDER_RULES.get(key)
             effective_group = (
                 _effective_builtin_group_label(rule, fallback_label)
                 if rule is not None
@@ -698,6 +713,11 @@ def get_order_item_details_for_group(category: str | None, group_label: str | No
             result.append(item)
 
     for rule_key in _dynamic_admin_rule_keys(category_text):
+        if (
+            rule_key in CATALOG_HIDDEN_RULE_KEYS
+            or not is_order_product_active(rule_key)
+        ):
+            continue
         rule = ORDER_RULES.get(rule_key)
         if rule is None:
             continue
@@ -706,6 +726,169 @@ def get_order_item_details_for_group(category: str | None, group_label: str | No
         result.append(_dynamic_admin_detail(rule))
 
     return result
+
+
+# Canonical catalog grouping policy, shared by Discord quick ordering and Web.
+# The five built-in season 3x3 plans are always one service, even when an older
+# manager group override points an individual plan to a retired second-level
+# category. Keep historical rule keys and manager-approved rule prices intact.
+_FARM_3X3_GROUP_LABEL = "賽季3x3"
+_FARM_3X3_RULE_ORDER = (
+    "farm_season_3x3_normal",
+    "farm_season_3x3_dc_loss",
+    "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_skin_loss",
+    "farm_season_3x3_contract",
+)
+_FARM_3X3_RULE_KEYS = frozenset(_FARM_3X3_RULE_ORDER)
+_GROUP_X_EQUIVALENTS = str.maketrans({
+    "×": "x", "✕": "x", "✖": "x", "⨯": "x", "Ｘ": "X", "ｘ": "x",
+})
+
+
+def _normalized_group_label(value) -> str:
+    # Preserve the fullwidth ｜ in owner-approved service labels such as
+    # 倒子彈｜500M while matching semantically equivalent separators.
+    text = "｜".join(
+        unicodedata.normalize("NFKC", segment)
+        for segment in str(value or "").split("｜")
+    ).translate(_GROUP_X_EQUIVALENTS)
+    cleaned = []
+    for char in text:
+        category = unicodedata.category(char)
+        if category.startswith(("C", "M")):
+            if char.isspace():
+                cleaned.append(" ")
+            continue
+        cleaned.append(char)
+    return " ".join("".join(cleaned).strip().split())
+
+
+def _normalized_group_key(value) -> str:
+    return "".join(
+        char for char in _normalized_group_label(value).casefold()
+        if char.isalnum()
+    )
+
+
+def _display_group_label(value) -> str:
+    normalized = _normalized_group_label(value)
+    if _normalized_group_key(normalized) == _normalized_group_key(_FARM_3X3_GROUP_LABEL):
+        return _FARM_3X3_GROUP_LABEL
+    return normalized
+
+
+def _farm_3x3_details() -> list[dict]:
+    by_key: dict[str, dict] = {}
+    for group in SELF_SERVICE_ORDER_CATALOG.get("farm", []):
+        if _normalized_group_key(group.get("label")) != _normalized_group_key(_FARM_3X3_GROUP_LABEL):
+            continue
+        for detail in group.get("details", []):
+            key = str(detail.get("rule_key") or "")
+            if (
+                key not in _FARM_3X3_RULE_KEYS
+                or key in CATALOG_HIDDEN_RULE_KEYS
+                or not is_order_product_active(key)
+            ):
+                continue
+            item = dict(detail)
+            rule = ORDER_RULES.get(key)
+            manager_group = (
+                str(getattr(rule, "catalog_group_label", "") or "").strip()
+                if rule is not None else ""
+            )
+            if manager_group and rule is not None:
+                item["label"] = str(getattr(rule, "label", "") or item.get("label") or "")
+            item["item"] = str(getattr(rule, "label", "") or item.get("label") or "")
+            by_key[key] = item
+        break
+    return [
+        by_key[key] for key in _FARM_3X3_RULE_ORDER if key in by_key
+    ]
+
+
+def get_order_item_details_for_group(category: str | None, group_label: str | None) -> list[dict]:
+    """Resolve selectable products directly from the authoritative catalog.
+
+    No Discord-startup monkey patch is needed. Both Bot and Web use this
+    resolver, so old aliases and manager-approved group changes cannot drift.
+    """
+    if category is None or group_label is None:
+        return []
+    category_text = str(category)
+    target = _normalized_group_key(group_label)
+    if not target:
+        return []
+    if category_text == "farm" and target == _normalized_group_key(_FARM_3X3_GROUP_LABEL):
+        return _farm_3x3_details()
+
+    candidates: list[str] = []
+    seen_raw: set[str] = set()
+    for value in ORDER_ITEM_GROUPS_BY_CATEGORY.get(category_text, []):
+        group = str(value or "").strip()
+        if group and _normalized_group_key(group) == target and group not in seen_raw:
+            seen_raw.add(group)
+            candidates.append(group)
+    raw = str(group_label).strip()
+    if raw and _normalized_group_key(raw) == target and raw not in seen_raw:
+        candidates.insert(0, raw)
+
+    result: list[dict] = []
+    # One rule key may legitimately expose several selectable options.
+    # In particular custom orders have four distinct headcount choices using
+    # the SAME rule key; dedup by (rule key, option value), not rule key alone.
+    seen_keys: set[tuple[str, str]] = set()
+    for candidate in candidates:
+        for detail in _get_order_item_details_for_group_exact(category_text, candidate):
+            rule_key = str(detail.get("rule_key") or "").strip()
+            detail_value = str(
+                detail.get("value") or detail.get("label") or rule_key
+            ).strip()
+            identity = (rule_key, detail_value)
+            if not detail_value or identity in seen_keys:
+                continue
+            seen_keys.add(identity)
+            result.append(dict(detail))
+    return result
+
+
+def get_live_order_item_groups(category: str) -> list[str]:
+    """Single source of real, deduplicated live order groups for any UI."""
+    category_text = str(category)
+    result: list[str] = []
+    seen: set[str] = set()
+    farm_3x3_added = False
+
+    for value in ORDER_ITEM_GROUPS_BY_CATEGORY.get(category_text, []):
+        details = get_order_item_details_for_group(category_text, value)
+        if not details:
+            continue
+        rule_keys = {
+            str(item.get("rule_key") or "")
+            for item in details if str(item.get("rule_key") or "")
+        }
+        if (
+            category_text == "farm"
+            and rule_keys
+            and rule_keys.issubset(_FARM_3X3_RULE_KEYS)
+        ):
+            if not farm_3x3_added:
+                result.append(_FARM_3X3_GROUP_LABEL)
+                seen.add(_normalized_group_key(_FARM_3X3_GROUP_LABEL))
+                farm_3x3_added = True
+            continue
+
+        label = _display_group_label(value)
+        normalized = _normalized_group_key(label)
+        if not label or not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(label)
+
+    if category_text == "farm" and not farm_3x3_added and _farm_3x3_details():
+        result.insert(0, _FARM_3X3_GROUP_LABEL)
+    return result
+
 
 
 def get_order_item_detail_for_selection(

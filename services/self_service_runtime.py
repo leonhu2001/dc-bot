@@ -306,14 +306,23 @@ def _extract_discord_ids_from_text(text_value: str) -> list[str]:
 
 
 def _get_rule_from_self_service_data(data: dict):
+    """Resolve effective, currently published products before final checkout.
+
+    Guard a preselected draft directly in the canonical order runtime. A
+    manager taking a product offline cannot be bypassed by an old Discord
+    ticket, and no startup-time function code replacement is needed.
+    """
     try:
         from services.order_rules import ORDER_RULES, get_rule
         from services.orders import ORDER_RULE_KEY_BY_LABEL
+        from services.order_product_status import is_order_product_active
     except Exception as exc:
         raise ValueError(f"讀取訂單規則失敗：{exc}") from exc
 
     rule_key = str(data.get("order_rule_key") or "").strip()
     if rule_key:
+        if not is_order_product_active(rule_key):
+            raise ValueError("這個商品目前已下架，請重新選擇品項。")
         try:
             return get_rule(rule_key)
         except Exception:
@@ -322,6 +331,8 @@ def _get_rule_from_self_service_data(data: dict):
     item_text = str(data.get("item") or "").strip()
     alias_rule_key = ORDER_RULE_KEY_BY_LABEL.get(item_text)
     if alias_rule_key:
+        if not is_order_product_active(str(alias_rule_key)):
+            raise ValueError("這個商品目前已下架，請重新選擇品項。")
         try:
             rule = get_rule(alias_rule_key)
             data["order_rule_key"] = rule.key
@@ -330,9 +341,12 @@ def _get_rule_from_self_service_data(data: dict):
             pass
 
     for rule in ORDER_RULES.values():
-        if str(rule.label) == item_text:
-            data["order_rule_key"] = rule.key
-            return rule
+        if str(rule.label) != item_text:
+            continue
+        if not is_order_product_active(str(rule.key)):
+            raise ValueError("這個商品目前已下架，請重新選擇品項。")
+        data["order_rule_key"] = rule.key
+        return rule
 
     raise ValueError("找不到這個訂單項目的規則，請重新選擇品項。")
 

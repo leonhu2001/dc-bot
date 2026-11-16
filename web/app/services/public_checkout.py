@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+from services.order_product_status import StatusAwareHiddenRuleKeys
 from services.order_rules import (
     RETIRED_PUBLIC_COIN_WASH_RULE_KEYS,
     CATEGORY_LABELS,
@@ -13,7 +14,7 @@ from services.order_rules import (
 )
 
 
-PUBLIC_DISABLED_RULE_KEYS = {
+PUBLIC_DISABLED_RULE_KEYS = StatusAwareHiddenRuleKeys({
     *RETIRED_PUBLIC_COIN_WASH_RULE_KEYS,
     "farm_season_3x3_skin",
     "farm_season_3x3_dc_skin",
@@ -22,7 +23,7 @@ PUBLIC_DISABLED_RULE_KEYS = {
     "valorant_entertain",
     "valorant_tech",
     "valorant_top_tech",
-}
+})
 
 
 PUBLIC_ROLE_LABELS = {

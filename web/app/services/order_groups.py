@@ -6,6 +6,7 @@ from services.order_rule_store import (
     get_active_override,
     get_custom_rule_definition,
 )
+from services.order_product_status import StatusAwareHiddenRuleKeys
 from services.order_rules import (
     AW_COLLISION_PRICING_BY_RULE,
     PUBLIC_COIN_WASH_VARIANTS,
@@ -40,7 +41,7 @@ CATEGORY_ORDER = [
 ]
 
 
-HIDDEN_PUBLIC_RULE_KEYS = {
+HIDDEN_PUBLIC_RULE_KEYS = StatusAwareHiddenRuleKeys({
     # 已下架 120M／360M 舊代洗僅供歷史訂單使用，不能再出現在網站。
     *RETIRED_PUBLIC_COIN_WASH_RULE_KEYS,
     # 造型不再作為獨立商品。
@@ -52,7 +53,7 @@ HIDDEN_PUBLIC_RULE_KEYS = {
     "valorant_entertain",
     "valorant_tech",
     "valorant_top_tech",
-}
+})
 
 
 GROUP_SPECS = [
@@ -959,11 +960,12 @@ def get_public_order_categories() -> list[dict]:
         }
     ]
 
-    current_specs = _current_group_specs()
+    # Only list categories with currently published products. This is
+    # canonical storefront behavior, not a post-import function replacement.
     available = {
-        spec["category"]
-        for spec
-        in current_specs
+        str(group.get("category") or "")
+        for group in get_grouped_order_catalog("all")
+        if str(group.get("category") or "")
     }
 
     for category in CATEGORY_ORDER:

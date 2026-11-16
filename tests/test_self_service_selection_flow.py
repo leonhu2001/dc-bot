@@ -107,10 +107,9 @@ def test_single_detail_group_uses_same_canonical_transition():
 
 
 def test_all_active_catalog_paths_have_valid_discord_detail_and_quantity_contracts():
-    # Production quick-order installs this resolver before exposing the public
-    # selector. Install the same layer here so the contract test observes the
-    # actual runtime catalog, including the five-scheme 賽季3x3 group.
-    quick_order_v2_fixes._install_canonical_group_resolver()
+    # The canonical catalog is available immediately upon importing orders,
+    # without a Discord-specific startup function override.
+    quick_order_v2_fixes.install_quick_order_v2_fixes(None)
 
     for category in orders_service.SELF_SERVICE_ACTIVE_CATEGORIES:
         groups = orders_service.ORDER_ITEM_GROUPS_BY_CATEGORY.get(category, [])
