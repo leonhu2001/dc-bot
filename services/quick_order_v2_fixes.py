@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import unicodedata
-
 import discord
 from discord.ext import commands
 
@@ -10,219 +8,23 @@ from services import quick_order_v2 as quick
 
 
 _INSTALLED = False
-_ORIGINAL_DETAILS_RESOLVER = None
 
-_X_EQUIVALENTS = str.maketrans({
-    "×": "x",
-    "✕": "x",
-    "✖": "x",
-    "⨯": "x",
-    "Ｘ": "X",
-    "ｘ": "x",
-})
-
-_FARM_3X3_GROUP_LABEL = "賽季3x3"
-_FARM_3X3_RULE_ORDER = (
-    "farm_season_3x3_normal",
-    "farm_season_3x3_dc_loss",
-    "farm_season_3x3_dc_skin",
-    "farm_season_3x3_dc_skin_loss",
-    "farm_season_3x3_contract",
-)
-_FARM_3X3_RULE_KEYS = frozenset(_FARM_3X3_RULE_ORDER)
-
-
-def _normalized_label(value) -> str:
-    """Normalize storefront labels for Discord display."""
-    # Fullwidth ｜ is intentionally part of the approved internal service
-    # labels ("倒子彈｜500M", "撞車｜500M"). NFKC turns it into ASCII |, which
-    # changes the displayed Quick Order selection even though the semantic
-    # group key is identical. Normalize the separated segments, not the glyph.
-    text = "｜".join(
-        unicodedata.normalize("NFKC", segment)
-        for segment in str(value or "").split("｜")
-    ).translate(_X_EQUIVALENTS)
-    cleaned: list[str] = []
-    for char in text:
-        category = unicodedata.category(char)
-        if category.startswith("C") or category.startswith("M"):
-            if char.isspace():
-                cleaned.append(" ")
-            continue
-        cleaned.append(char)
-    return " ".join("".join(cleaned).strip().split())
-
-
-def _normalized_key(value) -> str:
-    """Return a semantic key for storefront group identity."""
-    text = _normalized_label(value).casefold()
-    return "".join(char for char in text if char.isalnum())
-
-
-def _display_group_label(value) -> str:
-    text = _normalized_label(value)
-    if _normalized_key(text) == _normalized_key(_FARM_3X3_GROUP_LABEL):
-        return _FARM_3X3_GROUP_LABEL
-    return text
-
-
-def _farm_3x3_details() -> list[dict]:
-    """Return the five canonical built-in 3x3 schemes in the store-defined order.
-
-    These are variants of one service, not independent second-level groups. Manager
-    catalog_group_label overrides must never split them apart in Discord quick order.
-    Price/rule data is still resolved later through each detail's rule_key.
-    """
-    by_rule_key: dict[str, dict] = {}
-    for group in orders.SELF_SERVICE_ORDER_CATALOG.get("farm", []):
-        if _normalized_key(group.get("label")) != _normalized_key(_FARM_3X3_GROUP_LABEL):
-            continue
-        for detail in group.get("details", []):
-            rule_key = str(detail.get("rule_key") or "")
-            if rule_key not in _FARM_3X3_RULE_KEYS:
-                continue
-
-            item = dict(detail)
-            rule = orders.ORDER_RULES.get(rule_key)
-            manager_group_label = (
-                str(getattr(rule, "catalog_group_label", "") or "").strip()
-                if rule is not None
-                else ""
-            )
-            if manager_group_label and rule is not None:
-                item["label"] = str(
-                    getattr(rule, "label", "")
-                    or item.get("label")
-                    or ""
-                )
-            item["item"] = str(
-                getattr(rule, "label", "")
-                or item.get("label")
-                or ""
-            )
-            by_rule_key[rule_key] = item
-        break
-
-    return [
-        by_rule_key[rule_key]
-        for rule_key in _FARM_3X3_RULE_ORDER
-        if rule_key in by_rule_key
-    ]
-
-
-def _canonical_details(category: str | None, group_label: str | None) -> list[dict]:
-    """Resolve a visible Discord service group to its selectable details."""
-    if _ORIGINAL_DETAILS_RESOLVER is None:
-        return []
-    if category is None or group_label is None:
-        return []
-
-    category_text = str(category)
-    target_key = _normalized_key(group_label)
-    if not target_key:
-        return []
-
-    # 3x3 is a fixed built-in five-scheme service. Do not let per-rule manager
-    # catalog_group_label overrides split three variants away from this selector.
-    if category_text == "farm" and target_key == _normalized_key(_FARM_3X3_GROUP_LABEL):
-        return _farm_3x3_details()
-
-    candidates: list[str] = []
-    seen_raw: set[str] = set()
-
-    for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(category_text, []):
-        text = str(value or "").strip()
-        if not text or _normalized_key(text) != target_key or text in seen_raw:
-            continue
-        seen_raw.add(text)
-        candidates.append(text)
-
-    raw_group = str(group_label or "").strip()
-    if raw_group and _normalized_key(raw_group) == target_key and raw_group not in seen_raw:
-        candidates.insert(0, raw_group)
-
-    result: list[dict] = []
-    seen_details: set[str] = set()
-    for candidate in candidates:
-        for detail in _ORIGINAL_DETAILS_RESOLVER(category_text, candidate):
-            detail_key = str(
-                detail.get("rule_key")
-                or detail.get("value")
-                or detail.get("label")
-                or ""
-            )
-            if not detail_key or detail_key in seen_details:
-                continue
-            seen_details.add(detail_key)
-            result.append(dict(detail))
-    return result
+# Compatibility-only aliases. Catalog logic lives in services.orders and is
+# shared by the Bot and Web; no production module attribute is rebound.
+_FARM_3X3_GROUP_LABEL = orders._FARM_3X3_GROUP_LABEL
+_FARM_3X3_RULE_ORDER = orders._FARM_3X3_RULE_ORDER
+_FARM_3X3_RULE_KEYS = orders._FARM_3X3_RULE_KEYS
+_normalized_label = orders._normalized_group_label
+_normalized_key = orders._normalized_group_key
+_display_group_label = orders._display_group_label
+_farm_3x3_details = orders._farm_3x3_details
+_canonical_details = orders.get_order_item_details_for_group
 
 
 def _live_groups(category: str) -> list[str]:
-    """Return only real, selectable storefront groups for the public quick entry."""
-    category_text = str(category)
-    if category_text == str(quick.VIP_TIMER_CATEGORY):
+    if str(category) == str(quick.VIP_TIMER_CATEGORY):
         quick.refresh_vip_timer_self_service_catalog()
-
-    result: list[str] = []
-    seen: set[str] = set()
-    farm_3x3_added = False
-
-    for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(category_text, []):
-        details = _canonical_details(category_text, value)
-        if not details:
-            continue
-
-        # Any effective group made exclusively from the built-in 3x3 variants is
-        # one service. This collapses stale/manager-split groups into 賽季3x3 while
-        # keeping unrelated custom farm services untouched.
-        detail_rule_keys = {
-            str(detail.get("rule_key") or "")
-            for detail in details
-            if str(detail.get("rule_key") or "")
-        }
-        if (
-            category_text == "farm"
-            and detail_rule_keys
-            and detail_rule_keys.issubset(_FARM_3X3_RULE_KEYS)
-        ):
-            if not farm_3x3_added:
-                result.append(_FARM_3X3_GROUP_LABEL)
-                seen.add(_normalized_key(_FARM_3X3_GROUP_LABEL))
-                farm_3x3_added = True
-            continue
-
-        text = _display_group_label(value)
-        key = _normalized_key(text)
-        if not text or not key or key in seen:
-            continue
-
-        seen.add(key)
-        result.append(text)
-
-    # Defensive fallback: the raw catalog is authoritative for the built-in 3x3
-    # service even if every effective group label was overridden in manager data.
-    if category_text == "farm" and not farm_3x3_added and _farm_3x3_details():
-        result.insert(0, _FARM_3X3_GROUP_LABEL)
-
-    return result
-
-
-def _install_canonical_group_resolver() -> None:
-    global _ORIGINAL_DETAILS_RESOLVER
-    if _ORIGINAL_DETAILS_RESOLVER is not None:
-        return
-
-    _ORIGINAL_DETAILS_RESOLVER = orders.get_order_item_details_for_group
-    orders.get_order_item_details_for_group = _canonical_details
-
-    # These modules imported the resolver directly, so update their local aliases
-    # too. This is Discord-runtime only; the separate web process keeps its own UI.
-    from services import order_runtime
-    from services import self_service_selection_state as selection_state
-
-    order_runtime.get_order_item_details_for_group = _canonical_details
-    selection_state.get_order_item_details_for_group = _canonical_details
+    return orders.get_live_order_item_groups(category)
 
 
 async def _attach_order_control_view(channel: discord.TextChannel) -> bool:
@@ -353,13 +155,10 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
-    # Public entry and ticket detail lookup use one resolver. Built-in 3x3 is
-    # explicitly kept as one service with five schemes.
-    _install_canonical_group_resolver()
-
-    # The legacy Quick Order ticket UI wrapper is removed from core; the
-    # production module remains the single registered view/panel owner.
-    # _groups() uses _live_groups() directly without replacing a callback.
+    # Group and detail resolvers are native functions in services.orders.
+    # Preserve this installer as a harmless compatibility entrypoint for the
+    # existing startup sequence and explicit historical-ticket repair helpers.
+    # Never replace orders/order_runtime/selection_state callables here.
 
     _INSTALLED = True
     print("[quick-order-v2-fix] fixes installed", flush=True)
