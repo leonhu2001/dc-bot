@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from web.app.services.delta_desktop_price_copy import render_delta_desktop_group_copy
+
 from services.order_rule_store import (
     get_active_override,
     get_custom_rule_definition,
@@ -777,9 +779,7 @@ def _group_data(
                 "selector_label",
                 "方案",
             ),
-        "description": __import__(
-            "web.app.services.delta_desktop_price_copy", fromlist=["render_delta_desktop_group_copy"]
-        ).render_delta_desktop_group_copy(
+        "description": render_delta_desktop_group_copy(
             category=str(spec.get("category") or ""),
             label=str(spec.get("label") or ""),
             description=str(spec.get("description") or ""),
