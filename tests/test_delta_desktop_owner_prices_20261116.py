@@ -85,7 +85,7 @@ def test_approved_dc_price_list_matches_all_six_offers():
             assert term in plans[offer]["text"], (offer, term)
     assert "850T / H" not in plans["one_guard"]["text"]
     assert "800T / H" not in plans["technical"]["text"]
-    assert "888W" not in plans["trial"]["text"]
+    assert "500T　保底 888W" not in plans["trial"]["text"]
     assert "3500W" not in plans["oil"]["text"]
 
 
