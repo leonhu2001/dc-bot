@@ -10,10 +10,10 @@ from services.self_service_point_benefit_policy import check_order_point_benefit
 
 
 @pytest.mark.parametrize("key, count, amount", [
-    ("basic_entertain_single", 1, 350),
-    ("basic_entertain_single", 2, 650),
-    ("basic_entertain_female_single", 1, 350),
-    ("basic_entertain_male_single", 2, 650),
+    ("basic_entertain_single", 1, 320),
+    ("basic_entertain_single", 2, 600),
+    ("basic_entertain_female_single", 1, 320),
+    ("basic_entertain_male_single", 2, 600),
     ("basic_tech_secret_single", 1, 450),
     ("basic_tech_secret_single", 2, 850),
     ("basic_tech_topsecret_single", 1, 500),
