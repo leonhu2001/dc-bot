@@ -172,10 +172,10 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "賽季3x3",
             "details": [
-                {"label": "3x3", "value": "season_3x3", "rule_key": "farm_season_3x3_normal", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "3x3+造型", "value": "season_3x3_skin", "rule_key": "farm_season_3x3_dc_skin", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "3x3包損耗", "value": "season_3x3_loss", "rule_key": "farm_season_3x3_dc_loss", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "3x3+造型包損耗", "value": "season_3x3_skin_loss", "rule_key": "farm_season_3x3_dc_skin_loss", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "3×3安全箱", "value": "season_3x3", "rule_key": "farm_season_3x3_normal", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "3×3安全箱＋外觀", "value": "season_3x3_skin", "rule_key": "farm_season_3x3_dc_skin", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "3×3安全箱＋包損", "value": "season_3x3_loss", "rule_key": "farm_season_3x3_dc_loss", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "3×3安全箱＋外觀＋包損", "value": "season_3x3_skin_loss", "rule_key": "farm_season_3x3_dc_skin_loss", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "命運契約", "value": "season_contract", "rule_key": "farm_season_3x3_contract", "quantity_unit": "個", "min_quantity": 1, "max_quantity": 7},
             ],
         },
@@ -399,10 +399,7 @@ CATALOG_HIDDEN_RULE_KEYS = {
     "basic_black_tide_tech_2",
     "basic_black_tide_tech_3",
     "basic_black_tide_tech_4",
-    "farm_season_3x3_skin",
-    "farm_season_3x3_dc_skin",
-    "farm_season_3x3_dc_loss",
-    "farm_season_3x3_dc_skin_loss",
+    "farm_season_3x3_skin",  # retired standalone 3,000T variant, history only
     "valorant_entertain",
     "valorant_tech",
     "valorant_top_tech",
@@ -447,7 +444,15 @@ ORDER_RULE_KEY_BY_LABEL.update({
     "體驗單 1688w": "basic_trial_1000",
     "體驗單 1888w": "basic_trial_1000",
     "體驗單 尊爵1888w": "basic_trial_1000",
+    "賽季3x3": "farm_season_3x3_normal",
     "賽季3x3｜普通": "farm_season_3x3_normal",
+    "賽季3x3+造型": "farm_season_3x3_dc_skin",
+    "賽季3x3包損耗": "farm_season_3x3_dc_loss",
+    "賽季3x3+造型包損耗": "farm_season_3x3_dc_skin_loss",
+    "3x3": "farm_season_3x3_normal",
+    "3x3+造型": "farm_season_3x3_dc_skin",
+    "3x3包損耗": "farm_season_3x3_dc_loss",
+    "3x3+造型包損耗": "farm_season_3x3_dc_skin_loss",
     "賽季3x3｜命運契約": "farm_season_3x3_contract",
     "代解部門任務": "farm_department_task",
     "Steam 陪玩": "steam_play",
@@ -729,14 +734,15 @@ def _get_order_item_details_for_group_exact(category: str | None, group_label: s
 
 
 # Canonical catalog grouping policy, shared by Discord quick ordering and Web.
-# The five built-in season 3x3 plans are always one service, even when an older
-# manager group override points an individual plan to a retired second-level
-# category. Keep historical rule keys and manager-approved rule prices intact.
+# S12 3×3 is one group with four upfront-priced box configurations plus a
+# separate contract quantity. Web may present the same prices as two extras.
+# Booking discounts are deliberately NOT a customer-selectable adjustment:
+# customer service applies a shared 500T fixed discount manually.
 _FARM_3X3_GROUP_LABEL = "賽季3x3"
 _FARM_3X3_RULE_ORDER = (
     "farm_season_3x3_normal",
-    "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
     "farm_season_3x3_contract",
 )
