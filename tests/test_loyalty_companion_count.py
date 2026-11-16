@@ -128,7 +128,7 @@ def test_coupon_value_is_one_companion_service_unit_not_whole_multi_order():
         coupon=coupon,
     )
 
-    assert single_value == 175
+    assert single_value == 160  # 320T/H single, half-hour voucher.
     assert double_value == 150
     assert valorant_four_value == 175
 
