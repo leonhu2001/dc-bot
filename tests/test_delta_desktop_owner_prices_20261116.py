@@ -10,6 +10,7 @@ import pytest
 
 from services.order_rules import (
     APPROVED_DELTA_DESKTOP_RULE_KEYS,
+    DELTA_DESKTOP_APPROVAL_REVISION_MARKER,
     ORDER_RULES,
     calculate_price,
     get_base_rule,
@@ -106,6 +107,7 @@ def test_manager_stale_overrides_cannot_restore_old_prices_or_guarantees(monkeyp
         payload = rule_to_override_payload(get_base_rule(key))
         payload["price"] = 13
         payload["note"] = "舊保底 777W"
+        payload["__owner_confirmed_after_canonical"] = True
         if payload.get("player_count_prices"):
             payload["player_count_prices"] = {"1": 13, "2": 14}
         versions[key] = {"payload": payload}
@@ -126,6 +128,7 @@ def test_deliberate_new_manager_price_update_is_not_blocked(monkeypatch):
     payload["player_count_prices"] = {"1": 455, "2": 805}
     payload["price"] = 455
     payload["__owner_confirmed_after_canonical"] = True
+    payload[DELTA_DESKTOP_APPROVAL_REVISION_MARKER] = True
     monkeypatch.setattr(ORDER_RULES, "_refresh_external", lambda: None)
     monkeypatch.setattr(ORDER_RULES, "_override_cache", {key: {"payload": payload}})
     assert calculate_price(ORDER_RULES[key], quantity=1, player_count=2).total_amount == 805
