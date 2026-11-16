@@ -10,7 +10,8 @@ from pathlib import Path
 import pytest
 
 from services.order_discounts import allocate_store_absorbed_fixed_discount
-from services.order_rules import (ORDER_RULES, calculate_price, get_base_rule,\n    SEASON_3X3_EARLY_BOOKING_DISCOUNT_AMOUNT, SEASON_3X3_EARLY_BOOKING_DISCOUNT_SOURCE)
+from services.order_rules import (ORDER_RULES, calculate_price, get_base_rule,
+    SEASON_3X3_EARLY_BOOKING_DISCOUNT_AMOUNT, SEASON_3X3_EARLY_BOOKING_DISCOUNT_SOURCE)
 from services.orders import get_order_item_details_for_group
 from web.app.services.order_groups import get_grouped_order_catalog
 from web.app.services.public_checkout import build_public_quote
