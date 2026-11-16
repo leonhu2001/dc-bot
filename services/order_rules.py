@@ -1187,6 +1187,13 @@ for key, label, price in [
     ))
 
 
+# Approved season S12 3×3 early reservation is a manual CSR fixed cash
+# discount, never a customer-selectable product adjustment. The shared funding
+# contract lives in services.order_discounts under source "manual_fixed".
+SEASON_3X3_EARLY_BOOKING_DISCOUNT_AMOUNT = 500
+SEASON_3X3_EARLY_BOOKING_DISCOUNT_SOURCE = "manual_fixed"
+
+
 # ========= 代解代肝 =========
 
 _add(OrderRule(
