@@ -162,3 +162,20 @@ def install_self_service_financial_copy_policy() -> None:
     """
     global _INSTALLED
     _INSTALLED = True
+
+
+def render_quote_rows(rows: list[tuple[str, str]], data: dict) -> list[tuple[str, str]]:
+    """Funding-aware source formatter; no runtime patch and no finance mutation."""
+    funding = _promotion_funding(data)
+    rendered = [
+        (name, _rewrite_quote_text(str(value or ""), promotion_funding=funding))
+        for name, value in rows
+    ]
+    monthly = _vip_monthly_display(data)
+    if monthly:
+        from services.self_service_vip_monthly_ux import merge_vip_monthly_into_quote_rows
+        title, amount = monthly
+        return merge_vip_monthly_into_quote_rows(
+            rendered, title=title, amount_text=f"{int(amount):,}",
+        )
+    return rendered
