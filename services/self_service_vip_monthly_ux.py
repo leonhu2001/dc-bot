@@ -168,3 +168,69 @@ def install_self_service_vip_monthly_ux() -> None:
     """Compatibility hook; native finance and UI enforce voucher policies."""
     global _INSTALLED
     _INSTALLED = True
+
+
+def apply_vip_monthly_option_descriptions(select, parent_view) -> None:
+    from services import self_service_selection_runtime as selection
+
+    data = selection.SELF_SERVICE_ORDER_SELECTIONS.get(parent_view.channel_id, {})
+    original = _current_original_service_amount(parent_view.rule, data)
+    for option in select.options:
+        value = str(getattr(option, "value", "") or "")
+        if not value.startswith("vip_monthly:"):
+            continue
+        benefit = _monthly_benefit_by_id(
+            parent_view.available_vip_monthly_benefits, value.split(":", 1)[1],
+        )
+        if benefit is not None:
+            option.description = selection._truncate_select_text(
+                _option_description(_monthly_status(benefit, original_amount=original))
+            )
+
+
+def monthly_selection_error(view, selected: str, data: dict, guild) -> str | None:
+    if not selected.startswith("vip_monthly:"):
+        return None
+    from services.vip_monthly_benefits import list_available_cash_benefits
+
+    benefit = _monthly_benefit_by_id(
+        list_available_cash_benefits(view.customer_id), selected.split(":", 1)[1],
+    )
+    if benefit is None:
+        return "這張 VIP 每月折現券已使用、已保留或已失效，請重新開啟福利選單。"
+
+    original = _current_original_service_amount(view.rule, data, guild=guild)
+    status = _monthly_status(benefit, original_amount=original)
+    if not bool(status.get("eligible")):
+        return _monthly_requirement_text(status)
+    return None
+
+
+def render_vip_monthly_message(view, data: dict, selected_text: str) -> str:
+    message = (
+        f"請選擇這張單要使用的點數福利或會員福利券。\n"
+        f"目前可用點數：{view.point_balance} 點\n"
+        f"可用福利券：{len(view.available_vip_monthly_benefits) + len(view.available_coupons) + (1 if view.available_same_order_benefit else 0)} 張\n"
+        f"目前選擇：{selected_text}\n\n"
+        "同張訂單只能擇一；福利券會在訂單建立時先保留，結單後正式核銷。"
+    )
+    if not view.available_vip_monthly_benefits:
+        return message
+    original = _current_original_service_amount(view.rule, data)
+    statuses = [
+        _monthly_status(item, original_amount=original)
+        for item in view.available_vip_monthly_benefits
+    ]
+    other = len(view.available_coupons) + (
+        1 if view.available_same_order_benefit else 0
+    )
+    eligible = sum(bool(status.get("eligible")) for status in statuses)
+    message = re.sub(
+        r"可用福利券[:：]\d+ 張",
+        f"本單可用福利券：{eligible + other} 張\n持有福利券：{len(statuses) + other} 張",
+        message, count=1,
+    )
+    requirements = "\n".join(
+        f"・{_monthly_requirement_text(status)}" for status in statuses
+    )
+    return f"{message}\n\nVIP 月券使用門檻：\n{requirements}"
