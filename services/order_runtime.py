@@ -765,8 +765,6 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             store_item = str(store_data.get("item") or store_data.get("category_label") or "訂單")
             store_customer_id = _require_runtime_state().order_customer_id_getter(interaction.channel)
             store_customer_member = guild.get_member(store_customer_id) if store_customer_id is not None else None
-            # Preserve game + service/detail at the actual stored-order
-            # transition instead of replacing the configured renamer later.
             from services.order_ticket_name_restore_runtime import (
                 resolve_order_ticket_prefix,
             )
@@ -955,9 +953,6 @@ class PaymentMethodSelect(discord.ui.Select):
             )
 
             if selected_method == WALLET_PAYMENT_METHOD:
-                # A wallet debit may already have committed even if a later Discord/Web
-                # finalization step failed. Recover the authoritative ledger row by ticket
-                # channel so the UI and the next retry both know this order is already paid.
                 wallet_tx = get_wallet_payment_transaction(
                     self.customer_id,
                     self.channel_id,
