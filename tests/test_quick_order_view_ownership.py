@@ -20,7 +20,8 @@ def test_order_ticket_policy_no_longer_owns_quick_order_view_patch():
 def test_production_is_the_single_quick_order_view_owner():
     source = Path("services/quick_order_v2_production.py").read_text(encoding="utf-8")
 
-    assert source.count("ui.SelfServiceOrderView.__init__ = ticket_view_init") == 1
+    assert "ui.SelfServiceOrderView.__init__ =" not in source
+    assert "def apply_production_ticket_view_policy" in source
     assert "selected_category is None" in source
     assert "data[LEGACY_RESELECT_FLAG] = True" in source
     assert "apply_quick_order_select_display(self, data)" in source
