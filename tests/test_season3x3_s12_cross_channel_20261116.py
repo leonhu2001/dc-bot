@@ -58,7 +58,8 @@ def test_public_card_shows_new_image_and_owner_terms_but_no_booking_choice():
     group = next(g for g in get_grouped_order_catalog("farm") if g["key"] == "season_3x3")
     assert group["image_url"] == "/static/order_panels/delta_farm_3x3.png"
     assert "5,500T" in group["description"]
-    assert "8,000T" not in group["description"] or "外觀" in group["description"]
+    assert "8,000T" in group["description"]
+    assert "外觀" in group["description"]
     assert "客服" in group["description"]
     variant = next(v for v in group["variants"] if v["rule_key"] == "farm_season_3x3_normal")
     assert variant["price"] == 5500
