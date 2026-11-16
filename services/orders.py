@@ -5,6 +5,8 @@ import unicodedata
 
 import discord
 
+from services.order_product_status import is_order_product_active
+
 from services.order_rules import (
     CATEGORY_LABELS as RULE_CATEGORY_LABELS,
     ORDER_RULES,
@@ -559,7 +561,12 @@ class DynamicOrderItemGroups(dict):
         for group_label in _dynamic_admin_group_labels(category_text):
             if group_label not in base:
                 base.append(group_label)
-        return base
+        # Product availability is checked natively; no patching this method's
+        # __code__ after modules have imported it.
+        return [
+            group_label for group_label in base
+            if _get_order_item_details_for_group_exact(category_text, group_label)
+        ]
 
     def __getitem__(self, category):
         if not super().__contains__(category):
@@ -670,7 +677,14 @@ def _get_order_item_details_for_group_exact(category: str | None, group_label: s
         fallback_label = str(group.get("label") or "")
         for detail in group.get("details", []):
             item = dict(detail)
-            rule = ORDER_RULES.get(str(item.get("rule_key") or ""))
+            key = str(item.get("rule_key") or "")
+            if (
+                not key
+                or key in CATALOG_HIDDEN_RULE_KEYS
+                or not is_order_product_active(key)
+            ):
+                continue
+            rule = ORDER_RULES.get(key)
             effective_group = (
                 _effective_builtin_group_label(rule, fallback_label)
                 if rule is not None
@@ -699,6 +713,11 @@ def _get_order_item_details_for_group_exact(category: str | None, group_label: s
             result.append(item)
 
     for rule_key in _dynamic_admin_rule_keys(category_text):
+        if (
+            rule_key in CATALOG_HIDDEN_RULE_KEYS
+            or not is_order_product_active(rule_key)
+        ):
+            continue
         rule = ORDER_RULES.get(rule_key)
         if rule is None:
             continue
@@ -766,7 +785,11 @@ def _farm_3x3_details() -> list[dict]:
             continue
         for detail in group.get("details", []):
             key = str(detail.get("rule_key") or "")
-            if key not in _FARM_3X3_RULE_KEYS:
+            if (
+                key not in _FARM_3X3_RULE_KEYS
+                or key in CATALOG_HIDDEN_RULE_KEYS
+                or not is_order_product_active(key)
+            ):
                 continue
             item = dict(detail)
             rule = ORDER_RULES.get(key)
