@@ -51,7 +51,7 @@ def test_delta_desktop_price_list_has_ten_order_types_in_owner_requested_order()
 def test_delta_desktop_price_list_prices_and_rules_match_approved_copy() -> None:
     plans = price_lists.DELTA_DESKTOP_PRICE_LISTS
     expected = {
-        "entertainment": ("350T / H", "650T / H", "10 小時", "1 小時券", "+100T", "不保撤"),
+        "entertainment": ("320T / H", "600T / H", "10 小時", "1 小時券", "+100T", "不保撤"),
         "one_guard": ("800T / H", "900T / H", "8 殺", "7 殺", "+100T"),
         "black_tide": ("320T / H", "300T / H", "400T / H", "380T / H", "30 分鐘券"),
         "sweet": ("520T / H", "1314T / H", "專屬暱稱", "管理層", "+100T"),
