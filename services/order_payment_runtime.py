@@ -410,7 +410,17 @@ async def finalize_accepted_pending_payment(
             except discord.HTTPException:
                 pass
 
-        await rename_ticket_channel(interaction.channel, item, member=customer_member)
+        # Payment finalization may otherwise erase the game/group prefix of
+        # a Quick Order ticket. Resolve it natively before renaming.
+        from services.order_ticket_name_restore_runtime import (
+            resolve_order_ticket_prefix,
+        )
+        payment_prefix = resolve_order_ticket_prefix(
+            interaction.channel, item, data,
+        )
+        await rename_ticket_channel(
+            interaction.channel, payment_prefix, member=customer_member,
+        )
 
         payment_channel_id = _to_int(data.get("payment_channel_id"), interaction.channel.id) or interaction.channel.id
         payment_message_id = _to_int(data.get("payment_message_id"))
