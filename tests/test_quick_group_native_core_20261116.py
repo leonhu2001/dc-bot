@@ -70,3 +70,11 @@ def test_semantically_equal_group_labels_resolve_same_detail_keys():
             detail["rule_key"]
             for detail in orders.get_order_item_details_for_group(category, label)
         ] == ["farm_season_3x3_normal", "farm_season_3x3_contract"]
+
+
+def test_custom_order_still_supports_four_headcounts_with_one_rule_key():
+    details = orders.get_order_item_details_for_group("custom", "自訂")
+    assert [detail["value"] for detail in details] == [
+        "players_1", "players_2", "players_3", "players_4",
+    ]
+    assert len({detail["rule_key"] for detail in details}) == 1
