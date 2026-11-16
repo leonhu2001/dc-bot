@@ -117,20 +117,24 @@ def test_discord_catalog_hides_inactive_and_selected_draft_guard_rejects_it(
     )
     assert key not in {item["rule_key"] for item in details}
 
-    # Test the guard logic directly. The production Bot installs this guard once
-    # from services.order_flow after both self_service_runtime and orders have
-    # been imported; the full regression suite intentionally imports/reloads
-    # helper modules in a different collection order.
+    # The canonical rule resolver rejects a stale selected draft directly.
+    # Calling the old compatibility entrypoint does not rebind code objects.
+    from services import self_service_runtime
+    selected_resolver = self_service_runtime._get_rule_from_self_service_data
+    install_discord_catalog_guards()
+    assert self_service_runtime._get_rule_from_self_service_data is selected_resolver
     with pytest.raises(ValueError, match="已下架"):
-        order_product_status._guarded_self_service_rule(
+        selected_resolver(
             {
                 "order_rule_key": key,
                 "item": "技術陪｜機密單陪",
             }
         )
 
+    source = Path("services/order_product_status.py").read_text(encoding="utf-8")
+    assert ".__code__ =" not in source
     order_flow = Path("services/order_flow.py").read_text(encoding="utf-8")
-    assert "install_discord_catalog_guards()" in order_flow
+    assert "install_discord_catalog_guards()" not in order_flow
 
 
 def test_admin_order_rules_template_has_async_workspace_and_status_controls():
