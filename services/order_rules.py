@@ -1454,25 +1454,28 @@ _add_game_service_rule(category="lol", key="lol_elite_aram", label="英雄聯盟
 
 # 黑潮爆破：價格直接寫在商品規則，不用 runtime price patch。
 _add(OrderRule(
-    "delta_desktop_basic", "basic_black_tide_entertain", "黑潮爆破｜娛樂陪", "hourly", 320, "H",
+    "delta_desktop_basic", "basic_black_tide_entertain", "黑潮爆破｜娛樂陪", "hourly", 350, "H",
     allowed_roles=COMPANION_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE,
-    required_staff_count="player_count", player_count_enabled=True, min_player_count=1, max_player_count=4,
-    price_multiply_player_count=False, player_count_prices={1: 320, 2: 600, 3: 900, 4: 1200},
-    allow_specify=True, max_specified_count=4, specify_fee_default=100,
+    required_staff_count="player_count", player_count_enabled=True, min_player_count=1, max_player_count=5,
+    price_multiply_player_count=False, player_count_prices={1: 350, 2: 650, 3: 975, 4: 1300, 5: 1625},
+    allow_specify=True, max_specified_count=5, specify_fee_default=100,
     specify_fee_by_role={role: 100 for role in COMPANION_ROLES}, specify_free_min_units=2,
     specify_free_basis="quantity", loyalty_benefits_enabled=True,
+    note="單陪 350T/H；多陪每人 325T/H，最多 5 人；累積 10H 送 1H 折價券",
 ))
 _add(OrderRule(
-    "delta_desktop_basic", "basic_black_tide_tech", "黑潮爆破｜技術陪", "hourly", 400, "H",
+    "delta_desktop_basic", "basic_black_tide_tech", "黑潮爆破｜技術陪", "hourly", 450, "H",
     allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE,
-    required_staff_count="player_count", player_count_enabled=True, min_player_count=1, max_player_count=4,
-    price_multiply_player_count=False, player_count_prices={1: 400, 2: 760, 3: 1140, 4: 1520},
-    allow_specify=True, max_specified_count=4, specify_fee_default=100,
+    required_staff_count="player_count", player_count_enabled=True, min_player_count=1, max_player_count=5,
+    price_multiply_player_count=False, player_count_prices={1: 450, 2: 850, 3: 1275, 4: 1700, 5: 2125},
+    allow_specify=True, max_specified_count=5, specify_fee_default=100,
     specify_fee_by_role=_protectors_fee(), specify_free_min_units=2, specify_free_basis="quantity",
+    loyalty_benefits_enabled=True,
+    note="單陪 450T/H；多陪每人 425T/H，最多 5 人；累積 10H 送 1H 折價券",
 ))
 
 
-# 黑潮爆破新單只保留娛樂陪／技術陪；人數由獨立 1～4 人欄位決定。
+# 黑潮爆破新單只保留娛樂陪／技術陪；人數由獨立 1～5 人欄位決定。
 
 
 # ========= APEX Legends 陪玩 =========
@@ -1668,6 +1671,14 @@ DELTA_ENTERTAINMENT_RULE_KEYS = frozenset({
     "basic_entertain_single",
     "basic_entertain_female_single",
     "basic_entertain_male_single",
+})
+
+# User-approved Black Tide prices, 5-seat options and coupon eligibility. Prior
+# persisted manager overrides do not inherit this new approval revision.
+BLACK_TIDE_APPROVAL_REVISION_MARKER = "__owner_confirmed_black_tide_five_seat_20261116"
+BLACK_TIDE_SOURCE_RULE_KEYS = frozenset({
+    "basic_black_tide_entertain",
+    "basic_black_tide_tech",
 })
 
 APPROVED_DELTA_DESKTOP_RULE_KEYS = frozenset({
@@ -2158,6 +2169,35 @@ class EffectiveOrderRules(dict):
                     specify_fee_by_game_role=dict(base.specify_fee_by_game_role),
                     specify_free_min_units=base.specify_free_min_units,
                     specify_free_basis=base.specify_free_basis,
+                )
+            if (
+                key in BLACK_TIDE_SOURCE_RULE_KEYS
+                and payload.get(BLACK_TIDE_APPROVAL_REVISION_MARKER) is not True
+            ):
+                # Preserve the newly approved per-seat tiers, fifth seat,
+                # specify fees and hourly loyalty even with an older
+                # generic manager approval or Delta image revision.
+                rule = replace(
+                    rule,
+                    price=base.price,
+                    pricing_type=base.pricing_type,
+                    unit_label=base.unit_label,
+                    required_staff_count=base.required_staff_count,
+                    player_count_enabled=base.player_count_enabled,
+                    min_player_count=base.min_player_count,
+                    max_player_count=base.max_player_count,
+                    price_multiply_player_count=base.price_multiply_player_count,
+                    player_count_prices=dict(base.player_count_prices),
+                    allow_specify=base.allow_specify,
+                    max_specified_count=base.max_specified_count,
+                    specify_fee_default=base.specify_fee_default,
+                    specify_fee_by_role=dict(base.specify_fee_by_role),
+                    specify_free_min_units=base.specify_free_min_units,
+                    specify_free_basis=base.specify_free_basis,
+                    loyalty_benefits_enabled=base.loyalty_benefits_enabled,
+                    allowed_roles=base.allowed_roles,
+                    required_game_roles=base.required_game_roles,
+                    note=base.note,
                 )
             if key in ONE_COMPANION_ONE_GUARD_RULE_KEYS and not manager_confirmed:
                 # An old manager override may still say allow_specify=False.
