@@ -172,7 +172,7 @@ GROUP_SPECS = [
         "label": "體驗單",
         "selector_label": "方案",
         "variants": [
-            ("basic_trial_500", "普通｜888w"),
+            ("basic_trial_500", "普通｜850w"),
             ("basic_trial_1000", "尊爵｜1888w"),
         ],
     },
@@ -594,10 +594,10 @@ def _variant_data(
             f"{int(rule.required_staff_count)} 位"
         )
 
-    # Built-in trial variants are source-authoritative. Old 777W/850W
+    # Built-in trial variants are source-authoritative. Old 777W/888W
     # manager labels must not reappear in the live Web catalog.
     if rule_key == "basic_trial_500":
-        public_label = "普通｜888w"
+        public_label = "普通｜850w"
     elif rule_key == "basic_trial_1000":
         public_label = "尊爵｜1888w"
 
