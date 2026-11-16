@@ -25,6 +25,17 @@ def resolve_self_service_loyalty_discount(
     )
 
     selected_coupon_id = data.get("selected_benefit_coupon_id")
+    # Promotion selections and earned loyalty coupons share one selector, but
+    # preserve their distinct funding, eligibility and redemption policy.
+    from services.promotion_benefits import decode_selection_id
+    if decode_selection_id(selected_coupon_id) is not None:
+        from services.self_service_promotion_integration import resolve_promotion_loyalty_discount
+        return resolve_promotion_loyalty_discount(
+            data=data, rule=rule,
+            point_benefit_selected=point_benefit_selected,
+            vip_monthly_selected=vip_monthly_selected,
+            available_service_amount=available_service_amount,
+        )
     selected_same_order = bool(data.get("selected_same_order_benefit"))
     if selected_coupon_id in (None, "") and not selected_same_order:
         return {
