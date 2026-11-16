@@ -67,7 +67,15 @@ def test_status_aware_hidden_keys_preserve_static_and_live_status(tmp_path, monk
 
 def test_web_catalog_and_quote_hide_inactive_product(tmp_path, monkeypatch):
     db_file = _use_status_db(monkeypatch, tmp_path)
-    install_web_catalog_guards()
+    install_web_catalog_guards()  # Backward-compatible no-op.
+
+    # No import-order-dependent monkey patch in admin router; public checkout
+    # and catalog import the status-aware key set at their canonical source.
+    from web.app.services import order_groups, public_checkout
+    assert isinstance(order_groups.HIDDEN_PUBLIC_RULE_KEYS, StatusAwareHiddenRuleKeys)
+    assert isinstance(public_checkout.PUBLIC_DISABLED_RULE_KEYS, StatusAwareHiddenRuleKeys)
+    source = Path("web/app/routers/admin_order_rules.py").read_text(encoding="utf-8")
+    assert "install_web_catalog_guards()" not in source
 
     key = "basic_tech_secret_single"
     set_order_product_active(
