@@ -1423,7 +1423,7 @@ def _claim_pending_review_notifications(
     *, limit: int = 20, order_id: int | None = None
 ) -> list[dict]:
     """Claim notices that still match the latest pending submission."""
-    ensure_order_reporting_tables()
+    ensure_order_reporting_tables(engine)
     claimed: list[dict] = []
     params: dict[str, Any] = {
         "max_attempts": REVIEW_NOTIFICATION_MAX_ATTEMPTS,
