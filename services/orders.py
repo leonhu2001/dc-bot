@@ -834,18 +834,20 @@ def get_order_item_details_for_group(category: str | None, group_label: str | No
         candidates.insert(0, raw)
 
     result: list[dict] = []
-    seen_keys: set[str] = set()
+    # One rule key may legitimately expose several selectable options.
+    # In particular custom orders have four distinct headcount choices using
+    # the SAME rule key; dedup by (rule key, option value), not rule key alone.
+    seen_keys: set[tuple[str, str]] = set()
     for candidate in candidates:
         for detail in _get_order_item_details_for_group_exact(category_text, candidate):
-            key = str(
-                detail.get("rule_key")
-                or detail.get("value")
-                or detail.get("label")
-                or ""
-            )
-            if not key or key in seen_keys:
+            rule_key = str(detail.get("rule_key") or "").strip()
+            detail_value = str(
+                detail.get("value") or detail.get("label") or rule_key
+            ).strip()
+            identity = (rule_key, detail_value)
+            if not detail_value or identity in seen_keys:
                 continue
-            seen_keys.add(key)
+            seen_keys.add(identity)
             result.append(dict(detail))
     return result
 
