@@ -223,52 +223,16 @@ class StatusAwareHiddenRuleKeys(set):
         )
 
 
-def _available_public_categories():
-    from services.order_rules import CATEGORY_LABELS
-    from web.app.services import order_groups
-
-    groups = order_groups.get_grouped_order_catalog("all")
-    available = {
-        str(group.get("category") or "")
-        for group in groups
-        if str(group.get("category") or "")
-    }
-    result = [{"key": "all", "label": "全部"}]
-    for category in order_groups.CATEGORY_ORDER:
-        if category not in available:
-            continue
-        result.append(
-            {
-                "key": category,
-                "label": CATEGORY_LABELS.get(category, category),
-            }
-        )
-    return result
-
-
 def install_web_catalog_guards() -> None:
-    """Install live availability checks before the site router imports helpers."""
+    """Compatibility entrypoint: native public modules own their guards.
+
+    Web catalog/checkout import StatusAwareHiddenRuleKeys directly, and
+    categories are derived from the active catalog. Never rewrite module
+    globals or functions when the admin router is imported.
+    """
     global _WEB_GUARDS_INSTALLED
-    if _WEB_GUARDS_INSTALLED:
-        return
-
-    try:
-        from web.app.services import order_groups
-
-        order_groups.HIDDEN_PUBLIC_RULE_KEYS = StatusAwareHiddenRuleKeys(
-            order_groups.HIDDEN_PUBLIC_RULE_KEYS
-        )
-        order_groups.get_public_order_categories = _available_public_categories
-
-        from web.app.services import public_checkout
-
-        public_checkout.PUBLIC_DISABLED_RULE_KEYS = StatusAwareHiddenRuleKeys(
-            public_checkout.PUBLIC_DISABLED_RULE_KEYS
-        )
-    except Exception:
-        return
-
     _WEB_GUARDS_INSTALLED = True
+
 
 
 def install_discord_catalog_guards() -> None:
