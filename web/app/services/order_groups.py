@@ -149,7 +149,7 @@ GROUP_SPECS = [
         "category": "delta_desktop_basic",
         "label": "黑潮爆破",
         "selector_label": "服務類型",
-        "description": "黑潮爆破只選娛樂陪或技術陪；陪玩人數另選 1～4 人。",
+        "description": "黑潮爆破娛樂單陪 350T/H、多陪每人 325T/H；技術單陪 450T/H、多陪每人 425T/H；最多 5 人。累積 10H 送 1H 折價券，指定每人 +100T，2H 以上免指定費。",
         "variants": [
             ("basic_black_tide_entertain", "娛樂陪"),
             ("basic_black_tide_tech", "技術陪"),
