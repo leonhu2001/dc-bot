@@ -624,9 +624,7 @@ class SelfServicePointBenefitView(discord.ui.View):
             if not allowed:
                 continue
 
-            # Adapt first so dynamic formal-product pricing is authoritative before
-            # comparing against the customer's balance. The previous runtime wrapper
-            # existed only to repair this ordering after import.
+            # Adapt point costs before checking the customer's balance.
             merged = dict(item)
             merged.update(spec)
             merged = _adapt_order_point_benefit_for_rule(
