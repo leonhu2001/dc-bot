@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any
 
 from services.order_product_status import StatusAwareHiddenRuleKeys
@@ -35,31 +34,13 @@ PUBLIC_ROLE_LABELS = {
 }
 
 
-SEASON_NORMAL_PRICE = 4000
-
-SEASON_CONTRACT_UNIT_PRICE = 600
-
-SEASON_CONTRACT_MAX = 7
-
+# Product prices, option fees and quantity caps are defined in
+# services.order_rules only. Do not reintroduce Website-only season overrides.
 APEX_RANKED_SURCHARGE_PER_HOUR_PER_PLAYER = 50
 
-
-
-SEASON_NORMAL_ADJUSTMENTS = {
-    "skin": 2500,
-    "loss_cover": 500,
-}
-
-
-SEASON_NORMAL_ADJUSTMENT_LABELS = {
-    "skin": "造型",
-    "loss_cover": "包損耗",
-}
-
-
-CUSTOMER_FORBIDDEN_ADJUSTMENTS = {
-    "early_booking",
-}
+# Early booking is a staff-applied fixed discount in Discord, NEVER
+# a customer-selected checkout option.
+CUSTOMER_FORBIDDEN_ADJUSTMENTS = {"early_booking"}
 
 
 def _to_int(
@@ -129,86 +110,13 @@ def _public_role_label(
     )
 
 
-def _get_public_rule(
-    rule_key: str,
-):
-    source_rule = (
-        ORDER_RULES.get(
-            rule_key
-        )
-    )
+def _get_public_rule(rule_key: str):
+    """Always use the effective shared Discord/Web order rule directly."""
+    rule = ORDER_RULES.get(rule_key)
+    if rule is None:
+        raise ValueError("找不到這個商品方案。")
+    return rule
 
-    if source_rule is None:
-
-        raise ValueError(
-            "找不到這個商品方案。"
-        )
-
-
-    # --------------------------------------------------------
-    # 賽季 3x3 公開網站新規格
-    #
-    # 用 dataclasses.replace 建立一次性副本。
-    # 不修改全域 ORDER_RULES。
-    # 不影響 Discord Bot runtime。
-    # --------------------------------------------------------
-
-    if (
-        rule_key
-        == "farm_season_3x3_normal"
-    ):
-
-        return replace(
-            source_rule,
-
-            pricing_type="fixed",
-
-            price=
-                SEASON_NORMAL_PRICE,
-
-            min_quantity=1,
-
-            max_quantity=1,
-
-            staff_adjustments=
-                dict(
-                    SEASON_NORMAL_ADJUSTMENTS
-                ),
-
-            staff_adjustment_labels=
-                dict(
-                    SEASON_NORMAL_ADJUSTMENT_LABELS
-                ),
-        )
-
-
-    if (
-        rule_key
-        == "farm_season_3x3_contract"
-    ):
-
-        return replace(
-            source_rule,
-
-            pricing_type="unit",
-
-            price=
-                SEASON_CONTRACT_UNIT_PRICE,
-
-            unit_label="個",
-
-            min_quantity=1,
-
-            max_quantity=
-                SEASON_CONTRACT_MAX,
-
-            staff_adjustments={},
-
-            staff_adjustment_labels={},
-        )
-
-
-    return source_rule
 
 
 def build_public_quote(
@@ -259,10 +167,9 @@ def build_public_quote(
 
 
     if (
-        rule_key
-        == "farm_season_3x3_contract"
-        and quantity_value
-        > SEASON_CONTRACT_MAX
+        rule_key == "farm_season_3x3_contract"
+        and rule.max_quantity is not None
+        and quantity_value > int(rule.max_quantity)
     ):
 
         raise ValueError(
@@ -340,7 +247,7 @@ def build_public_quote(
             for key
             in price_adjustments
             if key not in
-            SEASON_NORMAL_ADJUSTMENTS
+            rule.staff_adjustments
         ]
 
 
@@ -424,10 +331,6 @@ def build_public_quote(
 
     special_price_applied = False
 
-
-    # --------------------------------------------------------
-    # 命運契約第 5 個封頂 3000T。
-    # --------------------------------------------------------
 
     adjustment_amount += urgent_fee
     original_amount = (
