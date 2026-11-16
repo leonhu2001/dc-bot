@@ -517,7 +517,8 @@ async def _create_ticket(
 
     if category == VIP_TIMER_CATEGORY:
         try:
-            assert_vip_timer_self_service_eligible(
+            from services import vip_timer_self_service as vip_source
+            vip_source.assert_vip_timer_self_service_eligible(
                 member.id,
                 check_open_order=True,
             )
@@ -706,61 +707,17 @@ async def _create_ticket(
 
 
 def _view_for_channel(channel_id: int) -> discord.ui.View:
-    if channel_id == QUICK_ORDER_V2_CHANNELS["delta"]:
-        return QuickDeltaEntryView()
-    if channel_id == QUICK_ORDER_V2_CHANNELS["vip_timer"]:
-        return QuickVipEntryView()
+    """Owner-approved public controls resolved directly at the core entrypoint."""
+    from services.quick_order_v2_production import _public_view_for_channel
 
-    category, _ = _GAME_ENTRY_META[channel_id]
-    return QuickGameEntryView(
-        category=category,
-        source_channel_id=channel_id,
-    )
+    return _public_view_for_channel(int(channel_id))
 
 
 async def _ensure_panel(bot: commands.Bot, channel_id: int) -> None:
-    channel = bot.get_channel(channel_id)
-    if not isinstance(channel, discord.TextChannel):
-        try:
-            fetched = await bot.fetch_channel(channel_id)
-            channel = fetched if isinstance(fetched, discord.TextChannel) else None
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            channel = None
+    """Update existing public panel using canonical production copy and artwork."""
+    from services.quick_order_v2_production import _clean_ensure_panel
 
-    if not isinstance(channel, discord.TextChannel):
-        print(
-            f"[quick-order-v2] channel not found: {channel_id}",
-            flush=True,
-        )
-        return
-
-    target: discord.Message | None = None
-    try:
-        async for message in channel.history(limit=50):
-            if bot.user is not None and message.author.id != bot.user.id:
-                continue
-            if any(
-                str(getattr(embed.footer, "text", "") or "") == _marker(channel_id)
-                for embed in message.embeds
-            ):
-                target = message
-                break
-    except (discord.Forbidden, discord.HTTPException):
-        pass
-
-    try:
-        view = _view_for_channel(channel_id)
-        embed = build_entry_embed(channel_id)
-        if target is None:
-            await channel.send(embed=embed, view=view)
-        else:
-            await target.edit(embed=embed, view=view)
-    except (discord.Forbidden, discord.HTTPException) as exc:
-        print(
-            f"[quick-order-v2] panel sync failed {channel_id}: "
-            f"{type(exc).__name__}: {exc}",
-            flush=True,
-        )
+    await _clean_ensure_panel(bot, int(channel_id))
 
 
 async def ensure_quick_order_v2_panels(bot: commands.Bot) -> None:
