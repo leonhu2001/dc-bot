@@ -765,9 +765,17 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             store_item = str(store_data.get("item") or store_data.get("category_label") or "訂單")
             store_customer_id = _require_runtime_state().order_customer_id_getter(interaction.channel)
             store_customer_member = guild.get_member(store_customer_id) if store_customer_id is not None else None
+            # Preserve game + service/detail at the actual stored-order
+            # transition instead of replacing the configured renamer later.
+            from services.order_ticket_name_restore_runtime import (
+                resolve_order_ticket_prefix,
+            )
+            stored_prefix = resolve_order_ticket_prefix(
+                interaction.channel, f"存單-{store_item}", store_data,
+            )
             await _require_runtime_state().ticket_channel_renamer(
                 interaction.channel,
-                f"存單-{store_item}",
+                stored_prefix,
                 member=store_customer_member,
             )
             await _require_runtime_state().order_log_sender(
