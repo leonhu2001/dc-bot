@@ -447,7 +447,6 @@ def _quote_preview_lines_for_self_service(
     data: dict, guild: discord.Guild | None = None
 ) -> list[tuple[str, str]]:
     from services.self_service_financial_copy import (
-        _VIP_MONTHLY_COPY,
         _promotion_funding,
         _rewrite_quote_text,
         _vip_monthly_display,
@@ -460,13 +459,11 @@ def _quote_preview_lines_for_self_service(
         for name, value in rows
     ]
     vip_monthly = _vip_monthly_display(data)
-    if vip_monthly and not any(name == "VIP 月券" for name, _ in result):
+    if vip_monthly:
+        from services.self_service_vip_monthly_ux import merge_vip_monthly_into_quote_rows
         title, amount = vip_monthly
-        result.append(
-            (
-                "VIP 月券",
-                f"{title}｜-{_format_plain_amount(amount)}｜{_VIP_MONTHLY_COPY}",
-            )
+        return merge_vip_monthly_into_quote_rows(
+            result, title=title, amount_text=_format_plain_amount(amount),
         )
     return result
 
@@ -725,6 +722,15 @@ def _calculate_self_service_financials_unsettled(rule, price_result, data: dict)
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
     if not bool(data.get("website_finance_settled")):
+        if data.get("selected_vip_monthly_benefit_id") not in (None, ""):
+            from services.self_service_vip_monthly_ux import _current_original_service_amount
+            prepared = dict(data)
+            prepared["service_original_amount"] = _current_original_service_amount(
+                rule, prepared, price_result=price_result,
+            )
+            return _calculate_self_service_financials_unsettled(
+                rule, price_result, prepared,
+            )
         return _calculate_self_service_financials_unsettled(rule, price_result, data)
 
     from services.self_service_financial_copy import _SETTLED_FINANCIAL_KEYS
