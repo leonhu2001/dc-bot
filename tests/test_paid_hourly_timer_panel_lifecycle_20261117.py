@@ -214,7 +214,10 @@ def test_explicit_payment_and_manager_restore_hooks_remain_source_owned():
     assert 'await ensure_timer_panel_after_operation(' in payment
     assert 'interaction.channel, order_id=int(web_order_id)' in payment
     assert 'install_simple_order_timer(bot, SELF_SERVICE_ORDER_SELECTIONS)' in bot
-    assert 'operation_view_factory=StaffOrderOperationView' in bot
+    assert 'follow_restored_order_panel(' in bot
+    assert 'SELF_SERVICE_ORDER_SELECTIONS, StaffOrderOperationView' in bot
+    runtime = (root / "services/order_runtime.py").read_text(encoding="utf-8")
+    assert 'finish_stored_order_modal(' in runtime
 
 
 def test_clock_buttons_and_stale_operation_confirm_never_repost(monkeypatch):
