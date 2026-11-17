@@ -163,6 +163,12 @@
     width: min(100vw, var(--m9-rail)) !important;
     min-width: 0 !important;
     max-width: 100vw !important;
+    /* The legacy customer dock reserves a phantom 10px on the right at
+       560px+. Explicit viewport centering avoids that inherited offset,
+       without a transform that would break its fixed bottom sheet. */
+    right: auto !important;
+    margin: 0 !important;
+    margin-left: max(0px, calc((100vw - var(--m9-rail))/2)) !important;
     height: calc(var(--m9-dock-height) + env(safe-area-inset-bottom)) !important;
     min-height: 0 !important;
     margin: 0 auto !important;
@@ -390,6 +396,7 @@
   /* Retire duplicate legacy hero/filters while retaining real product
      listings and their underlying checkout logic. V9 owns the navigation. */
   body.m9-mobile .site-main > .hero,
+  body.m9-mobile .site-main .trust-strip,
   body.m9-mobile .site-main .order3-hero,
   body.m9-mobile .site-main .order3-filter,
   body.m9-mobile .site-main .order3-specified,
