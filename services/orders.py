@@ -1300,37 +1300,13 @@ def build_self_service_order_embed(
     companion_preference: str | None = None,
     receiver_text: str | None = None,
     staff_note: str | None = None,
+    status_override: str | None = None,
 ) -> discord.Embed:
     payment_text = str(payment_method or "未紀錄").strip() or "未紀錄"
     source_data = _source_order_data(source_channel)
-    status = str(source_data.get("status") or "").strip().lower()
-    accepted_count = _to_int(source_data.get("accepted_count"), 0) or 0
-    required_staff_count = _to_int(source_data.get("required_staff_count"), 0) or 0
-
-    if status == "accepted_pending_pay":
-        status_text = "接單完成｜等待付款"
-        color = discord.Color.gold()
-    elif status == "active":
-        status_text = "已付款｜服務進行中"
-        color = discord.Color.green()
-    elif status == "stored":
-        status_text = "已存單"
-        color = discord.Color.blue()
-    elif status == "waiting_acceptance":
-        if accepted_count > 0 and required_staff_count > 0:
-            status_text = f"接單中｜{accepted_count}/{required_staff_count} 人"
-        else:
-            status_text = "等待接單｜付款前"
-        color = discord.Color.gold()
-    elif payment_text in {"待付款", "未付款", "等待付款"}:
-        status_text = "等待接單｜付款前"
-        color = discord.Color.gold()
-    elif payment_text in {"未紀錄", "待客服確認"}:
-        status_text = "狀態未紀錄"
-        color = discord.Color.blue()
-    else:
-        status_text = "已付款｜服務進行中"
-        color = discord.Color.green()
+    status = str(status_override or source_data.get("status") or "").strip().lower()
+    if not status or status == "draft":
+        status = "waiting_acceptance" if payment_text in {"待付款", "未付款", "等待付款"} else "draft"
 
     from services.order_customer_anonymity import (
         customer_name_is_anonymous,
@@ -1353,13 +1329,7 @@ def build_self_service_order_embed(
         quantity=quantity,
     )
 
-    embed = discord.Embed(
-        title="魔丸娛樂｜接單面板",
-        description="所有派單、接單、存單、恢復與結單狀態皆以此面板為準。",
-        color=color,
-    )
-
-    embed.add_field(name="狀態", value=status_text, inline=False)
+    embed = discord.Embed(title="魔丸娛樂｜接單面板")
     embed.add_field(name="顧客", value=customer_text, inline=True)
     embed.add_field(name="票口", value=str(ticket_text), inline=True)
     embed.add_field(name="訂單", value=f"{category_label}｜{item}", inline=False)
@@ -1402,6 +1372,20 @@ def build_self_service_order_embed(
         normalized_receiver_text = "尚未接單"
 
     embed.add_field(name="目前接單", value=normalized_receiver_text[:1024], inline=False)
+    from services.dispatch_embed_presentation import unify_dispatch_embed
+
+    unify_dispatch_embed(
+        embed, status=status,
+        zero_amount=bool(
+            source_data.get("payment_zero_amount_completed_at")
+            or source_data.get("payment_zero_amount")
+        ),
+        paid_confirmed=bool(
+            source_data.get("payment_review_applied_at")
+            or source_data.get("payment_zero_amount_completed_at")
+            or source_data.get("payment_review_finalized_id")
+        ),
+    )
     embed.set_footer(text="魔丸娛樂｜接單系統")
     return embed
 
