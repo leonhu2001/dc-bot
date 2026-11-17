@@ -78,8 +78,6 @@
 <section class="mobile-v6-route mobile-v6-vip" aria-label="VIP 手機版"><div class="mobile-v6-page-head"><strong>VIP 會員</strong><span>查看目前權益、升級門檻與每月福利</span></div></section>
 {% endif %}
 
-{% include "_mobile_v8_route_bar.html" %}
-
 <nav class="customer-app-bottom-nav" aria-label="魔丸 App 主要導覽">
     <a class="customer-app-nav-item{% if _customer_path == '/' %} is-active{% endif %}" href="/"><span class="customer-app-nav-icon" aria-hidden="true">⌂</span><span>首頁</span></a>
     <a class="customer-app-nav-item{% if _customer_path.startswith('/order') %} is-active{% endif %}" href="/order"><span class="customer-app-nav-icon customer-app-nav-order" aria-hidden="true">＋</span><span>下單</span></a>
