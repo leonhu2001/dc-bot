@@ -1,0 +1,56 @@
+{# Cross-product mobile route context. Links are stable fallbacks, never history-only. #}
+{% set _m8_path = request.url.path %}
+{% set _m8_parent = '' %}
+{% set _m8_parent_label = '' %}
+{% if _m8_path.startswith('/admin') and _m8_path != '/admin' %}
+  {% if _m8_path.startswith('/admin/customer-') or _m8_path.startswith('/admin/customers') or _m8_path.startswith('/admin/wallets') or _m8_path.startswith('/admin/reviews') %}
+    {% set _m8_parent = '/admin/customer-center' %}
+    {% set _m8_parent_label = '客戶中心' %}
+  {% elif _m8_path.startswith('/admin/payment-') or _m8_path.startswith('/admin/topups') or _m8_path.startswith('/admin/finance-') or _m8_path.startswith('/admin/payout') %}
+    {% set _m8_parent = '/admin/finance-center' %}
+    {% set _m8_parent_label = '財務中心' %}
+  {% else %}
+    {% set _m8_parent = '/admin' %}
+    {% set _m8_parent_label = '客服工作台' %}
+  {% endif %}
+{% elif _m8_path.startswith('/dispatch/reports/review/') %}
+  {% set _m8_parent = '/dispatch/reports/review' %}
+  {% set _m8_parent_label = '報單審核' %}
+{% elif _m8_path.startswith('/dispatch/reports/') %}
+  {% set _m8_parent = '/dispatch/reports' %}
+  {% set _m8_parent_label = '報單列表' %}
+{% elif _m8_path == '/dispatch/reports/review' %}
+  {% set _m8_parent = '/dispatch/reports' %}
+  {% set _m8_parent_label = '報單系統' %}
+{% elif _m8_path == '/dispatch/reports' %}
+  {% set _m8_parent = '/employee' %}
+  {% set _m8_parent_label = '員工後台' %}
+{% elif _m8_path == '/dispatch' or (_m8_path.startswith('/employee/') and _m8_path != '/employee') or _m8_path.startswith('/my/payouts') %}
+  {% set _m8_parent = '/employee' %}
+  {% set _m8_parent_label = '員工後台' %}
+{% elif _m8_path.startswith('/me/orders/') %}
+  {% set _m8_parent = '/me/orders' %}
+  {% set _m8_parent_label = '我的訂單' %}
+{% elif _m8_path.startswith('/me/topups/') or _m8_path.startswith('/me/wallet/') %}
+  {% set _m8_parent = '/me/wallet' %}
+  {% set _m8_parent_label = '錢包' %}
+{% elif _m8_path.startswith('/me/') or _m8_path == '/me/orders' %}
+  {% set _m8_parent = '/me' %}
+  {% set _m8_parent_label = '我的專區' %}
+{% elif _m8_path == '/me' or _m8_path == '/order' or _m8_path == '/staff' or _m8_path == '/vip' %}
+  {% set _m8_parent = '/' %}
+  {% set _m8_parent_label = '首頁' %}
+{% elif _m8_path.startswith('/games/delta-force/') %}
+  {% set _m8_parent = '/games/delta-force' %}
+  {% set _m8_parent_label = '三角洲行動' %}
+{% elif _m8_path.startswith('/games/') %}
+  {# /games is not a registered page; return to the public home instead. #}
+  {% set _m8_parent = '/' %}
+  {% set _m8_parent_label = '首頁' %}
+{% endif %}
+{% if _m8_parent and _m8_parent != _m8_path %}
+<nav class="m8-route-bar" aria-label="返回上一層功能">
+  <a class="m8-route-back" href="{{ _m8_parent }}"><span aria-hidden="true">←</span> 返回</a>
+  <span class="m8-route-parent">{{ _m8_parent_label }}</span>
+</nav>
+{% endif %}

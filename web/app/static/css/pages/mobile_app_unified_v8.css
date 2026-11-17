@@ -1,0 +1,482 @@
+/*
+  Mobile V8 / one coherent sizing system across customer, employee and CS.
+  This file loads LAST on both layout roots.  Legacy page-specific CSS stays
+  intact for desktop and serves as safe fallback, while V8 owns phone geometry.
+  A single centered content rail prevents route-to-route width jumps.
+*/
+@media (max-width: 767px) {
+  body.customer-mobile-app-site,
+  body.employee-workspace-site,
+  body.mw-mobile-ui.mw-r5-admin,
+  body.mw-mobile-ui.mw-r5-employee {
+    --m8-bg: #0a0b0e;
+    --m8-surface: #15171c;
+    --m8-surface-raised: #1c1f26;
+    --m8-line: rgba(230, 235, 247, .12);
+    --m8-text: #f4f5f7;
+    --m8-muted: #a9afbb;
+    --m8-gold: #f0cf72;
+    --m8-gold-soft: rgba(240, 207, 114, .12);
+    --m8-rail: 560px;
+    --m8-gutter: clamp(12px, 4vw, 18px);
+    --m8-gap: 12px;
+    --m8-card-radius: 18px;
+    --m8-control-radius: 12px;
+    --m8-control-height: 46px;
+    --m8-topbar-height: 62px;
+    --m8-bottom-height: 72px;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100vw !important;
+    min-height: 100dvh;
+    margin: 0;
+    overflow-x: clip !important;
+    background: var(--m8-bg) !important;
+    color: var(--m8-text);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html:has(body.mobile-ui),
+  html:has(body.mw-mobile-ui) {
+    overflow-x: clip;
+    scroll-padding-top: calc(80px + env(safe-area-inset-top));
+    scrollbar-gutter: stable;
+    background: #0a0b0e;
+  }
+
+  :is(body.customer-mobile-app-site, body.employee-workspace-site, body.mw-mobile-ui) *,
+  :is(body.customer-mobile-app-site, body.employee-workspace-site, body.mw-mobile-ui) *::before,
+  :is(body.customer-mobile-app-site, body.employee-workspace-site, body.mw-mobile-ui) *::after {
+    box-sizing: border-box;
+  }
+
+  /* Shared edge-to-edge chrome, shared inset content: 320px-767px. */
+  body.customer-mobile-app-site .site-main,
+  body.employee-workspace-site .site-main,
+  body.mw-mobile-ui .mw-mobile-main-host {
+    display: block !important;
+    width: min(100%, var(--m8-rail)) !important;
+    max-width: var(--m8-rail) !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 auto !important;
+    padding-right: var(--m8-gutter) !important;
+    padding-left: var(--m8-gutter) !important;
+    padding-bottom: calc(var(--m8-bottom-height) + env(safe-area-inset-bottom) + 28px) !important;
+    overflow: visible !important;
+  }
+
+  body.customer-mobile-app-site .site-main {
+    padding-top: calc(var(--m8-topbar-height) + env(safe-area-inset-top) + 16px) !important;
+  }
+  body.employee-workspace-site .site-main,
+  body.mw-mobile-ui .mw-mobile-main-host {
+    padding-top: 14px !important;
+  }
+
+  body.employee-workspace-site :is(.employee-workspace-frame, .employee-workspace-page-content),
+  body.mw-mobile-ui :is(.mw-r5-content, .mw-r5-legacy-body),
+  body.customer-mobile-app-site .site-main > :is(section, article, div, main),
+  body.mw-mobile-ui .mw-mobile-main-host > :is(section, article, div, main) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-inline: 0 !important;
+  }
+  body.employee-workspace-site :is(.employee-workspace-frame, .employee-workspace-page-content),
+  body.mw-mobile-ui .mw-r5-content {
+    padding-inline: 0 !important;
+  }
+
+  body.customer-mobile-app-site :is(.mobile-v6-route, .mobile-v6-employee-route),
+  body.employee-workspace-site :is(.mobile-v6-route, .mobile-v6-employee-route),
+  body.mw-mobile-ui :is(.mobile-v6-route, .mobile-v6-employee-route) {
+    width: min(calc(100% - 2 * var(--m8-gutter)), calc(var(--m8-rail) - 2 * var(--m8-gutter))) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 12px auto !important;
+  }
+
+  /* The three products now share exact top/dock measurements and surface. */
+  :is(.customer-app-topbar, .employee-app-topbar, .admin-app-topbar) {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: calc(var(--m8-topbar-height) + env(safe-area-inset-top)) !important;
+    min-height: 0 !important;
+    padding-top: env(safe-area-inset-top) !important;
+    padding-bottom: 0 !important;
+    padding-inline: max(var(--m8-gutter), calc((100vw - var(--m8-rail)) / 2 + var(--m8-gutter))) !important;
+    border-bottom: 1px solid var(--m8-line) !important;
+    background: rgba(12, 13, 17, .97) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(18px) !important;
+    -webkit-backdrop-filter: blur(18px) !important;
+  }
+  /* Employee legacy styles stopped at 720px although the server's mobile
+     * render path extends through 767px. Show chrome for the entire range. */
+  .customer-app-topbar, .employee-app-topbar { display: flex !important; }
+  .admin-app-topbar { display: grid !important; }
+  .customer-app-topbar { position: fixed !important; inset: 0 0 auto !important; z-index: 2200 !important; }
+  .employee-app-topbar,
+  .admin-app-topbar { position: sticky !important; top: 0 !important; z-index: 2200 !important; }
+
+  :is(.customer-app-title-wrap strong, .employee-app-topbar-copy strong, .admin-app-title strong) {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    letter-spacing: -.025em;
+    line-height: 1.25;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  :is(.customer-app-mark, .customer-app-account, .employee-app-mark, .employee-app-profile,
+      .admin-app-home, .admin-app-search) {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    border: 1px solid var(--m8-line) !important;
+    border-radius: 13px !important;
+    overflow: hidden;
+    background: var(--m8-surface-raised) !important;
+  }
+  :is(.customer-app-brand, .employee-app-topbar-brand, .admin-app-title) {
+    min-width: 0;
+    gap: 10px;
+  }
+
+  :is(.customer-app-bottom-nav, .employee-app-bottom-nav, .admin-app-bottom-nav) {
+    display: grid !important;
+    position: fixed !important;
+    z-index: 2300 !important;
+    /* Center without transform: transformed fixed bars break the fixed
+       bottom-sheet/backdrop descendants of the More menu. */
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin-inline: auto !important;
+    transform: none !important;
+    width: min(100vw, calc(var(--m8-rail) + 20px)) !important;
+    max-width: 100vw !important;
+    height: calc(var(--m8-bottom-height) + env(safe-area-inset-bottom)) !important;
+    min-height: 0 !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 2px !important;
+    align-items: start !important;
+    padding: 7px max(8px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(8px, env(safe-area-inset-left)) !important;
+    background: rgba(15, 17, 22, .98) !important;
+    border: 1px solid var(--m8-line) !important;
+    border-bottom: 0 !important;
+    border-radius: 18px 18px 0 0 !important;
+    box-shadow: 0 -8px 36px rgba(0,0,0,.33) !important;
+    /* A blurred dock becomes a containing block for position:fixed child
+       sheets on Safari/Chromium. Use the nearly opaque solid dock instead. */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  :is(.customer-app-nav-item, .employee-app-nav-item, .admin-app-nav-item) {
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 54px !important;
+    height: 54px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    padding: 4px 2px !important;
+    border-radius: 12px !important;
+    font-size: 11px !important;
+    font-weight: 750 !important;
+    line-height: 1.1;
+    color: var(--m8-muted) !important;
+    text-decoration: none !important;
+  }
+  :is(.customer-app-nav-item, .employee-app-nav-item, .admin-app-nav-item).is-active,
+  :is(.customer-app-more, .employee-app-more, .admin-app-more).is-active > summary {
+    color: var(--m8-gold) !important;
+    background: var(--m8-gold-soft) !important;
+  }
+  :is(.customer-app-nav-icon, .employee-app-nav-icon, .admin-app-nav-icon) {
+    font-size: 20px !important;
+    line-height: 1 !important;
+  }
+  :is(.employee-app-more, .admin-app-more) {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .mobile-app-context-switch {
+    width: min(calc(100% - 2 * var(--m8-gutter)), calc(var(--m8-rail) - 2 * var(--m8-gutter))) !important;
+    max-width: 100% !important;
+    margin: 10px auto !important;
+    padding: 4px !important;
+    gap: 4px !important;
+    border: 1px solid var(--m8-line) !important;
+    border-radius: 14px !important;
+    background: var(--m8-surface) !important;
+  }
+  .mobile-app-context-switch > a {
+    min-width: 0;
+    min-height: 42px !important;
+    border-radius: 10px !important;
+    align-content: center;
+  }
+
+  /* Compact, predictable parent navigation inside the same content rail. */
+  .m8-route-bar {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 14px;
+    padding: 4px 10px 4px 4px;
+    background: var(--m8-surface);
+    border: 1px solid var(--m8-line);
+    border-radius: 14px;
+    color: var(--m8-muted);
+  }
+  .m8-route-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 92px;
+    min-height: 42px;
+    padding: 0 12px;
+    border-radius: 11px;
+    background: var(--m8-surface-raised);
+    border: 1px solid var(--m8-line);
+    color: var(--m8-text) !important;
+    font-size: 14px;
+    font-weight: 750;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  .m8-route-parent {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--m8-muted);
+    font-size: 13px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* One design language for panels, summaries, and form steps. */
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(.mc-card, .customer-order-card, .wallet-card, .service-rules-card,
+        .vip-level-card, .vip-general-card, .vip-rule-card, .public-crew-card,
+        .crew-type-card, .delta-card, .dispatch-card, .it-card, .sbm-card,
+        .report-card, .report-empty, .admin-order-card, .history-ledger-panel,
+        .pay-review-panel, .topup-card, .panel, .card) {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: auto;
+    border-radius: var(--m8-card-radius) !important;
+    border-color: var(--m8-line) !important;
+    box-shadow: none;
+    overflow-wrap: anywhere;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(.report-filter-bar, .center-filter-form, .history-ledger-toolbar,
+        .dispatch-toolbar, .order3-filters, .member-filters, .mw-order-filters) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    gap: 10px !important;
+    border-radius: var(--m8-card-radius) !important;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(.center-grid, .dispatch-grid, .it-grid, .wallet-grid, .member-grid, .sbm-grid) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    gap: var(--m8-gap) !important;
+  }
+
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(.site-main, .mw-mobile-main-host) :is(h1, h2, h3) {
+    max-width: 100%;
+    overflow-wrap: break-word;
+    text-wrap: pretty;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui) :is(
+    p, dd, dt, li, .value, .desc, .description, .card-title, .report-card,
+    .dispatch-card, .center-cell, .order3-card
+  ) { min-width: 0; overflow-wrap: anywhere; }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(.stats, .center-stats, .history-ledger-stats, .mc-mini-stats, .customer-order-stats) {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    gap: 10px !important;
+  }
+
+  /* Consistent, accessible 46px controls; no Safari input zoom. */
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(button, .button, .btn, input[type="submit"], input[type="button"],
+        select, input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])) {
+    min-height: var(--m8-control-height) !important;
+    max-width: 100%;
+    border-radius: var(--m8-control-radius) !important;
+    font-size: 16px;
+    touch-action: manipulation;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+        textarea, select) {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: 16px !important;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(textarea, [contenteditable="true"]) {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-wrap: anywhere;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui) :is(
+    .button, .btn, button, a[role="button"], input[type="submit"]
+  ) {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--m8-gold) !important;
+    outline-offset: 2px !important;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(button, input[type="submit"], .button)[disabled],
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(button, .button)[aria-disabled="true"] {
+    opacity: .55 !important;
+    cursor: not-allowed !important;
+  }
+
+  /* Only data tables scroll sideways, not entire pages. */
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(.table-wrap, .table-responsive, .history-ledger-table-wrap,
+        .report-table-wrap, [data-m8-table-scroll], .m8-table-scroll) {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+    scrollbar-width: thin;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(table, pre, code, img, svg, canvas, iframe) {
+    max-width: 100%;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(.order3-dialog-panel, .modal-content, .dialog-panel,
+        .order-modal-content, .mw-modal-content) {
+    width: min(calc(100vw - 24px), var(--m8-rail)) !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px) !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 20px !important;
+  }
+  :is(.employee-app-more-panel, .admin-app-more-panel) {
+    width: min(100%, var(--m8-rail)) !important;
+    max-width: 100% !important;
+    max-height: min(85dvh, 700px) !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    border-radius: 22px 22px 0 0 !important;
+  }
+
+  /* Unified page spacing and actions, including page-specific legacy wrappers. */
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(.site-main, .mw-mobile-main-host) :is(form, section, article, .grid, .layout) {
+    min-width: 0;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui)
+    :is(.site-main, .mw-mobile-main-host) :is(.button-row, .action-row, .card-actions, .form-actions) {
+    max-width: 100%;
+    min-width: 0;
+    gap: 9px !important;
+    flex-wrap: wrap;
+  }
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui) [id] {
+    scroll-margin-top: calc(var(--m8-topbar-height) + 16px + env(safe-area-inset-top));
+  }
+
+  /* The dock retreats while a native keyboard/form control is active. */
+  body.m8-editing :is(.customer-app-bottom-nav, .employee-app-bottom-nav, .admin-app-bottom-nav) {
+    bottom: calc(-1 * (var(--m8-bottom-height) + env(safe-area-inset-bottom) + 12px)) !important;
+    pointer-events: none;
+  }
+  .m8-skip-link {
+    position: fixed;
+    z-index: 3100;
+    top: calc(6px + env(safe-area-inset-top));
+    left: var(--m8-gutter);
+    padding: 12px 16px;
+    border: 2px solid var(--m8-gold);
+    border-radius: 12px;
+    color: #111 !important;
+    background: var(--m8-gold);
+    font-size: 14px;
+    font-weight: 800;
+    text-decoration: none;
+    transform: translateY(-150%);
+  }
+  .m8-skip-link:focus-visible { transform: none; }
+  :is(input,textarea,select)[aria-invalid="true"] {
+    outline: 2px solid #e8a5a5 !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Navigation response: avoid full-page layout jumps and double taps. */
+  body.m8-navigating::after {
+    content: "";
+    position: fixed;
+    z-index: 3000;
+    top: env(safe-area-inset-top);
+    left: 0;
+    width: 36%;
+    height: 3px;
+    background: var(--m8-gold);
+    box-shadow: 0 0 12px rgba(240,207,114,.35);
+    animation: m8-nav-progress 1.6s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes m8-nav-progress {
+    from { transform: translateX(-100vw); }
+    to { transform: translateX(320vw); }
+  }
+}
+
+@media (max-width: 359px) {
+  body:is(.customer-mobile-app-site, .employee-workspace-site, .mw-mobile-ui) {
+    --m8-gutter: 12px;
+  }
+  :is(.customer-app-nav-item, .employee-app-nav-item, .admin-app-nav-item) {
+    font-size: 10px !important;
+  }
+  body.mw-r5-admin .center-stats,
+  body.mw-r5-admin .history-ledger-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.m8-navigating::after { animation: none !important; }
+  :is(.customer-app-nav-item, .employee-app-nav-item, .admin-app-nav-item) {
+    transition: none !important;
+  }
+}

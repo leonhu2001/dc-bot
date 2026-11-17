@@ -57,6 +57,11 @@
         <link rel="stylesheet" href="/static/css/pages/customer_mobile_app.css?v=20261026-3">
         {% endif %}
     {% endif %}
+    {# Mobile V8 is the final cascade layer shared with the backoffice shell. #}
+    {% if mobile_ui %}
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_unified_v8.css?v=20261117-1">
+    <script src="/static/js/pages/mobile_app_unified_v8.js?v=20261117-1" defer></script>
+    {% endif %}
 
     <link rel="icon" href="/static/img/favicon.ico?v=20261025-5" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png?v=20261025-5">
@@ -82,12 +87,14 @@
 
 <body class="site-body mw-public-r5{% if employee_app_shell %} employee-workspace-site{% elif mobile_ui %} customer-mobile-app-site{% endif %} {% if mobile_ui %}mobile-ui{% else %}desktop-ui{% endif %}" data-page="{{ page_name or '' }}">
     {% if mobile_ui %}
+        <a href="#m8-main" class="m8-skip-link">跳至主要內容</a>
         {% if employee_app_shell %}{% include "_employee_mobile_app_shell.html" %}{% else %}{% include "_customer_mobile_app_shell.html" %}{% endif %}
     {% else %}
         {% include "_site_header.html" %}
     {% endif %}
 
-    <main class="site-main">
+    <main class="site-main" id="m8-main" tabindex="-1">
+        {% if mobile_ui %}{% include "_mobile_v8_route_bar.html" %}{% endif %}
         {% if employee_workspace_shell|default(false) %}
         <section class="ec employee-workspace-frame">
             {% if not mobile_ui %}{% include "_employee_workspace_hero.html" %}{% endif %}

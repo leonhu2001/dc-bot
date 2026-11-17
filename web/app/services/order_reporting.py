@@ -22,6 +22,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.engine import Engine
 
+from services.cs_review_presentation import (
+    review_embed_payload, review_link_components, review_notification_text,
+)
 from shared.db import SessionLocal, engine
 from shared.models import (
     CustomerServicePayout,
@@ -1502,30 +1505,34 @@ def _finish_review_notification(
 
 
 def _pending_review_notice_payload(notice: Mapping[str, Any]) -> dict:
+    """One structured CS review card, retaining the existing durable outbox."""
     order_id = int(notice["order_id"])
-    report_url = f"{_public_base_url()}/dispatch/reports/review/{order_id}"
+    # Discord link buttons must use a public HTTPS URL. Local CI/dev may
+    # configure WEB_ALLOWED_ORIGINS to an http:// loopback server; do not
+    # publish that address to the customer-service channel.
+    public_base = _public_base_url()
+    if not public_base.startswith("https://"):
+        public_base = "https://mowanentertainment.com"
+    report_url = f"{public_base}/dispatch/reports/review/{order_id}"
     order_no = str(notice.get("bot_order_no") or f"WEB-{order_id}")
     customer = str(notice.get("customer_display_name") or "未紀錄")
     item = str(notice.get("item") or "未紀錄")
     author = str(notice.get("submitted_by_display_name") or "未紀錄")
     return {
-        "content": (
-            "📋 **報單待審核**\n"
-            f"訂單：{order_no}\n"
-            f"老闆：{customer}\n"
-            f"單別：{item}\n"
-            f"填報人：{author}\n"
-            "報單已送出，請客服至網頁審核。"
-        ),
-        "components": [{
-            "type": 1,
-            "components": [{
-                "type": 2,
-                "style": 5,
-                "label": "前往報單審核",
-                "url": report_url,
-            }],
-        }],
+        "content": review_notification_text("報單", reference=order_no),
+        "embeds": [review_embed_payload(
+            category="報單",
+            status="pending",
+            status_label="待客服審核",
+            description="陪玩已提交報單。請核對服務內容，再到網頁後台審核。",
+            reference=order_no,
+            applicant=customer,
+            fields=[
+                ("單別", item, False),
+                ("填報人", author, True),
+            ],
+        )],
+        "components": review_link_components(report_url),
         # Never ping everyone/roles/users from untrusted report display names.
         "allowed_mentions": {"parse": []},
         # Discord prevents duplicate messages with the same nonce for a short
@@ -1533,7 +1540,6 @@ def _pending_review_notice_payload(notice: Mapping[str, Any]) -> dict:
         "nonce": f"report-review-{int(notice['id'])}",
         "enforce_nonce": True,
     }
-
 
 async def _send_pending_review_notice(
     client: httpx.AsyncClient, notice: Mapping[str, Any]

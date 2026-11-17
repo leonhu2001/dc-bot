@@ -7,6 +7,9 @@ from datetime import datetime, timedelta, timezone
 import discord
 
 import services.rewards as rewards
+from services.cs_review_presentation import (
+    REVIEW_ACTION_LABEL, review_embed_payload, review_notification_text,
+)
 from core.discord_settings import (
     CUSTOMER_SERVICE_REVIEW_CHANNEL_ID,
     CUSTOMER_SERVICE_ROLE_ID,
@@ -397,27 +400,30 @@ async def _send_review_message(
 ) -> None:
     channel = await _get_review_channel(bot)
     candidate_lines = await _candidate_lines(bot, rows)
-    embed = discord.Embed(
-        title=title,
+    embed = discord.Embed.from_dict(review_embed_payload(
+        category="VIP 保級",
+        status="pending",
+        status_label="新增待審核" if "新增" in title else "每日待審核彙總",
         description=description,
-        color=discord.Color.purple(),
-    )
-    embed.add_field(name="待審核", value=f"**{len(rows)} 位**", inline=True)
-    embed.add_field(name="階級分布", value=_level_summary(rows), inline=False)
-    embed.add_field(name="名單", value=candidate_lines, inline=False)
-    embed.set_footer(text="僅提醒，不會自動降階；實際變更需由客服 / 總管在後台確認。")
+        fields=[
+            ("待審核", f"**{len(rows)} 位**", True),
+            ("階級分布", _level_summary(rows), False),
+            ("名單", candidate_lines, False),
+        ],
+        footer_note="僅提醒，不會自動降階；需由客服／總管在後台確認。",
+    ))
 
     view = discord.ui.View(timeout=None)
     view.add_item(
         discord.ui.Button(
-            label="前往 VIP 審核",
+            label=REVIEW_ACTION_LABEL,
             style=discord.ButtonStyle.link,
             url=VIP_REVIEW_URL,
         )
     )
 
     await channel.send(
-        content=f"<@&{CUSTOMER_SERVICE_ROLE_ID}> 有 VIP 保級名單需要審核。",
+        content=f"<@&{CUSTOMER_SERVICE_ROLE_ID}> {review_notification_text('VIP 保級')}",
         embed=embed,
         view=view,
         allowed_mentions=discord.AllowedMentions(
