@@ -137,7 +137,7 @@ GROUP_SPECS = [
         "category": "delta_mobile_basic",
         "label": "娛樂陪",
         "selector_label": "陪玩類型",
-        "description": "娛樂陪福利累積 10 個服務小時回饋 1 小時；陪玩類型與陪玩人數分開選擇，價格與端遊相同。",
+        "description": "娛樂陪福利累積 10 個服務小時回饋 1 小時；陪玩類型與陪玩人數分開選擇。",
         "variants": [
             ("basic_mobile_entertain_single", "不限"),
             ("basic_mobile_entertain_female_single", "女陪"),
