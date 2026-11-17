@@ -8,6 +8,7 @@ from core.database import remember_order_data, save_bot_data
 from core.time_utils import get_taipei_now_iso
 from services.logging_service import send_order_log
 from services.order_flow import build_payment_method_embed
+from services.payment_qr_assets import prepare_payment_qr_attachment
 from services.orders import _to_int
 
 
@@ -187,10 +188,16 @@ async def ensure_acceptance_payment_panel(
                 existing_message = await existing_channel.fetch_message(
                     existing_message_id
                 )
+                qr_file = prepare_payment_qr_attachment(
+                    payment_embed,
+                    payment_method=selected_method,
+                    amount=amount,
+                )
                 await existing_message.edit(
                     content=content,
                     embed=payment_embed,
                     view=payment_view,
+                    attachments=[qr_file] if qr_file is not None else [],
                     allowed_mentions=discord.AllowedMentions(
                         users=True,
                         roles=False,
@@ -207,16 +214,36 @@ async def ensure_acceptance_payment_panel(
                 payment_message = None
 
     if payment_message is None:
-        payment_message = await ticket_channel.send(
-            content=content,
-            embed=payment_embed,
-            view=payment_view,
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False,
-            ),
+        # A failed restore may have consumed the file handle; create a fresh
+        # surface and upload so a new message never reuses a closed attachment.
+        payment_embed, payment_view = build_acceptance_payment_surface(
+            payment_method_view_type=payment_method_view_type,
+            customer_id=customer_id,
+            channel_id=channel_id,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            companion_preference=companion_preference,
+            amount=amount,
+            receiver_text=receiver_text,
+            selected_method=selected_method,
         )
+        qr_file = prepare_payment_qr_attachment(
+            payment_embed,
+            payment_method=selected_method,
+            amount=amount,
+        )
+        send_kwargs = {
+            "content": content,
+            "embed": payment_embed,
+            "view": payment_view,
+            "allowed_mentions": discord.AllowedMentions(
+                users=True, roles=False, everyone=False,
+            ),
+        }
+        if qr_file is not None:
+            send_kwargs["file"] = qr_file
+        payment_message = await ticket_channel.send(**send_kwargs)
         action = "sent"
 
     data["payment_channel_id"] = int(payment_message.channel.id)
@@ -314,6 +341,7 @@ async def invalidate_acceptance_payment_panel(
                 await old_message.edit(
                     embed=disabled_embed,
                     view=disabled_view,
+                    attachments=[],
                     allowed_mentions=discord.AllowedMentions(
                         users=True,
                         roles=False,
