@@ -1,6 +1,28 @@
 {# V9 mobile page-level introduction; designed for one shared width rail. #}
 {% set m9_current = request.url.path %}
 {% set m9_place = mobile_v9_area|default('customer') %}
+{% if m9_current == '/' %}{% set m9_title='探索魔丸' %}
+{% elif m9_current == '/order' %}{% set m9_title='選擇服務' %}
+{% elif m9_current.startswith('/me/orders') %}{% set m9_title='我的訂單' %}
+{% elif m9_current.startswith('/me/wallet') or m9_current.startswith('/me/topups') %}{% set m9_title='錢包與儲值' %}
+{% elif m9_current.startswith('/me') %}{% set m9_title='會員中心' %}
+{% elif m9_current.startswith('/vip') %}{% set m9_title='VIP 會員' %}
+{% elif m9_current.startswith('/staff') %}{% set m9_title='陪玩陣容' %}
+{% elif m9_current.startswith('/games/delta-force') %}{% set m9_title='三角洲情報' %}
+{% elif m9_current.startswith('/games/') %}{% set m9_title='遊戲服務' %}
+{% elif m9_current.startswith('/dispatch/reports/review') %}{% set m9_title='報單審核' %}
+{% elif m9_current.startswith('/dispatch/reports') %}{% set m9_title='報單管理' %}
+{% elif m9_current.startswith('/dispatch') %}{% set m9_title='接單大廳' %}
+{% elif m9_current.startswith('/my/payouts') %}{% set m9_title='我的薪資' %}
+{% elif m9_current.startswith('/employee') %}{% set m9_title='員工工作台' %}
+{% elif m9_current.startswith('/admin/order-workspace') %}{% set m9_title='訂單工作區' %}
+{% elif m9_current.startswith('/admin/customer') or m9_current.startswith('/admin/wallets') %}{% set m9_title='客戶中心' %}
+{% elif m9_current.startswith('/admin/finance') or m9_current.startswith('/admin/payment') or m9_current.startswith('/admin/topups') or m9_current.startswith('/admin/payout') %}{% set m9_title='財務中心' %}
+{% elif m9_current.startswith('/admin/support') or m9_current.startswith('/admin/tickets') %}{% set m9_title='客服中心' %}
+{% elif m9_current.startswith('/admin/staff') %}{% set m9_title='人員中心' %}
+{% elif m9_current.startswith('/admin/search') %}{% set m9_title='全域搜尋' %}
+{% elif m9_current == '/admin' %}{% set m9_title='營運總覽' %}
+{% else %}{% set m9_title=title|default('魔丸娛樂') %}{% endif %}
 {% set m9_back = '' %}
 {% set m9_parent_name = '' %}
 {% if m9_current.startswith('/dispatch/reports/review/') %}
@@ -90,7 +112,7 @@
 </nav>
 {% elif m9_current == '/admin' %}
 <nav class="m9-action-links" aria-label="客服快捷操作">
-  <a href="/admin/order-workspace"><strong>訂單工作區</strong><span>↗</span></a>
+  <a href="/admin/orders/history"><strong>查詢歷史訂單</strong><span>↗</span></a>
   <a href="/admin/search"><strong>搜尋訂單與客戶</strong><span>↗</span></a>
 </nav>
 {% elif m9_current.startswith('/dispatch/reports') %}
