@@ -1381,7 +1381,8 @@ def build_self_service_order_embed(
             or source_data.get("payment_zero_amount")
         ),
         paid_confirmed=bool(
-            source_data.get("payment_review_applied_at")
+            source_data.get("payment_confirmed")
+            or source_data.get("payment_review_applied_at")
             or source_data.get("payment_zero_amount_completed_at")
             or source_data.get("payment_review_finalized_id")
         ),
