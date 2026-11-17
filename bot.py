@@ -1732,27 +1732,11 @@ class StaffOrderOperationView(discord.ui.View):
                     everyone=False
                 )
             )
-            # Explicitly move both panels after the successful restore. The
-            # background interaction listener is only a race-safe fallback.
-            restored_data = SELF_SERVICE_ORDER_SELECTIONS.get(interaction.channel.id, {})
-            if str(restored_data.get("status") or "") == "active":
-                operation_id = pre_resume_panel_id
-                if operation_id:
-                    try:
-                        from services.order_operation_panel_runtime import _reposition_panel
-                        await _reposition_panel(
-                            interaction.channel,
-                            expected_panel_message_id=int(operation_id),
-                            expected_status="active",
-                            order_selections=SELF_SERVICE_ORDER_SELECTIONS,
-                            operation_view_factory=StaffOrderOperationView,
-                        )
-                    except Exception as exc:
-                        print(
-                            f"[order-operation] restore panels failed "
-                            f"channel={interaction.channel.id}: {type(exc).__name__}: {exc}",
-                            flush=True,
-                        )
+            from services.order_panel_lifecycle import follow_restored_order_panel
+            await follow_restored_order_panel(
+                interaction.channel, pre_resume_panel_id,
+                SELF_SERVICE_ORDER_SELECTIONS, StaffOrderOperationView,
+            )
             await interaction.followup.send("已恢復訂單。", ephemeral=True)
         elif selected == "cancel":
             await interaction.response.send_message(
@@ -5331,27 +5315,11 @@ class StoredOrderResumeButton(discord.ui.Button):
             f"此訂單已由 {interaction.user.mention} 恢復，派單頻道接單面板已重新開放。",
             allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
-        # The stored-order manager is a second restore entrypoint, not covered
-        # by the staff-operation interaction listener. Repost both panels here.
-        restored = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel.id, {})
-        if str(restored.get("status") or "") == "active":
-            from services.order_operation_panel_runtime import _reposition_panel
-            panel_id = pre_manager_panel_id
-            if panel_id:
-                try:
-                    await _reposition_panel(
-                        order_channel,
-                        expected_panel_message_id=int(panel_id),
-                        expected_status="active",
-                        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
-                        operation_view_factory=StaffOrderOperationView,
-                    )
-                except Exception as exc:
-                    print(
-                        f"[order-operation] stored manager restore panels failed "
-                        f"channel={order_channel.id}: {type(exc).__name__}: {exc}",
-                        flush=True,
-                    )
+        from services.order_panel_lifecycle import follow_restored_order_panel
+        await follow_restored_order_panel(
+            order_channel, pre_manager_panel_id,
+            SELF_SERVICE_ORDER_SELECTIONS, StaffOrderOperationView,
+        )
         await send_order_log(
             interaction.guild,
             title="存單已恢復",
