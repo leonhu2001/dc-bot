@@ -55,7 +55,7 @@
     const bodyRows = Array.from(table.querySelectorAll(':scope > tbody > tr'));
     if (!headerRow || !bodyRows.length) return;
     const headings = Array.from(headerRow.querySelectorAll('th')).map((cell) =>
-      (cell.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 60)
+      (cell.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60)
     );
     const complicated = headings.length < 2 || headings.length > 7 ||
       table.querySelector('th[rowspan],th[colspan],td[rowspan],td[colspan]') ||
