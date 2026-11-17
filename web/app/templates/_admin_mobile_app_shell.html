@@ -43,6 +43,8 @@
 </nav>
 {% endif %}
 
+{% include "_mobile_v8_route_bar.html" %}
+
 <nav class="admin-app-bottom-nav" aria-label="客服 App 主要導覽">
     <a class="admin-app-nav-item{% if _admin_app_path == '/admin' or _admin_app_path.startswith('/admin/order-workspace') %} is-active{% endif %}" href="/admin">
         <span class="admin-app-nav-icon" aria-hidden="true">⌂</span>
