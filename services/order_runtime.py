@@ -751,6 +751,9 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             return
 
         await interaction.response.defer(ephemeral=True)
+        pre_store_panel_id = _require_runtime_state().order_selections.get(
+            interaction.channel.id, {}
+        ).get("operation_panel_message_id")
 
         try:
             await store_dispatch_claim_panel(
@@ -792,19 +795,14 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             await interaction.followup.send(str(e), ephemeral=True)
             return
 
-        await interaction.channel.send(
-            f"此訂單已由 {interaction.user.mention} 存單。\n\n"
-            f"存單原因：{self.reason.value.strip()}\n"
-            f"預計恢復：{self.expected_time.value.strip() or '未填寫'}\n"
-            f"備註：{self.note.value.strip() or '無'}",
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
-            )
+        from services.order_panel_lifecycle import finish_stored_order_modal
+        await finish_stored_order_modal(
+            interaction, pre_store_panel_id,
+            _require_runtime_state().order_selections,
+            reason=self.reason.value.strip(),
+            expected_time=self.expected_time.value.strip(),
+            note=self.note.value.strip(),
         )
-
-        await interaction.followup.send("已存單，派單頻道接單面板已鎖定。", ephemeral=True)
 
 
 async def finalize_payment_and_dispatch(

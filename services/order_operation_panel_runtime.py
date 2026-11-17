@@ -98,6 +98,19 @@ async def _reposition_panel(
         order_selections[channel.id] = order_data
         remember_order_data(channel.id, order_data)
 
+        # Keep the worker clock directly after this replacement panel on
+        # restore (and store), without resetting or duplicating its DB state.
+        try:
+            from services.simple_order_timer import ensure_timer_panel_after_operation
+            await ensure_timer_panel_after_operation(
+                channel, reposition=True, expected_status=expected_status
+            )
+        except Exception as exc:
+            print(
+                f"[simple-order-timer] follow operation failed channel={channel.id}: "
+                f"{type(exc).__name__}: {exc}", flush=True,
+            )
+
 
 async def handle_order_operation_panel_interaction(
     interaction: discord.Interaction,
@@ -119,6 +132,10 @@ async def handle_order_operation_panel_interaction(
     custom_id = str(interaction_data.get("custom_id") or "")
     if not custom_id or custom_id == "staff_order_operation_select":
         return
+    # Starting/pausing the *timer* (or any unrelated component) must not
+    # unexpectedly tear down the two order panels.
+    if custom_id != "staff_order_operation_confirm":
+        return
 
     order_data = order_selections.get(interaction.channel.id)
     initial_status = _order_status(order_data)
@@ -139,8 +156,8 @@ async def handle_order_operation_panel_interaction(
         expected_status = "active"
 
     panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
-    if panel_message_id is None:
-        return
+    if panel_message_id is None or interaction.message.id != panel_message_id:
+        return  # Never repost based on an obsolete/duplicate operation panel.
 
     # Give the component callback first chance to change the order state.
     await asyncio.sleep(0.8)
@@ -167,4 +184,7 @@ def register_order_operation_panel_listener(
             operation_view_factory=operation_view_factory,
         )
 
+    # The store modal is submitted in a *different* interaction. It needs the
+    # same factory to move the operation panel (then the clock) after saving.
+    bot._order_operation_panel_view_factory = operation_view_factory
     bot.add_listener(_listener, "on_interaction")

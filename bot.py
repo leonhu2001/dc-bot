@@ -1695,6 +1695,11 @@ class StaffOrderOperationView(discord.ui.View):
 
             await interaction.response.defer(ephemeral=True)
 
+            # The operation listener may run concurrently; both use the same
+            # original panel ID so only one replacement pair can be created.
+            pre_resume_panel_id = SELF_SERVICE_ORDER_SELECTIONS.get(
+                interaction.channel.id, {}
+            ).get("operation_panel_message_id")
             try:
                 await resume_stored_order(
                     guild=guild,
@@ -1726,6 +1731,11 @@ class StaffOrderOperationView(discord.ui.View):
                     roles=False,
                     everyone=False
                 )
+            )
+            from services.order_panel_lifecycle import follow_restored_order_panel
+            await follow_restored_order_panel(
+                interaction.channel, pre_resume_panel_id,
+                SELF_SERVICE_ORDER_SELECTIONS, StaffOrderOperationView,
             )
             await interaction.followup.send("已恢復訂單。", ephemeral=True)
         elif selected == "cancel":
@@ -2720,7 +2730,7 @@ async def _bot_setup_hook() -> None:
     from services.quick_order_v2_select_display import install_quick_order_v2_select_display
 
     from services.simple_order_timer import install_simple_order_timer
-    install_simple_order_timer(bot)
+    install_simple_order_timer(bot, SELF_SERVICE_ORDER_SELECTIONS)
     install_vip_timer_self_service()
     install_quick_order_v2_fixes(bot)
     install_quick_order_v2_production(bot)
@@ -5292,6 +5302,9 @@ class StoredOrderResumeButton(discord.ui.Button):
             return
 
         await interaction.response.defer(ephemeral=True)
+        pre_manager_panel_id = SELF_SERVICE_ORDER_SELECTIONS.get(
+            order_channel.id, {}
+        ).get("operation_panel_message_id")
         try:
             await resume_stored_order(interaction.guild, order_channel, interaction.user)
         except ValueError as e:
@@ -5301,6 +5314,11 @@ class StoredOrderResumeButton(discord.ui.Button):
         await order_channel.send(
             f"此訂單已由 {interaction.user.mention} 恢復，派單頻道接單面板已重新開放。",
             allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+        from services.order_panel_lifecycle import follow_restored_order_panel
+        await follow_restored_order_panel(
+            order_channel, pre_manager_panel_id,
+            SELF_SERVICE_ORDER_SELECTIONS, StaffOrderOperationView,
         )
         await send_order_log(
             interaction.guild,
