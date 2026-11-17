@@ -114,6 +114,10 @@
     backdrop-filter: blur(18px) !important;
     -webkit-backdrop-filter: blur(18px) !important;
   }
+  /* Employee legacy styles stopped at 720px although the server's mobile
+     * render path extends through 767px. Show chrome for the entire range. */
+  .customer-app-topbar, .employee-app-topbar { display: flex !important; }
+  .admin-app-topbar { display: grid !important; }
   .customer-app-topbar { position: fixed !important; inset: 0 0 auto !important; z-index: 2200 !important; }
   .employee-app-topbar,
   .admin-app-topbar { position: sticky !important; top: 0 !important; z-index: 2200 !important; }
@@ -145,6 +149,7 @@
   }
 
   :is(.customer-app-bottom-nav, .employee-app-bottom-nav, .admin-app-bottom-nav) {
+    display: grid !important;
     position: fixed !important;
     z-index: 2300 !important;
     left: 50% !important;
