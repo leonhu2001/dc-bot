@@ -450,7 +450,7 @@ class DispatchClaimView(discord.ui.View):
             category_label=self.category_label,
             item=self.item,
             quantity=_to_int(claim_data.get("quantity"), self.quantity) or 1,
-            payment_method=self.payment_method,
+            payment_method=str(claim_data.get("payment_method") or self.payment_method),
             source_channel=source_channel,
             companion_preference=self.companion_preference,
             receiver_text=receiver_text
@@ -480,7 +480,7 @@ class DispatchClaimView(discord.ui.View):
                 claim_data.get("quantity"),
                 self.quantity,
             ) or 1,
-            payment_method=self.payment_method,
+            payment_method=str(claim_data.get("payment_method") or self.payment_method),
             source_channel_id=self.source_channel_id,
             companion_preference=self.companion_preference,
             locked=bool(
