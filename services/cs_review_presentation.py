@@ -45,7 +45,9 @@ def _safe(value: Any, *, limit: int = 1024) -> str:
     if not raw:
         raw = "—"
     # Display names and user-supplied notes must not trigger unexpected mentions.
-    raw = raw.replace("@everyone", "@\u200beveryone").replace("@here", "@\u200bhere")
+    raw = (raw.replace("@everyone", "@\u200beveryone")
+           .replace("@here", "@\u200bhere")
+           .replace("<@", "<@\u200b"))
     return raw[:limit]
 
 
