@@ -15,6 +15,9 @@ from core.vip_levels import (
     get_topup_rebate_percent,
 )
 from services.legacy_topup_bridge import install_legacy_wallet_add_bridge
+from services.cs_review_presentation import (
+    REVIEW_ACTION_LABEL, review_embed_payload, review_notification_text,
+)
 from services.topup_notifications import (
     ensure_topup_notification_columns,
     list_review_notifications_to_update,
@@ -91,6 +94,73 @@ async def _repair_stuck_vip_members(bot: discord.Client) -> None:
     print(f"[vip-repair] repaired members: {len(repaired)}", flush=True)
 
 
+_TOPUP_REVIEW_STATUS_LABELS = {
+    "pending_review": "待客服審核",
+    "approved_pending_credit": "已核准，待入帳",
+    "crediting": "入帳處理中",
+    "completed": "已完成",
+    "rejected": "已駁回",
+    "cancelled": "已取消",
+}
+
+
+def _topup_review_embed(row: dict) -> discord.Embed:
+    """The same customer-service card for pending and updated top-ups."""
+    status = str(row.get("status") or "pending_review").strip()
+    customer_id = str(row.get("customer_discord_id") or "").strip()
+    customer_name = str(row.get("customer_display_name") or "").strip()
+    applicant = customer_name or customer_id or "未知"
+    if customer_name and customer_id:
+        applicant += f"\n\`{customer_id}\`"
+    topup_no = str(row.get("topup_no") or f"TOPUP-{row.get('id')}")
+    payment_method = str(row.get("payment_method") or "bank_transfer").strip()
+    payment_reference = str(row.get("payment_reference") or row.get("bank_last5") or "—")
+    source = str(row.get("source") or "").strip()
+    source_label = {
+        "web": "網站", "discord": "Discord", "discord_staff": "客服指令",
+    }.get(source, source or "未知")
+    fields = [
+        ("付款方式", topup_payment_method_label(payment_method), True),
+        (topup_payment_reference_label(payment_method), payment_reference, False),
+        ("來源", source_label, True),
+    ]
+    note = str(row.get("payment_note") or "").strip()
+    if note:
+        fields.append(("付款備註", note, False))
+
+    if status in {"approved_pending_credit", "crediting", "completed"}:
+        reviewer = (
+            str(row.get("approved_by_display_name") or "").strip()
+            or str(row.get("approved_by_discord_id") or "").strip()
+            or "未知客服"
+        )
+        fields.append(("審核人員", reviewer, True))
+        description = "客服已核准，入帳狀態請以後台紀錄為準。"
+    elif status == "rejected":
+        reviewer = str(row.get("rejected_by_discord_id") or "").strip() or "未知客服"
+        fields.append(("處理人員", reviewer, True))
+        if row.get("rejected_at"):
+            fields.append(("處理時間", row["rejected_at"], True))
+        if row.get("rejected_reason"):
+            fields.append(("駁回原因", row["rejected_reason"], False))
+        description = "儲值審核已駁回，不會進行入帳。"
+    elif status == "cancelled":
+        description = "儲值申請已取消，不再等待客服審核。"
+    else:
+        description = "老闆已送出付款資料，請核對款項後到網站後台審核。"
+
+    return discord.Embed.from_dict(review_embed_payload(
+        category="儲值",
+        status=status,
+        status_label=_TOPUP_REVIEW_STATUS_LABELS.get(status, status),
+        description=description,
+        reference=topup_no,
+        applicant=applicant,
+        amount=int(row.get("amount") or 0),
+        fields=fields,
+    ))
+
+
 async def _notify_one_pending_review(bot: discord.Client, row: dict) -> None:
     channel = bot.get_channel(TOPUP_REVIEW_CHANNEL_ID)
     if channel is None:
@@ -98,49 +168,17 @@ async def _notify_one_pending_review(bot: discord.Client, row: dict) -> None:
             channel = await bot.fetch_channel(TOPUP_REVIEW_CHANNEL_ID)
         except Exception:
             channel = None
-
     if channel is None or not hasattr(channel, "send"):
         raise RuntimeError(f"找不到儲值審核通知頻道 {TOPUP_REVIEW_CHANNEL_ID}")
 
-    customer_id = str(row.get("customer_discord_id") or "").strip()
-    customer_name = str(row.get("customer_display_name") or "").strip() or customer_id or "未知"
     topup_no = str(row.get("topup_no") or f"TOPUP-{row.get('id')}")
-    amount = int(row.get("amount") or 0)
-    payment_method = str(row.get("payment_method") or "bank_transfer").strip()
-    payment_method_label = topup_payment_method_label(payment_method)
-    payment_reference_label = topup_payment_reference_label(payment_method)
-    payment_reference = str(row.get("payment_reference") or row.get("bank_last5") or "—")
-    source = str(row.get("source") or "").strip()
-    source_label = {
-        "web": "網站",
-        "discord": "Discord",
-        "discord_staff": "客服指令",
-    }.get(source, source or "未知")
-
-    embed = discord.Embed(
-        title="💰 新儲值待審核",
-        description="老闆已送出付款資料，請客服確認款項後前往後台審核。",
-        color=discord.Color.gold(),
-    )
-    embed.add_field(name="儲值單", value=f"`{topup_no}`", inline=False)
-    embed.add_field(name="老闆", value=f"{customer_name}\n`{customer_id}`", inline=True)
-    embed.add_field(name="儲值金額", value=f"{amount:,}T", inline=True)
-    embed.add_field(name="付款方式", value=payment_method_label, inline=True)
-    embed.add_field(name=payment_reference_label, value=payment_reference, inline=False)
-    embed.add_field(name="來源", value=source_label, inline=True)
-
-    note = str(row.get("payment_note") or "").strip()
-    if note:
-        embed.add_field(name="付款備註", value=note[:1000], inline=False)
-
     view = discord.ui.View(timeout=None)
-    view.add_item(
-        discord.ui.Button(label="前往審核", style=discord.ButtonStyle.link, url=TOPUP_REVIEW_URL)
-    )
-
+    view.add_item(discord.ui.Button(
+        label=REVIEW_ACTION_LABEL, style=discord.ButtonStyle.link, url=TOPUP_REVIEW_URL,
+    ))
     message = await channel.send(
-        content=f"<@&{CUSTOMER_SERVICE_ROLE_ID}> 有新的儲值付款待審核。",
-        embed=embed,
+        content=f"<@&{CUSTOMER_SERVICE_ROLE_ID}> {review_notification_text('儲值', reference=topup_no)}",
+        embed=_topup_review_embed(row),
         view=view,
         allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=True),
     )
@@ -182,74 +220,10 @@ async def _sync_one_review_notification(bot: discord.Client, row: dict) -> None:
         mark_review_notification_updated(int(row["id"]))
         return
 
-    customer_id = str(row.get("customer_discord_id") or "").strip()
-    customer_name = str(row.get("customer_display_name") or "").strip() or customer_id or "未知"
     topup_no = str(row.get("topup_no") or f"TOPUP-{row.get('id')}")
-    amount = int(row.get("amount") or 0)
-    payment_method = str(row.get("payment_method") or "bank_transfer").strip()
-    payment_method_label = topup_payment_method_label(payment_method)
-    payment_reference_label = topup_payment_reference_label(payment_method)
-    payment_reference = str(row.get("payment_reference") or row.get("bank_last5") or "—")
-    source = str(row.get("source") or "").strip()
-    source_label = {
-        "web": "網站",
-        "discord": "Discord",
-        "discord_staff": "客服指令",
-    }.get(source, source or "未知")
     status = str(row.get("status") or "").strip()
-
-    approved_statuses = {"approved_pending_credit", "crediting", "completed"}
-    if status in approved_statuses:
-        reviewer_id = str(row.get("approved_by_discord_id") or "").strip()
-        reviewer_name = str(row.get("approved_by_display_name") or "").strip()
-        reviewer_display = reviewer_name or (f"Discord ID {reviewer_id}" if reviewer_id else "未知客服")
-        reviewer_value = reviewer_display
-        if reviewer_id:
-            reviewer_value += f"\n`{reviewer_id}`"
-
-        embed = discord.Embed(
-            title="✅ 儲值已審核",
-            description="此筆儲值已由客服審核通過。",
-            color=discord.Color.green(),
-        )
-        content = f"✅ 儲值付款已審核｜審核人：{reviewer_display}"
-        embed.add_field(name="審核人員", value=reviewer_value, inline=True)
-
-    elif status == "rejected":
-        reviewer_id = str(row.get("rejected_by_discord_id") or "").strip()
-        reviewer_display = f"Discord ID {reviewer_id}" if reviewer_id else "未知客服"
-        embed = discord.Embed(
-            title="❌ 儲值審核未通過",
-            description="此筆儲值已由客服駁回，不會進行入帳。",
-            color=discord.Color.red(),
-        )
-        content = f"❌ 儲值付款審核未通過｜處理人：{reviewer_display}"
-        embed.add_field(name="處理人員", value=reviewer_display, inline=True)
-        rejected_at = str(row.get("rejected_at") or "").strip()
-        if rejected_at:
-            embed.add_field(name="處理時間", value=rejected_at, inline=True)
-        reason = str(row.get("rejected_reason") or "").strip()
-        if reason:
-            embed.add_field(name="駁回原因", value=reason[:1000], inline=False)
-
-    else:
-        embed = discord.Embed(
-            title="⚪ 儲值審核已取消",
-            description="此筆儲值已取消，不再等待客服審核。",
-            color=discord.Color.light_grey(),
-        )
-        content = "⚪ 儲值付款審核已取消。"
-
-    embed.add_field(name="儲值單", value=f"`{topup_no}`", inline=False)
-    embed.add_field(name="老闆", value=f"{customer_name}\n`{customer_id}`", inline=True)
-    embed.add_field(name="儲值金額", value=f"{amount:,}T", inline=True)
-    embed.add_field(name="付款方式", value=payment_method_label, inline=True)
-    embed.add_field(name=payment_reference_label, value=payment_reference, inline=False)
-    embed.add_field(name="來源", value=source_label, inline=True)
-
-    note = str(row.get("payment_note") or "").strip()
-    if note:
-        embed.add_field(name="付款備註", value=note[:1000], inline=False)
+    embed = _topup_review_embed(row)
+    content = f"📋 儲值審核狀態已更新｜{topup_no}"
 
     await message.edit(
         content=content,
