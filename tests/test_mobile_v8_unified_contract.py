@@ -90,3 +90,15 @@ def test_mobile_v8_is_distinct_from_desktop_without_touching_economics() -> None
     # Mobile shell code never invokes private finance/order endpoints.
     assert "api/order" not in text(JS)
     assert "payment" not in text(JS).lower()
+
+
+def test_unified_dock_does_not_trap_fixed_more_sheets() -> None:
+    source = text(CSS)
+    # Transforms/filters on the dock can make position:fixed descendants
+    # relative to the dock rather than the viewport.
+    assert "margin-inline: auto !important;" in source
+    assert "transform: none !important;" in source
+    assert "backdrop-filter: none !important;" in source
+    assert "bottom: calc(-1 * (var(--m8-bottom-height)" in source
+    assert ".admin-app-more-panel" in source
+    assert ".employee-app-more-panel" in source
