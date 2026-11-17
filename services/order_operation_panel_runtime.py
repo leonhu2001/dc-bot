@@ -180,4 +180,7 @@ def register_order_operation_panel_listener(
             operation_view_factory=operation_view_factory,
         )
 
+    # The store modal is submitted in a *different* interaction. It needs the
+    # same factory to move the operation panel (then the clock) after saving.
+    bot._order_operation_panel_view_factory = operation_view_factory
     bot.add_listener(_listener, "on_interaction")
