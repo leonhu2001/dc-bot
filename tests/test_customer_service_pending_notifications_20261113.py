@@ -66,6 +66,7 @@ def test_cs_transfer_notice_contains_review_context():
         "created_by_display_name": "小明", "reason": "調整",
     }
     embed = _transfer_embed(row)
-    assert embed.title.startswith("💸 內部轉帳")
+    assert embed.title.startswith("📋 客服審核｜內部轉帳｜")
     assert any(field.name == "金額" and field.value == "850T" for field in embed.fields)
+    assert embed.footer.text.startswith("魔丸娛樂｜客服審核中心")
     assert any(field.name == "轉入" and field.value == "小美" for field in embed.fields)
