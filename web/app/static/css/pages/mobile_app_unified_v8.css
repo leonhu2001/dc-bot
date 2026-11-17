@@ -360,6 +360,32 @@
     scroll-margin-top: calc(var(--m8-topbar-height) + 16px + env(safe-area-inset-top));
   }
 
+  /* The dock retreats while a native keyboard/form control is active. */
+  body.m8-editing :is(.customer-app-bottom-nav, .employee-app-bottom-nav, .admin-app-bottom-nav) {
+    transform: translate(-50%, calc(100% + 12px)) !important;
+    pointer-events: none;
+  }
+  .m8-skip-link {
+    position: fixed;
+    z-index: 3100;
+    top: calc(6px + env(safe-area-inset-top));
+    left: var(--m8-gutter);
+    padding: 12px 16px;
+    border: 2px solid var(--m8-gold);
+    border-radius: 12px;
+    color: #111 !important;
+    background: var(--m8-gold);
+    font-size: 14px;
+    font-weight: 800;
+    text-decoration: none;
+    transform: translateY(-150%);
+  }
+  .m8-skip-link:focus-visible { transform: none; }
+  :is(input,textarea,select)[aria-invalid="true"] {
+    outline: 2px solid #e8a5a5 !important;
+    outline-offset: 2px !important;
+  }
+
   /* Navigation response: avoid full-page layout jumps and double taps. */
   body.m8-navigating::after {
     content: "";
