@@ -53,7 +53,9 @@ def _positive_int(value: object) -> int | None:
     return result if result > 0 else None
 
 
-def _has_wrong_paid_status(embed: discord.Embed, *, zero_amount: bool) -> bool:
+def _has_wrong_paid_status(
+    embed: discord.Embed, *, zero_amount: bool, method: str = "",
+) -> bool:
     fields = [(str(f.name), str(f.value)) for f in embed.fields]
     expected_phase, _color = display_status("active")
     expected_payment = display_payment(
@@ -65,6 +67,11 @@ def _has_wrong_paid_status(embed: discord.Embed, *, zero_amount: bool) -> bool:
         or any(name in {"狀態", "目前階段"} for name, _value in fields)
         or any(name == STATUS_FIELD and value != expected_phase for name, value in fields)
         or any(name == PAYMENT_FIELD and value != expected_payment for name, value in fields)
+        or (
+            method not in {"", "待付款", "未紀錄"}
+            and any(name == "付款方式" and value in {"待付款", "未紀錄", "等待付款"}
+                    for name, value in fields)
+        )
     )
 
 
@@ -94,10 +101,10 @@ async def reconcile_recent_paid_dispatch_embeds(
             }:
                 continue
             zero_amount = row["amount"] is not None and int(row["amount"]) == 0
-            if not _has_wrong_paid_status(original, zero_amount=zero_amount):
+            method = str(row["payment_method"] or "").strip()
+            if not _has_wrong_paid_status(original, zero_amount=zero_amount, method=method):
                 continue
             corrected = original.copy()
-            method = str(row["payment_method"] or "").strip()
             if method and method not in {"待付款", "未紀錄"}:
                 for index, field in enumerate(corrected.fields):
                     if str(field.name) == "付款方式" and str(field.value) in {
