@@ -804,6 +804,33 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             )
         )
 
+        # The store modal is separate from the original Confirm interaction,
+        # so its completed state was not reliably observed by the listener.
+        # Move the operation panel and its clock only after storage succeeded.
+        operation_factory = getattr(
+            interaction.client, "_order_operation_panel_view_factory", None
+        )
+        stored_data = _require_runtime_state().order_selections.get(
+            interaction.channel.id, {}
+        )
+        panel_id = stored_data.get("operation_panel_message_id")
+        if operation_factory and panel_id and stored_data.get("status") == "stored":
+            try:
+                from services.order_operation_panel_runtime import _reposition_panel
+                await _reposition_panel(
+                    interaction.channel,
+                    expected_panel_message_id=int(panel_id),
+                    expected_status="stored",
+                    order_selections=_require_runtime_state().order_selections,
+                    operation_view_factory=operation_factory,
+                )
+            except Exception as exc:
+                print(
+                    f"[order-operation] store panel reposition failed "
+                    f"channel={interaction.channel.id}: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
         await interaction.followup.send("已存單，派單頻道接單面板已鎖定。", ephemeral=True)
 
 
