@@ -32,17 +32,13 @@
     {% block head %}{% endblock %}
 
     {% if mobile_ui %}
-        <link rel="stylesheet" href="/static/css/pages/mobile_backoffice_chrome.css?v=20261026-1">
         {% if mw_admin_area %}
-            <link rel="stylesheet" href="/static/css/pages/admin_mobile_app.css?v=20261026-3">
             {% if current_path.startswith('/admin/wallets') %}<link rel="stylesheet" href="/static/css/pages/admin_wallet_mobile.css?v=20261026-2">{% endif %}
         {% else %}
             <link rel="stylesheet" href="/static/css/mw_site.css?v=16">
             <link rel="stylesheet" href="/static/css/pages/employee_center.css?v=20261020-2">
             <link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-9">
             <link rel="stylesheet" href="/static/css/pages/employee_workspace_unified.css?v=20261020-1">
-            <link rel="stylesheet" href="/static/css/pages/employee_mobile_pwa.css?v=20261024-2">
-            <link rel="stylesheet" href="/static/css/pages/employee_mobile_app.css?v=20261026-3">
             <link rel="stylesheet" href="/static/css/pages/employee_mobile_routes.css?v=20261026-1">
             <link rel="stylesheet" href="/static/css/pages/employee_mobile_loading.css?v=20261026-2">
         {% endif %}
@@ -58,21 +54,22 @@
         {% endif %}
     {% endif %}
     {% if mobile_ui %}
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_unified_v8.css?v=20261117-1">
-    <script src="/static/js/pages/mobile_app_unified_v8.js?v=20261117-1" defer></script>
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_v9.css?v=20261117-1">
+    <script src="/static/js/pages/mobile_app_v9.js?v=20261117-1" defer></script>
     {% endif %}
 
     <link rel="icon" type="image/png" href="/static/img/favicon.png?v=20260904-2">
     <link rel="apple-touch-icon" href="/static/img/favicon.png?v=20260904-2">
 </head>
 
-<body class="mw-r5-layout {% if mw_admin_area %}mw-r5-admin{% else %}mw-r5-employee{% endif %} {% if mobile_ui %}mw-mobile-ui{% else %}mw-desktop-ui{% endif %}">
+<body class="mw-r5-layout {% if mw_admin_area %}mw-r5-admin{% else %}mw-r5-employee{% endif %} {% if mobile_ui %}mw-mobile-ui m9-mobile{% else %}mw-desktop-ui{% endif %}">
 
 {% if mobile_ui %}
-    <a href="#m8-main" class="m8-skip-link">跳至主要內容</a>
-    {% if mw_admin_area %}{% include "_admin_mobile_app_shell.html" %}{% else %}{% include "_employee_mobile_app_shell.html" %}{% endif %}
+    <a href="#m8-main" class="m9-skip-link m8-skip-link">跳至主要內容</a>
+    {% set mobile_v9_area = 'admin' if mw_admin_area else 'employee' %}
+    {% include "_mobile_v9_shell.html" %}
     <main id="m8-main" tabindex="-1" class="mw-mobile-main-host mw-r5-main-host">
-        {% include "_mobile_v8_route_bar.html" %}
+        {% include "_mobile_v9_page.html" %}
 {% else %}
     <div class="mw-r5-shell">
         {% if mw_admin_area %}{% include "_admin_sidebar.html" %}{% else %}{% include "_employee_sidebar.html" %}{% endif %}
