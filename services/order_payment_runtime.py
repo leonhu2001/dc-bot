@@ -448,6 +448,7 @@ async def finalize_accepted_pending_payment(
             data["operation_panel_message_id"] = operation_message.id
 
         data["status"] = "active"
+        data["payment_confirmed"] = True
         data["closed"] = False
         if zero_amount_order:
             data["payment_zero_amount_completed_at"] = get_taipei_now_iso()
