@@ -42,6 +42,7 @@
   html:has(body.mw-mobile-ui) {
     overflow-x: clip;
     scroll-padding-top: calc(80px + env(safe-area-inset-top));
+    scrollbar-gutter: stable;
     background: #0a0b0e;
   }
 
@@ -134,10 +135,10 @@
   }
   :is(.customer-app-mark, .customer-app-account, .employee-app-mark, .employee-app-profile,
       .admin-app-home, .admin-app-search) {
-    flex: 0 0 42px !important;
-    width: 42px !important;
-    height: 42px !important;
-    min-width: 42px !important;
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
     border: 1px solid var(--m8-line) !important;
     border-radius: 13px !important;
     overflow: hidden;
