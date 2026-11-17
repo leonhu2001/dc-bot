@@ -171,7 +171,6 @@
     margin-left: max(0px, calc((100vw - var(--m9-rail))/2)) !important;
     height: calc(var(--m9-dock-height) + env(safe-area-inset-bottom)) !important;
     min-height: 0 !important;
-    margin: 0 auto !important;
     padding: 7px max(8px,env(safe-area-inset-left))
              calc(6px + env(safe-area-inset-bottom))
              max(8px,env(safe-area-inset-right)) !important;
