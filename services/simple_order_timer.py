@@ -122,7 +122,21 @@ def _authorized_staff(db: sqlite3.Connection, order_id: int, user_id: int) -> bo
         "WHERE order_id=? AND is_active=1",
         (int(order_id),),
     ).fetchall()
-    return str(user_id) in {str(row[0]) for row in rows}
+    if str(user_id) in {str(row[0]) for row in rows}:
+        return True
+    # Keep accepted/claimed workers eligible after payment if assignment sync
+    # is lagging.  change_clock already forbids all prepayment statuses.
+    has_claim_table = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' "
+        "AND name='order_acceptance_claims'"
+    ).fetchone()
+    if not has_claim_table:
+        return False
+    return db.execute(
+        "SELECT 1 FROM order_acceptance_claims "
+        "WHERE order_id=? AND staff_discord_id=? AND is_active=1 LIMIT 1",
+        (int(order_id), str(user_id)),
+    ).fetchone() is not None
 
 
 def change_clock(channel_id: int, user_id: int, action: str, *, now: float | None = None) -> dict:
@@ -304,18 +318,19 @@ def _order_for_panel(channel_id: int, *, allow_stored: bool = False) -> dict | N
         return None
     permitted = ("active", "stored") if allow_stored else ("active",)
     with _connect() as db:
-        rows = db.execute(
+        row = db.execute(
             "SELECT id, ticket_channel_id, order_rule_key, rule_snapshot_json, status "
-            "FROM web_orders WHERE ticket_channel_id=? ORDER BY id DESC",
+            "FROM web_orders WHERE ticket_channel_id=? ORDER BY id DESC LIMIT 1",
             (str(channel_id),),
-        ).fetchall()
-    for row in rows:
-        order = dict(row)
-        if str(order["status"]).lower() not in permitted:
-            continue
-        if eligible_hourly_rule(order["order_rule_key"], order["rule_snapshot_json"]):
-            return order
-    return None
+        ).fetchone()
+    if row is None:
+        return None
+    order = dict(row)
+    if str(order["status"]).lower() not in permitted:
+        return None
+    return order if eligible_hourly_rule(
+        order["order_rule_key"], order["rule_snapshot_json"]
+    ) else None
 
 
 async def ensure_timer_panel_after_operation(
