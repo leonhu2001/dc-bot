@@ -14,8 +14,11 @@
 {% elif m9_current.startswith('/dispatch/reports') %}{% set m9_title='報單管理' %}
 {% elif m9_current.startswith('/dispatch') %}{% set m9_title='接單大廳' %}
 {% elif m9_current.startswith('/my/payouts') %}{% set m9_title='我的薪資' %}
+{% elif m9_current.startswith('/employee/internal-transfers') %}{% set m9_title='內部轉帳' %}
+{% elif m9_current.startswith('/employee/store-bindings') %}{% set m9_title='綁店管理' %}
 {% elif m9_current.startswith('/employee') %}{% set m9_title='員工工作台' %}
 {% elif m9_current.startswith('/admin/order-workspace') %}{% set m9_title='訂單工作區' %}
+{% elif m9_current.startswith('/admin/orders') %}{% set m9_title='訂單管理' %}
 {% elif m9_current.startswith('/admin/customer') or m9_current.startswith('/admin/wallets') %}{% set m9_title='客戶中心' %}
 {% elif m9_current.startswith('/admin/finance') or m9_current.startswith('/admin/payment') or m9_current.startswith('/admin/topups') or m9_current.startswith('/admin/payout') %}{% set m9_title='財務中心' %}
 {% elif m9_current.startswith('/admin/support') or m9_current.startswith('/admin/tickets') %}{% set m9_title='客服中心' %}
@@ -27,6 +30,8 @@
 {% set m9_parent_name = '' %}
 {% if m9_current.startswith('/dispatch/reports/review/') %}
   {% set m9_back='/dispatch/reports/review' %}{% set m9_parent_name='返回報單審核' %}
+{% elif m9_current == '/dispatch/reports/review' %}
+  {% set m9_back='/dispatch/reports' %}{% set m9_parent_name='返回報單管理' %}
 {% elif m9_current.startswith('/dispatch/reports') %}
   {% set m9_back='/employee' %}{% set m9_parent_name='返回工作台' %}
 {% elif m9_current == '/dispatch' or m9_current.startswith('/employee/') or m9_current.startswith('/my/payouts') %}
