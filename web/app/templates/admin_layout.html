@@ -72,6 +72,7 @@
     <a href="#m8-main" class="m8-skip-link">跳至主要內容</a>
     {% if mw_admin_area %}{% include "_admin_mobile_app_shell.html" %}{% else %}{% include "_employee_mobile_app_shell.html" %}{% endif %}
     <main id="m8-main" tabindex="-1" class="mw-mobile-main-host mw-r5-main-host">
+        {% include "_mobile_v8_route_bar.html" %}
 {% else %}
     <div class="mw-r5-shell">
         {% if mw_admin_area %}{% include "_admin_sidebar.html" %}{% else %}{% include "_employee_sidebar.html" %}{% endif %}
