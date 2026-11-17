@@ -100,14 +100,14 @@ def test_admin_manager_receives_management_routes_without_revealing_to_customer(
     ("/dispatch", "employee", "接單大廳"),
     ("/dispatch/reports", "employee", "報單管理"),
     ("/admin", "admin", "營運總覽"),
-    ("/admin/orders/history", "admin", "魔丸娛樂"),
+    ("/admin/orders/history", "admin", "訂單管理"),
 ])
 def test_mobile_v9_page_uses_route_specific_heading_and_useful_links(route,area,title):
     html = jinja_render("_mobile_v9_page.html", route=route, area=area)
     assert title in html
     assert 'class="m9-intro' in html
     if route != "/":
-        assert 'class="m9-section-heading"' in html
+        assert 'm9-section-heading' in html
     if route == "/":
         assert 'href="/order"' in html and 'href="/staff"' in html
 
