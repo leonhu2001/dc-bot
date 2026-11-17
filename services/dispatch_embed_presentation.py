@@ -62,6 +62,47 @@ def display_payment(
     return "付款狀態待確認"
 
 
+# Discord accepts at most 25 fields. On exceptionally dense custom orders,
+# combine financial detail before that limit is reached: never silently drop
+# discount/payout values from the tail of the source Embed.
+_FINANCIAL = frozenset({
+    "客服報價", "商品原價", "百分比折扣", "固定折扣", "點數折價",
+    "指定費", "顧客應付", "顧客實付", "打手分潤基準", "加急費",
+    "掛名狀態", "店家抽成前差額", "客服分潤", "店家實留",
+    "VIP 月券", "活動加贈", "訂單福利備註",
+})
+
+
+def _compact_financials(
+    entries: list[tuple[str, str, bool]],
+) -> list[tuple[str, str, bool]]:
+    financial = [
+        (name, value) for name, value, _ in entries if name in _FINANCIAL
+    ]
+    if not financial:
+        return entries
+    sections: list[str] = []
+    section = ""
+    for name, value in financial:
+        line = f"**{name}**：{value}"
+        if section and len(section) + len(line) + 1 > 1000:
+            sections.append(section)
+            section = ""
+        section = f"{section}\n{line}" if section else line
+    if section:
+        sections.append(section)
+    remaining = [
+        entry for entry in entries if entry[0] not in _FINANCIAL
+    ]
+    for index, text in enumerate(sections, 1):
+        remaining.append((
+            "金額明細" if len(sections) == 1 else f"金額明細 {index}/{len(sections)}",
+            text[:1024],
+            False,
+        ))
+    return remaining
+
+
 def unify_dispatch_embed(
     embed: discord.Embed,
     *,
@@ -95,13 +136,16 @@ def unify_dispatch_embed(
             item[0],
         ),
     )
+    ordered_fields = [entry for _index, entry in ordered]
+    if len(ordered_fields) > 23:
+        ordered_fields = _compact_financials(ordered_fields)
     embed.title = TITLE
     embed.description = DESCRIPTION
     embed.color = color
     embed.clear_fields()
     embed.add_field(name=STATUS_FIELD, value=phase, inline=True)
     embed.add_field(name=PAYMENT_FIELD, value=payment, inline=True)
-    for _index, (name, value, inline) in ordered[:23]:
+    for name, value, inline in ordered_fields[:23]:
         embed.add_field(name=name, value=value, inline=inline)
     return embed
 
