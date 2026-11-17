@@ -139,10 +139,7 @@ async def finalize_accepted_pending_payment(
         await interaction.response.send_message("找不到派單訊息，請通知客服確認。", ephemeral=True)
         return
 
-    # Every payment path (wallet / zero-amount / external review) must finalize
-    # against the same canonical WebOrder.  Previously only external reviews
-    # enforced this, allowing wallet/0T orders to become active in Discord while
-    # silently skipping assignment/payout promotion on the website.
+    # Bind all payment types to one WebOrder before updating dispatch or payroll.
     web_order_id = _to_int(data.get("web_order_id"))
     if web_order_id is None:
         try:
