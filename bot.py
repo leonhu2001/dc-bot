@@ -1695,6 +1695,11 @@ class StaffOrderOperationView(discord.ui.View):
 
             await interaction.response.defer(ephemeral=True)
 
+            # The operation listener may run concurrently; both use the same
+            # original panel ID so only one replacement pair can be created.
+            pre_resume_panel_id = SELF_SERVICE_ORDER_SELECTIONS.get(
+                interaction.channel.id, {}
+            ).get("operation_panel_message_id")
             try:
                 await resume_stored_order(
                     guild=guild,
@@ -1731,7 +1736,7 @@ class StaffOrderOperationView(discord.ui.View):
             # background interaction listener is only a race-safe fallback.
             restored_data = SELF_SERVICE_ORDER_SELECTIONS.get(interaction.channel.id, {})
             if str(restored_data.get("status") or "") == "active":
-                operation_id = restored_data.get("operation_panel_message_id")
+                operation_id = pre_resume_panel_id
                 if operation_id:
                     try:
                         from services.order_operation_panel_runtime import _reposition_panel
@@ -5313,6 +5318,9 @@ class StoredOrderResumeButton(discord.ui.Button):
             return
 
         await interaction.response.defer(ephemeral=True)
+        pre_manager_panel_id = SELF_SERVICE_ORDER_SELECTIONS.get(
+            order_channel.id, {}
+        ).get("operation_panel_message_id")
         try:
             await resume_stored_order(interaction.guild, order_channel, interaction.user)
         except ValueError as e:
@@ -5328,7 +5336,7 @@ class StoredOrderResumeButton(discord.ui.Button):
         restored = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel.id, {})
         if str(restored.get("status") or "") == "active":
             from services.order_operation_panel_runtime import _reposition_panel
-            panel_id = restored.get("operation_panel_message_id")
+            panel_id = pre_manager_panel_id
             if panel_id:
                 try:
                     await _reposition_panel(
