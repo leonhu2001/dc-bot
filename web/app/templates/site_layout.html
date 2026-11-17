@@ -94,6 +94,7 @@
     {% endif %}
 
     <main class="site-main" id="m8-main" tabindex="-1">
+        {% if mobile_ui %}{% include "_mobile_v8_route_bar.html" %}{% endif %}
         {% if employee_workspace_shell|default(false) %}
         <section class="ec employee-workspace-frame">
             {% if not mobile_ui %}{% include "_employee_workspace_hero.html" %}{% endif %}
