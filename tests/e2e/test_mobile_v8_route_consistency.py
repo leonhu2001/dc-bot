@@ -18,7 +18,7 @@ def test_mobile_v8_public_page_boundaries_do_not_change_between_routes(
     page.set_viewport_size({"width": width, "height": 844})
     page.set_extra_http_headers({"Sec-CH-UA-Mobile": "?1"})
     widths = []
-    for path in ("/", "/order", "/vip", "/staff"):
+    for path in ("/", "/order", "/vip", "/service-rules"):
         response = page.goto(f"{BASE_URL}{path}", wait_until="domcontentloaded")
         assert response is not None and response.ok, path
         expect(page.locator(".customer-app-topbar")).to_be_visible()
@@ -73,9 +73,9 @@ def test_mobile_v8_shell_is_visible_at_744px_without_720px_breakpoint_gap(page: 
             const bar = document.querySelector('.customer-app-bottom-nav').getBoundingClientRect();
             return {railWidth: rail.width, railLeft: rail.left, dockWidth:bar.width,
                     dockLeft:bar.left, outer:document.documentElement.scrollWidth,
-                    viewport:innerWidth};
+                    client:document.documentElement.clientWidth, viewport:innerWidth};
         }""")
         assert abs(dims["railWidth"] - 560) <= 2, (route, dims)
-        assert abs(dims["railLeft"] - (744 - 560) / 2) <= 2, (route, dims)
-        assert abs(dims["dockLeft"] - (744 - dims["dockWidth"]) / 2) <= 2, (route, dims)
+        assert abs(dims["railLeft"] - (dims["client"] - 560) / 2) <= 2, (route, dims)
+        assert abs(dims["dockLeft"] - (dims["client"] - dims["dockWidth"]) / 2) <= 2, (route, dims)
         assert dims["outer"] <= 746, (route, dims)
