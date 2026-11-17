@@ -427,6 +427,59 @@
     background: var(--m9-surface) !important; border-radius: 16px !important;
   }
 
+  /* Staff and VIP customer pages get the same V9 hierarchy without
+     hiding member entitlement information. */
+  body.m9-mobile .site-main .crew-page-hero { display: none !important; }
+  body.m9-mobile :is(.crew-filters,.public-crew-grid,.vip-level-grid,.vip-rule-grid) {
+    width: 100% !important; max-width: 100% !important; min-width: 0 !important;
+  }
+  body.m9-mobile .crew-filters {
+    display: flex !important; gap: 8px !important; flex-wrap: nowrap !important;
+    overflow-x: auto !important; overscroll-behavior-x: contain;
+    scrollbar-width: none; padding-bottom: 13px; margin-bottom: 13px;
+  }
+  body.m9-mobile .crew-filters a {
+    flex: 0 0 auto; display: grid; place-items: center;
+    min-height: 43px; padding: 9px 14px;
+    border: 1px solid var(--m9-line);
+    background: var(--m9-surface); border-radius: 13px;
+    color: var(--m9-muted); font-weight: 720;
+    text-decoration: none;
+  }
+  body.m9-mobile .crew-filters a.is-active {
+    background: #303a66; color: white; border-color: rgba(160,176,255,.38);
+  }
+  body.m9-mobile .vip-page-hero {
+    display: block !important; padding: 0 !important; margin: 0 0 12px !important;
+    min-height: 0 !important; border: 0 !important; background: transparent !important;
+    box-shadow: none !important;
+  }
+  body.m9-mobile .vip-page-orbit,
+  body.m9-mobile .vip-page-heading > :is(.section-eyebrow,h1,p) {
+    display: none !important;
+  }
+  body.m9-mobile .vip-current-member {
+    display: grid !important; gap: 5px !important;
+    width: 100% !important; margin: 0 !important; padding: 17px !important;
+    border: 1px solid rgba(160,176,255,.28) !important;
+    border-radius: 19px !important;
+    background: linear-gradient(125deg,#282f55,#172138) !important;
+  }
+  body.m9-mobile .vip-current-member > * { min-width: 0; overflow-wrap: anywhere; }
+  body.m9-mobile :is(.vip-level-grid,.vip-rule-grid,.public-crew-grid) {
+    display: grid !important; grid-template-columns: minmax(0,1fr) !important;
+    gap: 12px !important;
+  }
+  body.m9-mobile .public-crew-card {
+    display: grid !important; grid-template-columns: 90px minmax(0,1fr);
+    align-items: start !important; gap: 12px !important;
+  }
+  body.m9-mobile .public-crew-photo {
+    min-width: 0; width: 90px !important; max-width: 100%;
+  }
+  body.m9-mobile .public-crew-photo img { width: 90px; height: 100px; border-radius: 13px; object-fit: cover; }
+  body.m9-mobile .public-crew-content { min-width: 0; }
+
   /* Genuine content reflow for each application — not legacy width patches. */
   body.m9-mobile :is(.center-grid, .dispatch-grid, .order3-grid, .it-grid, .sbm-grid,
      .wallet-grid, .member-grid, .order-list, .report-list, .admin-order-list,
