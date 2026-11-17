@@ -44,8 +44,9 @@
   {% set _m8_parent = '/games/delta-force' %}
   {% set _m8_parent_label = '三角洲行動' %}
 {% elif _m8_path.startswith('/games/') %}
-  {% set _m8_parent = '/games' %}
-  {% set _m8_parent_label = '遊戲服務' %}
+  {# /games is not a registered page; return to the public home instead. #}
+  {% set _m8_parent = '/' %}
+  {% set _m8_parent_label = '首頁' %}
 {% endif %}
 {% if _m8_parent and _m8_parent != _m8_path %}
 <nav class="m8-route-bar" aria-label="返回上一層功能">
