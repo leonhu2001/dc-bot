@@ -99,6 +99,24 @@ def test_paid_store_retains_confirmed_payment_instead_of_reverting_to_waiting():
     _assert_one_state(card, "已存單", "已付款")
 
 
+def test_overfull_dispatch_financial_details_are_compacted_not_lost():
+    embed = discord.Embed(title="派單")
+    for index in range(17):
+        embed.add_field(name=f"一般資訊{index}", value=f"內容{index}")
+    finance = (
+        "商品原價", "百分比折扣", "固定折扣", "點數折價", "指定費",
+        "顧客實付", "打手分潤基準", "加急費", "店家實留",
+    )
+    for index, name in enumerate(finance):
+        embed.add_field(name=name, value=f"{index + 10:,}T")
+    unify_dispatch_embed(embed, status="active")
+    assert len(embed.fields) <= 25
+    text = str(embed.to_dict())
+    for name in finance:
+        assert name in text
+    assert "金額明細" in text
+
+
 def test_web_placeholder_uses_same_title_fields_and_retry_marker():
     embed = dispatch_creation_placeholder(
         order_id=42, customer_mention="<@1234>", category="三角洲",
