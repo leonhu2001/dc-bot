@@ -772,7 +772,13 @@ for category, prefix, display, game_roles in [
     ("delta_desktop_basic", "basic_entertain", "娛樂陪〈端遊〉", DELTA_DESKTOP_GAME_ROLE),
     ("delta_mobile_basic", "basic_mobile_entertain", "娛樂陪〈手遊〉", DELTA_MOBILE_GAME_ROLE),
 ]:
-    entertain_prices = {1: 320, 2: 600}  # Owner retained earlier rates for BOTH Delta platforms.
+    # 2026-11-18: only desktop entertainment is 350T/H (1 companion) /
+    # 680T/H (2 companions total); Delta mobile remains 320T/H / 600T/H.
+    entertain_prices = (
+        {1: 350, 2: 680}
+        if category == "delta_desktop_basic"
+        else {1: 320, 2: 600}
+    )
     _add_delta_entertain_rule(category=category, key=f"{prefix}_single", label=f"{display}｜不限", allowed_roles=COMPANION_ROLES, game_roles=game_roles, prices=entertain_prices)
     _add_delta_entertain_rule(category=category, key=f"{prefix}_female_single", label=f"{display}｜女陪", allowed_roles=("female_companion",), game_roles=game_roles, prices=entertain_prices)
     _add_delta_entertain_rule(category=category, key=f"{prefix}_male_single", label=f"{display}｜男陪", allowed_roles=("male_companion",), game_roles=game_roles, prices=entertain_prices)
@@ -1664,9 +1670,10 @@ for (
 # the owner's 2026-11-16 changes.
 DELTA_DESKTOP_APPROVAL_REVISION_MARKER = "__owner_confirmed_delta_desktop_image_final_20261116"
 
-# Entertainment is explicitly exempt from the 2026-11-16 image's price rise.
-# Only a NEW manager publish after this freeze can deliberately change 320/600.
-DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER = "__owner_confirmed_delta_entertain_320_600_20261116"
+# 2026-11-18 desktop entertainment replaces the prior 320/600 freeze.
+# Earlier manager approvals must not silently restore old single/double rates.
+# New authenticated manager updates can still deliberately change these tiers.
+DELTA_ENTERTAINMENT_APPROVAL_REVISION_MARKER = "__owner_confirmed_delta_entertain_350_680_20261118"
 DELTA_ENTERTAINMENT_RULE_KEYS = frozenset({
     "basic_entertain_single",
     "basic_entertain_female_single",
@@ -2144,8 +2151,8 @@ class EffectiveOrderRules(dict):
             )
             if key in APPROVED_DELTA_DESKTOP_RULE_KEYS and not delta_revision_confirmed:
                 # An old manager publish may carry the GENERIC approval flag.
-                # The latest 2026-11-16 owner-approved price, headcount,
-                # discounts and guarantee prevail until a NEW Delta-specific
+                # The latest owner-approved price and unchanged headcount,
+                # discounts and guarantees prevail until a NEW Delta-specific
                 # manager publish explicitly replaces that policy.
                 rule = replace(
                     rule,
