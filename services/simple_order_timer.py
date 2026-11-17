@@ -10,6 +10,7 @@ import asyncio
 import json
 import sqlite3
 import time
+from collections.abc import Mapping
 from pathlib import Path
 
 import discord
@@ -25,9 +26,14 @@ SUPPORTED_GAMES = frozenset({
     "delta_desktop_basic", "delta_mobile_basic", "basic", "farm",
 })
 DELTA_FUN_CATEGORIES = frozenset({"delta_desktop_fun", "fun"})
-ACTIVE_TICKET_STATUSES = frozenset({
-    "pending_cs_dispatch", "waiting_acceptance", "accepted_pending_pay", "active",
+# The ordinary timer is created and operable only after canonical payment.
+# Acceptance and pending-payment states must never expose an operational clock.
+ACTIVE_TICKET_STATUSES = frozenset({"active"})
+UNPAID_TICKET_STATUSES = frozenset({
+    "pending_cs_dispatch", "waiting_acceptance", "accepted_pending_pay",
 })
+_PANEL_LOCKS: dict[int, asyncio.Lock] = {}
+_ORDER_SELECTIONS: Mapping[int, dict] | None = None
 TERMINAL_STATUSES = frozenset({"closed", "cancelled", "canceled", "stored"})
 FOOTER_PREFIX = "SIMPLE-HOURLY-TIMER:"
 
@@ -116,20 +122,7 @@ def _authorized_staff(db: sqlite3.Connection, order_id: int, user_id: int) -> bo
         "WHERE order_id=? AND is_active=1",
         (int(order_id),),
     ).fetchall()
-    if str(user_id) in {str(row[0]) for row in rows}:
-        return True
-    # Web orders may be claimed before payment finalizes assignments.
-    has_claim_table = db.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' "
-        "AND name='order_acceptance_claims'"
-    ).fetchone()
-    if not has_claim_table:
-        return False
-    return db.execute(
-        "SELECT 1 FROM order_acceptance_claims "
-        "WHERE order_id=? AND staff_discord_id=? AND is_active=1 LIMIT 1",
-        (int(order_id), str(user_id)),
-    ).fetchone() is not None
+    return str(user_id) in {str(row[0]) for row in rows}
 
 
 def change_clock(channel_id: int, user_id: int, action: str, *, now: float | None = None) -> dict:
@@ -220,6 +213,15 @@ class SimpleHourlyTimerView(discord.ui.View):
         if interaction.channel_id is None:
             await interaction.response.send_message("無法辨識票口。", ephemeral=True)
             return
+        # Old moved panels must never remain usable, even if Discord retained a copy.
+        session = _session(interaction.channel_id)
+        live_id = str((session or {}).get("timer_message_id") or "")
+        pressed_id = str(getattr(interaction.message, "id", "") or "")
+        if not live_id or pressed_id != live_id:
+            await interaction.response.send_message(
+                "這個計時器面板已更新，請使用票口最下方的新面板。", ephemeral=True
+            )
+            return
         try:
             current = change_clock(interaction.channel_id, interaction.user.id, action)
         except (ValueError, PermissionError) as exc:
@@ -256,8 +258,7 @@ def _eligible_orders() -> list[dict]:
     with _connect() as db:
         orders = db.execute(
             "SELECT id, ticket_channel_id, order_rule_key, rule_snapshot_json "
-            "FROM web_orders WHERE status IN "
-            "('pending_cs_dispatch','waiting_acceptance','accepted_pending_pay','active') "
+            "FROM web_orders WHERE status='active' "
             "AND ticket_channel_id IS NOT NULL "
             "AND ticket_channel_id!='' ORDER BY id DESC"
         ).fetchall()
@@ -281,6 +282,175 @@ def _register_order(order: dict) -> bool:
             (int(order["id"]),),
         ).fetchone()
     return bool(row and str(row[0] or "") in {"", "0"})
+
+
+def _operation_panel_id(channel_id: int, *, status: str = "active") -> int | None:
+    """Require a real, paid Discord operation panel before posting a timer."""
+    if _ORDER_SELECTIONS is None:
+        # Compatible with standalone tests; production always injects selections.
+        return None
+    data = _ORDER_SELECTIONS.get(int(channel_id))
+    if not isinstance(data, dict) or str(data.get("status") or "").lower() != status:
+        return None
+    try:
+        value = int(data.get("operation_panel_message_id") or 0)
+        return value if value > 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _order_for_panel(channel_id: int, *, allow_stored: bool = False) -> dict | None:
+    if not DATABASE.is_file():
+        return None
+    permitted = ("active", "stored") if allow_stored else ("active",)
+    with _connect() as db:
+        rows = db.execute(
+            "SELECT id, ticket_channel_id, order_rule_key, rule_snapshot_json, status "
+            "FROM web_orders WHERE ticket_channel_id=? ORDER BY id DESC",
+            (str(channel_id),),
+        ).fetchall()
+    for row in rows:
+        order = dict(row)
+        if str(order["status"]).lower() not in permitted:
+            continue
+        if eligible_hourly_rule(order["order_rule_key"], order["rule_snapshot_json"]):
+            return order
+    return None
+
+
+async def ensure_timer_panel_after_operation(
+    channel: discord.TextChannel, *,
+    order_id: int | None = None,
+    reposition: bool = False,
+    expected_status: str = "active",
+) -> int | None:
+    """Keep one timer directly below the operation panel, preserving elapsed time.
+
+    Payment calls with reposition=False after the operation panel is persisted.
+    Store/resume calls reposition=True once the operation panel was moved.
+    """
+    if expected_status not in {"active", "stored"} or not DATABASE.is_file():
+        return None
+    operation_id = _operation_panel_id(channel.id, status=expected_status)
+    if operation_id is None:
+        return None
+    order = _order_for_panel(channel.id, allow_stored=expected_status == "stored")
+    if order is None or str(order["status"]).lower() != expected_status:
+        return None
+    if order_id is not None and int(order["id"]) != int(order_id):
+        return None
+
+    lock = _PANEL_LOCKS.setdefault(int(channel.id), asyncio.Lock())
+    async with lock:
+        # Recheck after acquiring the lock so an unpaid/stored transition cannot
+        # create a timer on a stale callback.
+        current = _order_for_panel(channel.id, allow_stored=expected_status == "stored")
+        if current is None or current["id"] != order["id"] or str(current["status"]).lower() != expected_status:
+            return None
+
+        if expected_status == "active":
+            ensure_tables()
+            _register_order(order)
+        else:
+            # Store pauses any running clock without zeroing accumulated time.
+            _finish_non_active()
+
+        session = _session(channel.id)
+        if session is None or int(session["order_id"]) != int(order["id"]):
+            return None
+        message_id = int(session.get("timer_message_id") or 0)
+        if message_id:
+            try:
+                old = await channel.fetch_message(message_id)
+            except discord.NotFound:
+                old = None
+                _set_message_id(order["id"], 0)
+            except (discord.Forbidden, discord.HTTPException):
+                return None  # Do not make a duplicate if the old panel is inaccessible.
+            if old is not None:
+                if reposition or int(old.id) < operation_id:
+                    try:
+                        await old.delete()
+                    except (discord.NotFound,):
+                        pass
+                    except (discord.Forbidden, discord.HTTPException):
+                        return None
+                    _set_message_id(order["id"], 0)
+                else:
+                    if session["state"] == "running":
+                        await old.edit(
+                            embed=timer_embed(session),
+                            view=SimpleHourlyTimerView(session["state"]),
+                        )
+                    return int(old.id)
+
+        existing = await _find_existing(channel, int(order["id"]))
+        if existing is not None:
+            if int(existing.id) > operation_id:
+                _set_message_id(order["id"], existing.id)
+                return int(existing.id)
+            try:
+                await existing.delete()
+            except discord.NotFound:
+                pass
+            except (discord.Forbidden, discord.HTTPException):
+                return None
+
+        created = await channel.send(
+            embed=timer_embed(session),
+            view=SimpleHourlyTimerView(session["state"]),
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        _set_message_id(order["id"], created.id)
+        return int(created.id)
+
+
+async def hide_early_unpaid_timer_panels(bot: discord.Client) -> None:
+    """Remove previously emitted prepayment panels without deleting timer state."""
+    if not DATABASE.is_file():
+        return
+    with _connect() as db:
+        rows = db.execute(
+            "SELECT t.order_id, t.ticket_channel_id, t.timer_message_id "
+            "FROM simple_order_timers t JOIN web_orders o ON o.id=t.order_id "
+            "WHERE o.status IN ('pending_cs_dispatch','waiting_acceptance','accepted_pending_pay') "
+            "AND t.timer_message_id IS NOT NULL AND t.timer_message_id!='0'"
+        ).fetchall()
+    for row in rows:
+        ticket_id = str(row["ticket_channel_id"])
+        channel = await _channel(bot, ticket_id)
+        if not isinstance(channel, discord.TextChannel):
+            continue
+        lock = _PANEL_LOCKS.setdefault(int(channel.id), asyncio.Lock())
+        async with lock:
+            with _connect() as db:
+                fresh = db.execute(
+                    "SELECT t.timer_message_id, o.status FROM simple_order_timers t "
+                    "JOIN web_orders o ON o.id=t.order_id WHERE t.order_id=?",
+                    (int(row["order_id"]),),
+                ).fetchone()
+            if not fresh or str(fresh["status"]) not in UNPAID_TICKET_STATUSES:
+                continue
+            message_id = int(fresh["timer_message_id"] or 0)
+            if not message_id:
+                continue
+            try:
+                message = await channel.fetch_message(message_id)
+                await message.delete()
+            except discord.NotFound:
+                pass
+            except (discord.Forbidden, discord.HTTPException):
+                continue
+            with _connect() as db:
+                db.execute(
+                    "UPDATE simple_order_timers SET "
+                    "elapsed_seconds=elapsed_seconds + CASE WHEN state='running' "
+                    "THEN MAX(0, ? - COALESCE(running_since, ?)) ELSE 0 END, "
+                    "state=CASE WHEN state='running' THEN 'paused' ELSE state END, "
+                    "running_since=NULL, timer_message_id='0', updated_at=? "
+                    "WHERE order_id=?",
+                    (time.time(), time.time(), time.time(), int(row["order_id"])),
+                )
 
 
 def _set_message_id(order_id: int, message_id: int) -> None:
@@ -352,10 +522,11 @@ async def _find_existing(channel: discord.TextChannel, order_id: int):
 
 
 async def sync_once(bot: discord.Client) -> None:
-    """Create only missing panels and refresh running times. Safe after restarts."""
+    """Refresh paid clocks, never opening an unpaid panel before order operations."""
     ensure_tables()
-    if not DATABASE.exists():
+    if not DATABASE.is_file():
         return
+    await hide_early_unpaid_timer_panels(bot)
     finished = _finish_non_active()
     for order_id, ticket_id in finished:
         session = _session(ticket_id)
@@ -370,34 +541,17 @@ async def sync_once(bot: discord.Client) -> None:
         except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError):
             pass
     for order in _eligible_orders():
-        order_id = int(order["id"])
-        needs_message = _register_order(order)
-        session = _session(order["ticket_channel_id"])
-        if session is None:
+        # Operation panel is the source of placement: never race payment
+        # finalization or recreate a timer in an unpaid ticket.
+        if _operation_panel_id(int(order["ticket_channel_id"])) is None:
             continue
         channel = await _channel(bot, order["ticket_channel_id"])
         if not isinstance(channel, discord.TextChannel):
             continue
-        if needs_message:
-            existing = await _find_existing(channel, order_id)
-            if existing is None:
-                existing = await channel.send(
-                    embed=timer_embed(session),
-                    view=SimpleHourlyTimerView(session["state"]),
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
-            _set_message_id(order_id, existing.id)
-        elif session["state"] == "running":
-            try:
-                message = await channel.fetch_message(int(session["timer_message_id"]))
-                await message.edit(
-                    embed=timer_embed(session),
-                    view=SimpleHourlyTimerView(session["state"]),
-                )
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError):
-                # Restore missing panels on the next pass without resetting the clock.
-                _set_message_id(order_id, 0)
-
+        try:
+            await ensure_timer_panel_after_operation(channel, order_id=int(order["id"]))
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+            print(f"[simple-order-timer] refresh failed order={order['id']}: {type(exc).__name__}", flush=True)
 
 async def timer_worker(bot: discord.Client) -> None:
     await bot.wait_until_ready()
@@ -409,7 +563,12 @@ async def timer_worker(bot: discord.Client) -> None:
         await asyncio.sleep(60)
 
 
-def install_simple_order_timer(bot: discord.Client) -> None:
+def install_simple_order_timer(
+    bot: discord.Client, order_selections: Mapping[int, dict] | None = None
+) -> None:
+    global _ORDER_SELECTIONS
+    if order_selections is not None:
+        _ORDER_SELECTIONS = order_selections
     if not getattr(bot, "_simple_order_timer_view_registered", False):
         bot.add_view(SimpleHourlyTimerView())
         bot._simple_order_timer_view_registered = True
