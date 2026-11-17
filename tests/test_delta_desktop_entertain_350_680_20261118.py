@@ -121,12 +121,13 @@ def test_mobile_legacy_double_black_tide_and_unrelated_prices_not_changed():
 
 
 @pytest.mark.parametrize("key", sorted(DELTA_ENTERTAINMENT_RULE_KEYS))
+@pytest.mark.parametrize("old_single,old_double", [(320, 600), (350, 650)])
 def test_previous_approved_manager_price_cannot_rollback_nov18_rates(
-    monkeypatch, key,
+    monkeypatch, key, old_single, old_double,
 ):
     stale = rule_to_override_payload(get_base_rule(key))
-    stale["price"] = 320
-    stale["player_count_prices"] = {"1": 320, "2": 600}
+    stale["price"] = old_single
+    stale["player_count_prices"] = {"1": old_single, "2": old_double}
     stale["__owner_confirmed_after_canonical"] = True
     stale["__owner_confirmed_delta_desktop_image_final_20261116"] = True
     stale["__owner_confirmed_delta_entertain_320_600_20261116"] = True
