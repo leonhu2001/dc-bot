@@ -58,3 +58,24 @@ def test_mobile_v8_bottom_navigation_and_back_link_work_as_real_routes(page: Pag
     expect(page.locator(".customer-app-bottom-nav a[href='/']")).to_have_attribute(
         "aria-current", "page"
     )
+
+
+def test_mobile_v8_shell_is_visible_at_744px_without_720px_breakpoint_gap(page: Page) -> None:
+    page.set_viewport_size({"width": 744, "height": 960})
+    page.set_extra_http_headers({"Sec-CH-UA-Mobile": "?1"})
+    for route in ("/", "/order"):
+        response = page.goto(f"{BASE_URL}{route}", wait_until="domcontentloaded")
+        assert response is not None and response.ok
+        expect(page.locator(".customer-app-topbar")).to_be_visible()
+        expect(page.locator(".customer-app-bottom-nav")).to_be_visible()
+        dims = page.evaluate("""() => {
+            const rail = document.querySelector('main#m8-main').getBoundingClientRect();
+            const bar = document.querySelector('.customer-app-bottom-nav').getBoundingClientRect();
+            return {railWidth: rail.width, railLeft: rail.left, dockWidth:bar.width,
+                    dockLeft:bar.left, outer:document.documentElement.scrollWidth,
+                    viewport:innerWidth};
+        }""")
+        assert abs(dims["railWidth"] - 560) <= 2, (route, dims)
+        assert abs(dims["railLeft"] - (744 - 560) / 2) <= 2, (route, dims)
+        assert abs(dims["dockLeft"] - (744 - dims["dockWidth"]) / 2) <= 2, (route, dims)
+        assert dims["outer"] <= 746, (route, dims)
