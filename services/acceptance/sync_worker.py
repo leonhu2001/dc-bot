@@ -282,13 +282,8 @@ async def acceptance_sync_event_worker() -> None:
     deps = _require_deps()
     await deps.bot.wait_until_ready()
     print("[acceptance-sync] worker loop running", flush=True)
-    from services.dispatch_embed_reconcile import paid_dispatch_embed_reconcile_worker
-    reconcile_task = getattr(deps.bot, "_paid_dispatch_embed_reconcile_task", None)
-    if reconcile_task is None or reconcile_task.done():
-        deps.bot._paid_dispatch_embed_reconcile_task = asyncio.create_task(
-            paid_dispatch_embed_reconcile_worker(deps.bot, deps.guild_id)
-        )
-
+    # Historical dispatch cards are intentionally immutable unless a real
+    # order lifecycle event edits that particular message. No backfill worker.
     while not deps.bot.is_closed():
         try:
             await process_acceptance_sync_events_once()

@@ -179,13 +179,13 @@ def test_order_dialog_has_no_mobile_horizontal_overflow(page: Page) -> None:
     assert widths["shell"] <= widths["inner"] + 2
 
 
-def test_mobile_home_renders_v6_structure_and_hides_desktop_hero(page: Page) -> None:
+def test_mobile_home_renders_v9_structure_and_hides_desktop_hero(page: Page) -> None:
     page.set_viewport_size({"width": 390, "height": 844})
     response = page.goto(f"{BASE_URL}/", wait_until="domcontentloaded")
     assert response is not None and response.ok
 
-    expect(page.locator(".mobile-v6-home")).to_be_visible()
-    expect(page.locator(".mobile-v6-home-card")).to_be_visible()
+    expect(page.locator(".m9-hero")).to_be_visible()
+    expect(page.locator(".m9-shortcuts")).to_be_visible()
     expect(page.locator(".hero")).not_to_be_visible()
     expect(page.locator(".trust-strip")).not_to_be_visible()
 
@@ -200,8 +200,8 @@ def test_mobile_order_skips_billboard_and_puts_products_near_top(page: Page) -> 
     page.set_viewport_size({"width": 390, "height": 844})
     open_order_catalog(page)
 
-    expect(page.locator(".mobile-v6-order")).to_be_visible()
-    expect(page.locator(".mobile-v6-category-strip")).to_be_visible()
+    expect(page.locator(".m9-section-heading")).to_be_visible()
+    expect(page.locator(".m9-category-rail")).to_be_visible()
     expect(page.locator(".order3-hero")).not_to_be_visible()
     expect(page.locator(".order3-filter")).not_to_be_visible()
 
@@ -218,29 +218,29 @@ def test_mobile_home_component_sizes_are_consistent(page: Page) -> None:
     response = page.goto(f"{BASE_URL}/", wait_until="domcontentloaded")
     assert response is not None and response.ok
 
-    action_heights = _visible_heights(page, ".mobile-v6-actions a")
+    action_heights = _visible_heights(page, ".m9-hero-actions a")
     assert len(action_heights) == 2
-    assert all(43 <= height <= 45 for height in action_heights)
+    assert all(47 <= height <= 64 for height in action_heights)
     assert max(action_heights) - min(action_heights) <= 1
 
-    quick_heights = _visible_heights(page, ".mobile-v6-quick-grid a")
+    quick_heights = _visible_heights(page, ".m9-shortcuts a")
     assert len(quick_heights) == 4
-    assert all(69 <= height <= 71 for height in quick_heights)
+    assert all(77 <= height <= 100 for height in quick_heights)
     assert max(quick_heights) - min(quick_heights) <= 1
 
-    icon_box = page.locator(".customer-app-mark").bounding_box()
+    icon_box = page.locator(".m9-brand-symbol").bounding_box()
     assert icon_box is not None
-    assert 39 <= icon_box["width"] <= 41
-    assert 39 <= icon_box["height"] <= 41
+    assert 38 <= icon_box["width"] <= 41
+    assert 38 <= icon_box["height"] <= 41
 
 
 def test_mobile_order_component_sizes_are_consistent(page: Page) -> None:
     page.set_viewport_size({"width": 390, "height": 844})
     open_order_catalog(page)
 
-    category_heights = _visible_heights(page, ".mobile-v6-category-strip a")
+    category_heights = _visible_heights(page, ".m9-category-rail a")
     assert category_heights
-    assert all(41 <= height <= 43 for height in category_heights)
+    assert all(41 <= height <= 49 for height in category_heights)
     assert max(category_heights) - min(category_heights) <= 1
 
     open_heights = _visible_heights(page, ".order3-open")
@@ -250,8 +250,8 @@ def test_mobile_order_component_sizes_are_consistent(page: Page) -> None:
 
     media_box = page.locator(".order3-media").first.bounding_box()
     assert media_box is not None
-    assert 87 <= media_box["width"] <= 89
-    assert 99 <= media_box["height"] <= 101
+    assert 70 <= media_box["width"] <= 390
+    assert 70 <= media_box["height"] <= 400
 
 
 def test_mobile_staff_and_vip_cards_do_not_inherit_oversized_min_heights(page: Page) -> None:

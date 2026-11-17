@@ -1,0 +1,127 @@
+{# Mobile V9: a single genuine app shell across customer, employee and CS. #}
+{% set m9_path = request.url.path %}
+{% set m9_area = mobile_v9_area|default('customer') %}
+{% set m9_logged_in = user is defined and user %}
+{% set m9_user_name = ((user.display_name or user.global_name or user.username or '會員') if m9_logged_in else '訪客') %}
+{% set m9_can_manage = m9_logged_in and (user.is_admin or user.is_customer_service or user.is_manager) %}
+{% if m9_area == 'admin' %}
+  {% set m9_root = '/admin' %}
+  {% set m9_area_label = '客服工作台' %}
+  {% set m9_search = '/admin/search' %}
+{% elif m9_area == 'employee' %}
+  {% set m9_root = '/employee' %}
+  {% set m9_area_label = '員工工作台' %}
+  {% set m9_search = '/dispatch' %}
+{% else %}
+  {% set m9_root = '/' %}
+  {% set m9_area_label = '魔丸娛樂' %}
+  {% set m9_search = '/order' %}
+{% endif %}
+{% if m9_path == '/' %}{% set m9_title='探索魔丸' %}
+{% elif m9_path == '/order' %}{% set m9_title='選擇服務' %}
+{% elif m9_path.startswith('/me/orders') %}{% set m9_title='我的訂單' %}
+{% elif m9_path.startswith('/me/wallet') or m9_path.startswith('/me/topups') %}{% set m9_title='錢包與儲值' %}
+{% elif m9_path.startswith('/me') %}{% set m9_title='會員中心' %}
+{% elif m9_path.startswith('/vip') %}{% set m9_title='VIP 會員' %}
+{% elif m9_path.startswith('/staff') %}{% set m9_title='陪玩陣容' %}
+{% elif m9_path.startswith('/games/delta-force') %}{% set m9_title='三角洲情報' %}
+{% elif m9_path.startswith('/games/') %}{% set m9_title='遊戲服務' %}
+{% elif m9_path.startswith('/dispatch/reports/review') %}{% set m9_title='報單審核' %}
+{% elif m9_path.startswith('/dispatch/reports') %}{% set m9_title='報單管理' %}
+{% elif m9_path.startswith('/dispatch') %}{% set m9_title='接單大廳' %}
+{% elif m9_path.startswith('/my/payouts') %}{% set m9_title='我的薪資' %}
+{% elif m9_path.startswith('/employee/internal-transfers') %}{% set m9_title='內部轉帳' %}
+{% elif m9_path.startswith('/employee/store-bindings') %}{% set m9_title='綁店管理' %}
+{% elif m9_path.startswith('/employee') %}{% set m9_title='工作總覽' %}
+{% elif m9_path.startswith('/admin/order-workspace') %}{% set m9_title='訂單工作區' %}
+{% elif m9_path.startswith('/admin/orders') %}{% set m9_title='訂單管理' %}
+{% elif m9_path.startswith('/admin/customer') or m9_path.startswith('/admin/wallet') or m9_path.startswith('/admin/reviews') %}{% set m9_title='客戶中心' %}
+{% elif m9_path.startswith('/admin/finance') or m9_path.startswith('/admin/payment') or m9_path.startswith('/admin/topups') or m9_path.startswith('/admin/payout') or m9_path.startswith('/admin/accounting') %}{% set m9_title='財務中心' %}
+{% elif m9_path.startswith('/admin/support') or m9_path.startswith('/admin/tickets') or m9_path.startswith('/admin/ai-support') %}{% set m9_title='客服中心' %}
+{% elif m9_path.startswith('/admin/staff') %}{% set m9_title='人員中心' %}
+{% elif m9_path.startswith('/admin/search') %}{% set m9_title='全域搜尋' %}
+{% elif m9_path == '/admin' %}{% set m9_title='營運總覽' %}
+{% else %}{% set m9_title=m9_area_label %}{% endif %}
+
+<header class="m9-topbar {% if m9_area == 'customer' %}customer-app-topbar{% elif m9_area == 'employee' %}employee-app-topbar{% else %}admin-app-topbar{% endif %}" aria-label="{{ m9_area_label }}行動版">
+  <div class="m9-topbar-inner">
+    <a class="m9-brand" href="{{ m9_root }}" aria-label="返回{{ m9_area_label }}">
+      <span class="m9-brand-symbol"><img src="/static/img/server_logo.gif" alt="" loading="eager"></span>
+      <span class="m9-brand-name"><small>{{ 'MOWAN / PLAY' if m9_area == 'customer' else 'MOWAN / WORKSPACE' }}</small><strong>{{ m9_title }}</strong></span>
+    </a>
+    <div class="m9-topbar-actions">
+      <a class="m9-header-action" href="{{ m9_search }}" aria-label="{{ '搜尋' if m9_area == 'admin' else '快速前往' }}" title="{{ '全域搜尋' if m9_area == 'admin' else '快速前往' }}"><span aria-hidden="true">⌕</span></a>
+      {% if m9_logged_in %}
+        <a class="m9-user" href="/me" aria-label="會員中心">
+          {% if user.avatar %}<img src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png?size=96" alt="">{% else %}<span>{{ m9_user_name[:1] }}</span>{% endif %}
+        </a>
+      {% else %}
+        <a class="m9-login" href="/auth/discord/login">登入</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+{% if m9_area in ('employee','admin') and m9_can_manage %}
+<nav class="m9-workspace-switch" aria-label="切換工作空間">
+  <a href="/employee" class="{% if m9_area == 'employee' %}is-active{% endif %}" {% if m9_area == 'employee' %}aria-current="page"{% endif %}><span aria-hidden="true">◈</span> 員工</a>
+  <a href="/admin" class="{% if m9_area == 'admin' %}is-active{% endif %}" {% if m9_area == 'admin' %}aria-current="page"{% endif %}><span aria-hidden="true">◎</span> 客服</a>
+</nav>
+{% endif %}
+
+<nav class="m9-dock {% if m9_area == 'customer' %}customer-app-bottom-nav{% elif m9_area == 'employee' %}employee-app-bottom-nav{% else %}admin-app-bottom-nav{% endif %}" aria-label="主要功能導覽">
+  {% if m9_area == 'customer' %}
+    <a href="/" class="m9-nav-link customer-app-nav-item {% if m9_path == '/' %}is-active{% endif %}" {% if m9_path == '/' %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">⌂</span><span>首頁</span></a>
+    <a href="/order" class="m9-nav-link customer-app-nav-item {% if m9_path.startswith('/order') %}is-active{% endif %}" {% if m9_path.startswith('/order') %}aria-current="page"{% endif %}><span class="m9-nav-icon m9-nav-primary" aria-hidden="true">＋</span><span>下單</span></a>
+    <a href="{% if m9_logged_in %}/me/orders{% else %}/auth/discord/login{% endif %}" class="m9-nav-link customer-app-nav-item {% if m9_path.startswith('/me/orders') %}is-active{% endif %}" {% if m9_path.startswith('/me/orders') %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">▤</span><span>訂單</span></a>
+    <a href="/vip" class="m9-nav-link customer-app-nav-item {% if m9_path.startswith('/vip') %}is-active{% endif %}" {% if m9_path.startswith('/vip') %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">◇</span><span>VIP</span></a>
+    <a href="{% if m9_logged_in %}/me{% else %}/auth/discord/login{% endif %}" class="m9-nav-link customer-app-nav-item {% if m9_path.startswith('/me') and not m9_path.startswith('/me/orders') %}is-active{% endif %}" {% if m9_path.startswith('/me') and not m9_path.startswith('/me/orders') %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">◉</span><span>我的</span></a>
+  {% elif m9_area == 'employee' %}
+    <a href="/employee" class="m9-nav-link employee-app-nav-item {% if m9_path == '/employee' %}is-active{% endif %}" {% if m9_path == '/employee' %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">⌂</span><span>總覽</span></a>
+    <a href="/dispatch" class="m9-nav-link employee-app-nav-item {% if m9_path == '/dispatch' %}is-active{% endif %}" {% if m9_path == '/dispatch' %}aria-current="page"{% endif %}><span class="m9-nav-icon m9-nav-primary" aria-hidden="true">⚡</span><span>接單</span></a>
+    <a href="/dispatch/reports" class="m9-nav-link employee-app-nav-item {% if m9_path.startswith('/dispatch/reports') %}is-active{% endif %}" {% if m9_path.startswith('/dispatch/reports') %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">▤</span><span>報單</span></a>
+    <a href="/my/payouts" class="m9-nav-link employee-app-nav-item {% if m9_path.startswith('/my/payouts') %}is-active{% endif %}" {% if m9_path.startswith('/my/payouts') %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">＄</span><span>薪資</span></a>
+  {% else %}
+    <a href="/admin" class="m9-nav-link admin-app-nav-item {% if m9_path == '/admin' or m9_path.startswith('/admin/order-workspace') %}is-active{% endif %}" {% if m9_path == '/admin' or m9_path.startswith('/admin/order-workspace') %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">⌂</span><span>總覽</span></a>
+    <a href="/admin/customer-center" class="m9-nav-link admin-app-nav-item {% if m9_path.startswith('/admin/customer') or m9_path.startswith('/admin/wallet') or m9_path.startswith('/admin/reviews') %}is-active{% endif %}" {% if m9_path.startswith('/admin/customer') or m9_path.startswith('/admin/wallet') or m9_path.startswith('/admin/reviews') %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">◎</span><span>客戶</span></a>
+    <a href="/admin/support-center" class="m9-nav-link admin-app-nav-item {% if m9_path.startswith('/admin/support') or m9_path.startswith('/admin/tickets') %}is-active{% endif %}" {% if m9_path.startswith('/admin/support') or m9_path.startswith('/admin/tickets') %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">◌</span><span>客服</span></a>
+    <a href="/admin/finance-center" class="m9-nav-link admin-app-nav-item {% if m9_path.startswith('/admin/finance') or m9_path.startswith('/admin/payment') or m9_path.startswith('/admin/topups') or m9_path.startswith('/admin/payout') %}is-active{% endif %}" {% if m9_path.startswith('/admin/finance') or m9_path.startswith('/admin/payment') or m9_path.startswith('/admin/topups') or m9_path.startswith('/admin/payout') %}aria-current="page"{% endif %}><span class="m9-nav-icon" aria-hidden="true">＄</span><span>財務</span></a>
+  {% endif %}
+  {% if m9_area != 'customer' %}
+  <details class="m9-more {% if m9_area == 'employee' %}employee-app-more{% else %}admin-app-more{% endif %}">
+    <summary class="m9-nav-link {% if m9_area == 'employee' %}employee-app-nav-item{% else %}admin-app-nav-item{% endif %}" aria-label="更多功能" aria-haspopup="dialog" aria-expanded="false"><span class="m9-nav-icon" aria-hidden="true">☷</span><span>更多</span></summary>
+    <button type="button" class="m9-sheet-backdrop" data-mobile-sheet-close aria-label="關閉功能選單"></button>
+    <section class="m9-sheet {% if m9_area == 'employee' %}employee-app-more-panel{% else %}admin-app-more-panel{% endif %}" aria-label="更多功能">
+      <div class="m9-sheet-handle" aria-hidden="true"></div>
+      <header class="m9-sheet-title"><div><small>MORE OPTIONS</small><strong>所有功能</strong></div><button type="button" data-mobile-sheet-close aria-label="關閉更多功能">×</button></header>
+      <div class="m9-sheet-links">
+        {% if m9_area == 'admin' %}
+          <a href="/admin/search">全域搜尋 <span>⌕</span></a>
+          <a href="/admin/orders/history">歷史訂單 <span>▤</span></a>
+          <a href="/admin/staff-center">人員中心 <span>◎</span></a>
+          <a href="/admin/vip-timers">VIP 計時 <span>◷</span></a>
+          <a href="/admin/fun-orders">趣味單管理 <span>◇</span></a>
+          {% if m9_logged_in and user.is_manager %}
+            <a href="/admin/order-rules">商品規則 <span>⚙</span></a>
+            <a href="/admin/benefits">優惠福利 <span>％</span></a>
+            <a href="/admin/anomalies">系統維運 <span>!</span></a>
+          {% endif %}
+        {% else %}
+          <a href="/employee/internal-transfers">內部轉帳 <span>⇄</span></a>
+          {% if m9_can_manage %}
+            <a href="/dispatch/reports/review">報單審核 <span>✓</span></a>
+            <a href="/employee/store-bindings">綁店管理 <span>◇</span></a>
+          {% endif %}
+          {% if m9_logged_in %}<a href="/staff/{{ user.id }}">公開個人牆 <span>☆</span></a>{% endif %}
+        {% endif %}
+        {% if m9_can_manage %}
+          <a href="{{ '/admin' if m9_area == 'employee' else '/employee' }}">切換至{{ '客服' if m9_area == 'employee' else '員工' }}工作台 <span>↔</span></a>
+        {% endif %}
+        <a href="/me">個人中心 <span>◉</span></a>
+        <a href="/">返回官網 <span>↗</span></a>
+        <a class="m9-logout" href="/auth/logout">登出 <span>⏻</span></a>
+      </div>
+    </section>
+  </details>
+  {% endif %}
+</nav>

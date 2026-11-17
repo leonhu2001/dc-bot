@@ -1,0 +1,130 @@
+{# V9 mobile page-level introduction; designed for one shared width rail. #}
+{% set m9_current = request.url.path %}
+{% set m9_place = mobile_v9_area|default('customer') %}
+{% if m9_current == '/' %}{% set m9_title='探索魔丸' %}
+{% elif m9_current == '/order' %}{% set m9_title='選擇服務' %}
+{% elif m9_current.startswith('/me/orders') %}{% set m9_title='我的訂單' %}
+{% elif m9_current.startswith('/me/wallet') or m9_current.startswith('/me/topups') %}{% set m9_title='錢包與儲值' %}
+{% elif m9_current.startswith('/me') %}{% set m9_title='會員中心' %}
+{% elif m9_current.startswith('/vip') %}{% set m9_title='VIP 會員' %}
+{% elif m9_current.startswith('/staff') %}{% set m9_title='陪玩陣容' %}
+{% elif m9_current.startswith('/games/delta-force') %}{% set m9_title='三角洲情報' %}
+{% elif m9_current.startswith('/games/') %}{% set m9_title='遊戲服務' %}
+{% elif m9_current.startswith('/dispatch/reports/review') %}{% set m9_title='報單審核' %}
+{% elif m9_current.startswith('/dispatch/reports') %}{% set m9_title='報單管理' %}
+{% elif m9_current.startswith('/dispatch') %}{% set m9_title='接單大廳' %}
+{% elif m9_current.startswith('/my/payouts') %}{% set m9_title='我的薪資' %}
+{% elif m9_current.startswith('/employee/internal-transfers') %}{% set m9_title='內部轉帳' %}
+{% elif m9_current.startswith('/employee/store-bindings') %}{% set m9_title='綁店管理' %}
+{% elif m9_current.startswith('/employee') %}{% set m9_title='員工工作台' %}
+{% elif m9_current.startswith('/admin/order-workspace') %}{% set m9_title='訂單工作區' %}
+{% elif m9_current.startswith('/admin/orders') %}{% set m9_title='訂單管理' %}
+{% elif m9_current.startswith('/admin/customer') or m9_current.startswith('/admin/wallets') %}{% set m9_title='客戶中心' %}
+{% elif m9_current.startswith('/admin/finance') or m9_current.startswith('/admin/payment') or m9_current.startswith('/admin/topups') or m9_current.startswith('/admin/payout') %}{% set m9_title='財務中心' %}
+{% elif m9_current.startswith('/admin/support') or m9_current.startswith('/admin/tickets') %}{% set m9_title='客服中心' %}
+{% elif m9_current.startswith('/admin/staff') %}{% set m9_title='人員中心' %}
+{% elif m9_current.startswith('/admin/search') %}{% set m9_title='全域搜尋' %}
+{% elif m9_current == '/admin' %}{% set m9_title='營運總覽' %}
+{% else %}{% set m9_title=title|default('魔丸娛樂') %}{% endif %}
+{% set m9_back = '' %}
+{% set m9_parent_name = '' %}
+{% if m9_current.startswith('/dispatch/reports/review/') %}
+  {% set m9_back='/dispatch/reports/review' %}{% set m9_parent_name='返回報單審核' %}
+{% elif m9_current == '/dispatch/reports/review' %}
+  {% set m9_back='/dispatch/reports' %}{% set m9_parent_name='返回報單管理' %}
+{% elif m9_current.startswith('/dispatch/reports') %}
+  {% set m9_back='/employee' %}{% set m9_parent_name='返回工作台' %}
+{% elif m9_current == '/dispatch' or m9_current.startswith('/employee/') or m9_current.startswith('/my/payouts') %}
+  {% set m9_back='/employee' %}{% set m9_parent_name='返回工作台' %}
+{% elif m9_current.startswith('/admin') and m9_current != '/admin' %}
+  {% if m9_current.startswith('/admin/wallets') or m9_current.startswith('/admin/customers') %}
+    {% set m9_back='/admin/customer-center' %}{% set m9_parent_name='返回客戶中心' %}
+  {% elif m9_current.startswith('/admin/payment') or m9_current.startswith('/admin/payout') or m9_current.startswith('/admin/topups') %}
+    {% set m9_back='/admin/finance-center' %}{% set m9_parent_name='返回財務中心' %}
+  {% else %}
+    {% set m9_back='/admin' %}{% set m9_parent_name='返回客服工作台' %}
+  {% endif %}
+{% elif m9_current.startswith('/me/orders/') %}
+  {% set m9_back='/me/orders' %}{% set m9_parent_name='返回我的訂單' %}
+{% elif m9_current.startswith('/me/wallet/') or m9_current.startswith('/me/topups/') %}
+  {% set m9_back='/me/wallet' %}{% set m9_parent_name='返回錢包' %}
+{% elif m9_current.startswith('/me/') %}
+  {% set m9_back='/me' %}{% set m9_parent_name='返回會員中心' %}
+{% elif m9_current.startswith('/games/delta-force/') %}
+  {% set m9_back='/games/delta-force' %}{% set m9_parent_name='返回三角洲' %}
+{% elif m9_current.startswith('/games/') or m9_current in ('/order','/vip','/staff','/me') %}
+  {% set m9_back='/' %}{% set m9_parent_name='返回首頁' %}
+{% endif %}
+{% if m9_back and m9_back != m9_current %}
+<nav class="m9-breadcrumb m8-route-bar" aria-label="返回上一層">
+  <a class="m9-back m8-route-back" href="{{ m9_back }}"><span aria-hidden="true">←</span> 返回</a>
+  <span>{{ m9_parent_name }}</span>
+</nav>
+{% endif %}
+
+{% if m9_current == '/' %}
+<section class="m9-intro m9-hero" aria-label="探索魔丸">
+  <div class="m9-intro-kicker"><span class="m9-live-dot"></span> MOWAN EXPERIENCE</div>
+  <h1>今晚，<em>開一場好局。</em></h1>
+  <p>從陪玩到遊戲服務，找到適合自己的玩法，一路順暢下單。</p>
+  <div class="m9-hero-actions">
+    <a class="m9-primary-action" href="/order">立即挑選服務 <span aria-hidden="true">↗</span></a>
+    <a class="m9-secondary-action" href="/staff">認識陪玩</a>
+  </div>
+  <div class="m9-hero-mark" aria-hidden="true">M<span>+</span></div>
+</section>
+<nav class="m9-shortcuts" aria-label="常用功能">
+  <a href="/order"><span aria-hidden="true">＋</span><strong>立即下單</strong><small>快速開始</small></a>
+  <a href="/games/delta-force"><span aria-hidden="true">△</span><strong>三角洲</strong><small>遊戲情報</small></a>
+  <a href="{% if user is defined and user %}/me/orders{% else %}/auth/discord/login{% endif %}"><span aria-hidden="true">▤</span><strong>我的訂單</strong><small>查看進度</small></a>
+  <a href="/vip"><span aria-hidden="true">◇</span><strong>VIP</strong><small>專屬福利</small></a>
+</nav>
+{% else %}
+<section class="m9-intro m9-section-heading" aria-label="目前頁面">
+  <div class="m9-intro-kicker"><span class="m9-live-dot"></span> {{ 'CUSTOMER EXPERIENCE' if m9_place == 'customer' else ('STAFF OPERATIONS' if m9_place == 'employee' else 'SERVICE CONSOLE') }}</div>
+  <h1>{{ m9_title }}</h1>
+  {% if m9_current == '/order' %}<p>選擇遊戲、設定服務，再確認你的專屬訂單。</p>
+  {% elif m9_current.startswith('/me/orders') %}<p>目前進度、訂單狀態與過往紀錄，都在這裡。</p>
+  {% elif m9_current.startswith('/me/wallet') %}<p>餘額、交易紀錄與儲值資訊，一頁就能掌握。</p>
+  {% elif m9_current.startswith('/vip') %}<p>查看會員等級、專屬權益與福利。</p>
+  {% elif m9_current.startswith('/staff') %}<p>看看誰能和你一起開一場好局。</p>
+  {% elif m9_current == '/dispatch' %}<p>查看正在等待接單的工作與自己的進行中訂單。</p>
+  {% elif m9_current.startswith('/dispatch/reports') %}<p>先處理待辦，再回頭查找已完成紀錄。</p>
+  {% elif m9_place == 'admin' %}<p>重要工作與待處理資訊集中呈現，操作更快更清楚。</p>
+  {% elif m9_place == 'employee' %}<p>任務、進度與工作紀錄，從同一個地方開始。</p>
+  {% else %}<p>掌握你需要的資訊，輕鬆繼續下一步。</p>{% endif %}
+</section>
+{% endif %}
+
+{% if m9_current == '/order' and categories is defined and categories %}
+<nav class="m9-category-rail" aria-label="服務分類">
+  {% for item in categories %}
+    <a href="/order?category={{ item.key }}{% if selected_staff is defined and selected_staff %}&amp;staff={{ selected_staff.staff_id }}{% endif %}"
+       class="{% if category_filter is defined and category_filter == item.key %}is-active{% endif %}"
+       {% if category_filter is defined and category_filter == item.key %}aria-current="page"{% endif %}>{{ item.label }}</a>
+  {% endfor %}
+</nav>
+{% if selected_staff is defined and selected_staff %}
+<div class="m9-specified">
+  <img src="{{ selected_staff.avatar_url }}" alt="" loading="lazy">
+  <span><small>已指定陪玩</small><strong>{{ selected_staff.display_name }} · {{ selected_staff.role_title }}</strong></span>
+</div>
+{% endif %}
+{% elif m9_current == '/employee' %}
+<nav class="m9-action-links" aria-label="員工快捷操作">
+  <a href="/dispatch"><strong>前往接單大廳</strong><span>↗</span></a>
+  <a href="/dispatch/reports"><strong>處理我的報單</strong><span>↗</span></a>
+</nav>
+{% elif m9_current == '/admin' %}
+<nav class="m9-action-links" aria-label="客服快捷操作">
+  <a href="/admin/orders/history"><strong>查詢歷史訂單</strong><span>↗</span></a>
+  <a href="/admin/search"><strong>搜尋訂單與客戶</strong><span>↗</span></a>
+</nav>
+{% elif m9_current.startswith('/dispatch/reports') %}
+<nav class="m9-category-rail" aria-label="報單狀態">
+  <a href="/dispatch/reports" {% if m9_current == '/dispatch/reports' %}class="is-active" aria-current="page"{% endif %}>全部</a>
+  <a href="/dispatch/reports?status=missing">未報單</a>
+  <a href="/dispatch/reports?status=changes_requested">待修改</a>
+  {% if support_can_manage is defined and support_can_manage %}<a href="/dispatch/reports/review">客服審核{% if pending_report_review_count is defined and pending_report_review_count %} · {{ pending_report_review_count }}{% endif %}</a>{% endif %}
+</nav>
+{% endif %}
