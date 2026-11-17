@@ -2720,7 +2720,7 @@ async def _bot_setup_hook() -> None:
     from services.quick_order_v2_select_display import install_quick_order_v2_select_display
 
     from services.simple_order_timer import install_simple_order_timer
-    install_simple_order_timer(bot)
+    install_simple_order_timer(bot, SELF_SERVICE_ORDER_SELECTIONS)
     install_vip_timer_self_service()
     install_quick_order_v2_fixes(bot)
     install_quick_order_v2_production(bot)
@@ -5302,6 +5302,27 @@ class StoredOrderResumeButton(discord.ui.Button):
             f"此訂單已由 {interaction.user.mention} 恢復，派單頻道接單面板已重新開放。",
             allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
+        # The stored-order manager is a second restore entrypoint, not covered
+        # by the staff-operation interaction listener. Repost both panels here.
+        restored = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel.id, {})
+        if str(restored.get("status") or "") == "active":
+            from services.order_operation_panel_runtime import _reposition_panel
+            panel_id = restored.get("operation_panel_message_id")
+            if panel_id:
+                try:
+                    await _reposition_panel(
+                        order_channel,
+                        expected_panel_message_id=int(panel_id),
+                        expected_status="active",
+                        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+                        operation_view_factory=StaffOrderOperationView,
+                    )
+                except Exception as exc:
+                    print(
+                        f"[order-operation] stored manager restore panels failed "
+                        f"channel={order_channel.id}: {type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
         await send_order_log(
             interaction.guild,
             title="存單已恢復",
