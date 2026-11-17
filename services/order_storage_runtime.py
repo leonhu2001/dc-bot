@@ -190,11 +190,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
             companion_preference=claim_data.get("companion_preference") or companion_preference,
             receiver_text=receiver_text
         )
-        embed.add_field(
-            name="狀態",
-            value="已結單，接單面板已鎖定",
-            inline=False
-        )
+        # The shared Embed already shows the canonical closed status.
 
         try:
             await message.edit(
@@ -367,13 +363,9 @@ async def store_dispatch_claim_panel(
         receiver_text=receiver_text
     )
     embed.add_field(
-        name="狀態",
-        value=(
-            "已存單，接單面板已鎖定\n"
-            f"存單原因：{reason}\n"
-            f"預計恢復：{expected_time or '未填寫'}"
-        ),
-        inline=False
+        name="存單資訊",
+        value=f"原因：{reason}\n預計恢復：{expected_time or '未填寫'}",
+        inline=False,
     )
 
     if note:
@@ -550,9 +542,8 @@ async def resume_stored_order(
         receiver_text=receiver_text
     )
     embed.add_field(
-        name="狀態",
-        value=f"已由 {staff_member.mention} 恢復訂單，接單面板已重新發到最新位置。",
-        inline=False
+        name="恢復紀錄", value=f"由 {staff_member.mention} 恢復",
+        inline=False,
     )
 
     resume_smart_dispatch = None

@@ -46,7 +46,8 @@ def test_dispatch_fields_show_specified_priority_before_public_open_without_muta
     apply_acceptance_dispatch_fields(embed, claim_data, now_ts=1900)
 
     fields = _field_map(embed)
-    assert fields["目前階段"] == "🎯 等待接單｜指定優先 → 公開 <t:2000:R>"
+    assert fields["訂單狀態"] == "🟡 等待接單"
+    assert fields["付款狀態"] == "尚未付款"
     assert fields["接單進度"] == "1/2 位"
     assert fields["護航需求"] == "1/1 位護級"
     assert "<@111>" in fields["接單規則"]
@@ -72,7 +73,8 @@ def test_dispatch_fields_show_generic_protection_without_specified_staff():
     apply_acceptance_dispatch_fields(embed, claim_data, now_ts=1900)
 
     fields = _field_map(embed)
-    assert fields["目前階段"] == "🔒 等待接單｜接單保護 → 公開 <t:2000:R>"
+    assert fields["訂單狀態"] == "🟡 等待接單"
+    assert fields["付款狀態"] == "尚未付款"
     assert "公開接單：<t:2000:T> 開放" in fields["接單規則"]
 
 
@@ -88,7 +90,7 @@ def test_dispatch_fields_show_public_acceptance_after_open_time():
     apply_acceptance_dispatch_fields(embed, claim_data, now_ts=2000)
 
     fields = _field_map(embed)
-    assert fields["目前階段"] == "🟢 等待接單｜公開接單中"
+    assert fields["訂單狀態"] == "🟡 等待接單"
     assert "已於 <t:2000:T> 開放" in fields["接單規則"]
 
 
@@ -103,7 +105,8 @@ def test_dispatch_fields_show_full_waiting_payment_state():
     apply_acceptance_dispatch_fields(embed, claim_data, now_ts=2000)
 
     fields = _field_map(embed)
-    assert fields["目前階段"] == "✅ 等待付款｜接單人數已滿"
+    assert fields["訂單狀態"] == "🟡 接單完成｜等待付款"
+    assert fields["付款狀態"] == "等待付款"
     assert fields["接單進度"] == "2/2 位"
 
 
@@ -121,5 +124,26 @@ def test_dispatch_fields_use_same_base_labels_as_web_for_active_and_stored():
         now_ts=2000,
     )
 
-    assert _field_map(active_embed)["目前階段"] == "🟢 進行中｜已付款"
-    assert _field_map(stored_embed)["目前階段"] == "🔵 已暫存｜接單暫停"
+    assert _field_map(active_embed)["訂單狀態"] == "🟢 服務進行中"
+    assert _field_map(active_embed)["付款狀態"] == "已付款"
+    assert _field_map(stored_embed)["訂單狀態"] == "🔵 已存單｜暫停服務"
+    assert _field_map(stored_embed)["付款狀態"] == "請依原付款紀錄確認"
+
+
+def test_acceptance_repeated_refresh_never_duplicates_state_fields():
+    embed = discord.Embed(title="魔丸娛樂｜接單面板")
+    embed.add_field(name="狀態", value="接單完成｜等待付款", inline=False)
+    embed.add_field(name="付款狀態", value="已付款，接單人員已確認", inline=False)
+    claim_data = {
+        "status": "active", "accepted_count": 2,
+        "required_staff_count": 2, "payment_confirmed": True,
+    }
+    apply_acceptance_dispatch_fields(embed, claim_data)
+    apply_acceptance_dispatch_fields(embed, claim_data)
+    fields = [field.name for field in embed.fields]
+    assert fields.count("訂單狀態") == 1
+    assert fields.count("付款狀態") == 1
+    assert "狀態" not in fields
+    assert "目前階段" not in fields
+    assert _field_map(embed)["訂單狀態"] == "🟢 服務進行中"
+    assert _field_map(embed)["付款狀態"] == "已付款"

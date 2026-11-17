@@ -329,9 +329,7 @@ async def finalize_accepted_pending_payment(
         )
         data["promoted_assignment_count"] = promoted_count
 
-        # Member accumulation is a post-promotion side effect.  Do not award
-        # spend/order progress for a payment that failed to become the canonical
-        # active WebOrder.
+        # Award customer progress only after canonical payment promotion.
         reward_result = await add_customer_reward_from_order(
             guild=guild,
             order_channel_id=channel_id,
@@ -351,6 +349,7 @@ async def finalize_accepted_pending_payment(
                 claim_data = ORDER_CLAIMS.setdefault(dispatch_message_id, {})
                 claim_data["locked"] = True
                 claim_data["status"] = "active"
+                claim_data["payment_confirmed"] = True
                 claim_data["payment_method"] = str(payment_method)
                 claim_data["amount"] = amount
                 claim_data["total_amount"] = amount
@@ -380,14 +379,10 @@ async def finalize_accepted_pending_payment(
                     final_label="顧客實付",
                 )
 
-                dispatch_embed.add_field(
-                    name="付款狀態",
-                    value=(
-                        "免付款，接單人員已確認"
-                        if zero_amount_order
-                        else "已付款，接單人員已確認"
-                    ),
-                    inline=False,
+                from services.dispatch_embed_presentation import unify_dispatch_embed
+                unify_dispatch_embed(
+                    dispatch_embed, status="active", zero_amount=zero_amount_order,
+                    paid_confirmed=True,
                 )
 
                 await dispatch_message.edit(
@@ -407,8 +402,8 @@ async def finalize_accepted_pending_payment(
                 )
 
                 remember_claim_data(dispatch_message_id, claim_data)
-            except discord.HTTPException:
-                pass
+            except discord.HTTPException as exc:
+                print(f"[dispatch-embed] paid edit failed WEB-{web_order_id}: {exc}")
 
         payment_channel_id = _to_int(data.get("payment_channel_id"), interaction.channel.id) or interaction.channel.id
         payment_message_id = _to_int(data.get("payment_message_id"))
@@ -453,6 +448,7 @@ async def finalize_accepted_pending_payment(
             data["operation_panel_message_id"] = operation_message.id
 
         data["status"] = "active"
+        data["payment_confirmed"] = True
         data["closed"] = False
         if zero_amount_order:
             data["payment_zero_amount_completed_at"] = get_taipei_now_iso()

@@ -7,6 +7,7 @@ import discord
 
 from services.order_dispatch_runtime import DispatchClaimView
 from services.orders import _to_int, build_self_service_order_embed
+from services.dispatch_embed_presentation import unify_dispatch_embed
 
 
 def acceptance_public_open_timestamp(
@@ -150,17 +151,15 @@ def apply_acceptance_dispatch_fields(
         {
             "狀態",
             "目前階段",
+            "訂單狀態",
+            "付款狀態",
             "接單保護",
             "指定／公開名額",
             "接單規則",
+            "接單進度",
+            "護航需求",
+            "網站下單資訊",
         },
-    )
-
-    _upsert_field(
-        embed,
-        name="目前階段",
-        value=_dispatch_phase_text(claim_data, now_ts=now_ts),
-        inline=False,
     )
     _upsert_field(
         embed,
@@ -225,6 +224,16 @@ def apply_acceptance_dispatch_fields(
             inline=False,
         )
 
+    amount = _to_int(claim_data.get("amount"), None)
+    unify_dispatch_embed(
+        embed,
+        status=str(claim_data.get("status") or ""),
+        zero_amount=bool(
+            claim_data.get("payment_zero_amount_completed_at")
+            or (str(claim_data.get("status") or "") == "active" and amount == 0)
+        ),
+        paid_confirmed=bool(claim_data.get("payment_confirmed")),
+    )
     return embed
 
 
@@ -307,7 +316,7 @@ class AcceptanceDispatchView(DispatchClaimView):
                 category_label=self.category_label,
                 item=self.item,
                 quantity=_to_int(claim_data.get("quantity"), self.quantity) or 1,
-                payment_method=self.payment_method,
+                payment_method=str(claim_data.get("payment_method") or self.payment_method),
                 source_channel=source_channel,
                 companion_preference=self.companion_preference,
                 receiver_text=receiver_text,
@@ -321,7 +330,7 @@ class AcceptanceDispatchView(DispatchClaimView):
             category_label=self.category_label,
             item=self.item,
             quantity=_to_int(claim_data.get("quantity"), self.quantity) or 1,
-            payment_method=self.payment_method,
+            payment_method=str(claim_data.get("payment_method") or self.payment_method),
             source_channel_id=self.source_channel_id,
             companion_preference=self.companion_preference,
             locked=bool(claim_data.get("locked")),

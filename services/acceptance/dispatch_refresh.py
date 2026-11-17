@@ -227,7 +227,7 @@ async def refresh_acceptance_dispatch_from_web_order(
     else:
         data.pop("accepted_staff_display_text", None)
 
-    if data.get("website_finance_settled"):
+    if data.get("website_finance_settled") and str(state.status) != "active":
         website_selected_method = str(
             data.get("website_payment_method")
             or payment_method
@@ -258,7 +258,8 @@ async def refresh_acceptance_dispatch_from_web_order(
         or "不指定陪玩/打手"
     )
 
-    claim_data["locked"] = False
+    claim_data["locked"] = str(state.status) in {"active", "stored", "closed", "cancelled"}
+    claim_data["payment_confirmed"] = str(state.status) == "active"
     claim_data["customer_id"] = customer_id
     claim_data["category_label"] = category_label
     claim_data["item"] = item
@@ -291,6 +292,8 @@ async def refresh_acceptance_dispatch_from_web_order(
     data["accepted_count"] = int(state.accepted_count)
     data["required_staff_count"] = int(state.required_staff_count)
     data["status"] = str(state.status)
+    if str(state.status) == "active":
+        data["payment_method"] = payment_method
 
     for key, value in web_price_data.items():
         if value is not None:
@@ -389,7 +392,7 @@ async def refresh_acceptance_dispatch_from_web_order(
                 payment_method=payment_method,
                 source_channel_id=ticket_channel_id,
                 companion_preference=companion_preference,
-                locked=False,
+                locked=bool(claim_data["locked"]),
                 status=str(state.status),
             ),
             allowed_mentions=discord.AllowedMentions(

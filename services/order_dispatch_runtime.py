@@ -450,30 +450,27 @@ class DispatchClaimView(discord.ui.View):
             category_label=self.category_label,
             item=self.item,
             quantity=_to_int(claim_data.get("quantity"), self.quantity) or 1,
-            payment_method=self.payment_method,
+            payment_method=str(claim_data.get("payment_method") or self.payment_method),
             source_channel=source_channel,
             companion_preference=self.companion_preference,
             receiver_text=receiver_text
         )
 
-        status = claim_data.get("status", "active")
-
+        status = str(claim_data.get("status") or self.status or "")
         if status == "stored":
             new_embed.add_field(
-                name="狀態",
+                name="存單資訊",
                 value=(
-                    "已存單，接單面板已鎖定\n"
-                    f"存單原因：{claim_data.get('stored_reason') or '未填寫'}\n"
+                    f"原因：{claim_data.get('stored_reason') or '未填寫'}\n"
                     f"預計恢復：{claim_data.get('stored_expected_time') or '未填寫'}"
                 ),
-                inline=False
+                inline=False,
             )
-        elif claim_data.get("locked"):
-            new_embed.add_field(
-                name="狀態",
-                value="已結單，接單面板已鎖定",
-                inline=False
-            )
+        from services.dispatch_embed_presentation import unify_dispatch_embed
+        unify_dispatch_embed(
+            new_embed, status=status,
+            paid_confirmed=bool(claim_data.get("payment_confirmed")),
+        )
 
         updated_view = DispatchClaimView(
             customer_id=self.customer_id,
@@ -483,7 +480,7 @@ class DispatchClaimView(discord.ui.View):
                 claim_data.get("quantity"),
                 self.quantity,
             ) or 1,
-            payment_method=self.payment_method,
+            payment_method=str(claim_data.get("payment_method") or self.payment_method),
             source_channel_id=self.source_channel_id,
             companion_preference=self.companion_preference,
             locked=bool(
