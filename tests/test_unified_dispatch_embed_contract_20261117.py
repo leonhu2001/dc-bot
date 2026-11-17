@@ -82,6 +82,23 @@ def test_zero_amount_is_only_declared_after_canonical_active_status():
     assert display_payment("active", zero_amount=True) == "免付款（0T）"
 
 
+def test_paid_store_retains_confirmed_payment_instead_of_reverting_to_waiting():
+    guild = SimpleNamespace(get_member=lambda _uid: None)
+    channel = SimpleNamespace(id=12345678, mention="<#12345678>", guild=guild)
+    orders.configure_order_helpers({
+        channel.id: {
+            "status": "stored", "payment_confirmed": True,
+            "customer_display_name": "老闆甲",
+        }
+    })
+    card = orders.build_self_service_order_embed(
+        customer_mention="老闆甲", category_label="三角洲",
+        item="娛樂陪", quantity=1, payment_method="我的錢包",
+        source_channel=channel,
+    )
+    _assert_one_state(card, "已存單", "已付款")
+
+
 def test_web_placeholder_uses_same_title_fields_and_retry_marker():
     embed = dispatch_creation_placeholder(
         order_id=42, customer_mention="<@1234>", category="三角洲",
