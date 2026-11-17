@@ -1507,7 +1507,13 @@ def _finish_review_notification(
 def _pending_review_notice_payload(notice: Mapping[str, Any]) -> dict:
     """One structured CS review card, retaining the existing durable outbox."""
     order_id = int(notice["order_id"])
-    report_url = f"{_public_base_url()}/dispatch/reports/review/{order_id}"
+    # Discord link buttons must use a public HTTPS URL. Local CI/dev may
+    # configure WEB_ALLOWED_ORIGINS to an http:// loopback server; do not
+    # publish that address to the customer-service channel.
+    public_base = _public_base_url()
+    if not public_base.startswith("https://"):
+        public_base = "https://mowanentertainment.com"
+    report_url = f"{public_base}/dispatch/reports/review/{order_id}"
     order_no = str(notice.get("bot_order_no") or f"WEB-{order_id}")
     customer = str(notice.get("customer_display_name") or "未紀錄")
     item = str(notice.get("item") or "未紀錄")
