@@ -68,7 +68,7 @@ DELTA_DESKTOP_PRICE_LISTS = {
     "entertainment": {
         "label": "娛樂陪",
         "text": f"""**娛樂陪**
-{_aligned_code_block((("娛樂單陪", "320T / H"), ("娛樂雙陪", "600T / H")))}
+{_aligned_code_block((("娛樂單陪", "350T / H"), ("娛樂雙陪", "680T / H")))}
 ⚠️ **不保撤、無保底**
 
 🎁 **娛樂陪累積回饋**
