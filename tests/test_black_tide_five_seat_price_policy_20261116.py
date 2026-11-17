@@ -136,7 +136,7 @@ def test_new_explicit_web_manager_publish_can_still_change_black_tide(monkeypatc
     assert calculate_price(ORDER_RULES[key], player_count=5).base_amount == 1650
 
 
-def test_non_black_tide_delta_entertainment_and_fun_prices_unchanged():
-    assert calculate_price(get_rule("basic_entertain_single"), player_count=1).base_amount == 320
-    assert calculate_price(get_rule("basic_entertain_single"), player_count=2).base_amount == 600
+def test_non_black_tide_delta_entertainment_nov18_price_and_fun_unchanged():
+    assert calculate_price(get_rule("basic_entertain_single"), player_count=1).base_amount == 350
+    assert calculate_price(get_rule("basic_entertain_single"), player_count=2).base_amount == 680
     assert get_rule("fun_lovebirds").category == "delta_desktop_fun"
