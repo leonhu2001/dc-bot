@@ -15,6 +15,11 @@ from core.discord_settings import (
     CUSTOMER_SERVICE_ROLE_ID,
 )
 from services.payment_reviews import _db_path as payment_db_path, ensure_payment_review_tables
+from services.cs_review_presentation import (
+    REVIEW_ACTION_LABEL,
+    review_embed_payload,
+    review_notification_text,
+)
 from web.app.services import internal_transfers
 
 PAYMENT_URL = "https://mowanentertainment.com/admin/payment-reviews?status=pending"
@@ -119,36 +124,51 @@ async def _get_channel(bot: discord.Client):
 
 def _payment_embed(row: dict, *, resolved: bool = False) -> discord.Embed:
     status = str(row.get("status") or "pending_review")
-    embed = discord.Embed(
-        title="💳 付款審核｜" + _PAYMENT_STATUS.get(status, status),
-        description="請核對款項後在網站後台審核。" if not resolved else "此筆付款審核已更新。",
-        color=discord.Color.green() if status == "applied" else discord.Color.gold(),
-    )
-    embed.add_field(name="審核編號", value=str(row.get("review_no") or row.get("id")), inline=True)
-    embed.add_field(name="來源", value="雞腿" if row.get("source_type") == "worker_tip" else "訂單", inline=True)
-    embed.add_field(name="老闆", value=str(row.get("customer_display_name") or row.get("customer_discord_id") or "未知"), inline=False)
-    embed.add_field(name="金額", value=f"{int(row.get('amount') or 0):,}T", inline=True)
-    embed.add_field(name="付款方式", value=str(row.get("payment_method") or "未提供"), inline=True)
+    extras = [
+        ("來源", "雞腿" if row.get("source_type") == "worker_tip" else "訂單", True),
+        ("付款方式", str(row.get("payment_method") or "未提供"), True),
+    ]
     channel_id = str(row.get("ticket_channel_id") or "").strip()
     if channel_id.isdigit():
-        embed.add_field(name="付款票口", value=f"https://discord.com/channels/1129474191226306672/{channel_id}", inline=False)
-    return embed
+        extras.append((
+            "付款票口",
+            f"https://discord.com/channels/1129474191226306672/{channel_id}",
+            False,
+        ))
+    return discord.Embed.from_dict(review_embed_payload(
+        category="付款審核",
+        status=status,
+        status_label=_PAYMENT_STATUS.get(status, status),
+        description=(
+            "已完成狀態更新，請以網站後台紀錄為準。"
+            if resolved else "請核對付款憑證與金額，再從網站後台審核。"
+        ),
+        reference=str(row.get("review_no") or row.get("id")),
+        applicant=str(row.get("customer_display_name") or row.get("customer_discord_id") or "未知"),
+        amount=int(row.get("amount") or 0),
+        fields=extras,
+    ))
 
 
 def _transfer_embed(row: dict, *, resolved: bool = False) -> discord.Embed:
     status = str(row.get("status") or "pending")
-    embed = discord.Embed(
-        title="💸 內部轉帳｜" + _TRANSFER_STATUS.get(status, status),
-        description="請確認薪資轉帳後在員工後台審核。" if not resolved else "此筆轉帳已更新。",
-        color=discord.Color.green() if status == "approved" else discord.Color.gold(),
-    )
-    embed.add_field(name="轉帳編號", value=f"#{row.get('id')}", inline=True)
-    embed.add_field(name="金額", value=f"{int(row.get('amount') or 0):,}T", inline=True)
-    embed.add_field(name="轉出", value=str(row.get("from_employee_display_name") or row.get("from_employee_discord_id") or "未知"), inline=True)
-    embed.add_field(name="轉入", value=str(row.get("to_employee_display_name") or row.get("to_employee_discord_id") or "未知"), inline=True)
-    embed.add_field(name="申請者", value=str(row.get("created_by_display_name") or row.get("created_by_discord_id") or "未知"), inline=False)
-    embed.add_field(name="原因", value=str(row.get("reason") or "未提供")[:1000], inline=False)
-    return embed
+    return discord.Embed.from_dict(review_embed_payload(
+        category="內部轉帳",
+        status=status,
+        status_label=_TRANSFER_STATUS.get(status, status),
+        description=(
+            "此筆內部轉帳審核狀態已更新。"
+            if resolved else "請確認轉出／轉入成員與金額，再從後台審核。"
+        ),
+        reference=f"#{row.get('id')}",
+        applicant=str(row.get("created_by_display_name") or row.get("created_by_discord_id") or "未知"),
+        amount=int(row.get("amount") or 0),
+        fields=[
+            ("轉出", str(row.get("from_employee_display_name") or row.get("from_employee_discord_id") or "未知"), True),
+            ("轉入", str(row.get("to_employee_display_name") or row.get("to_employee_discord_id") or "未知"), True),
+            ("原因", str(row.get("reason") or "未提供"), False),
+        ],
+    ))
 
 
 async def _process_kind(bot, channel, *, connector, table: str, pending_status: str,
@@ -157,9 +177,9 @@ async def _process_kind(bot, channel, *, connector, table: str, pending_status: 
     for row in pending:
         try:
             view = discord.ui.View(timeout=None)
-            view.add_item(discord.ui.Button(label="前往審核", url=url, style=discord.ButtonStyle.link))
+            view.add_item(discord.ui.Button(label=REVIEW_ACTION_LABEL, url=url, style=discord.ButtonStyle.link))
             message = await channel.send(
-                content=f"<@&{CUSTOMER_SERVICE_ROLE_ID}> 有新的{label}待審核。",
+                content=f"<@&{CUSTOMER_SERVICE_ROLE_ID}> {review_notification_text(label, reference=str(row.get('review_no') or row.get('id')))}",
                 embed=embed_builder(row),
                 view=view,
                 allowed_mentions=discord.AllowedMentions(users=False, roles=True, everyone=False),
@@ -171,7 +191,7 @@ async def _process_kind(bot, channel, *, connector, table: str, pending_status: 
         try:
             message = await channel.fetch_message(int(row["cs_notice_message_id"]))
             await message.edit(
-                content=f"{label} #{row['id']} 已更新為：{str(row.get('status') or '')}。",
+                content=f"📋 {label}審核狀態已更新｜{str(row.get('review_no') or row.get('id'))}",
                 embed=embed_builder(row, resolved=True),
                 view=None,
                 allowed_mentions=discord.AllowedMentions.none(),
