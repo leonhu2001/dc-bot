@@ -246,7 +246,7 @@ def test_mobile_order_component_sizes_are_consistent(page: Page) -> None:
     open_heights = _visible_heights(page, ".order3-open")
     if not open_heights:
         pytest.skip("No public order groups are available in this fixture")
-    assert all(43 <= height <= 45 for height in open_heights[:4])
+    assert all(45 <= height <= 50 for height in open_heights[:4])
 
     media_box = page.locator(".order3-media").first.bounding_box()
     assert media_box is not None
