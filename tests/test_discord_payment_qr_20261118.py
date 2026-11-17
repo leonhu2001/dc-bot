@@ -123,9 +123,15 @@ def test_all_payment_message_paths_attach_or_clear_the_previous_qr():
             "services/order_payment_runtime.py",
         )
     }
-    for path, source in sources.items():
+    for path in ("services/acceptance/payment_panel.py",
+                 "services/order_payment_review_submission.py"):
+        source = sources[path]
         assert "prepare_payment_qr_attachment(" in source, path
         assert "attachments=[qr_file] if qr_file is not None else []" in source, path
+    assert "edit_payment_qr_interaction(" in sources["services/order_runtime.py"]
+    assert "edit_payment_qr_message(" in sources["services/order_payment_runtime.py"]
+    qr_helper = (ROOT / "services/payment_qr_assets.py").read_text(encoding="utf-8")
+    assert "attachments=[image] if image is not None else []" in qr_helper
     panel = sources["services/acceptance/payment_panel.py"]
     assert 'send_kwargs["file"] = qr_file' in panel
     assert "attachments=[]" in panel  # invalidated acceptances clear stale QR
