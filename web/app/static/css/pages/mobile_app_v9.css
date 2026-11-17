@@ -385,6 +385,48 @@
   .m9-specified small { color: var(--m9-muted); font-size: 11px; }
   .m9-specified strong { color: var(--m9-text); font-size: 13px; overflow-wrap: anywhere; }
 
+  /* Retire duplicate legacy hero/filters while retaining real product
+     listings and their underlying checkout logic. V9 owns the navigation. */
+  body.m9-mobile .site-main > .hero,
+  body.m9-mobile .site-main .order3-hero,
+  body.m9-mobile .site-main .order3-filter,
+  body.m9-mobile .site-main .order3-specified,
+  body.m9-mobile .admin-mobile-task-hub {
+    display: none !important;
+  }
+  body.m9-mobile :is(.admin-dashboard-shell,.admin-dashboard-main,
+     .customer-orders-shell,.order3-store,.queues,.admin-priority-queues,
+     .customer-order-list,.customer-order-section,.customer-order-section-head) {
+    min-width: 0 !important; max-width: 100% !important;
+    width: 100% !important; margin-inline: 0 !important;
+  }
+  body.m9-mobile :is(.admin-dashboard-shell,.admin-dashboard-main) {
+    display: block !important; padding: 0 !important;
+    background: transparent !important; border: 0 !important; box-shadow: none !important;
+  }
+  body.m9-mobile :is(.queues,.admin-priority-queues,.customer-order-list) {
+    display: grid !important; grid-template-columns: minmax(0,1fr) !important;
+    gap: 12px !important;
+  }
+  body.m9-mobile .customer-orders-head {
+    display: flex !important; flex-direction: column !important;
+    min-width: 0; gap: 10px;
+  }
+  body.m9-mobile .customer-orders-head > div:first-child { display: none !important; }
+  body.m9-mobile .customer-orders-actions {
+    display: flex !important; gap: 10px !important;
+    width: 100% !important; flex-wrap: wrap !important;
+  }
+  body.m9-mobile .customer-order-stats {
+    display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+    width: 100% !important; gap: 9px !important;
+  }
+  body.m9-mobile .customer-order-stat {
+    padding: 13px !important; min-width: 0 !important;
+    border: 1px solid var(--m9-line) !important;
+    background: var(--m9-surface) !important; border-radius: 16px !important;
+  }
+
   /* Genuine content reflow for each application — not legacy width patches. */
   body.m9-mobile :is(.center-grid, .dispatch-grid, .order3-grid, .it-grid, .sbm-grid,
      .wallet-grid, .member-grid, .order-list, .report-list, .admin-order-list,
