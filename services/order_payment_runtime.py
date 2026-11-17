@@ -5,6 +5,7 @@ from typing import Callable
 import discord
 
 from services.payment_methods import WALLET_PAYMENT_METHOD
+from services.payment_qr_assets import edit_payment_qr_message
 from services.order_payment_policy import (
     is_zero_amount_order,
     requires_wallet_debit,
@@ -138,10 +139,7 @@ async def finalize_accepted_pending_payment(
         await interaction.response.send_message("找不到派單訊息，請通知客服確認。", ephemeral=True)
         return
 
-    # Every payment path (wallet / zero-amount / external review) must finalize
-    # against the same canonical WebOrder.  Previously only external reviews
-    # enforced this, allowing wallet/0T orders to become active in Discord while
-    # silently skipping assignment/payout promotion on the website.
+    # Bind all payment types to one WebOrder before updating dispatch or payroll.
     web_order_id = _to_int(data.get("web_order_id"))
     if web_order_id is None:
         try:
@@ -425,8 +423,8 @@ async def finalize_accepted_pending_payment(
         if isinstance(payment_channel, discord.TextChannel) and payment_message_id is not None:
             try:
                 payment_message = await payment_channel.fetch_message(payment_message_id)
-                await payment_message.edit(
-                    embed=submitted_embed,
+                await edit_payment_qr_message(
+                    payment_message, submitted_embed, str(payment_method), amount,
                     view=PaymentMethodView(
                         customer_id=customer_id,
                         channel_id=channel_id,
