@@ -98,6 +98,19 @@ async def _reposition_panel(
         order_selections[channel.id] = order_data
         remember_order_data(channel.id, order_data)
 
+        # Keep the worker clock directly after this replacement panel on
+        # restore (and store), without resetting or duplicating its DB state.
+        try:
+            from services.simple_order_timer import ensure_timer_panel_after_operation
+            await ensure_timer_panel_after_operation(
+                channel, reposition=True, expected_status=expected_status
+            )
+        except Exception as exc:
+            print(
+                f"[simple-order-timer] follow operation failed channel={channel.id}: "
+                f"{type(exc).__name__}: {exc}", flush=True,
+            )
+
 
 async def handle_order_operation_panel_interaction(
     interaction: discord.Interaction,
