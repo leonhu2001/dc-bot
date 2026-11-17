@@ -751,6 +751,11 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             return
 
         await interaction.response.defer(ephemeral=True)
+        # Snapshot the old ID once; concurrent confirm-listener retries must
+        # never move the newly posted panel a second time.
+        pre_store_panel_id = _require_runtime_state().order_selections.get(
+            interaction.channel.id, {}
+        ).get("operation_panel_message_id")
 
         try:
             await store_dispatch_claim_panel(
@@ -813,7 +818,7 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
         stored_data = _require_runtime_state().order_selections.get(
             interaction.channel.id, {}
         )
-        panel_id = stored_data.get("operation_panel_message_id")
+        panel_id = pre_store_panel_id
         if operation_factory and panel_id and stored_data.get("status") == "stored":
             try:
                 from services.order_operation_panel_runtime import _reposition_panel
