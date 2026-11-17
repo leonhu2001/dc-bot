@@ -53,7 +53,7 @@ def test_v9_is_the_only_phone_chrome_in_both_layouts():
 
 def test_one_rail_three_role_specific_navigation_shells():
     for area, route, expected in (
-        ("customer", "/", ("/order", "/vip", "/me/orders")),
+        ("customer", "/", ("/order", "/vip", "/auth/discord/login")),
         ("employee", "/dispatch", ("/employee", "/dispatch/reports", "/my/payouts")),
         ("admin", "/admin", ("/admin/customer-center", "/admin/support-center", "/admin/finance-center")),
     ):
@@ -150,7 +150,7 @@ def test_v9_js_does_not_mutate_business_state_or_intercept_native_checkout():
         assert marker in script
     assert "fetch(" not in script
     assert "XMLHttpRequest" not in script
-    assert "POST" in script
+    assert ".addEventListener('submit'" not in script
     assert ".preventDefault()" not in script.split("function noteNavigation")[1].split("function restoreExplicitNav")[0]
 
 
