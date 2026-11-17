@@ -73,9 +73,11 @@ def test_mobile_v8_shell_is_visible_at_744px_without_720px_breakpoint_gap(page: 
             const bar = document.querySelector('.customer-app-bottom-nav').getBoundingClientRect();
             return {railWidth: rail.width, railLeft: rail.left, dockWidth:bar.width,
                     dockLeft:bar.left, outer:document.documentElement.scrollWidth,
-                    client:document.documentElement.clientWidth, viewport:innerWidth};
+                    client:document.documentElement.clientWidth,
+                    layoutWidth:document.body.getBoundingClientRect().width,
+                    viewport:innerWidth};
         }""")
         assert abs(dims["railWidth"] - 560) <= 2, (route, dims)
-        assert abs(dims["railLeft"] - (dims["client"] - 560) / 2) <= 2, (route, dims)
-        assert abs(dims["dockLeft"] - (dims["client"] - dims["dockWidth"]) / 2) <= 2, (route, dims)
+        assert abs(dims["railLeft"] - (dims["layoutWidth"] - 560) / 2) <= 2, (route, dims)
+        assert abs(dims["dockLeft"] - (dims["layoutWidth"] - dims["dockWidth"]) / 2) <= 2, (route, dims)
         assert dims["outer"] <= 746, (route, dims)
