@@ -751,8 +751,6 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             return
 
         await interaction.response.defer(ephemeral=True)
-        # Snapshot the old ID once; concurrent confirm-listener retries must
-        # never move the newly posted panel a second time.
         pre_store_panel_id = _require_runtime_state().order_selections.get(
             interaction.channel.id, {}
         ).get("operation_panel_message_id")
@@ -797,46 +795,14 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             await interaction.followup.send(str(e), ephemeral=True)
             return
 
-        await interaction.channel.send(
-            f"此訂單已由 {interaction.user.mention} 存單。\n\n"
-            f"存單原因：{self.reason.value.strip()}\n"
-            f"預計恢復：{self.expected_time.value.strip() or '未填寫'}\n"
-            f"備註：{self.note.value.strip() or '無'}",
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
-            )
+        from services.order_panel_lifecycle import finish_stored_order_modal
+        await finish_stored_order_modal(
+            interaction, pre_store_panel_id,
+            _require_runtime_state().order_selections,
+            reason=self.reason.value.strip(),
+            expected_time=self.expected_time.value.strip(),
+            note=self.note.value.strip(),
         )
-
-        # The store modal is separate from the original Confirm interaction,
-        # so its completed state was not reliably observed by the listener.
-        # Move the operation panel and its clock only after storage succeeded.
-        operation_factory = getattr(
-            interaction.client, "_order_operation_panel_view_factory", None
-        )
-        stored_data = _require_runtime_state().order_selections.get(
-            interaction.channel.id, {}
-        )
-        panel_id = pre_store_panel_id
-        if operation_factory and panel_id and stored_data.get("status") == "stored":
-            try:
-                from services.order_operation_panel_runtime import _reposition_panel
-                await _reposition_panel(
-                    interaction.channel,
-                    expected_panel_message_id=int(panel_id),
-                    expected_status="stored",
-                    order_selections=_require_runtime_state().order_selections,
-                    operation_view_factory=operation_factory,
-                )
-            except Exception as exc:
-                print(
-                    f"[order-operation] store panel reposition failed "
-                    f"channel={interaction.channel.id}: {type(exc).__name__}: {exc}",
-                    flush=True,
-                )
-
-        await interaction.followup.send("已存單，派單頻道接單面板已鎖定。", ephemeral=True)
 
 
 async def finalize_payment_and_dispatch(
