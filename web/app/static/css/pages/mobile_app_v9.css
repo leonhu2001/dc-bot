@@ -4,7 +4,7 @@
  * remain untouched. The old V8 chrome is not loaded by either layout.
  */
 @media (max-width: 767px) {
-  :root {
+  body.m9-mobile {
     color-scheme: dark;
     --m9-rail: 560px;
     --m9-gutter: clamp(12px, 4vw, 18px);
@@ -551,7 +551,6 @@
     background: #20283e;
     box-shadow: 0 -10px 26px rgba(0,0,0,.22);
   }
-  body.m9-mobile .m9-input-active .m9-dock { display: none; }
   body.m9-mobile.m9-input-active .m9-dock {
     bottom: calc(-1 * (var(--m9-dock-height) + env(safe-area-inset-bottom) + 14px)) !important;
     pointer-events: none;
@@ -577,7 +576,7 @@
   @keyframes m9-loading { from { transform: translateX(-100vw); } to { transform: translateX(330vw); } }
 }
 @media (max-width: 359px) {
-  :root { --m9-gutter: 12px; }
+  body.m9-mobile { --m9-gutter: 12px; }
   body.m9-mobile .m9-hero { min-height: 265px; }
   body.m9-mobile .m9-shortcuts a { grid-template-columns: 25px 1fr; padding: 12px 9px; }
   body.m9-mobile .m9-nav-link { font-size: 10px !important; }
