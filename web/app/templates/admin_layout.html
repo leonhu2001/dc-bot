@@ -57,6 +57,10 @@
             <link rel="stylesheet" href="/static/css/pages/employee_workspace_unified.css?v=20261020-1">
         {% endif %}
     {% endif %}
+    {% if mobile_ui %}
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_unified_v8.css?v=20261117-1">
+    <script src="/static/js/pages/mobile_app_unified_v8.js?v=20261117-1" defer></script>
+    {% endif %}
 
     <link rel="icon" type="image/png" href="/static/img/favicon.png?v=20260904-2">
     <link rel="apple-touch-icon" href="/static/img/favicon.png?v=20260904-2">
@@ -65,8 +69,9 @@
 <body class="mw-r5-layout {% if mw_admin_area %}mw-r5-admin{% else %}mw-r5-employee{% endif %} {% if mobile_ui %}mw-mobile-ui{% else %}mw-desktop-ui{% endif %}">
 
 {% if mobile_ui %}
+    <a href="#m8-main" class="m8-skip-link">跳至主要內容</a>
     {% if mw_admin_area %}{% include "_admin_mobile_app_shell.html" %}{% else %}{% include "_employee_mobile_app_shell.html" %}{% endif %}
-    <main class="mw-mobile-main-host mw-r5-main-host">
+    <main id="m8-main" tabindex="-1" class="mw-mobile-main-host mw-r5-main-host">
 {% else %}
     <div class="mw-r5-shell">
         {% if mw_admin_area %}{% include "_admin_sidebar.html" %}{% else %}{% include "_employee_sidebar.html" %}{% endif %}
