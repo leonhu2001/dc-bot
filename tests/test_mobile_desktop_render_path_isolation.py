@@ -21,12 +21,13 @@ def test_admin_sidebar_is_desktop_only_markup():
 def test_admin_layout_server_splits_mobile_and_desktop_shells():
     layout = read(TEMPLATES / "admin_layout.html")
     assert "{% if mobile_ui %}" in layout
-    assert '{% include "_admin_mobile_app_shell.html" %}' in layout
+    assert '{% include "_mobile_v9_shell.html" %}' in layout
     assert '{% include "_admin_sidebar.html" %}' in layout
     assert "mw-mobile-ui" in layout
     assert "mw-desktop-ui" in layout
-    assert "mobile_backoffice_chrome.css" in layout
-    assert "admin_mobile_app.css" in layout
+    assert "mobile_app_v9.css" in layout
+    assert "mobile_backoffice_chrome.css" not in layout
+    assert "admin_mobile_app.css" not in layout
     assert "admin_shell_layout.css" in layout
     assert "mobile_app_rebuild_v6.css" not in layout
     assert "mobile_app_component_sizing_v7.css" not in layout
@@ -35,13 +36,13 @@ def test_admin_layout_server_splits_mobile_and_desktop_shells():
 def test_public_layout_server_splits_mobile_and_desktop_dom():
     layout = read(TEMPLATES / "site_layout.html")
     assert "{% if mobile_ui %}" in layout
-    assert '{% include "_customer_mobile_app_shell.html" %}' in layout
-    assert '{% include "_employee_mobile_app_shell.html" %}' in layout
+    assert '{% include "_mobile_v9_shell.html" %}' in layout
     assert '{% include "_site_header.html" %}' in layout
-    assert "customer_mobile_app.css?v=20261026-3" in layout
-    assert "employee_mobile_app.css?v=20261026-3" in layout
+    assert "mobile_app_v9.css?v=20261117-1" in layout
+    assert "customer_mobile_app.css?v=20261026-3" not in layout
+    assert "employee_mobile_app.css?v=20261026-3" not in layout
     assert "employee_mobile_routes.css?v=20261026-1" in layout
-    assert "mobile_backoffice_chrome.css?v=20261026-1" in layout
+    assert "mobile_backoffice_chrome.css?v=20261026-1" not in layout
     assert "mobile_app_rebuild_v6.css" not in layout
     assert "mobile_app_component_sizing_v7.css" not in layout
 
