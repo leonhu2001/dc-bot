@@ -61,6 +61,9 @@ def test_v9_hero_to_order_and_parent_back_navigation(page: Page):
 
 def test_new_mobile_styles_never_render_on_desktop_ua(page: Page):
     page.set_viewport_size({"width": 1280, "height": 900})
+    # Prior mobile cases set this request header. Reset the server-side UA
+    # hint as well as the viewport, or a desktop-only test renders a phone DOM.
+    page.set_extra_http_headers({"Sec-CH-UA-Mobile": "?0"})
     response = page.goto(f"{BASE_URL}/", wait_until="domcontentloaded")
     assert response is not None and response.ok
     assert page.locator("body.m9-mobile").count() == 0
