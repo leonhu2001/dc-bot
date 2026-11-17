@@ -220,6 +220,6 @@ def test_dispatch_lifecycle_producers_use_shared_contract_without_second_status(
         "services/order_dispatch_runtime.py",
     ):
         assert 'name="狀態"' not in source(name)
-    assert "paid_dispatch_embed_reconcile_worker" in source(
+    assert "paid_dispatch_embed_reconcile_worker" not in source(
         "services/acceptance/sync_worker.py"
     )
