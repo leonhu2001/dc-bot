@@ -313,17 +313,13 @@ async def _web_order_created_ensure_dispatch(
         await _web_order_created_find_dispatch_message(guild, order_id, order)
     )
     if dispatch_message is None:
-        placeholder = discord.Embed(
-            title="網站訂單｜等待接單",
-            description=(
-                f"網站訂單：WEB-{order_id}\n"
-                f"顧客：<@{customer_id}>\n"
-                f"項目：{details['category_label']}｜{details['item']}\n"
-                "正在建立正式接單面板。"
-            ),
-            color=discord.Color.gold(),
+        from services.dispatch_embed_presentation import dispatch_creation_placeholder
+        placeholder = dispatch_creation_placeholder(
+            order_id=order_id,
+            customer_mention=f"<@{customer_id}>",
+            category=str(details["category_label"]),
+            item=str(details["item"]),
         )
-        placeholder.set_footer(text=f"WEB-{order_id}｜網站訂單")
         dispatch_message = await dispatch_channel.send(
             content=None,
             embed=placeholder,
