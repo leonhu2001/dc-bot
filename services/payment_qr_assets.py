@@ -75,3 +75,35 @@ def prepare_payment_qr_attachment(
     )
     embed.set_image(url=f"attachment://{PAYMENT_QR_ATTACHMENT_NAME}")
     return payment_file
+
+
+async def edit_payment_qr_interaction(
+    interaction: discord.Interaction,
+    embed: discord.Embed,
+    view: discord.ui.View,
+    payment_method: str | None,
+    amount: int | None,
+) -> None:
+    """Replace the selected payment QR with one interaction edit."""
+    image = prepare_payment_qr_attachment(
+        embed, payment_method=payment_method, amount=amount,
+    )
+    await interaction.response.edit_message(
+        embed=embed, view=view, attachments=[image] if image is not None else [],
+    )
+
+
+async def edit_payment_qr_message(
+    message: discord.Message,
+    embed: discord.Embed,
+    payment_method: str | None,
+    amount: int | None,
+    **kwargs,
+) -> None:
+    """Update the existing ticket card and its QR together, without duplicates."""
+    image = prepare_payment_qr_attachment(
+        embed, payment_method=payment_method, amount=amount,
+    )
+    await message.edit(
+        embed=embed, attachments=[image] if image is not None else [], **kwargs,
+    )
