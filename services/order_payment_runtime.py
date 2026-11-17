@@ -494,6 +494,20 @@ async def finalize_accepted_pending_payment(
                     flush=True,
                 )
 
+        # The clock belongs underneath the paid order-operation panel, never
+        # to the prepayment ticket.  Its state is display-only; a Discord
+        # failure must not roll back payment or accidentally charge again.
+        try:
+            from services.simple_order_timer import ensure_timer_panel_after_operation
+            await ensure_timer_panel_after_operation(
+                interaction.channel, order_id=int(web_order_id)
+            )
+        except Exception as exc:
+            print(
+                f"[simple-order-timer] paid panel failed order={web_order_id}: "
+                f"{type(exc).__name__}: {exc}", flush=True,
+            )
+
         response_text = f"已確認付款方式：{payment_method}，訂單正式成立。"
         if _order_requires_credentials(data):
             credential_hint = ("內部洗幣／AW 服務" if str(data.get("category") or "").strip().lower() == "staff_internal" else "代肝／代解")
