@@ -210,3 +210,40 @@ def test_explicit_payment_and_manager_restore_hooks_remain_source_owned():
     assert 'interaction.channel, order_id=int(web_order_id)' in payment
     assert 'install_simple_order_timer(bot, SELF_SERVICE_ORDER_SELECTIONS)' in bot
     assert 'operation_view_factory=StaffOrderOperationView' in bot
+
+
+def test_clock_buttons_and_stale_operation_confirm_never_repost(monkeypatch):
+    from types import SimpleNamespace
+
+    class FakeMember:
+        pass
+
+    channel = FakeChannel()
+    channel.messages[1000] = FakeMessage(channel, 1000)
+    selections = {
+        channel.id: {"status": "active", "operation_panel_message_id": 1000}
+    }
+    monkeypatch.setattr(operation.discord, "Member", FakeMember)
+    monkeypatch.setattr(operation.discord, "TextChannel", FakeChannel)
+    user = FakeMember()
+
+    async def run(custom_id, message_id):
+        message = FakeMessage(channel, message_id)
+        message.flags = SimpleNamespace(ephemeral=False)
+        interaction = SimpleNamespace(
+            type=operation.discord.InteractionType.component,
+            user=user, channel=channel, message=message,
+            data={"custom_id": custom_id},
+        )
+        await operation.handle_order_operation_panel_interaction(
+            interaction,
+            order_selections=selections,
+            is_staff=lambda _member: True,
+            operation_view_factory=lambda: object(),
+        )
+
+    asyncio.run(run("simple_hourly_timer:start", 1001))
+    asyncio.run(run("simple_hourly_timer:pause", 1001))
+    asyncio.run(run("staff_order_operation_confirm", 999))
+    assert channel.sent == []
+    assert set(channel.messages) == {1000}
