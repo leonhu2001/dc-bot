@@ -162,6 +162,11 @@ def test_reposition_moves_both_panels_but_keeps_elapsed_time(tmp_path, monkeypat
         assert timer._session(channel.id)["timer_message_id"] == "1007"
         assert timer._session(channel.id)["state"] == "paused"
         assert timer.recorded_seconds(timer._session(channel.id)) == 3600
+        with pytest.raises(ValueError, match="最下方"):
+            timer.change_clock(
+                channel.id, 12345, "start",
+                expected_message_id=1001, now=9000,
+            )
         assert len(channel.sent) == 7
         assert set(channel.messages) == {1006, 1007}
         # A repeated interaction with a stale panel cannot create another pair.
