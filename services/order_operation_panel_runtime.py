@@ -132,6 +132,10 @@ async def handle_order_operation_panel_interaction(
     custom_id = str(interaction_data.get("custom_id") or "")
     if not custom_id or custom_id == "staff_order_operation_select":
         return
+    # Starting/pausing the *timer* (or any unrelated component) must not
+    # unexpectedly tear down the two order panels.
+    if custom_id != "staff_order_operation_confirm":
+        return
 
     order_data = order_selections.get(interaction.channel.id)
     initial_status = _order_status(order_data)
@@ -152,8 +156,8 @@ async def handle_order_operation_panel_interaction(
         expected_status = "active"
 
     panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
-    if panel_message_id is None:
-        return
+    if panel_message_id is None or interaction.message.id != panel_message_id:
+        return  # Never repost based on an obsolete/duplicate operation panel.
 
     # Give the component callback first chance to change the order state.
     await asyncio.sleep(0.8)
