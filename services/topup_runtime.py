@@ -111,7 +111,7 @@ def _topup_review_embed(row: dict) -> discord.Embed:
     customer_name = str(row.get("customer_display_name") or "").strip()
     applicant = customer_name or customer_id or "未知"
     if customer_name and customer_id:
-        applicant += f"\n\`{customer_id}\`"
+        applicant += f"\n`{customer_id}`"
     topup_no = str(row.get("topup_no") or f"TOPUP-{row.get('id')}")
     payment_method = str(row.get("payment_method") or "bank_transfer").strip()
     payment_reference = str(row.get("payment_reference") or row.get("bank_last5") or "—")
