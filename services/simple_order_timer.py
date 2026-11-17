@@ -139,7 +139,10 @@ def _authorized_staff(db: sqlite3.Connection, order_id: int, user_id: int) -> bo
     ).fetchone() is not None
 
 
-def change_clock(channel_id: int, user_id: int, action: str, *, now: float | None = None) -> dict:
+def change_clock(
+    channel_id: int, user_id: int, action: str, *,
+    now: float | None = None, expected_message_id: int | None = None,
+) -> dict:
     """Atomic, worker-only start / pause. Customer and CS cannot operate it."""
     if action not in {"start", "pause"}:
         raise ValueError("不支援的計時操作。")
@@ -154,6 +157,8 @@ def change_clock(channel_id: int, user_id: int, action: str, *, now: float | Non
         ).fetchone()
         if row is None:
             raise ValueError("找不到這張訂單的計時器。")
+        if expected_message_id is not None and str(row["timer_message_id"] or "") != str(expected_message_id):
+            raise ValueError("計時器面板已更新，請使用票口最下方的新面板。")
         if str(row["order_status"]).lower() not in ACTIVE_TICKET_STATUSES:
             raise ValueError("訂單目前不是進行中，無法操作計時。")
         if not _authorized_staff(db, int(row["order_id"]), user_id):
@@ -237,7 +242,10 @@ class SimpleHourlyTimerView(discord.ui.View):
             )
             return
         try:
-            current = change_clock(interaction.channel_id, interaction.user.id, action)
+            current = change_clock(
+                interaction.channel_id, interaction.user.id, action,
+                expected_message_id=int(pressed_id),
+            )
         except (ValueError, PermissionError) as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
