@@ -45,22 +45,16 @@
     {% block head %}{% endblock %}
     <link rel="stylesheet" href="/static/css/mw_public_r5.css?v=scroll_perf_20260917_1">
 
+    {# V9 is the new mobile presentation, not a cascade of V6/V8 chrome.
+       Keep employee route-specific styles and submit guards for functionality. #}
     {% if mobile_ui %}
         {% if employee_app_shell %}
-        <link rel="stylesheet" href="/static/css/pages/mobile_backoffice_chrome.css?v=20261026-1">
-        <link rel="stylesheet" href="/static/css/pages/employee_mobile_pwa.css?v=20261024-2">
-        <link rel="stylesheet" href="/static/css/pages/employee_mobile_app.css?v=20261026-3">
         <link rel="stylesheet" href="/static/css/pages/employee_mobile_routes.css?v=20261026-1">
         <link rel="stylesheet" href="/static/css/pages/employee_mobile_loading.css?v=20261026-2">
         <script src="/static/js/pages/mobile_app_interactions.js?v=20261026-2" defer></script>
-        {% else %}
-        <link rel="stylesheet" href="/static/css/pages/customer_mobile_app.css?v=20261026-3">
         {% endif %}
-    {% endif %}
-    {# Mobile V8 is the final cascade layer shared with the backoffice shell. #}
-    {% if mobile_ui %}
-    <link rel="stylesheet" href="/static/css/pages/mobile_app_unified_v8.css?v=20261117-1">
-    <script src="/static/js/pages/mobile_app_unified_v8.js?v=20261117-1" defer></script>
+        <link rel="stylesheet" href="/static/css/pages/mobile_app_v9.css?v=20261117-1">
+        <script src="/static/js/pages/mobile_app_v9.js?v=20261117-1" defer></script>
     {% endif %}
 
     <link rel="icon" href="/static/img/favicon.ico?v=20261025-5" sizes="any">
@@ -85,16 +79,17 @@
     {% for schema in seo_data.get("schemas", []) %}<script nonce="{{ request.state.csp_nonce }}" type="application/ld+json">{{ schema|tojson }}</script>{% endfor %}
 </head>
 
-<body class="site-body mw-public-r5{% if employee_app_shell %} employee-workspace-site{% elif mobile_ui %} customer-mobile-app-site{% endif %} {% if mobile_ui %}mobile-ui{% else %}desktop-ui{% endif %}" data-page="{{ page_name or '' }}">
+<body class="site-body mw-public-r5{% if employee_app_shell %} employee-workspace-site{% elif mobile_ui %} customer-mobile-app-site{% endif %} {% if mobile_ui %}mobile-ui m9-mobile{% else %}desktop-ui{% endif %}" data-page="{{ page_name or '' }}">
     {% if mobile_ui %}
-        <a href="#m8-main" class="m8-skip-link">跳至主要內容</a>
-        {% if employee_app_shell %}{% include "_employee_mobile_app_shell.html" %}{% else %}{% include "_customer_mobile_app_shell.html" %}{% endif %}
+        <a href="#m8-main" class="m9-skip-link m8-skip-link">跳至主要內容</a>
+        {% set mobile_v9_area = 'employee' if employee_app_shell else 'customer' %}
+        {% include "_mobile_v9_shell.html" %}
     {% else %}
         {% include "_site_header.html" %}
     {% endif %}
 
     <main class="site-main" id="m8-main" tabindex="-1">
-        {% if mobile_ui %}{% include "_mobile_v8_route_bar.html" %}{% endif %}
+        {% if mobile_ui %}{% include "_mobile_v9_page.html" %}{% endif %}
         {% if employee_workspace_shell|default(false) %}
         <section class="ec employee-workspace-frame">
             {% if not mobile_ui %}{% include "_employee_workspace_hero.html" %}{% endif %}
