@@ -99,7 +99,7 @@
 {% if m9_current == '/order' and categories is defined and categories %}
 <nav class="m9-category-rail" aria-label="服務分類">
   {% for item in categories %}
-    <a href="/order?category={{ item.key }}{% if selected_staff is defined and selected_staff %}&staff={{ selected_staff.staff_id }}{% endif %}"
+    <a href="/order?category={{ item.key }}{% if selected_staff is defined and selected_staff %}&amp;staff={{ selected_staff.staff_id }}{% endif %}"
        class="{% if category_filter is defined and category_filter == item.key %}is-active{% endif %}"
        {% if category_filter is defined and category_filter == item.key %}aria-current="page"{% endif %}>{{ item.label }}</a>
   {% endfor %}
