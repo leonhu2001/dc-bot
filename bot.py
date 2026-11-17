@@ -1727,6 +1727,27 @@ class StaffOrderOperationView(discord.ui.View):
                     everyone=False
                 )
             )
+            # Explicitly move both panels after the successful restore. The
+            # background interaction listener is only a race-safe fallback.
+            restored_data = SELF_SERVICE_ORDER_SELECTIONS.get(interaction.channel.id, {})
+            if str(restored_data.get("status") or "") == "active":
+                operation_id = restored_data.get("operation_panel_message_id")
+                if operation_id:
+                    try:
+                        from services.order_operation_panel_runtime import _reposition_panel
+                        await _reposition_panel(
+                            interaction.channel,
+                            expected_panel_message_id=int(operation_id),
+                            expected_status="active",
+                            order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+                            operation_view_factory=StaffOrderOperationView,
+                        )
+                    except Exception as exc:
+                        print(
+                            f"[order-operation] restore panels failed "
+                            f"channel={interaction.channel.id}: {type(exc).__name__}: {exc}",
+                            flush=True,
+                        )
             await interaction.followup.send("已恢復訂單。", ephemeral=True)
         elif selected == "cancel":
             await interaction.response.send_message(
