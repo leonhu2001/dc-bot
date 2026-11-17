@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import discord
 
 from services.payment_methods import PAYMENT_METHOD_OPTIONS, WALLET_PAYMENT_METHOD
-from services.payment_qr_assets import prepare_payment_qr_attachment
+from services.payment_qr_assets import edit_payment_qr_interaction
 from services.wallet_service import get_wallet_payment_transaction
 from services.orders import (
     ORDER_CATEGORY_LABELS,
@@ -992,15 +992,8 @@ class PaymentMethodSelect(discord.ui.Select):
                     inline=False,
                 )
 
-            qr_file = prepare_payment_qr_attachment(
-                payment_embed,
-                payment_method=selected_method,
-                amount=amount,
-            )
-            await interaction.response.edit_message(
-                embed=payment_embed,
-                view=self.view,
-                attachments=[qr_file] if qr_file is not None else [],
+            await edit_payment_qr_interaction(
+                interaction, payment_embed, self.view, selected_method, amount,
             )
         else:
             await interaction.response.defer()
