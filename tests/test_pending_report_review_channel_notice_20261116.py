@@ -76,12 +76,19 @@ def test_one_notification_per_pending_submission_and_no_duplicate_after_retries(
     payload = reporting._pending_review_notice_payload(notice[0])
     assert "報單待審核" in payload["content"]
     assert "MW-88" in payload["content"]
-    assert "客戶甲" in payload["content"]
-    assert "陪玩乙" in payload["content"]
+    assert len(payload["embeds"]) == 1
+    card = payload["embeds"][0]
+    assert card["title"].startswith("📋 客服審核｜報單｜")
+    assert card["fields"][0]["value"] == "MW-88"
+    assert card["fields"][1]["value"] == "客戶甲"
+    assert any(field["name"] == "填報人" and field["value"] == "陪玩乙"
+               for field in card["fields"])
+    assert card["footer"]["text"].startswith("魔丸娛樂｜客服審核中心")
     assert payload["components"][0]["components"][0]["url"].endswith(
         "/dispatch/reports/review/88"
     )
     assert payload["allowed_mentions"] == {"parse": []}
+    assert payload["components"][0]["components"][0]["label"] == "前往審核"
     assert payload["enforce_nonce"] is True
 
     reporting._finish_review_notification(int(notice[0]["id"]), success=True)
