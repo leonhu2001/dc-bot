@@ -359,12 +359,13 @@ def _quote_preview_lines_raw(
         if is_internal_ammo_dump_rule(rule):
             named = selected_ammo_dump_named(data)
             lines.append(("掛名狀態", "有掛名" if named is True else "無掛名" if named is False else "等待客服勾選"))
-            if named is False and rule.key.endswith("500m"):
-                detail_parts.append(
-                    "店家抽成前差額 350｜客服分潤 25%：88｜店家實留 262"
-                )
-                lines.append(("客服分潤", "88（350T 差額的 25%，整數 T 四捨五入）"))
-                lines.append(("店家實留", "262"))
+            if named is False:
+                margin = int(adjustment["store_margin_amount"])
+                cs = int(adjustment["customer_service_payout_amount"])
+                retained = int(adjustment["store_retained_amount"])
+                detail_parts.append(f"沒掛名差額 {margin}｜客服分潤 25%：{cs}｜店家實留 {retained}")
+                lines.append(("客服分潤", f"{cs}（{margin}T 差額的 25%，整數 T 四捨五入）"))
+                lines.append(("店家實留", str(retained)))
         if adjustment["point_discount_coupon_amount"] > 0:
             detail_parts.append(
                 f"點數折價 -{_format_plain_amount(adjustment['point_discount_coupon_amount'])}（店內吸收）"
