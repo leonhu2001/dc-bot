@@ -127,7 +127,7 @@ def test_discord_fun_price_lists_use_canonical_amounts_and_original_artwork():
     fat_list = price_lists.DELTA_FUN_PRICE_LISTS["eat_to_fat"]
     love_list = price_lists.DELTA_FUN_PRICE_LISTS["our_love"]
     assert fat_list["image"] == "price_lists/delta_fun_eat_to_fat.webp"
-    assert love_list["image"] == "price_lists/delta_fun_our_love.webp"
+    assert love_list["image"] == "price_lists/delta_fun_our_love_20261118.jpg"
     for key, amount, _guarantee, _weight in FAT:
         assert f"{amount:,}T" in fat_list["text"]
         assert price_lists._approved_fun_price(key) == f"{amount:,}T"
@@ -135,16 +135,21 @@ def test_discord_fun_price_lists_use_canonical_amounts_and_original_artwork():
         assert f"{amount:,}T" in love_list["text"]
         assert price_lists._approved_fun_price(key) == f"{amount:,}T"
 
-    for plan in (fat_list, love_list):
-        asset = ROOT / "web" / "app" / "static" / plan["image"]
-        assert asset.is_file()
-        assert asset.read_bytes()[:4] == b"RIFF"
-        assert asset.stat().st_size > 100_000
+    # Preserved uploaded original for this unchanged product.
+    asset = ROOT / "web" / "app" / "static" / fat_list["image"]
+    assert asset.is_file() and asset.read_bytes()[:4] == b"RIFF"
+    assert asset.stat().st_size > 100_000
 
-    for key in ("eat_to_fat", "our_love"):
-        embed = price_lists._delta_fun_embed(key)
-        assert embed.image.url.startswith("https://mowanentertainment.com/static/price_lists/")
-        assert "?v=missing" not in embed.image.url
+    # 2026-11-18 replacement artwork is an owner-uploaded VPS asset, never
+    # silently show the outdated, previously tracked Our Love poster.
+    love_image = ROOT / "web" / "app" / "static" / love_list["image"]
+    love_embed = price_lists._delta_fun_embed("our_love")
+    assert not love_embed.image.url if not love_image.is_file() else (
+        "delta_fun_our_love_20261118.jpg" in love_embed.image.url
+    )
+    fat_embed = price_lists._delta_fun_embed("eat_to_fat")
+    assert fat_embed.image.url.startswith("https://mowanentertainment.com/static/price_lists/")
+    assert "?v=missing" not in fat_embed.image.url
 
 
 def test_existing_approved_fun_products_and_prices_are_not_overwritten():
