@@ -1338,7 +1338,7 @@ for key, plan in AW_COLLISION_PRICING_BY_RULE.items():
 
 # 內部員工固定價商品。只由內部下單頻道提供入口，並不加入公開分類選項。
 # 票口沿用正常接單流程；付款成立後觸發帳號密碼私密流程。
-# 100M/200M/300M 倒子彈：有掛名及無掛名暫時同價，500M 原差額規則不變。
+# 100M/200M/300M 倒子彈：商品基價為掛名價，沒掛名價由財務策略統一計算。
 _INTERNAL_AMMO_DUMP_PRICES = ((100, 550), (200, 1080), (300, 1620))
 for _millions, _price in _INTERNAL_AMMO_DUMP_PRICES:
     _add(OrderRule(
@@ -1350,7 +1350,7 @@ for _millions, _price in _INTERNAL_AMMO_DUMP_PRICES:
         min_quantity=1, max_quantity=1, allow_specify=False,
         vip_discount_allowed=False, point_benefits_allowed=False,
         loyalty_benefits_enabled=False, required_game_roles=(),
-        note="有掛名／無掛名價格一致；整筆金額歸接單打手，加急另計。",
+        note="有掛名價為基價；無掛名按規格收取額外差價，打手基薪不變；加急另計。",
     ))
 for key, label, price in (
     ("staff_internal_ammo_dump_500m", "內部洗幣｜倒子彈 500M", 2650),
