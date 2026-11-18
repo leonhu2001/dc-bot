@@ -58,8 +58,8 @@ LOVE_DELTA_ITEM_HINT = "戀與三角洲"
 
 EVENT_SCORES = {
     "item_gold": ("金色物資 / 紫卡", 3.0),
-    "item_small_red": ("小紅 / 金卡", 8.0),
-    "item_big_red": ("大紅 / 紅卡", 15.0),
+    "item_small_red": ("小紅（200W以下）/ 金卡", 8.0),
+    "item_big_red": ("大紅（200W以上）/ 紅卡", 15.0),
     "item_heart_tear": ("心 / 淚", 30.0),
     "squad_wipe": ("女陪一打三滅隊", 10.0),
     "ban_1": ("觸發禁語 1", -2.0),
