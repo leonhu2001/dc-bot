@@ -989,11 +989,14 @@ class _BaseSelfServiceOrderView(discord.ui.View):
         panel_message_id = interaction.message.id if interaction.message is not None else None
         if is_internal_ammo_dump_rule(rule):
             from services.staff_internal_ammo_dump_ui import InternalAmmoNamedView
+            from services.staff_internal_ammo_dump_policy import AMMO_DUMP_PRICES_BY_RULE
+            named_price, unnamed_price, _worker = AMMO_DUMP_PRICES_BY_RULE[rule.key]
 
             await interaction.response.send_message(
                 (
                     f"送出{rule.label}前，請由客服選擇掛名狀態。"
-                    "\n100M／200M／300M 有無掛名同價；500M 保留差額 350T（客服 88T、店家 262T）。"
+                    f"\n掛名 {named_price:,}T；沒掛名 {unnamed_price:,}T。"
+                    "\n沒掛名差額依原有規則計算客服 25% 分潤，其餘歸店家。"
                 ),
                 view=InternalAmmoNamedView(
                     customer_id=self.customer_id,
