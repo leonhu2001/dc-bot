@@ -1072,7 +1072,7 @@ def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_
             cur = conn.cursor()
             cols = _db_columns(cur, "orders")
 
-            if {"customer_id", "amount", "status", "closed_at"}.issubset(cols):
+            if {"customer_id", "amount", "status", "closed_at", "category", "data_json"}.issubset(cols):
                 rows = cur.execute(
                     """
                     SELECT amount, category, data_json
