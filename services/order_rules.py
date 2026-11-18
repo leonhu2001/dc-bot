@@ -1192,6 +1192,13 @@ for key, label, price in [
             "female_protector": 0,
         },
         point_benefits_allowed=False,
+        note=(
+            "好感度達100結單；小金+2、小紅+5、大紅+10（心／淚+30），"
+            "紫卡+5、金卡+10、紅卡+15；陪陪擊殺+3、老闆倒地被拉起+2、"
+            "老闆擊殺-5，500W撤離+3且不可疊加。"
+            "出大紅必須喊「寶寶出貨啦❤️」，未喊一次扣分（圖卡未提供明確數字）。"
+            "默認機密地圖；娛樂單無賠付；撤離失敗保險內物資照算。"
+        ),
     ))
 
 
@@ -1998,6 +2005,14 @@ SOURCE_AUTHORITY_RULE_KEYS = frozenset(
 # keep all old override versions in SQLite for history without startup writes.
 # Newly approved challenge cards must never be replaced by stale admin prices
 # or role restrictions; both storefronts and payroll must read these same rules.
+AFFECTION_APPROVAL_REVISION_MARKER = "__owner_confirmed_affection_20261118"
+AFFECTION_APPROVED_RULE_KEYS = frozenset({
+    *(f"fun_our_love_{tier}" for tier, *_ in _OUR_LOVE_PLANS),
+    "fun_mawan_galagame_basic",
+    "fun_mawan_galagame_standard",
+    "fun_mawan_galagame_hard",
+    "fun_mawan_galagame_hell",
+})
 NEW_FUN_PRICE_CARD_RULE_KEYS = frozenset({
     *(f"fun_eat_to_fat_{tier}" for tier, *_ in _EAT_TO_FAT_PLANS),
     *(f"fun_our_love_{tier}" for tier, *_ in _OUR_LOVE_PLANS),
@@ -2181,6 +2196,21 @@ class EffectiveOrderRules(dict):
                     specify_fee_by_game_role=dict(base.specify_fee_by_game_role),
                     specify_free_min_units=base.specify_free_min_units,
                     specify_free_basis=base.specify_free_basis,
+                )
+            if (
+                key in AFFECTION_APPROVED_RULE_KEYS
+                and payload.get(AFFECTION_APPROVAL_REVISION_MARKER) is not True
+            ):
+                # A prior manager confirmation predates the image's new prices
+                # and event terms. Old DB rows may not restore obsolete values.
+                rule = replace(
+                    rule, price=base.price, label=base.label, note=base.note,
+                    required_staff_count=base.required_staff_count,
+                    min_protector_count=base.min_protector_count,
+                    allowed_roles=base.allowed_roles,
+                    allow_specify=base.allow_specify,
+                    specify_fee_default=base.specify_fee_default,
+                    specify_fee_by_role=dict(base.specify_fee_by_role),
                 )
             if (
                 key in BLACK_TIDE_SOURCE_RULE_KEYS
