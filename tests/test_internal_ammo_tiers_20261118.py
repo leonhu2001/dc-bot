@@ -16,15 +16,14 @@ from services.order_rules import (
     get_base_rule,
 )
 from services.orders import SELF_SERVICE_ORDER_CATALOG
-from services.self_service_financial_breakdown_display import (
-    render_self_service_financial_breakdown_fields,
+from services.self_service_financials import (
+    add_self_service_financial_breakdown_fields,
+    calculate_self_service_financials,
 )
-from services.self_service_financials import calculate_self_service_financials
 from services.staff_internal_ammo_dump_policy import (
     AMMO_DUMP_PRICES_BY_RULE,
     NAMED_SELECTION_KEY,
     calculate_internal_ammo_dump_cs_payout,
-    calculate_internal_ammo_dump_financials,
     require_ammo_dump_named_selection,
 )
 from services.staff_internal_ammo_dump_ui import InternalAmmoNamedView
@@ -98,7 +97,7 @@ def test_price_worker_split_and_discord_selector(
 
         embed = discord.Embed()
         financials["order_rule_key"] = rule_key
-        render_self_service_financial_breakdown_fields(embed, financials)
+        add_self_service_financial_breakdown_fields(embed, financials)
         fields = {field.name: field.value for field in embed.fields}
         assert fields["顧客應付"] == f"{price:,}"
         assert fields["打手分潤基準"] == f"{named_price:,}"
