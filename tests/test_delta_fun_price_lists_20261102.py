@@ -36,18 +36,19 @@ def test_delta_fun_russian_roulette_copy_and_image() -> None:
 def test_delta_fun_love_delta_copy() -> None:
     text = str(price_lists.DELTA_FUN_PRICE_LISTS["love_delta"]["text"])
     for fragment in (
-        "1688T",
-        "2688T",
-        "4688T",
-        "6688T",
-        "好感度達 **100** 結單",
-        "金色物資／紫卡",
-        "300W以上撤離",
-        "好感度 **30**",
-        "好感度 **60**",
+        "2,200T",
+        "3,288T",
+        "4,888T",
+        "5,688T",
+        "好感度達 **100** 即可結單",
+        "摸到小金",
+        "摸到小紅",
+        "500W 撤離",
+        "老闆擊殺 1 人",
+        "無賠付",
     ):
         assert fragment in text
-    assert "｜" not in text
+    assert "默認機密地圖" in text
 
 
 def test_delta_fun_watch_your_words_copy() -> None:
