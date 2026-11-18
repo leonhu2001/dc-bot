@@ -251,7 +251,7 @@ GROUP_SPECS = [
         "key": "our_love",
         "category": "delta_desktop_fun",
         "label": "我們的愛",
-        "image": "price_lists/delta_fun_our_love.webp",
+        "image": "price_lists/delta_fun_our_love_20261118.svg",
         "selector_label": "初始好感度",
         "description": (
             "兩位護航以上的專屬技術陪玩單（男護／女護／頂護皆可）。好感度達100結單；"
