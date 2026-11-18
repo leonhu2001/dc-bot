@@ -147,6 +147,9 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
         embed = discord.Embed(
             title="🛠️ 內部專用｜洗幣與 AW 子彈",
             description=(
+                "**洗幣｜100M / 200M / 300M**\n"
+                "• 倒子彈：**100M 550T／200M 1,080T／300M 1,620T**\n"
+                "• 有掛名／無掛名目前同價，送單時仍由客服選擇。\n\n"
                 "**洗幣｜500M**\n"
                 "• 倒子彈：**有掛名 2,650T／單｜無掛名 3,000T／單**（由客服勾選）\n"
                 "• 撞車：**2,480T／單**\n"
