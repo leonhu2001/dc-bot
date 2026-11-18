@@ -9,6 +9,7 @@
   const root = $("#loveDeltaRoot");
   const base = `/me/orders/${Number(boot.order.id)}/love-delta`;
   const viewer = boot.viewer;
+  const ourLove = boot.plan && boot.plan.mode === "our_love";
   let state = boot.state;
   let events = Array.isArray(boot.events) ? boot.events : [];
   let readOnly = Boolean(boot.read_only);
@@ -70,6 +71,13 @@
   }
 
   function ambientPalette(score) {
+    if (ourLove) {
+      const progress = Math.max(0, Math.min(1, (Number(score || 0) + 10) / 110));
+      const hue = Math.round(218 - progress * 23);
+      return `radial-gradient(circle at 8% 0%, hsla(${hue},85%,69%,.44), transparent 39%),
+        radial-gradient(circle at 94% 12%, hsla(191,83%,58%,.36), transparent 42%),
+        linear-gradient(160deg, #092c55 0%, #165a93 50%, #9fc8e9 100%)`;
+    }
     const anchors = [
       { s: -80, c1: [74, 78, 144], c2: [105, 68, 128], c3: [62, 100, 143], base: [206, 200, 217] },
       { s: -30, c1: [101, 68, 148], c2: [135, 63, 122], c3: [78, 90, 148], base: [215, 199, 216] },
@@ -282,6 +290,8 @@
       button.disabled = disabledByState();
     });
     $("#ldUndo").disabled = readOnly || !state.started;
+    const ourUndo = $("#ldUndoOur");
+    if (ourUndo) ourUndo.disabled = readOnly || !state.started || Boolean(state.completed);
 
     renderRescueButtons();
     renderBanButtons();
@@ -453,16 +463,20 @@
     "下局指定已儲存",
   ));
 
-  $("#ldUndo").addEventListener("click", () => run(
-    $("#ldUndo"),
-    () => request("/undo", { method: "POST", body: "{}" }),
-    "已撤銷上一個事件",
-  ));
+  ["#ldUndo", "#ldUndoOur"].forEach((selector) => {
+    const button = $(selector);
+    if (!button) return;
+    button.addEventListener("click", () => run(
+      button,
+      () => request("/undo", { method: "POST", body: "{}" }),
+      "已撤銷上一個事件",
+    ));
+  });
 
-  $$("#ldValueGrid [data-tier]").forEach((button) => {
+  $$("[data-tier]").forEach((button) => {
     button.addEventListener("click", () => {
       selectedTier = Number(button.dataset.tier || 0);
-      $$("#ldValueGrid [data-tier]").forEach((node) => node.classList.toggle("is-active", node === button));
+      $$("[data-tier]").forEach((node) => node.classList.toggle("is-active", node === button));
     });
   });
 
@@ -476,7 +490,7 @@
     button.addEventListener("click", () => {
       selectedTier = Number(button.dataset.modalTier || 0);
       syncModalTier();
-      $$("#ldValueGrid [data-tier]").forEach((node) => {
+      $$("[data-tier]").forEach((node) => {
         node.classList.toggle("is-active", Number(node.dataset.tier || 0) === selectedTier);
       });
     });
@@ -491,7 +505,11 @@
     } else if (state.boss_answer_locked) {
       message = "老闆答案已鎖定，但女陪尚未鎖定共同答案。";
     }
-    $("#ldGuessResult").textContent = message;
+    $("#ldGuessResult").textContent = ourLove
+      ? (result === "fail"
+        ? "撤離失敗 -10；保險箱中的紅仍可計入先前的物資分數。"
+        : "成功撤離 +5；若達千萬撤離，可再 +3。")
+      : message;
     syncModalTier();
     $("#ldSettleModal").classList.add("is-open");
     $("#ldSettleModal").setAttribute("aria-hidden", "false");
@@ -525,7 +543,7 @@
       $("#ldSettleModal").setAttribute("aria-hidden", "true");
       toast(pendingResult === "success" ? "成功撤離｜本局已結算" : "撤離失敗｜安全箱價值已結算");
       selectedTier = 0;
-      $$("#ldValueGrid [data-tier]").forEach((node) => node.classList.toggle("is-active", Number(node.dataset.tier || 0) === 0));
+      $$("[data-tier]").forEach((node) => node.classList.toggle("is-active", Number(node.dataset.tier || 0) === 0));
       pendingResult = null;
     } catch (error) {
       toast(error.message || "結算失敗。");
