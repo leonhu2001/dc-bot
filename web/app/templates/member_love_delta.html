@@ -32,7 +32,7 @@
 
         <div class="ld-context">
             <div>
-                目前身份 <strong id="ldViewerRole">{{ '老闆' if viewer.role == 'boss' else '女陪' }}</strong>
+                目前身份 <strong id="ldViewerRole">{{ '老闆' if viewer.role == 'boss' else ('護航' if our_love else '女陪') }}</strong>
                 ・ {{ ld.order.order_no }}
             </div>
             <span class="ld-live">共同進度已連線</span>
@@ -74,8 +74,13 @@
                 <div class="ld-track-fill" id="ldTrackFill"></div>
             </div>
             <div class="ld-markers">
+                {% if our_love %}
+                <div class="ld-marker csp-sa-5847a3a0d7"><b>25</b><span>升溫</span></div>
+                <div class="ld-marker csp-sa-86b133c368"><b>75</b><span>熱戀</span></div>
+                {% else %}
                 <div class="ld-marker csp-sa-5847a3a0d7"><b>30</b><span>句末助詞</span></div>
                 <div class="ld-marker csp-sa-86b133c368"><b>60</b><span>特殊稱呼</span></div>
+                {% endif %}
                 <div class="ld-marker is-end csp-sa-4f724c8faf"><b>100</b><span>完成</span></div>
             </div>
             <div class="ld-complete-banner" id="ldCompleteBanner">💗 好感度已滿｜最終結局已解鎖</div>
@@ -259,7 +264,7 @@
                 <section class="ld-card ld-side-card">
                     <h3>本局狀態</h3>
                     <div class="ld-state-list">
-                        <div class="ld-state-row"><span>身份</span><b>{{ '老闆' if viewer.role == 'boss' else '女陪' }}</b></div>
+                        <div class="ld-state-row"><span>身份</span><b>{{ '老闆' if viewer.role == 'boss' else ('護航' if our_love else '女陪') }}</b></div>
                         <div class="ld-state-row"><span>物資答案</span><b id="ldBossLockSide">尚未鎖定</b></div>
                         <div class="ld-state-row"><span>女陪猜測</span><b id="ldCompanionLockSide">尚未鎖定</b></div>
                         <div class="ld-state-row"><span>句末助詞</span><b id="ldSuffixSide">尚未解鎖</b></div>
@@ -277,12 +282,12 @@
     <div class="ld-intro" id="ldIntro" {% if state.started %}hidden{% endif %}>
         <div class="ld-intro-card">
             <div class="ld-intro-mark">♡</div>
-            <div class="ld-intro-eyebrow">LOVE DELTA</div>
+            <div class="ld-intro-eyebrow">{{ 'OUR LOVE' if our_love else 'LOVE DELTA' }}</div>
             <h2>{{ '我們的愛' if our_love else '戀與三角洲' }}</h2>
             {% if viewer.role == 'boss' %}
                 <p>本次攻略已綁定 {{ plan.label }}方案。<br>按下開始後，共同進度正式啟動。</p>
             {% else %}
-                <p>你已加入這張攻略。<br>等待老闆啟動後就會一起進入面板。</p>
+                <p>你已加入這張{{ '護航' if our_love else '' }}攻略。<br>等待老闆啟動後就會一起進入面板。</p>
             {% endif %}
             <div class="ld-intro-plan">{{ plan.label }}・起始好感 {{ plan.initial_affection|int }}</div>
             {% if viewer.role == 'boss' and not ld.read_only %}
