@@ -9,7 +9,8 @@
 {% set plan = ld.plan %}
 {% set state = ld.state %}
 {% set viewer = ld.viewer %}
-<section class="ld-page" id="loveDeltaRoot" data-role="{{ viewer.role }}">
+{% set is_our_love = ld.game_key == 'our_love' %}
+<section class="ld-page" id="loveDeltaRoot" data-role="{{ viewer.role }}" data-game="{{ ld.game_key }}">
     <div class="ld-ambient" id="ldAmbient"></div>
     <div class="ld-ambient-next" id="ldAmbientNext"></div>
 
@@ -18,7 +19,7 @@
             <div class="ld-brand">
                 <div class="ld-logo">♡</div>
                 <div>
-                    <h1>戀與三角洲</h1>
+                    <h1>{{ ld.game_title }}</h1>
                     <small>互動攻略進度</small>
                 </div>
             </div>
@@ -31,7 +32,7 @@
 
         <div class="ld-context">
             <div>
-                目前身份 <strong id="ldViewerRole">{{ '老闆' if viewer.role == 'boss' else '女陪' }}</strong>
+                目前身份 <strong id="ldViewerRole">{{ '老闆' if viewer.role == 'boss' else ('護航' if is_our_love else '女陪') }}</strong>
                 ・ {{ ld.order.order_no }}
             </div>
             <span class="ld-live">共同進度已連線</span>
@@ -40,7 +41,7 @@
         <section class="ld-hero">
             <div class="ld-hero-head">
                 <div>
-                    <div class="ld-eyebrow">AFFECTION ROUTE</div>
+                    <div class="ld-eyebrow">{{ 'OUR LOVE • AFFECTION' if is_our_love else 'AFFECTION ROUTE' }}</div>
                     <h2>{{ plan.label }}方案</h2>
                 </div>
                 <div class="ld-order-no">{{ ld.order.order_no }}</div>
@@ -53,6 +54,7 @@
                 </div>
                 <div class="ld-plan-meta">
                     <span>起始好感 <b>{{ plan.initial_affection|int }}</b></span>
+                    {% if is_our_love %}<span>保底 <b>{{ plan.guarantee }}W</b></span>{% endif %}
                     <span class="ld-plan-price">{{ "{:,}".format(plan.price) }}T</span>
                 </div>
             </div>
@@ -72,8 +74,8 @@
                 <div class="ld-track-fill" id="ldTrackFill"></div>
             </div>
             <div class="ld-markers">
-                <div class="ld-marker csp-sa-5847a3a0d7"><b>30</b><span>句末助詞</span></div>
-                <div class="ld-marker csp-sa-86b133c368"><b>60</b><span>特殊稱呼</span></div>
+                <div class="ld-marker ld-love-only csp-sa-5847a3a0d7"><b>30</b><span>句末助詞</span></div>
+                <div class="ld-marker ld-love-only csp-sa-86b133c368"><b>60</b><span>特殊稱呼</span></div>
                 <div class="ld-marker is-end csp-sa-4f724c8faf"><b>100</b><span>完成</span></div>
             </div>
             <div class="ld-complete-banner" id="ldCompleteBanner">💗 好感度已滿｜最終結局已解鎖</div>
@@ -81,7 +83,7 @@
 
         <div class="ld-layout">
             <main>
-                <section class="ld-card ld-only-boss" id="ldBossGuessCard">
+                <section class="ld-card ld-only-boss ld-love-only" id="ldBossGuessCard">
                     <div class="ld-guess">
                         <div class="ld-guess-head">
                             <h3>🎯 老闆設定本局答案</h3>
@@ -99,7 +101,7 @@
                     </div>
                 </section>
 
-                <section class="ld-card ld-only-companion" id="ldCompanionGuessCard">
+                <section class="ld-card ld-only-companion ld-love-only" id="ldCompanionGuessCard">
                     <div class="ld-guess">
                         <div class="ld-guess-head">
                             <h3>🎯 女陪共同猜測</h3>
@@ -120,36 +122,59 @@
                 </section>
 
                 <section class="ld-card">
-                    <div class="ld-section ld-only-boss">
-                        <h3>🎁 摸出物資並送給老闆</h3>
+                    <div class="ld-section ld-only-boss ld-our-only">
+                        <h3>💗 我們的愛｜好感度增加</h3>
                         <div class="ld-event-grid">
-                            <button class="ld-event" type="button" data-ld-event="item_gold"><strong>金色物資 / 紫卡</strong><span class="ld-points">+3</span></button>
-                            <button class="ld-event" type="button" data-ld-event="item_small_red"><strong>小紅 / 金卡</strong><span class="ld-points">+8</span></button>
-                            <button class="ld-event" type="button" data-ld-event="item_big_red"><strong>大紅 / 紅卡</strong><span class="ld-points">+15</span></button>
-                            <button class="ld-event" type="button" data-ld-event="item_heart_tear"><strong>心 / 淚</strong><span class="ld-points">+30</span></button>
+                            <button class="ld-event" type="button" data-ld-event="guard_kill"><strong>陪玩擊殺 1 名幹員</strong><span class="ld-points">+1</span></button>
+                            <button class="ld-event" type="button" data-ld-event="our_small_red"><strong>摸出小紅（1～4 格）</strong><span class="ld-points">+2</span></button>
+                            <button class="ld-event" type="button" data-ld-event="our_big_red"><strong>大紅（6 格）／金卡／紫卡</strong><span class="ld-points">+5</span></button>
+                            <button class="ld-event" type="button" data-ld-event="our_huge_red"><strong>大大紅（9～12 格）／紅卡</strong><span class="ld-points">+10</span></button>
+                            <button class="ld-event" type="button" data-ld-event="our_heart_tear"><strong>非洲之心／海洋之淚／復甦呼吸機</strong><span class="ld-points">+35</span></button>
+                        </div>
+                    </div>
+                    <div class="ld-section ld-only-boss ld-our-only">
+                        <h3>💔 我們的愛｜好感度扣除</h3>
+                        <div class="ld-event-grid">
+                            <button class="ld-event" type="button" data-ld-event="boss_kill"><strong>老闆擊殺 1 名幹員</strong><span class="ld-points is-minus">-1</span></button>
+                        </div>
+                        <div class="ld-helper">撤離成功 +5；撤離失敗 -10 由「本局結束」自動計算。千萬撤離成功額外 +3。</div>
+                    </div>
+                    <div class="ld-section ld-only-boss ld-love-only">
+                        <h3>🎁 摸到物資並送給老闆</h3>
+                        <div class="ld-event-grid">
+                            <button class="ld-event" type="button" data-ld-event="item_small_gold"><strong>摸到小金</strong><span class="ld-points">+2</span></button>
+                            <button class="ld-event" type="button" data-ld-event="item_small_red"><strong>摸到小紅</strong><span class="ld-points">+5</span></button>
+                            <button class="ld-event" type="button" data-ld-event="item_big_red"><strong>摸到大紅</strong><span class="ld-points">+15</span></button>
+                            <button class="ld-event" type="button" data-ld-event="item_heart_tear"><strong>非洲之心／海洋之淚</strong><span class="ld-points">+30</span></button>
+                            <button class="ld-event" type="button" data-ld-event="item_purple_card"><strong>紫卡</strong><span class="ld-points">+5</span></button>
+                            <button class="ld-event" type="button" data-ld-event="item_gold_card"><strong>金卡</strong><span class="ld-points">+10</span></button>
+                            <button class="ld-event" type="button" data-ld-event="item_red_card"><strong>紅卡</strong><span class="ld-points">+15</span></button>
                         </div>
                     </div>
 
-                    <div class="ld-section ld-only-boss">
+                    <div class="ld-section ld-only-boss ld-love-only">
                         <h3>⚔️ 遊戲事件</h3>
                         <div class="ld-event-grid" id="ldCombatEvents">
-                            <button class="ld-event" type="button" data-ld-event="squad_wipe"><strong>女陪一打三滅隊</strong><span class="ld-points">+10</span></button>
+                            <button class="ld-event" type="button" data-ld-event="miss_callout"><strong>出貨沒喊寶寶出貨啦</strong><span class="ld-points is-minus">-2</span></button>
                             <button class="ld-event" type="button" data-ld-event="four_same"><strong>四個同款小金 / 紅</strong><span class="ld-points">指定下局</span></button>
                         </div>
-                        <div class="ld-event-grid csp-sa-b1ecc496e0" id="ldRescueButtons"></div>
+                        <div class="ld-event-grid csp-sa-b1ecc496e0 ld-love-only" id="ldRescueButtons"></div>
                     </div>
 
                     <div class="ld-section ld-only-boss">
                         <h3>📦 本局撤離價值</h3>
                         <div class="ld-value-grid" id="ldValueGrid">
-                            <button class="ld-value is-active" type="button" data-tier="0"><b>未達 300W</b><span>+0</span></button>
-                            <button class="ld-value" type="button" data-tier="300"><b>300W+</b><span>+4</span></button>
-                            <button class="ld-value" type="button" data-tier="600"><b>600W+</b><span>+8</span></button>
-                            <button class="ld-value" type="button" data-tier="900"><b>900W+</b><span>+12</span></button>
+                            {% if is_our_love %}
+                            <button class="ld-value is-active" type="button" data-tier="0"><b>未達千萬</b><span>+0</span></button>
+                            <button class="ld-value" type="button" data-tier="1000"><b>千萬撤離</b><span>額外 +3</span></button>
+                            {% else %}
+                            <button class="ld-value is-active" type="button" data-tier="0"><b>未達 600W</b><span>+0</span></button>
+                            <button class="ld-value" type="button" data-tier="600"><b>600W+</b><span>+2</span></button>
+                            {% endif %}
                         </div>
                     </div>
 
-                    <div class="ld-section">
+                    <div class="ld-section ld-love-only">
                         <h3>🚫 禁語</h3>
                         <div class="ld-only-boss">
                             <div class="ld-three">
@@ -172,7 +197,7 @@
                         </div>
                     </div>
 
-                    <div class="ld-section">
+                    <div class="ld-section ld-love-only">
                         <h3>✨ 好感度解鎖</h3>
                         <div class="ld-only-boss ld-two">
                             <div class="ld-setting-box" id="ldSuffixBox">
@@ -195,7 +220,7 @@
                         </div>
                     </div>
 
-                    <div class="ld-section">
+                    <div class="ld-section ld-love-only">
                         <h3>🎮 下一局指定</h3>
                         <div class="ld-readout" id="ldCurrentDesignation">本局沒有指定幹員或槍械。</div>
                         <div class="ld-only-boss ld-setting-box csp-sa-b1ecc496e0" id="ldLoadoutBox">
@@ -226,12 +251,19 @@
                 <section class="ld-card ld-side-card">
                     <h3>本局狀態</h3>
                     <div class="ld-state-list">
-                        <div class="ld-state-row"><span>身份</span><b>{{ '老闆' if viewer.role == 'boss' else '女陪' }}</b></div>
-                        <div class="ld-state-row"><span>物資答案</span><b id="ldBossLockSide">尚未鎖定</b></div>
-                        <div class="ld-state-row"><span>女陪猜測</span><b id="ldCompanionLockSide">尚未鎖定</b></div>
-                        <div class="ld-state-row"><span>句末助詞</span><b id="ldSuffixSide">尚未解鎖</b></div>
-                        <div class="ld-state-row"><span>特殊稱呼</span><b id="ldNicknameSide">尚未解鎖</b></div>
+                        <div class="ld-state-row"><span>身份</span><b>{{ '老闆' if viewer.role == 'boss' else ('護航' if is_our_love else '女陪') }}</b></div>
+                        <div class="ld-state-row ld-love-only"><span>物資答案</span><b id="ldBossLockSide">尚未鎖定</b></div>
+                        <div class="ld-state-row ld-love-only"><span>女陪猜測</span><b id="ldCompanionLockSide">尚未鎖定</b></div>
+                        <div class="ld-state-row ld-love-only"><span>句末助詞</span><b id="ldSuffixSide">尚未解鎖</b></div>
+                        <div class="ld-state-row ld-love-only"><span>特殊稱呼</span><b id="ldNicknameSide">尚未解鎖</b></div>
                     </div>
+                </section>
+                <section class="ld-card ld-our-only">
+                    <h3>📖 我們的愛｜規則提醒</h3>
+                    <p>好感度達到 100 即可結單。</p>
+                    <p>小紅 1～4 格、大紅 6 格、大大紅 9～12 格；紅修不計。</p>
+                    <p>撤離失敗仍計算保險箱內的紅色物資；千萬撤離成功額外 +3。</p>
+                    <p>本單為 2 位護航以上的專屬技術陪玩單。</p>
                 </section>
                 <section class="ld-card">
                     <h3>最近操作</h3>
@@ -244,8 +276,8 @@
     <div class="ld-intro" id="ldIntro" {% if state.started %}hidden{% endif %}>
         <div class="ld-intro-card">
             <div class="ld-intro-mark">♡</div>
-            <div class="ld-intro-eyebrow">LOVE DELTA</div>
-            <h2>戀與三角洲</h2>
+            <div class="ld-intro-eyebrow">{{ 'OUR LOVE' if is_our_love else 'LOVE DELTA' }}</div>
+            <h2>{{ ld.game_title }}</h2>
             {% if viewer.role == 'boss' %}
                 <p>本次攻略已綁定 {{ plan.label }}方案。<br>按下開始後，共同進度正式啟動。</p>
             {% else %}
@@ -271,10 +303,13 @@
             <div class="ld-section">
                 <h3>撤離價值</h3>
                 <div class="ld-value-grid" id="ldModalValueGrid">
-                    <button class="ld-value is-active" type="button" data-modal-tier="0"><b>未達 300W</b><span>+0</span></button>
-                    <button class="ld-value" type="button" data-modal-tier="300"><b>300W+</b><span>+4</span></button>
-                    <button class="ld-value" type="button" data-modal-tier="600"><b>600W+</b><span>+8</span></button>
-                    <button class="ld-value" type="button" data-modal-tier="900"><b>900W+</b><span>+12</span></button>
+                    {% if is_our_love %}
+                    <button class="ld-value is-active" type="button" data-modal-tier="0"><b>未達千萬</b><span>+0</span></button>
+                    <button class="ld-value" type="button" data-modal-tier="1000"><b>千萬撤離</b><span>額外 +3</span></button>
+                    {% else %}
+                    <button class="ld-value is-active" type="button" data-modal-tier="0"><b>未達 600W</b><span>+0</span></button>
+                    <button class="ld-value" type="button" data-modal-tier="600"><b>600W+</b><span>+2</span></button>
+                    {% endif %}
                 </div>
             </div>
             <div class="ld-modal-footer">

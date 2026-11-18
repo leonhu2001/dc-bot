@@ -7,7 +7,8 @@
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
   const root = $("#loveDeltaRoot");
-  const base = `/me/orders/${Number(boot.order.id)}/love-delta`;
+  const isOurLove = boot.game_key === "our_love";
+  const base = `/me/orders/${Number(boot.order.id)}/${isOurLove ? "our-love" : "love-delta"}`;
   const viewer = boot.viewer;
   let state = boot.state;
   let events = Array.isArray(boot.events) ? boot.events : [];
@@ -25,7 +26,7 @@
 
   const visualPercent = (score) => {
     const n = Number(score || 0);
-    return Math.max(0, Math.min(100, ((n + 80) / 180) * 100));
+    return Math.max(0, Math.min(100, isOurLove ? n : ((n + 80) / 180) * 100));
   };
 
   const escapeText = (value) => String(value ?? "")
@@ -484,11 +485,14 @@
 
   function openSettle(result) {
     pendingResult = result;
+    if (isOurLove && result === "fail") selectedTier = 0;
     $("#ldSettleTitle").textContent = result === "success" ? "✓ 成功撤離｜本局結算" : "× 撤離失敗｜本局結算";
-    let message = "雙方答案尚未全部鎖定，本局不會套用猜中倍率。";
-    if (state.boss_answer_locked && state.companion_guess_locked) {
+    let message = isOurLove
+      ? (result === "success" ? "成功撤離 +5，千萬撤離額外 +3。" : "撤離失敗 -10；保險箱內的紅色物資仍計分。")
+      : "雙方答案尚未全部鎖定，本局不會套用猜中倍率。";
+    if (!isOurLove && state.boss_answer_locked && state.companion_guess_locked) {
       message = "雙方答案都已鎖定，確認結算後會自動比對並套用 1.2 倍。";
-    } else if (state.boss_answer_locked) {
+    } else if (!isOurLove && state.boss_answer_locked) {
       message = "老闆答案已鎖定，但女陪尚未鎖定共同答案。";
     }
     $("#ldGuessResult").textContent = message;
@@ -523,7 +527,7 @@
       applyPayload(payload, { animateTheme: pendingResult === "success" });
       $("#ldSettleModal").classList.remove("is-open");
       $("#ldSettleModal").setAttribute("aria-hidden", "true");
-      toast(pendingResult === "success" ? "成功撤離｜本局已結算" : "撤離失敗｜安全箱價值已結算");
+      toast(pendingResult === "success" ? "成功撤離｜本局已結算" : (isOurLove ? "撤離失敗｜好感 -10，保險箱紅色物資仍計分" : "撤離失敗｜安全箱價值已結算"));
       selectedTier = 0;
       $$("#ldValueGrid [data-tier]").forEach((node) => node.classList.toggle("is-active", Number(node.dataset.tier || 0) === 0));
       pendingResult = null;

@@ -7,49 +7,72 @@ from pathlib import Path
 from typing import Any
 
 
-LOVE_DELTA_RULES_VERSION = "love-delta-v1-2026-10-12"
+LOVE_DELTA_RULES_VERSION = "romance-cards-2026-11-19"
 LOVE_DELTA_RULE_KEYS = {
     "fun_mawan_galagame_basic": {
-        "key": "basic",
-        "label": "基礎",
-        "price": 1688,
-        "initial_affection": 30.0,
+        "key": "basic", "label": "基礎", "price": 2288,
+        "initial_affection": 30.0, "game_key": "love_delta",
     },
     "fun_mawan_galagame_standard": {
-        "key": "standard",
-        "label": "標準",
-        "price": 2688,
-        "initial_affection": 0.0,
+        "key": "standard", "label": "標準", "price": 3288,
+        "initial_affection": 0.0, "game_key": "love_delta",
     },
     "fun_mawan_galagame_hard": {
-        "key": "hard",
-        "label": "困難",
-        "price": 4688,
-        "initial_affection": -30.0,
+        "key": "hard", "label": "困難", "price": 4888,
+        "initial_affection": -30.0, "game_key": "love_delta",
     },
     "fun_mawan_galagame_hell": {
-        "key": "hell",
-        "label": "地獄",
-        "price": 6688,
-        "initial_affection": -80.0,
+        "key": "hell", "label": "地獄", "price": 5688,
+        "initial_affection": -80.0, "game_key": "love_delta",
     },
 }
+OUR_LOVE_RULE_KEYS = {
+    "fun_our_love_start_75": {
+        "key": "start_75", "label": "初始好感度75", "price": 2488,
+        "initial_affection": 75.0, "guarantee": 2088, "game_key": "our_love",
+    },
+    "fun_our_love_start_50": {
+        "key": "start_50", "label": "初始好感度50", "price": 3688,
+        "initial_affection": 50.0, "guarantee": 3088, "game_key": "our_love",
+    },
+    "fun_our_love_start_0": {
+        "key": "start_0", "label": "初始好感度0", "price": 4888,
+        "initial_affection": 0.0, "guarantee": 3688, "game_key": "our_love",
+    },
+}
+ROMANCE_RULE_KEYS = {**LOVE_DELTA_RULE_KEYS, **OUR_LOVE_RULE_KEYS}
 LOVE_DELTA_ALLOWED_STATUSES = {"active", "stored"}
 LOVE_DELTA_VIEW_STATUSES = LOVE_DELTA_ALLOWED_STATUSES | {"closed"}
 LOVE_DELTA_ITEM_HINT = "戀與三角洲"
+LOVE_DELTA_LEGACY_HINT = "魔丸娛樂嘎拉給木"
+OUR_LOVE_ITEM_HINT = "我們的愛"
 
+# These score tables come from the two separate latest owner-approved posters.
 EVENT_SCORES = {
-    "item_gold": ("金色物資 / 紫卡", 3.0),
-    "item_small_red": ("小紅 / 金卡", 8.0),
-    "item_big_red": ("大紅 / 紅卡", 15.0),
-    "item_heart_tear": ("心 / 淚", 30.0),
-    "squad_wipe": ("女陪一打三滅隊", 10.0),
+    "item_small_gold": ("摸到小金", 2.0),
+    "item_small_red": ("摸到小紅", 5.0),
+    "item_big_red": ("摸到大紅", 15.0),
+    "item_heart_tear": ("非洲之心 / 海洋之淚", 30.0),
+    "item_purple_card": ("紫卡", 5.0),
+    "item_gold_card": ("金卡", 10.0),
+    "item_red_card": ("紅卡", 15.0),
+    "miss_callout": ("出貨未喊「寶寶出貨啦」", -2.0),
     "ban_1": ("觸發禁語 1", -2.0),
     "ban_2": ("觸發禁語 2", -2.0),
     "ban_3": ("觸發禁語 3", -2.0),
     "miss_suffix": ("忘記句末助詞", -2.0),
 }
-EXTRACTION_TIERS = {0: 0.0, 300: 4.0, 600: 8.0, 900: 12.0}
+OUR_LOVE_EVENT_SCORES = {
+    "guard_kill": ("陪玩擊殺 1 名幹員", 1.0),
+    "our_small_red": ("摸出小紅", 2.0),
+    "our_big_red": ("大紅 / 金卡 / 紫卡", 5.0),
+    "our_huge_red": ("大大紅 / 紅卡", 10.0),
+    "our_heart_tear": ("非洲之心 / 海洋之淚 / 復甦呼吸機", 35.0),
+    "boss_kill": ("老闆擊殺 1 名幹員", -1.0),
+}
+EXTRACTION_TIERS = {0: 0.0, 600: 2.0}
+OUR_LOVE_EXTRACTION_TIERS = {0: 0.0, 1000: 3.0}
+
 
 
 def _db_path(db_file: str | Path | None = None) -> Path:
@@ -165,16 +188,24 @@ def _load_order(conn: sqlite3.Connection, order_id: int) -> dict[str, Any] | Non
 
 def _plan_from_order(order: dict[str, Any]) -> dict[str, Any] | None:
     rule_key = str(order.get("order_rule_key") or "").strip()
-    plan = LOVE_DELTA_RULE_KEYS.get(rule_key)
+    plan = ROMANCE_RULE_KEYS.get(rule_key)
     if plan is not None:
         return {**plan, "rule_key": rule_key}
 
     item = str(order.get("item") or "")
     category = str(order.get("category") or "")
-    if LOVE_DELTA_ITEM_HINT not in item and LOVE_DELTA_ITEM_HINT not in category:
-        return None
-
     label_text = f"{item} {category}"
+    if OUR_LOVE_ITEM_HINT in label_text:
+        for key, data in OUR_LOVE_RULE_KEYS.items():
+            if data["label"] in label_text or (
+                f"初始{int(data['initial_affection'])}" in label_text
+            ):
+                return {**data, "rule_key": key}
+        return None
+    if not any(hint in label_text for hint in (
+        LOVE_DELTA_ITEM_HINT, LOVE_DELTA_LEGACY_HINT,
+    )):
+        return None
     for key, data in LOVE_DELTA_RULE_KEYS.items():
         if data["label"] in label_text:
             return {**data, "rule_key": key}
@@ -414,7 +445,7 @@ def get_love_delta_entry_info(
             raise LookupError("找不到這張訂單。")
         plan = _plan_from_order(order)
         if plan is None:
-            raise ValueError("這張訂單不是戀與三角洲。")
+            raise ValueError("這張訂單不是戀與三角洲或我們的愛。")
         session_row = conn.execute(
             "SELECT started_at, completed_at FROM love_delta_sessions WHERE order_id = ? LIMIT 1",
             (int(order_id),),
@@ -434,7 +465,9 @@ def get_love_delta_entry_info(
         "started": started,
         "completed": completed,
         "plan": plan,
-        "href": f"/me/orders/{int(order_id)}/love-delta",
+        "href": f"/me/orders/{int(order_id)}/{'our-love' if plan['game_key'] == 'our_love' else 'love-delta'}",
+        "game_key": str(plan["game_key"]),
+        "game_title": "我們的愛" if plan["game_key"] == "our_love" else "戀與三角洲",
     }
 
 
@@ -451,7 +484,7 @@ def get_love_delta_context(
             raise LookupError("找不到這張訂單。")
         plan = _plan_from_order(order)
         if plan is None:
-            raise ValueError("這張訂單不是戀與三角洲。")
+            raise ValueError("這張訂單不是戀與三角洲或我們的愛。")
         companions = _active_companions(conn, order_id)
         role = _actor_role(order, companions, actor_discord_id)
         if role is None:
@@ -477,6 +510,8 @@ def get_love_delta_context(
         "state": state,
         "events": events,
         "read_only": status == "closed",
+        "game_key": str(plan["game_key"]),
+        "game_title": "我們的愛" if plan["game_key"] == "our_love" else "戀與三角洲",
     }
 
 
@@ -490,7 +525,7 @@ def _mutation_context(
         raise LookupError("找不到這張訂單。")
     plan = _plan_from_order(order)
     if plan is None:
-        raise ValueError("這張訂單不是戀與三角洲。")
+        raise ValueError("這張訂單不是戀與三角洲或我們的愛。")
     companions = _active_companions(conn, order_id)
     role = _actor_role(order, companions, actor_discord_id)
     if role is None:
@@ -589,52 +624,25 @@ def apply_love_delta_event(
 
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
-        order, _plan, companions, role, session = _mutation_context(conn, actor_id, order_id)
+        order, plan, companions, role, session = _mutation_context(conn, actor_id, order_id)
         _assert_started(session)
         _assert_not_completed(session)
         data = dict(session)
+        is_our_love = plan["game_key"] == "our_love"
         before = _score(data.get("affection"))
         round_no = int(data.get("round_no") or 1)
         round_positive = _score(data.get("round_positive"))
         actor_name = _actor_name(order, companions, actor_id)
         payload: dict[str, Any] = {}
 
-        if event_type == "first_rescue":
-            target_id = actor_id if role == "companion" else str(target_companion_id or "").strip()
-            target = next((item for item in companions if item["id"] == target_id), None)
-            if target is None:
-                raise ValueError("請選擇實際完成救援的女陪。")
-            rescue_row = conn.execute(
-                """
-                SELECT first_rescue_scored FROM love_delta_companion_state
-                WHERE order_id = ? AND companion_discord_id = ? LIMIT 1
-                """,
-                (int(order_id), target_id),
-            ).fetchone()
-            if rescue_row is not None and bool(rescue_row["first_rescue_scored"]):
-                raise ValueError(f"{target['name']} 的首次救援分數已計算。")
-            label, delta = f"{target['name']} 第一次救起老闆", 5.0
-            now = _now_iso()
-            conn.execute(
-                """
-                INSERT INTO love_delta_companion_state (
-                    order_id, companion_discord_id, first_rescue_scored, updated_at
-                ) VALUES (?, ?, 1, ?)
-                ON CONFLICT(order_id, companion_discord_id)
-                DO UPDATE SET first_rescue_scored = 1, updated_at = excluded.updated_at
-                """,
-                (int(order_id), target_id, now),
-            )
-            payload["target_companion_id"] = target_id
-            payload["target_companion_name"] = target["name"]
-        elif event_type == "four_same":
+        if event_type == "four_same" and not is_our_love:
             label, delta = "四個同款小金 / 紅", 0.0
             conn.execute(
                 "UPDATE love_delta_sessions SET loadout_unlocked = 1, updated_at = ? WHERE order_id = ?",
                 (_now_iso(), int(order_id)),
             )
         else:
-            spec = EVENT_SCORES.get(event_type)
+            spec = (OUR_LOVE_EVENT_SCORES if is_our_love else EVENT_SCORES).get(event_type)
             if spec is None:
                 raise ValueError("未知的攻略事件。")
             label, delta = spec
@@ -696,6 +704,8 @@ def save_bans(
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
         _order, _plan, _companions, role, session = _mutation_context(conn, actor_id, order_id)
+        if _plan["game_key"] == "our_love":
+            raise ValueError("我們的愛不使用禁語、猜物資或指定玩法。")
         _assert_started(session)
         _assert_not_completed(session)
         if role != "boss":
@@ -736,6 +746,8 @@ def save_unlock_text(
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
         _order, _plan, _companions, role, session = _mutation_context(conn, actor_id, order_id)
+        if _plan["game_key"] == "our_love":
+            raise ValueError("我們的愛不使用禁語、猜物資或指定玩法。")
         _assert_started(session)
         _assert_not_completed(session)
         if role != "boss":
@@ -779,6 +791,8 @@ def save_boss_guess(
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
         _order, _plan, _companions, role, session = _mutation_context(conn, actor_id, order_id)
+        if _plan["game_key"] == "our_love":
+            raise ValueError("我們的愛不使用禁語、猜物資或指定玩法。")
         _assert_started(session)
         _assert_not_completed(session)
         if role != "boss":
@@ -808,6 +822,8 @@ def clear_boss_guess(
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
         _order, _plan, _companions, role, session = _mutation_context(conn, actor_id, order_id)
+        if _plan["game_key"] == "our_love":
+            raise ValueError("我們的愛不使用禁語、猜物資或指定玩法。")
         _assert_started(session)
         if role != "boss":
             raise PermissionError("只有老闆可以清除本局答案。")
@@ -840,6 +856,8 @@ def save_companion_guess(
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
         _order, _plan, _companions, role, session = _mutation_context(conn, actor_id, order_id)
+        if _plan["game_key"] == "our_love":
+            raise ValueError("我們的愛不使用禁語、猜物資或指定玩法。")
         _assert_started(session)
         _assert_not_completed(session)
         if role != "companion":
@@ -868,6 +886,8 @@ def clear_companion_guess(
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
         _order, _plan, _companions, role, session = _mutation_context(conn, actor_id, order_id)
+        if _plan["game_key"] == "our_love":
+            raise ValueError("我們的愛不使用禁語、猜物資或指定玩法。")
         _assert_started(session)
         if role != "companion":
             raise PermissionError("只有本單女陪可以清除共同答案。")
@@ -899,6 +919,8 @@ def save_next_loadout(
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
         _order, _plan, _companions, role, session = _mutation_context(conn, actor_id, order_id)
+        if _plan["game_key"] == "our_love":
+            raise ValueError("我們的愛不使用禁語、猜物資或指定玩法。")
         _assert_started(session)
         _assert_not_completed(session)
         if role != "boss":
@@ -936,14 +958,15 @@ def settle_love_delta_round(
         tier = int(extraction_tier)
     except (TypeError, ValueError) as exc:
         raise ValueError("撤離價值不正確。") from exc
-    if tier not in EXTRACTION_TIERS:
-        raise ValueError("撤離價值不正確。")
-
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
-        order, _plan, companions, role, session = _mutation_context(conn, actor_id, order_id)
+        order, plan, companions, role, session = _mutation_context(conn, actor_id, order_id)
         _assert_started(session)
         _assert_not_completed(session)
+        is_our_love = plan["game_key"] == "our_love"
+        tiers = OUR_LOVE_EXTRACTION_TIERS if is_our_love else EXTRACTION_TIERS
+        if tier not in tiers:
+            raise ValueError("撤離價值不正確。")
         data = dict(session)
         round_no = int(data.get("round_no") or 1)
         if int(expected_round) != round_no:
@@ -951,13 +974,15 @@ def settle_love_delta_round(
 
         before = _score(data.get("affection"))
         positive = _score(data.get("round_positive"))
-        success_bonus = 5.0 if result == "success" else 0.0
-        extraction_bonus = float(EXTRACTION_TIERS[tier])
-        positive_for_multiplier = round(positive + success_bonus + extraction_bonus, 1)
+        success_bonus = (5.0 if result == "success" else -10.0) if is_our_love else 0.0
+        extraction_bonus = float(tiers[tier])
+        if is_our_love and result != "success":
+            extraction_bonus = 0.0
+        positive_for_multiplier = round(positive + extraction_bonus, 1)
         boss_answer = str(data.get("boss_answer") or "")
         companion_guess = str(data.get("companion_guess") or "")
         guess_hit = bool(
-            data.get("boss_answer_locked")
+            not is_our_love and data.get("boss_answer_locked")
             and data.get("companion_guess_locked")
             and _normalize_answer(boss_answer)
             and _normalize_answer(boss_answer) == _normalize_answer(companion_guess)
@@ -1005,7 +1030,7 @@ def settle_love_delta_round(
         )
         actor_name = _actor_name(order, companions, actor_id)
         result_label = "成功撤離" if result == "success" else "撤離失敗"
-        tier_label = "未達 300W" if tier == 0 else f"{tier}W+"
+        tier_label = ("千萬以下" if tier == 0 else "千萬撤離") if is_our_love else ("未達 600W" if tier == 0 else "600W+")
         label = f"{result_label}｜{tier_label}"
         if guess_hit:
             label += f"｜猜中「{boss_answer}」"

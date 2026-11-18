@@ -111,10 +111,13 @@ def _public_payload(context: dict) -> dict:
         "state": context["state"],
         "events": context["events"],
         "read_only": context["read_only"],
+        "game_key": context["game_key"],
+        "game_title": context["game_title"],
     }
 
 
 @router.get("/me/orders/{order_id}/love-delta/entry")
+@router.get("/me/orders/{order_id}/our-love/entry")
 async def love_delta_entry(request: Request, order_id: int):
     user = _session_user(request)
     user_id = _user_id(user)
@@ -132,11 +135,12 @@ async def love_delta_entry(request: Request, order_id: int):
 
 
 @router.get("/me/orders/{order_id}/love-delta")
+@router.get("/me/orders/{order_id}/our-love")
 async def love_delta_page(request: Request, order_id: int):
     user = _session_user(request)
     user_id = _user_id(user)
     if not user_id:
-        next_path = quote(f"/me/orders/{int(order_id)}/love-delta", safe="")
+        next_path = quote(str(request.url.path), safe="")
         return RedirectResponse(
             url=f"/auth/discord/login?next={next_path}",
             status_code=303,
@@ -159,7 +163,7 @@ async def love_delta_page(request: Request, order_id: int):
         request=request,
         name="member_love_delta.html",
         context={
-            "title": "戀與三角洲｜攻略進度",
+            "title": f"{context['game_title']}｜攻略進度",
             "user": user,
             "love_delta": context,
         },
@@ -167,12 +171,14 @@ async def love_delta_page(request: Request, order_id: int):
 
 
 @router.get("/me/orders/{order_id}/love-delta/state")
+@router.get("/me/orders/{order_id}/our-love/state")
 async def love_delta_state(request: Request, order_id: int):
     context = await _context_for(request, order_id)
     return _public_payload(context)
 
 
 @router.post("/me/orders/{order_id}/love-delta/start")
+@router.post("/me/orders/{order_id}/our-love/start")
 async def love_delta_start(request: Request, order_id: int):
     user_id = _user_id(_session_user(request))
     if not user_id:
@@ -185,6 +191,7 @@ async def love_delta_start(request: Request, order_id: int):
 
 
 @router.post("/me/orders/{order_id}/love-delta/event")
+@router.post("/me/orders/{order_id}/our-love/event")
 async def love_delta_event(
     request: Request,
     order_id: int,
@@ -207,6 +214,7 @@ async def love_delta_event(
 
 
 @router.post("/me/orders/{order_id}/love-delta/guess/boss")
+@router.post("/me/orders/{order_id}/our-love/guess/boss")
 async def love_delta_boss_guess(
     request: Request,
     order_id: int,
@@ -230,6 +238,7 @@ async def love_delta_boss_guess(
 
 
 @router.delete("/me/orders/{order_id}/love-delta/guess/boss")
+@router.delete("/me/orders/{order_id}/our-love/guess/boss")
 async def love_delta_boss_guess_clear(request: Request, order_id: int):
     user_id = _user_id(_session_user(request))
     if not user_id:
@@ -242,6 +251,7 @@ async def love_delta_boss_guess_clear(request: Request, order_id: int):
 
 
 @router.post("/me/orders/{order_id}/love-delta/guess/companion")
+@router.post("/me/orders/{order_id}/our-love/guess/companion")
 async def love_delta_companion_guess(
     request: Request,
     order_id: int,
@@ -263,6 +273,7 @@ async def love_delta_companion_guess(
 
 
 @router.delete("/me/orders/{order_id}/love-delta/guess/companion")
+@router.delete("/me/orders/{order_id}/our-love/guess/companion")
 async def love_delta_companion_guess_clear(request: Request, order_id: int):
     user_id = _user_id(_session_user(request))
     if not user_id:
@@ -275,6 +286,7 @@ async def love_delta_companion_guess_clear(request: Request, order_id: int):
 
 
 @router.post("/me/orders/{order_id}/love-delta/bans")
+@router.post("/me/orders/{order_id}/our-love/bans")
 async def love_delta_bans(
     request: Request,
     order_id: int,
@@ -296,6 +308,7 @@ async def love_delta_bans(
 
 
 @router.post("/me/orders/{order_id}/love-delta/settings/{kind}")
+@router.post("/me/orders/{order_id}/our-love/settings/{kind}")
 async def love_delta_unlock_setting(
     request: Request,
     order_id: int,
@@ -321,6 +334,7 @@ async def love_delta_unlock_setting(
 
 
 @router.post("/me/orders/{order_id}/love-delta/loadout")
+@router.post("/me/orders/{order_id}/our-love/loadout")
 async def love_delta_loadout(
     request: Request,
     order_id: int,
@@ -343,6 +357,7 @@ async def love_delta_loadout(
 
 
 @router.post("/me/orders/{order_id}/love-delta/settle")
+@router.post("/me/orders/{order_id}/our-love/settle")
 async def love_delta_settle(
     request: Request,
     order_id: int,
@@ -366,6 +381,7 @@ async def love_delta_settle(
 
 
 @router.post("/me/orders/{order_id}/love-delta/undo")
+@router.post("/me/orders/{order_id}/our-love/undo")
 async def love_delta_undo(request: Request, order_id: int):
     user_id = _user_id(_session_user(request))
     if not user_id:

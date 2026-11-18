@@ -80,34 +80,33 @@ def test_correct_guess_multiplies_positive_round_score(tmp_path):
     service.save_companion_guess("girl1", 1, guess=" 非洲之心 ", db_file=db)
     service.apply_love_delta_event("girl1", 1, "item_big_red", db_file=db)
     ctx = service.settle_love_delta_round(
-        "boss", 1, expected_round=1, result="success", extraction_tier=300, db_file=db
+        "boss", 1, expected_round=1, result="success", extraction_tier=600, db_file=db
     )
-    assert ctx["state"]["affection"] == 28.8
+    assert ctx["state"]["affection"] == 20.4
     assert ctx["state"]["round_no"] == 2
-    assert ctx["state"]["theme_affection"] == 28.8
+    assert ctx["state"]["theme_affection"] == 20.4
 
 
 def test_failed_extraction_counts_safe_value_but_does_not_change_theme(tmp_path):
     db = tmp_path / "ld.db"
     make_db(db, rule_key="fun_mawan_galagame_standard")
     start(db)
-    service.apply_love_delta_event("girl1", 1, "item_gold", db_file=db)
+    service.apply_love_delta_event("girl1", 1, "item_small_gold", db_file=db)
     ctx = service.settle_love_delta_round(
         "girl1", 1, expected_round=1, result="fail", extraction_tier=600, db_file=db
     )
-    assert ctx["state"]["affection"] == 11
+    assert ctx["state"]["affection"] == 4
     assert ctx["state"]["theme_affection"] == 0
 
 
-def test_first_rescue_is_per_companion(tmp_path):
+def test_old_first_rescue_removed_and_new_callout_penalty(tmp_path):
     db = tmp_path / "ld.db"
     make_db(db, rule_key="fun_mawan_galagame_standard")
     start(db)
-    service.apply_love_delta_event("boss", 1, "first_rescue", target_companion_id="girl1", db_file=db)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="未知"):
         service.apply_love_delta_event("boss", 1, "first_rescue", target_companion_id="girl1", db_file=db)
-    ctx = service.apply_love_delta_event("boss", 1, "first_rescue", target_companion_id="girl2", db_file=db)
-    assert ctx["state"]["affection"] == 10
+    ctx = service.apply_love_delta_event("boss", 1, "miss_callout", db_file=db)
+    assert ctx["state"]["affection"] == -2
 
 
 def test_four_same_unlocks_next_round_loadout(tmp_path):

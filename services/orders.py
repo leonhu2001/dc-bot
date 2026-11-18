@@ -156,11 +156,13 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
                     "rule_key": f"fun_our_love_start_{start}",
                     "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
                 }
-                for start, guarantee, price in ((50, 2088, 2888), (0, 3688, 4888))
+                for start, guarantee, price in (
+                    (75, 2088, 2488), (50, 3088, 3688), (0, 3688, 4888)
+                )
             ],
         },
         {
-            "label": "魔丸娛樂嘎拉給木",
+            "label": "戀與三角洲",
             "details": [
                 {"label": "基礎", "value": "basic", "rule_key": "fun_mawan_galagame_basic", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "標準", "value": "standard", "rule_key": "fun_mawan_galagame_standard", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
@@ -842,6 +844,9 @@ def get_order_item_details_for_group(category: str | None, group_label: str | No
     target = _normalized_group_key(group_label)
     if not target:
         return []
+    # Keep in-flight Discord tickets from the legacy 嘎拉給木 group selectable.
+    if category_text == "delta_desktop_fun" and target == _normalized_group_key("魔丸娛樂嘎拉給木"):
+        return get_order_item_details_for_group(category_text, "戀與三角洲")
     # Preserve open tickets created with the two old ammo groups. They must
     # still resolve their selected SKU, but never appear in new service menus.
     if category_text == "staff_internal":
