@@ -156,11 +156,11 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
                     "rule_key": f"fun_our_love_start_{start}",
                     "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
                 }
-                for start, guarantee, price in ((75, 2088, 2488), (50, 3088, 3688), (0, 3688, 4888))
+                for start, guarantee, price in ((50, 2088, 2888), (0, 3688, 4888))
             ],
         },
         {
-            "label": "戀與三角洲",
+            "label": "魔丸娛樂嘎拉給木",
             "details": [
                 {"label": "基礎", "value": "basic", "rule_key": "fun_mawan_galagame_basic", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "標準", "value": "standard", "rule_key": "fun_mawan_galagame_standard", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
