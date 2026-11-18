@@ -10,7 +10,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from services.order_rules import get_base_rule
+from services.order_rules import get_rule
 
 AFFECTION_VERSION = "affection-20261118-v2"
 PLANS = {
@@ -137,7 +137,7 @@ def _lookup(conn, actor_id, order_id, *, game=None, require_paid=True, customer_
     status = str(order.get("status") or "").lower().strip()
     if require_paid and status not in VIEW_STATUSES:
         raise PermissionError("訂單付款完成後才會開放專屬網站。")
-    price = int(get_base_rule(rule_key).price)
+    price = int(get_rule(rule_key).price)
     return order, {
         "key": rule_key,
         "game": kind,
