@@ -131,14 +131,12 @@ async def love_delta_entry(request: Request, order_id: int):
     return {"ok": True, **info}
 
 
-@router.get("/me/orders/{order_id}/our-love")
 @router.get("/me/orders/{order_id}/love-delta")
 async def love_delta_page(request: Request, order_id: int):
     user = _session_user(request)
     user_id = _user_id(user)
     if not user_id:
-        requested_slug = "our-love" if request.url.path.endswith("/our-love") else "love-delta"
-        next_path = quote(f"/me/orders/{int(order_id)}/{requested_slug}", safe="")
+        next_path = quote(f"/me/orders/{int(order_id)}/love-delta", safe="")
         return RedirectResponse(
             url=f"/auth/discord/login?next={next_path}",
             status_code=303,
@@ -157,16 +155,11 @@ async def love_delta_page(request: Request, order_id: int):
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
 
-    mode = context["plan"].get("mode", "love_delta")
-    canonical_slug = "our-love" if mode == "our_love" else "love-delta"
-    if not request.url.path.endswith("/" + canonical_slug):
-        return RedirectResponse(f"/me/orders/{int(order_id)}/{canonical_slug}", status_code=303)
-    title = "我們的愛" if mode == "our_love" else "戀與三角洲"
     return TEMPLATES.TemplateResponse(
         request=request,
         name="member_love_delta.html",
         context={
-            "title": f"{title}｜攻略進度",
+            "title": "戀與三角洲｜攻略進度",
             "user": user,
             "love_delta": context,
         },
