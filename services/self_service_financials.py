@@ -376,7 +376,7 @@ def _quote_preview_lines_raw(
         if is_internal_ammo_dump_rule(rule):
             named = selected_ammo_dump_named(data)
             lines.append(("掛名狀態", "有掛名" if named is True else "無掛名" if named is False else "等待客服勾選"))
-            if named is False:
+            if named is False and str(rule.key) == "staff_internal_ammo_dump_500m":
                 detail_parts.append(
                     "店家抽成前差額 350｜客服分潤 25%：88｜店家實留 262"
                 )
@@ -480,7 +480,7 @@ def _format_point_hours(hours) -> str:
 def _calculate_self_service_financials_unsettled(rule, price_result, data: dict) -> dict:
     if is_internal_ammo_dump_rule(rule):
         return apply_vip_monthly_store_funding(
-            apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data))
+            apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data, rule))
         )
     if is_aw_collision_rule(rule):
         return apply_vip_monthly_store_funding(calculate_aw_collision_financials(price_result, data))
