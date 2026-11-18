@@ -47,6 +47,7 @@ from web.app.routers.auth import router as auth_router
 from web.app.routers.site import router as site_router
 from web.app.routers.game_news import router as game_news_router
 from web.app.routers.game_tools import router as game_tools_router
+from web.app.routers.love_delta import router as romance_live_router
 from web.app.routers.market_push import router as market_push_router
 from web.app.routers.web_support import router as web_support_router
 from web.app.routers.dispatch import router as dispatch_router
@@ -269,6 +270,8 @@ app.include_router(auth_router)
 app.include_router(site_router)
 app.include_router(game_news_router)
 app.include_router(game_tools_router)
+# Live, authenticated per-order romance sites: both Love Delta and Our Love.
+app.include_router(romance_live_router)
 app.include_router(market_push_router)
 app.include_router(web_support_router)
 app.include_router(topups_router)
