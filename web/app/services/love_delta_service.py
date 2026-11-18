@@ -7,49 +7,72 @@ from pathlib import Path
 from typing import Any
 
 
-LOVE_DELTA_RULES_VERSION = "love-delta-v1-2026-10-12"
+LOVE_DELTA_RULES_VERSION = "romance-cards-2026-11-19"
 LOVE_DELTA_RULE_KEYS = {
     "fun_mawan_galagame_basic": {
-        "key": "basic",
-        "label": "基礎",
-        "price": 1688,
-        "initial_affection": 30.0,
+        "key": "basic", "label": "基礎", "price": 2288,
+        "initial_affection": 30.0, "game_key": "love_delta",
     },
     "fun_mawan_galagame_standard": {
-        "key": "standard",
-        "label": "標準",
-        "price": 2688,
-        "initial_affection": 0.0,
+        "key": "standard", "label": "標準", "price": 3288,
+        "initial_affection": 0.0, "game_key": "love_delta",
     },
     "fun_mawan_galagame_hard": {
-        "key": "hard",
-        "label": "困難",
-        "price": 4688,
-        "initial_affection": -30.0,
+        "key": "hard", "label": "困難", "price": 4888,
+        "initial_affection": -30.0, "game_key": "love_delta",
     },
     "fun_mawan_galagame_hell": {
-        "key": "hell",
-        "label": "地獄",
-        "price": 6688,
-        "initial_affection": -80.0,
+        "key": "hell", "label": "地獄", "price": 5688,
+        "initial_affection": -80.0, "game_key": "love_delta",
     },
 }
+OUR_LOVE_RULE_KEYS = {
+    "fun_our_love_start_75": {
+        "key": "start_75", "label": "初始好感度75", "price": 2488,
+        "initial_affection": 75.0, "guarantee": 2088, "game_key": "our_love",
+    },
+    "fun_our_love_start_50": {
+        "key": "start_50", "label": "初始好感度50", "price": 3688,
+        "initial_affection": 50.0, "guarantee": 3088, "game_key": "our_love",
+    },
+    "fun_our_love_start_0": {
+        "key": "start_0", "label": "初始好感度0", "price": 4888,
+        "initial_affection": 0.0, "guarantee": 3688, "game_key": "our_love",
+    },
+}
+ROMANCE_RULE_KEYS = {**LOVE_DELTA_RULE_KEYS, **OUR_LOVE_RULE_KEYS}
 LOVE_DELTA_ALLOWED_STATUSES = {"active", "stored"}
 LOVE_DELTA_VIEW_STATUSES = LOVE_DELTA_ALLOWED_STATUSES | {"closed"}
 LOVE_DELTA_ITEM_HINT = "戀與三角洲"
+LOVE_DELTA_LEGACY_HINT = "魔丸娛樂嘎拉給木"
+OUR_LOVE_ITEM_HINT = "我們的愛"
 
+# These score tables come from the two separate latest owner-approved posters.
 EVENT_SCORES = {
-    "item_gold": ("金色物資 / 紫卡", 3.0),
-    "item_small_red": ("小紅 / 金卡", 8.0),
-    "item_big_red": ("大紅 / 紅卡", 15.0),
-    "item_heart_tear": ("心 / 淚", 30.0),
-    "squad_wipe": ("女陪一打三滅隊", 10.0),
+    "item_small_gold": ("摸到小金", 2.0),
+    "item_small_red": ("摸到小紅", 5.0),
+    "item_big_red": ("摸到大紅", 15.0),
+    "item_heart_tear": ("非洲之心 / 海洋之淚", 30.0),
+    "item_purple_card": ("紫卡", 5.0),
+    "item_gold_card": ("金卡", 10.0),
+    "item_red_card": ("紅卡", 15.0),
+    "miss_callout": ("出貨未喊「寶寶出貨啦」", -2.0),
     "ban_1": ("觸發禁語 1", -2.0),
     "ban_2": ("觸發禁語 2", -2.0),
     "ban_3": ("觸發禁語 3", -2.0),
     "miss_suffix": ("忘記句末助詞", -2.0),
 }
-EXTRACTION_TIERS = {0: 0.0, 300: 4.0, 600: 8.0, 900: 12.0}
+OUR_LOVE_EVENT_SCORES = {
+    "guard_kill": ("陪玩擊殺 1 名幹員", 1.0),
+    "our_small_red": ("摸出小紅", 2.0),
+    "our_big_red": ("大紅 / 金卡 / 紫卡", 5.0),
+    "our_huge_red": ("大大紅 / 紅卡", 10.0),
+    "our_heart_tear": ("非洲之心 / 海洋之淚 / 復甦呼吸機", 35.0),
+    "boss_kill": ("老闆擊殺 1 名幹員", -1.0),
+}
+EXTRACTION_TIERS = {0: 0.0, 600: 2.0}
+OUR_LOVE_EXTRACTION_TIERS = {0: 0.0, 1000: 3.0}
+
 
 
 def _db_path(db_file: str | Path | None = None) -> Path:
@@ -165,16 +188,24 @@ def _load_order(conn: sqlite3.Connection, order_id: int) -> dict[str, Any] | Non
 
 def _plan_from_order(order: dict[str, Any]) -> dict[str, Any] | None:
     rule_key = str(order.get("order_rule_key") or "").strip()
-    plan = LOVE_DELTA_RULE_KEYS.get(rule_key)
+    plan = ROMANCE_RULE_KEYS.get(rule_key)
     if plan is not None:
         return {**plan, "rule_key": rule_key}
 
     item = str(order.get("item") or "")
     category = str(order.get("category") or "")
-    if LOVE_DELTA_ITEM_HINT not in item and LOVE_DELTA_ITEM_HINT not in category:
-        return None
-
     label_text = f"{item} {category}"
+    if OUR_LOVE_ITEM_HINT in label_text:
+        for key, data in OUR_LOVE_RULE_KEYS.items():
+            if data["label"] in label_text or (
+                f"初始{int(data['initial_affection'])}" in label_text
+            ):
+                return {**data, "rule_key": key}
+        return None
+    if not any(hint in label_text for hint in (
+        LOVE_DELTA_ITEM_HINT, LOVE_DELTA_LEGACY_HINT,
+    )):
+        return None
     for key, data in LOVE_DELTA_RULE_KEYS.items():
         if data["label"] in label_text:
             return {**data, "rule_key": key}
@@ -414,7 +445,7 @@ def get_love_delta_entry_info(
             raise LookupError("找不到這張訂單。")
         plan = _plan_from_order(order)
         if plan is None:
-            raise ValueError("這張訂單不是戀與三角洲。")
+            raise ValueError("這張訂單不是戀與三角洲或我們的愛。")
         session_row = conn.execute(
             "SELECT started_at, completed_at FROM love_delta_sessions WHERE order_id = ? LIMIT 1",
             (int(order_id),),
@@ -434,7 +465,9 @@ def get_love_delta_entry_info(
         "started": started,
         "completed": completed,
         "plan": plan,
-        "href": f"/me/orders/{int(order_id)}/love-delta",
+        "href": f"/me/orders/{int(order_id)}/{'our-love' if plan['game_key'] == 'our_love' else 'love-delta'}",
+        "game_key": str(plan["game_key"]),
+        "game_title": "我們的愛" if plan["game_key"] == "our_love" else "戀與三角洲",
     }
 
 
@@ -451,7 +484,7 @@ def get_love_delta_context(
             raise LookupError("找不到這張訂單。")
         plan = _plan_from_order(order)
         if plan is None:
-            raise ValueError("這張訂單不是戀與三角洲。")
+            raise ValueError("這張訂單不是戀與三角洲或我們的愛。")
         companions = _active_companions(conn, order_id)
         role = _actor_role(order, companions, actor_discord_id)
         if role is None:
@@ -477,6 +510,8 @@ def get_love_delta_context(
         "state": state,
         "events": events,
         "read_only": status == "closed",
+        "game_key": str(plan["game_key"]),
+        "game_title": "我們的愛" if plan["game_key"] == "our_love" else "戀與三角洲",
     }
 
 
@@ -490,7 +525,7 @@ def _mutation_context(
         raise LookupError("找不到這張訂單。")
     plan = _plan_from_order(order)
     if plan is None:
-        raise ValueError("這張訂單不是戀與三角洲。")
+        raise ValueError("這張訂單不是戀與三角洲或我們的愛。")
     companions = _active_companions(conn, order_id)
     role = _actor_role(order, companions, actor_discord_id)
     if role is None:
