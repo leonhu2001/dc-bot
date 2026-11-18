@@ -32,7 +32,6 @@ from services.vip_monthly_order_discount import (
     resolve_vip_monthly_cash_discount,
 )
 
-
 _get_rule_from_self_service_data: Callable[..., Any]
 _is_specify_preference: Callable[..., bool]
 _role_key_for_member: Callable[..., Any]
@@ -43,7 +42,6 @@ get_effective_member_level: Callable[..., Any]
 get_self_service_quantity_unit: Callable[..., Any]
 get_vip_discount_pay_rate: Callable[..., Any]
 
-
 def is_self_service_staff_price_required(rule) -> bool:
     rule_key = str(getattr(rule, "key", "") or "").strip().lower()
     pricing_type = str(getattr(rule, "pricing_type", "") or "").strip().lower()
@@ -52,7 +50,6 @@ def is_self_service_staff_price_required(rule) -> bool:
         "staff",
         "custom",
     }
-
 
 def get_self_service_staff_price(data: dict) -> int | None:
     raw_amount = data.get("manual_staff_amount")
@@ -63,7 +60,6 @@ def get_self_service_staff_price(data: dict) -> int | None:
     except (TypeError, ValueError):
         return None
     return max(0, amount)
-
 
 def configure_self_service_financials(
     *,
@@ -107,12 +103,10 @@ def configure_self_service_financials(
         customer_reward_data=customer_reward_data,
     )
 
-
 def _format_plain_amount(amount: int | None) -> str:
     if amount is None:
         return "客服待填價"
     return f"{int(amount or 0):,}"
-
 
 def _price_int(src: dict, *keys, default=0):
     for key in keys:
@@ -123,7 +117,6 @@ def _price_int(src: dict, *keys, default=0):
         if value is not None:
             return int(value)
     return int(default)
-
 
 def _price_rate(src: dict) -> float:
     try:
@@ -138,7 +131,6 @@ def _price_rate(src: dict) -> float:
         return value
     return 100.0 - value
 
-
 def _price_snapshot(value) -> dict:
     if isinstance(value, dict):
         return dict(value)
@@ -147,7 +139,6 @@ def _price_snapshot(value) -> dict:
     except Exception:
         return {}
     return parsed if isinstance(parsed, dict) else {}
-
 
 def add_self_service_financial_breakdown_fields(
     embed: discord.Embed,
@@ -161,7 +152,6 @@ def add_self_service_financial_breakdown_fields(
         embed, src, final_label=final_label
     )
 
-
 def _format_percent_value(value) -> str:
     try:
         number = float(value or 0)
@@ -170,7 +160,6 @@ def _format_percent_value(value) -> str:
     if number.is_integer():
         return str(int(number))
     return f"{number:.2f}".rstrip("0").rstrip(".")
-
 
 def _parse_discount_percent_text(value: str | None) -> float:
     raw = str(value or "").strip().replace("%", "")
@@ -184,7 +173,6 @@ def _parse_discount_percent_text(value: str | None) -> float:
         raise ValueError("折後比例只能輸入 0～100。")
     return value
 
-
 def _parse_cash_amount_text(value: str | None) -> int:
     raw = str(value or "").strip().replace(",", "")
     if not raw:
@@ -196,7 +184,6 @@ def _parse_cash_amount_text(value: str | None) -> int:
     if amount < 0:
         raise ValueError("固定折扣金額不能小於 0。")
     return amount
-
 
 def _resolve_manual_discount_rate_percent(data: dict) -> float:
     raw = data.get("manual_discount_percent")
@@ -210,7 +197,6 @@ def _resolve_manual_discount_rate_percent(data: dict) -> float:
     if str(data.get("manual_discount_mode") or "").strip().lower() == "pay_rate":
         return value
     return 100.0 - value
-
 
 def _resolve_self_service_discount_rate(rule, data: dict) -> tuple[float, str, str, str]:
     """Resolve staff override first, otherwise apply the customer's effective VIP."""
@@ -250,7 +236,6 @@ def _resolve_self_service_discount_rate(rule, data: dict) -> tuple[float, str, s
     reason = f"{vip_name} 自動 VIP 折扣" if rate < 100 else ""
     return rate, reason, ("vip" if rate < 100 else "none"), vip_name
 
-
 def calculate_manual_price_adjustment(base_amount: int, data: dict) -> dict:
     original = max(0, int(base_amount or 0))
     rate = _resolve_manual_discount_rate_percent(data)
@@ -282,7 +267,6 @@ def calculate_manual_price_adjustment(base_amount: int, data: dict) -> dict:
         "cash_coupon_reason": str(data.get("cash_coupon_reason") or "").strip(),
     }
 
-
 def apply_manual_price_adjustment_to_order_data(data: dict, base_amount: int) -> dict:
     adjustment = calculate_manual_price_adjustment(base_amount, data)
     data.update(adjustment)
@@ -290,7 +274,6 @@ def apply_manual_price_adjustment_to_order_data(data: dict, base_amount: int) ->
     data["total_amount"] = adjustment["customer_pay_amount"]
     data["amount_text"] = _format_plain_amount(adjustment["customer_pay_amount"])
     return adjustment
-
 
 def _quote_preview_lines_raw(
     data: dict,
@@ -376,7 +359,7 @@ def _quote_preview_lines_raw(
         if is_internal_ammo_dump_rule(rule):
             named = selected_ammo_dump_named(data)
             lines.append(("掛名狀態", "有掛名" if named is True else "無掛名" if named is False else "等待客服勾選"))
-            if named is False:
+            if named is False and rule.key.endswith("500m"):
                 detail_parts.append(
                     "店家抽成前差額 350｜客服分潤 25%：88｜店家實留 262"
                 )
@@ -442,13 +425,11 @@ def _quote_preview_lines_raw(
         lines.append(("最低數量", f"{rule.min_quantity} {unit}"))
     return lines
 
-
 def _quote_preview_lines_for_self_service(
     data: dict, guild: discord.Guild | None = None
 ) -> list[tuple[str, str]]:
     from services.self_service_financial_copy import render_quote_rows
     return render_quote_rows(_quote_preview_lines_raw(data, guild), data)
-
 
 def add_self_service_quote_preview(
     embed: discord.Embed,
@@ -461,7 +442,6 @@ def add_self_service_quote_preview(
     preview_text = "\n".join(f"**{name}：** {value}" for name, value in lines)
     embed.add_field(name="訂單試算", value=preview_text[:1024], inline=False)
     return embed
-
 
 def _format_point_hours(hours) -> str:
     try:
@@ -476,11 +456,10 @@ def _format_point_hours(hours) -> str:
         return f"{int(value)}H"
     return f"{value:g}H"
 
-
 def _calculate_self_service_financials_unsettled(rule, price_result, data: dict) -> dict:
     if is_internal_ammo_dump_rule(rule):
         return apply_vip_monthly_store_funding(
-            apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data))
+            apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data, rule))
         )
     if is_aw_collision_rule(rule):
         return apply_vip_monthly_store_funding(calculate_aw_collision_financials(price_result, data))
@@ -701,7 +680,6 @@ def _calculate_self_service_financials_unsettled(rule, price_result, data: dict)
     }
     return apply_vip_monthly_store_funding(apply_urgent_fee(rule, data, financials))
 
-
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
     if data.get("website_finance_settled"):
         from services.self_service_financial_copy import _SETTLED_FINANCIAL_KEYS
@@ -728,7 +706,6 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
     return apply_promotion_funding_snapshot(
         _calculate_self_service_financials_unsettled(rule, price_result, data)
     )
-
 
 def apply_self_service_financials_to_order_data(data: dict, rule, price_result) -> dict:
     adjustment = calculate_self_service_financials(rule, price_result, data)

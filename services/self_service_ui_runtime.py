@@ -991,12 +991,15 @@ class _BaseSelfServiceOrderView(discord.ui.View):
             from services.staff_internal_ammo_dump_ui import InternalAmmoNamedView
 
             await interaction.response.send_message(
-                "送出倒子彈 500M 前，請由客服選擇掛名狀態。"
-                "\n有掛名 2,650T；無掛名 3,000T（差額 350T：客服 88T、店家 262T）。",
+                (
+                    f"送出{rule.label}前，請由客服選擇掛名狀態。"
+                    "\n100M／200M／300M 有無掛名同價；500M 保留差額 350T（客服 88T、店家 262T）。"
+                ),
                 view=InternalAmmoNamedView(
                     customer_id=self.customer_id,
                     channel_id=self.channel_id,
                     panel_message_id=panel_message_id,
+                    rule_key=str(rule.key),
                 ),
                 ephemeral=True,
             )

@@ -11,6 +11,9 @@ EXTERNAL_URGENT_FEE = 280
 # AW collision is not washing and must never receive the washing surcharge.
 INTERNAL_WASH_RULE_KEYS = frozenset({
     "staff_internal_car_500m",
+    "staff_internal_ammo_dump_100m",
+    "staff_internal_ammo_dump_200m",
+    "staff_internal_ammo_dump_300m",
     "staff_internal_ammo_dump_500m",
 })
 # External washing must attach only to the current car / ammo services.

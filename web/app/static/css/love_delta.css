@@ -320,3 +320,45 @@ body{
 @media(prefers-reduced-motion:reduce){
   *,*:before,*:after{animation:none !important;transition:none !important;scroll-behavior:auto !important}
 }
+
+/* 2026-11-18: dedicated blue technical-escort skin, without modifying Love Delta. */
+.ld-page.is-our-love{
+  --ld-ink:#102d4d; --ld-muted:#58748b; --ld-line:rgba(114,166,204,.62);
+  --ld-berry:#1379bd; --ld-berry-2:#37a8d9; --ld-lav:#285ea5;
+  --ld-mint:#189b9e; --ld-card:rgba(239,249,255,.95);
+  --ld-shadow:0 18px 48px rgba(8,46,90,.25);
+}
+.ld-page.is-our-love:after{
+  background:linear-gradient(180deg,rgba(5,32,72,.08),rgba(6,37,77,.28));
+}
+.ld-page.is-our-love .ld-original-controls,
+.ld-page.is-our-love #ldBossGuessCard,
+.ld-page.is-our-love #ldCompanionGuessCard{display:none!important}
+.ld-page:not(.is-our-love) #ldOurLoveCard,
+.ld-page:not(.is-our-love) [data-modal-tier="1000"]{display:none!important}
+.ld-page.is-our-love [data-modal-tier="300"],
+.ld-page.is-our-love [data-modal-tier="600"],
+.ld-page.is-our-love [data-modal-tier="900"]{display:none!important}
+.ld-page.is-our-love .ld-our-love-card{
+  border:1px solid rgba(121,192,232,.8);
+  box-shadow:var(--ld-shadow);
+}
+.ld-page.is-our-love .ld-our-love-card .ld-event{
+  border-color:rgba(103,169,213,.53);
+}
+.ld-page.is-our-love .ld-our-love-card .ld-settle-grid{
+  margin:18px 0;
+}
+.ld-page.is-our-love .ld-brand .ld-logo{
+  background:linear-gradient(135deg,#1073ad,#32c6d3);
+}
+.ld-page.is-our-love .ld-hero{
+  background:linear-gradient(135deg,rgba(242,251,255,.95),rgba(193,225,244,.89));
+}
+.ld-page.is-our-love .ld-state-row:nth-child(2),
+.ld-page.is-our-love .ld-state-row:nth-child(3),
+.ld-page.is-our-love .ld-state-row:nth-child(4),
+.ld-page.is-our-love .ld-state-row:nth-child(5){display:none}
+@media(max-width:560px){
+  .ld-page.is-our-love .ld-our-love-card .ld-event-grid{grid-template-columns:1fr}
+}

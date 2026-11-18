@@ -43,8 +43,8 @@
     <section class="customer-detail-card customer-love-delta-card" id="customerLoveDeltaCard" hidden>
         <div class="customer-love-delta-head">
             <div class="customer-love-delta-copy">
-                <div class="section-eyebrow">LOVE DELTA</div>
-                <h2>戀與三角洲</h2>
+                <div class="section-eyebrow" id="customerLoveDeltaEyebrow">LOVE DELTA</div>
+                <h2 id="customerLoveDeltaTitle">戀與三角洲</h2>
                 <p id="customerLoveDeltaCopy">正在確認本單攻略資格…</p>
             </div>
             <div class="customer-love-delta-actions" id="customerLoveDeltaActions"></div>
@@ -151,13 +151,16 @@
         if (!data || !data.eligible) return;
         card.hidden = false;
         const plan = data.plan || {};
+        const ourLove = plan.mode === "our_love";
+        document.getElementById("customerLoveDeltaTitle").textContent = ourLove ? "我們的愛" : "戀與三角洲";
+        document.getElementById("customerLoveDeltaEyebrow").textContent = ourLove ? "OUR LOVE" : "LOVE DELTA";
         const planText = `${plan.label || ""}・起始好感 ${plan.initial_affection ?? "-"}`;
 
         actions.replaceChildren();
         if (data.available) {
             copy.textContent = data.started
                 ? "攻略進度已建立。老闆與本單女陪會共用同一份即時進度。"
-                : "付款已完成。本單已開放戀與三角洲互動攻略。";
+                : (ourLove ? "付款已完成。本單已開放「我們的愛」專屬攻略。" : "付款已完成。本單已開放戀與三角洲互動攻略。");
             const link = document.createElement("a");
             link.className = "button button-primary";
             link.href = data.href;

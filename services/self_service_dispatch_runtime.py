@@ -430,12 +430,15 @@ async def _create_waiting_acceptance_order_once(
             f"客服備註：{staff_order_note}"
         )
 
-    if rule.key == "staff_internal_ammo_dump_500m":
+    from services.staff_internal_ammo_dump_policy import is_internal_ammo_dump_rule
+    if is_internal_ammo_dump_rule(rule):
         named = price_adjustment.get("staff_internal_ammo_named")
+        pay = int(price_adjustment.get("customer_pay_amount") or 0)
+        worker = int(price_adjustment.get("payout_base_amount") or 0)
+        margin = int(price_adjustment.get("store_margin_amount") or 0)
         web_note_parts.append(
-            "掛名：有掛名｜顧客 2650T｜代肝 2650T"
-            if named is True
-            else "掛名：無掛名｜顧客 3000T｜代肝 2650T｜店抽 350T"
+            f"掛名：{'有掛名' if named is True else '無掛名'}"
+            f"｜顧客 {pay}T｜代肝 {worker}T｜店抽 {margin}T"
         )
 
     if price_adjustment.get("urgent_fee_amount"):

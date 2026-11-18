@@ -78,7 +78,7 @@ def test_correct_guess_multiplies_positive_round_score(tmp_path):
     start(db)
     service.save_boss_guess("boss", 1, answer="非洲之心", hint_category="收藏品", hint_quality="紅色", db_file=db)
     service.save_companion_guess("girl1", 1, guess=" 非洲之心 ", db_file=db)
-    service.apply_love_delta_event("girl1", 1, "item_big_red", db_file=db)
+    service.apply_love_delta_event("boss", 1, "item_big_red", db_file=db)
     ctx = service.settle_love_delta_round(
         "boss", 1, expected_round=1, result="success", extraction_tier=300, db_file=db
     )
@@ -91,9 +91,9 @@ def test_failed_extraction_counts_safe_value_but_does_not_change_theme(tmp_path)
     db = tmp_path / "ld.db"
     make_db(db, rule_key="fun_mawan_galagame_standard")
     start(db)
-    service.apply_love_delta_event("girl1", 1, "item_gold", db_file=db)
+    service.apply_love_delta_event("boss", 1, "item_gold", db_file=db)
     ctx = service.settle_love_delta_round(
-        "girl1", 1, expected_round=1, result="fail", extraction_tier=600, db_file=db
+        "boss", 1, expected_round=1, result="fail", extraction_tier=600, db_file=db
     )
     assert ctx["state"]["affection"] == 11
     assert ctx["state"]["theme_affection"] == 0
@@ -114,7 +114,7 @@ def test_four_same_unlocks_next_round_loadout(tmp_path):
     db = tmp_path / "ld.db"
     make_db(db, rule_key="fun_mawan_galagame_standard")
     start(db)
-    service.apply_love_delta_event("girl1", 1, "four_same", db_file=db)
+    service.apply_love_delta_event("boss", 1, "four_same", db_file=db)
     ctx = service.save_next_loadout("boss", 1, agent="紅狼", weapon="M4A1", db_file=db)
     assert ctx["state"]["next_designation"] == {"round_no": 2, "agent": "紅狼", "weapon": "M4A1"}
     ctx = service.settle_love_delta_round("boss", 1, expected_round=1, result="success", extraction_tier=0, db_file=db)
@@ -127,3 +127,45 @@ def test_closed_unstarted_order_has_no_fake_history(tmp_path):
     info = service.get_love_delta_entry_info("boss", 1, db_file=db)
     assert info["view_only"] is False
     assert info["expired"] is True
+
+
+def test_our_love_uses_separate_rules_without_love_delta_guess_multiplier(tmp_path):
+    db = tmp_path / "our_love.db"
+    make_db(db, rule_key="fun_our_love_start_50")
+    initial = service.get_love_delta_context("boss", 1, db_file=db)
+    assert initial["plan"]["mode"] == "our_love"
+    assert initial["plan"]["guarantee_w"] == 3088
+    assert initial["state"]["affection"] == 50
+    service.start_love_delta("boss", 1, db_file=db)
+    service.apply_love_delta_event("boss", 1, "our_big_red", db_file=db)
+    service.apply_love_delta_event("boss", 1, "our_heart", db_file=db)
+    assert service.get_love_delta_context("boss", 1, db_file=db)["state"]["affection"] == 90
+    with pytest.raises(ValueError, match="我們的愛"):
+        service.apply_love_delta_event("boss", 1, "item_small_red", db_file=db)
+    with pytest.raises(PermissionError):
+        service.apply_love_delta_event("girl1", 1, "our_small_red", db_file=db)
+    fail = service.settle_love_delta_round(
+        "boss", 1, expected_round=1, result="fail", extraction_tier=0, db_file=db
+    )
+    assert fail["state"]["affection"] == 80
+    assert fail["state"]["round_no"] == 2
+    assert fail["state"]["theme_affection"] == 50
+    service.apply_love_delta_event("boss", 1, "our_small_red", db_file=db)
+    success = service.settle_love_delta_round(
+        "boss", 1, expected_round=2, result="success", extraction_tier=1000, db_file=db
+    )
+    assert success["state"]["affection"] == 90  # 80 + 2 + 5 + 3
+
+
+def test_original_love_delta_shipment_call_and_boss_only(tmp_path):
+    db = tmp_path / "old_love_delta.db"
+    make_db(db, rule_key="fun_mawan_galagame_standard")
+    service.start_love_delta("boss", 1, db_file=db)
+    score = service.apply_love_delta_event(
+        "boss", 1, "miss_shipment_call", db_file=db
+    )
+    assert score["state"]["affection"] == -2
+    with pytest.raises(PermissionError):
+        service.apply_love_delta_event("girl1", 1, "item_gold", db_file=db)
+    with pytest.raises(ValueError, match="戀與三角洲"):
+        service.apply_love_delta_event("boss", 1, "our_big_red", db_file=db)
