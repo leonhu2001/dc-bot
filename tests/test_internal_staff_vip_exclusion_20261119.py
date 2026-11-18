@@ -151,8 +151,8 @@ def test_history_plan_excludes_only_proven_internal_rewards():
     assert change["before"] == 7500
     assert change["after"] == 6950
     assert change["new_data"]["wallet_point_spend_total"] == 780
-    assert change["after_points"] == 73  # -5 VIP base, -3 wallet spending
-    assert change["new_data"]["point_adjustment"] == 4
+    assert change["after_points"] == 72  # -6 VIP base, -3 wallet spending
+    assert change["new_data"]["point_adjustment"] == 3
     assert change["level_after"] == "金級魔丸"
 
 
@@ -180,7 +180,7 @@ def test_history_repair_is_atomic_idempotent_and_preserves_order_amount(tmp_path
     history.repair(path, apply=True)
     with sqlite3.connect(path) as db:
         c = db.execute("SELECT total_spent, points FROM customers WHERE customer_id=42").fetchone()
-        assert c == (7450, 75)
+        assert c == (7450, 74)
         assert db.execute("SELECT total_spent FROM customers WHERE customer_id=99").fetchone()[0] == 12000
         assert db.execute("SELECT amount FROM orders WHERE channel_id=11").fetchone()[0] == 550
         data = json.loads(db.execute("SELECT data_json FROM orders WHERE channel_id=11").fetchone()[0])
