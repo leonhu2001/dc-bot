@@ -267,7 +267,7 @@ GROUP_SPECS = [
     {
         "key": "galagame",
         "category": "delta_desktop_fun",
-        "label": "魔丸娛樂嘎拉給木",
+        "label": "戀與三角洲",
         "selector_label": "難度",
         "description": "依好感度難度選擇本次趣味方案。",
         "variants": [
