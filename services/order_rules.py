@@ -1162,14 +1162,14 @@ for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
     ))
 
 
-# 魔丸娛樂嘎拉給木
+# 戀與三角洲（保留舊 fun_mawan_galagame_* 商品鍵相容歷史訂單）
 # 固定 1 單 / 2 位 / 只允許女陪或女護
 # 可指定女陪 / 女護，指定費 0T；不使用點數福利，客服人工折扣仍走通用折扣功能。
 for key, label, price in [
-    ("fun_mawan_galagame_basic", "魔丸娛樂嘎拉給木｜基礎", 1688),
-    ("fun_mawan_galagame_standard", "魔丸娛樂嘎拉給木｜標準", 2688),
-    ("fun_mawan_galagame_hard", "魔丸娛樂嘎拉給木｜困難", 4688),
-    ("fun_mawan_galagame_hell", "魔丸娛樂嘎拉給木｜地獄", 6688),
+    ("fun_mawan_galagame_basic", "戀與三角洲｜基礎", 1688),
+    ("fun_mawan_galagame_standard", "戀與三角洲｜標準", 2688),
+    ("fun_mawan_galagame_hard", "戀與三角洲｜困難", 4688),
+    ("fun_mawan_galagame_hell", "戀與三角洲｜地獄", 6688),
 ]:
     _add(OrderRule(
         "delta_desktop_fun",
@@ -2018,6 +2018,8 @@ NEW_FUN_PRICE_CARD_RULE_KEYS = frozenset({
 FULL_SOURCE_AUTHORITY_RULE_KEYS = frozenset({
     "fun_read_no_reply", "fun_eat_yourself",
     *(f"staff_internal_ammo_dump_{millions}m" for millions, _price in _INTERNAL_AMMO_DUMP_PRICES),
+    "fun_mawan_galagame_basic", "fun_mawan_galagame_standard",
+    "fun_mawan_galagame_hard", "fun_mawan_galagame_hell",
     # S12 3×3 latest approved price card: ignore preexisting manager overrides
     # while permitting explicit, newly confirmed changes in the rule manager.
     "farm_season_3x3_normal", "farm_season_3x3_dc_skin",
