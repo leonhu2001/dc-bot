@@ -480,7 +480,7 @@ def _format_point_hours(hours) -> str:
 def _calculate_self_service_financials_unsettled(rule, price_result, data: dict) -> dict:
     if is_internal_ammo_dump_rule(rule):
         return apply_vip_monthly_store_funding(
-            apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data))
+            apply_urgent_fee(rule, data, calculate_internal_ammo_dump_financials(price_result, data, rule_key=rule.key))
         )
     if is_aw_collision_rule(rule):
         return apply_vip_monthly_store_funding(calculate_aw_collision_financials(price_result, data))
