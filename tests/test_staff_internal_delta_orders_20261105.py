@@ -40,6 +40,9 @@ def test_internal_panel_is_channel_scoped_and_not_in_public_category_picker():
     select = view.children[0]
     assert select.custom_id == "quick_order_v2_service_staff_internal"
     assert [option.label for option in select.options] == [
+        "倒子彈｜100M",
+        "倒子彈｜200M",
+        "倒子彈｜300M",
         "倒子彈｜500M",
         "撞車｜500M",
         "AW 子彈",
@@ -54,6 +57,9 @@ def test_internal_panel_is_channel_scoped_and_not_in_public_category_picker():
 @pytest.mark.parametrize(
     ("group", "rule_key", "expected"),
     [
+        ("倒子彈｜100M", "staff_internal_ammo_dump_100m", 550),
+        ("倒子彈｜200M", "staff_internal_ammo_dump_200m", 1080),
+        ("倒子彈｜300M", "staff_internal_ammo_dump_300m", 1620),
         ("倒子彈｜500M", "staff_internal_ammo_dump_500m", 2650),
         ("撞車｜500M", "staff_internal_car_500m", 2480),
     ],
