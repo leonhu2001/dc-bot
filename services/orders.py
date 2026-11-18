@@ -206,7 +206,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
     ],
     "staff_internal": [
         {
-            "label": "倒子彈｜有／無掛名",
+            "label": "倒子彈｜100M～300M",
             "details": [
                 {
                     "label": f"倒子彈｜{millions}M｜{price:,}T（有／無掛名同價）",
@@ -215,8 +215,12 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
                     "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
                 }
                 for millions, price in ((100, 550), (200, 1080), (300, 1620))
-            ] + [
-                {"label": "倒子彈｜500M｜有／無掛名", "value": "ammo_dump_500m", "rule_key": "staff_internal_ammo_dump_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+            ],
+        },
+        {
+            "label": "倒子彈｜500M",
+            "details": [
+                {"label": "倒子彈｜500M", "value": "ammo_dump_500m", "rule_key": "staff_internal_ammo_dump_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
         {
