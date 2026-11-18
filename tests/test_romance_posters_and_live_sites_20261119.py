@@ -184,7 +184,12 @@ def test_love_delta_latest_distinct_scores(tmp_path):
 
 def test_two_live_website_routes_are_registered_and_priced_posters_are_current():
     from web.app.main import app
-    routes = {(route.path, ",".join(sorted(getattr(route, "methods", ())))) for route in app.routes}
+    # Other regression tests may inject _IncludedRouter compatibility objects.
+    # Check only actual FastAPI path routes, not these test-only proxies.
+    routes = {
+        (route.path, ",".join(sorted(getattr(route, "methods", ()))))
+        for route in app.routes if hasattr(route, "path")
+    }
     for path in (
         "/me/orders/{order_id}/love-delta",
         "/me/orders/{order_id}/our-love",
