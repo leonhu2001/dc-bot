@@ -513,8 +513,8 @@ def _customer_service_payout_base(order: WebOrder) -> int:
     from services.staff_internal_ammo_dump_policy import is_internal_ammo_dump_rule
 
     if is_internal_ammo_dump_rule(getattr(order, "order_rule_key", None)):
-        # Special 500M is 100% worker on 2,650T, CS takes 25% of only
-        # the extra 350T collected when the boss is unnamed.
+        # Every internal ammo tier pays the worker its named base.
+        # CS gets 25% of the exact unnamed difference (if any).
         return int(
             order.customer_pay_amount
             if order.customer_pay_amount is not None

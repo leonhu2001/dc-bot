@@ -4,12 +4,12 @@ from services.aw_collision_financials import calculate_aw_collision_financials
 
 
 AMMO_DUMP_RULE_KEY = "staff_internal_ammo_dump_500m"
-# The first three tiers use the same price with / without naming.
-# Legacy 500M keeps its separate 350T unnamed margin and CS 25% split.
+# Each unnamed tier pays the same worker base as its named tier.
+# CS receives 25% of the unnamed difference; 500M historic figures remain unchanged.
 AMMO_DUMP_PRICES_BY_RULE = {
-    "staff_internal_ammo_dump_100m": (550, 550, 550),
-    "staff_internal_ammo_dump_200m": (1080, 1080, 1080),
-    "staff_internal_ammo_dump_300m": (1620, 1620, 1620),
+    "staff_internal_ammo_dump_100m": (550, 620, 550),
+    "staff_internal_ammo_dump_200m": (1080, 1220, 1080),
+    "staff_internal_ammo_dump_300m": (1620, 1830, 1620),
     "staff_internal_ammo_dump_500m": (2650, 3000, 2650),
 }
 NAMED_PRICE = 2650
@@ -45,19 +45,24 @@ def require_ammo_dump_named_selection(rule_or_key, data: dict) -> None:
 def calculate_internal_ammo_dump_cs_payout(
     rule_or_key, customer_pay_amount: int | None, worker_payout_base_amount: int | None,
 ) -> int:
-    """Only unnamed 500M orders split their 350T store margin with CS.
+    """CS gets 25% of a recognized unnamed price difference, never worker base.
 
-    Fail closed for inconsistent prices/worker bases rather than introducing
-    phantom commissions on special products or damaged historical orders.
+    Check exact SKU/price/worker basis so historical overrides, discounts,
+    urgent charges, and unrelated orders cannot fabricate a CS payout.
     """
-    if str(getattr(rule_or_key, "key", rule_or_key) or "") != AMMO_DUMP_RULE_KEY:
+    key = str(getattr(rule_or_key, "key", rule_or_key) or "").strip()
+    prices = AMMO_DUMP_PRICES_BY_RULE.get(key)
+    if prices is None:
         return 0
+    named_price, unnamed_price, worker_base = prices
     if (
-        int(customer_pay_amount or 0) == UNNAMED_PRICE
-        and int(worker_payout_base_amount or 0) == WORKER_PAYOUT
+        int(customer_pay_amount or 0) != unnamed_price
+        or int(worker_payout_base_amount or 0) != worker_base
+        or unnamed_price <= named_price
     ):
-        return UNNAMED_CS_PAYOUT
-    return 0
+        return 0
+    difference = unnamed_price - worker_base
+    return int(difference * UNNAMED_CS_MARGIN_RATE + 0.5)
 
 
 def calculate_internal_ammo_dump_financials(

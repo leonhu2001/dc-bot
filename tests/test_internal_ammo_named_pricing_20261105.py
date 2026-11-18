@@ -146,9 +146,9 @@ def test_send_order_uses_named_dropdown_then_existing_note_modal():
 
 def test_store_internal_panel_displays_both_ammo_prices_and_cs_choice():
     panel = build_entry_embed(QUICK_ORDER_V2_CHANNELS["staff_internal"])
-    assert "有掛名 2,650T" in panel.description
-    assert "無掛名 3,000T" in panel.description
-    assert "由客服勾選" in panel.description
+    for amount in ("550T", "620T", "1,080T", "1,220T", "1,620T", "1,830T", "2,650T", "3,000T"):
+        assert amount in panel.description
+    assert "由客服在送單時勾選" in panel.description
 
 
 @pytest.mark.parametrize(
