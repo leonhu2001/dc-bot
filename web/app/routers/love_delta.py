@@ -9,6 +9,10 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
+from web.app.services.affection_game_service import (
+    get_entry_info as get_affection_entry_info,
+    legacy_romance_session_exists,
+)
 from web.app.services.love_delta_service import (
     apply_love_delta_event,
     clear_boss_guess,
@@ -121,11 +125,12 @@ async def love_delta_entry(request: Request, order_id: int):
     if not user_id:
         raise HTTPException(status_code=401, detail="請先登入。")
     try:
-        info = await run_in_threadpool(
-            get_love_delta_entry_info,
-            user_id,
-            int(order_id),
-        )
+        if legacy_romance_session_exists(int(order_id)):
+            info = await run_in_threadpool(get_love_delta_entry_info, user_id, int(order_id))
+        else:
+            info = await run_in_threadpool(
+                get_affection_entry_info, user_id, int(order_id), game="romance"
+            )
     except (LookupError, PermissionError, ValueError) as exc:
         raise _json_error(exc) from exc
     return {"ok": True, **info}
@@ -140,6 +145,11 @@ async def love_delta_page(request: Request, order_id: int):
         return RedirectResponse(
             url=f"/auth/discord/login?next={next_path}",
             status_code=303,
+        )
+
+    if not legacy_romance_session_exists(int(order_id)):
+        return RedirectResponse(
+            url=f"/me/orders/{int(order_id)}/romance-delta", status_code=303,
         )
 
     try:
