@@ -1,4 +1,5 @@
 """Internal employee wash/AW must not award VIP, with a reversible history repair."""
+import asyncio
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -90,15 +91,14 @@ def test_public_orders_are_not_excluded(rule_key):
     })
 
 
-@pytest.mark.asyncio
-async def test_non_wallet_staff_payment_counts_order_not_vip_or_points(monkeypatch):
+def test_non_wallet_staff_payment_counts_order_not_vip_or_points(monkeypatch):
     orders = {7: {"category": "staff_internal", "order_rule_key": "staff_internal_aw_collision"}}
     users = {}
     monkeypatch.setattr(rewards, "_ORDER_SELECTIONS", orders)
     monkeypatch.setattr(rewards, "_CUSTOMER_REWARDS", users)
     monkeypatch.setattr(rewards, "_SAVE_BOT_DATA", lambda: None)
     rewards.configure_rewards(member_levels=[dict(x) for x in BASE_MEMBER_LEVELS])
-    result = await rewards.add_customer_reward_from_order(None, 7, 42, "3000T")
+    result = asyncio.run(rewards.add_customer_reward_from_order(None, 7, 42, "3000T"))
     assert "不累積 VIP" in result
     assert users[42]["total_spent"] == 0
     assert users[42]["order_count"] == 1
@@ -106,14 +106,13 @@ async def test_non_wallet_staff_payment_counts_order_not_vip_or_points(monkeypat
     assert orders[7]["reward_counted"] is True
     assert orders[7]["reward_amount"] == 0
     assert orders[7]["reward_excluded"] is True
-    await rewards.add_customer_reward_from_order(None, 7, 42, "3000T")
+    asyncio.run(rewards.add_customer_reward_from_order(None, 7, 42, "3000T"))
     assert users[42]["order_count"] == 1
     assert rewards.sync_reward_counted_order_amount(orders[7], 3100) is None
     assert users[42]["total_spent"] == 0
 
 
-@pytest.mark.asyncio
-async def test_wallet_staff_payment_keeps_topup_progress_but_no_spend_points(monkeypatch):
+def test_wallet_staff_payment_keeps_topup_progress_but_no_spend_points(monkeypatch):
     orders = {7: {
         "category": "staff_internal",
         "order_rule_key": "staff_internal_ammo_dump_200m",
@@ -126,9 +125,9 @@ async def test_wallet_staff_payment_keeps_topup_progress_but_no_spend_points(mon
     monkeypatch.setattr(rewards, "_CUSTOMER_REWARDS", users)
     monkeypatch.setattr(rewards, "_SAVE_BOT_DATA", lambda: None)
     rewards.configure_rewards(member_levels=[dict(x) for x in BASE_MEMBER_LEVELS])
-    result = await wallet_spend_rewards._wallet_aware_add_customer_reward_from_order(
+    result = asyncio.run(wallet_spend_rewards._wallet_aware_add_customer_reward_from_order(
         None, 7, 42, "1220"
-    )
+    ))
     assert "不累積 VIP" in result
     assert users[42]["total_spent"] == 6000
     assert users[42]["wallet_point_spend_total"] == 200
