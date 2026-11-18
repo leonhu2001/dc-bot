@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from services import rewards
+from services.internal_non_vip_policy import (
+    INTERNAL_NO_VIP_REASON,
+    is_internal_non_vip_order,
+)
 
 
 _PATCH_INSTALLED_ATTR = "_wallet_spend_rewards_patch_installed"
@@ -31,7 +35,11 @@ def _order_amount(order_data: dict[str, Any], amount_text: str | None = None) ->
 
 def _is_wallet_point_excluded(order_data: dict[str, Any]) -> bool:
     item = str(order_data.get("item") or "").strip()
-    return item in rewards.NO_VIP_REWARD_ITEMS or item in rewards.VIP_PROGRESS_EXCLUDED_ITEMS
+    return (
+        is_internal_non_vip_order(order_data)
+        or item in rewards.NO_VIP_REWARD_ITEMS
+        or item in rewards.VIP_PROGRESS_EXCLUDED_ITEMS
+    )
 
 
 def _award_wallet_spend_points(data: dict[str, Any], amount: int) -> int:
@@ -124,6 +132,8 @@ async def _wallet_aware_add_customer_reward_from_order(
         earned=earned,
         excluded=excluded,
     )
+    if is_internal_non_vip_order(order_data):
+        order_data["reward_excluded_reason"] = INTERNAL_NO_VIP_REASON
     rewards._ORDER_SELECTIONS[order_channel_id] = order_data
 
     if rewards._SAVE_BOT_DATA is not None:
