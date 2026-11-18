@@ -4,6 +4,14 @@ from services.aw_collision_financials import calculate_aw_collision_financials
 
 
 AMMO_DUMP_RULE_KEY = "staff_internal_ammo_dump_500m"
+# The first three tiers use the same price with / without naming.
+# Legacy 500M keeps its separate 350T unnamed margin and CS 25% split.
+AMMO_DUMP_PRICES_BY_RULE = {
+    "staff_internal_ammo_dump_100m": (550, 550, 550),
+    "staff_internal_ammo_dump_200m": (1080, 1080, 1080),
+    "staff_internal_ammo_dump_300m": (1620, 1620, 1620),
+    "staff_internal_ammo_dump_500m": (2650, 3000, 2650),
+}
 NAMED_PRICE = 2650
 UNNAMED_PRICE = 3000
 WORKER_PAYOUT = 2650
@@ -18,7 +26,7 @@ NAMED_SELECTION_KEY = "staff_internal_ammo_named"
 
 def is_internal_ammo_dump_rule(rule_or_key) -> bool:
     key = str(getattr(rule_or_key, "key", rule_or_key) or "").strip()
-    return key == AMMO_DUMP_RULE_KEY
+    return key in AMMO_DUMP_PRICES_BY_RULE
 
 
 def selected_ammo_dump_named(data: dict | None) -> bool | None:
@@ -31,7 +39,7 @@ def selected_ammo_dump_named(data: dict | None) -> bool | None:
 
 def require_ammo_dump_named_selection(rule_or_key, data: dict) -> None:
     if is_internal_ammo_dump_rule(rule_or_key) and selected_ammo_dump_named(data) is None:
-        raise ValueError("倒子彈 500M 請先由客服選擇「有掛名」或「無掛名」才能送出。")
+        raise ValueError("內部倒子彈請先由客服選擇「有掛名」或「無掛名」才能送出。")
 
 
 def calculate_internal_ammo_dump_cs_payout(
@@ -42,7 +50,7 @@ def calculate_internal_ammo_dump_cs_payout(
     Fail closed for inconsistent prices/worker bases rather than introducing
     phantom commissions on special products or damaged historical orders.
     """
-    if not is_internal_ammo_dump_rule(rule_or_key):
+    if str(getattr(rule_or_key, "key", rule_or_key) or "") != AMMO_DUMP_RULE_KEY:
         return 0
     if (
         int(customer_pay_amount or 0) == UNNAMED_PRICE
@@ -52,13 +60,19 @@ def calculate_internal_ammo_dump_cs_payout(
     return 0
 
 
-def calculate_internal_ammo_dump_financials(price_result, data: dict) -> dict:
+def calculate_internal_ammo_dump_financials(
+    price_result, data: dict, rule_or_key=AMMO_DUMP_RULE_KEY,
+) -> dict:
+    rule_key = str(getattr(rule_or_key, "key", rule_or_key) or "")
+    if rule_key not in AMMO_DUMP_PRICES_BY_RULE:
+        raise ValueError("不是內部倒子彈商品。")
+    named_price, unnamed_price, worker_payout = AMMO_DUMP_PRICES_BY_RULE[rule_key]
     named = selected_ammo_dump_named(data)
-    customer_price = UNNAMED_PRICE if named is False else NAMED_PRICE
-    store_margin = customer_price - WORKER_PAYOUT if named is not None else 0
+    customer_price = unnamed_price if named is False else named_price
+    store_margin = customer_price - worker_payout if named is not None else 0
     customer_service_payout = (
         calculate_internal_ammo_dump_cs_payout(
-            AMMO_DUMP_RULE_KEY, customer_price, WORKER_PAYOUT
+            rule_key, customer_price, worker_payout
         )
         if named is not None else 0
     )
@@ -75,7 +89,7 @@ def calculate_internal_ammo_dump_financials(price_result, data: dict) -> dict:
         original_amount=customer_price,
         priced_amount=customer_price,
         customer_pay_amount=customer_price,
-        payout_base_amount=WORKER_PAYOUT,
+        payout_base_amount=worker_payout,
         store_margin_amount=store_margin,
         customer_service_payout_amount=customer_service_payout,
         store_retained_amount=store_margin - customer_service_payout,
@@ -86,6 +100,7 @@ def calculate_internal_ammo_dump_financials(price_result, data: dict) -> dict:
 
 __all__ = [
     "AMMO_DUMP_RULE_KEY",
+    "AMMO_DUMP_PRICES_BY_RULE",
     "NAMED_PRICE",
     "UNNAMED_PRICE",
     "WORKER_PAYOUT",
