@@ -145,7 +145,7 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
         )
     elif channel_id == QUICK_ORDER_V2_CHANNELS["staff_internal"]:
         embed = discord.Embed(
-            title="🛠️ 內部專用｜價目表",
+            title="🛠️ 內部專用｜洗幣與 AW 子彈",
             description=(
                 "**倒子彈｜掛名／沒掛名**\n"
                 "100M｜550T／620T\n"
