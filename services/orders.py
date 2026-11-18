@@ -156,7 +156,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
                     "rule_key": f"fun_our_love_start_{start}",
                     "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
                 }
-                for start, guarantee, price in ((50, 2088, 2888), (0, 3688, 4888))
+                for start, guarantee, price in ((75, 2088, 2488), (50, 3088, 3688), (0, 3688, 4888))
             ],
         },
         {
@@ -205,6 +205,18 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         },
     ],
     "staff_internal": [
+        *[
+            {
+                "label": f"倒子彈｜{millions}M",
+                "details": [{
+                    "label": f"倒子彈｜{millions}M",
+                    "value": f"ammo_dump_{millions}m",
+                    "rule_key": f"staff_internal_ammo_dump_{millions}m",
+                    "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
+                }],
+            }
+            for millions in (100, 200, 300)
+        ],
         {
             "label": "倒子彈｜500M",
             "details": [
