@@ -110,14 +110,14 @@ def test_ammo_requires_explicit_customer_service_choice_before_dispatch():
 def test_named_state_clears_when_switching_product():
     data = {
         "category": "staff_internal",
-        "item_group": "倒子彈｜500M",
+        "item_group": "倒子彈",
         "order_rule_key": AMMO_DUMP_RULE_KEY,
         NAMED_SELECTION_KEY: False,
         "staff_internal_ammo_named_set_by": 123,
         "staff_internal_ammo_named_set_at": "now",
         "store_margin_amount": 350,
     }
-    apply_self_service_item_group_selection(data, "撞車｜500M")
+    apply_self_service_item_group_selection(data, "撞車")
     assert data["order_rule_key"] == "staff_internal_car_500m"
     assert NAMED_SELECTION_KEY not in data
     assert "staff_internal_ammo_named_set_by" not in data
@@ -148,7 +148,8 @@ def test_store_internal_panel_displays_both_ammo_prices_and_cs_choice():
     panel = build_entry_embed(QUICK_ORDER_V2_CHANNELS["staff_internal"])
     for amount in ("550T", "620T", "1,080T", "1,220T", "1,620T", "1,830T", "2,650T", "3,000T"):
         assert amount in panel.description
-    assert "由客服在送單時勾選" in panel.description
+    assert "倒子彈｜掛名／沒掛名" in panel.description
+    assert "由客服在送單時勾選" not in panel.description
 
 
 @pytest.mark.parametrize(

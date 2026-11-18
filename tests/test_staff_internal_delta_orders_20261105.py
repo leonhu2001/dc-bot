@@ -22,6 +22,7 @@ from services.quick_order_v2 import (
 )
 from services.self_service_selection_state import (
     apply_self_service_category_selection,
+    apply_self_service_detail_selection,
     apply_self_service_item_group_selection,
 )
 
@@ -40,29 +41,38 @@ def test_internal_panel_is_channel_scoped_and_not_in_public_category_picker():
     select = view.children[0]
     assert select.custom_id == "quick_order_v2_service_staff_internal"
     assert [option.label for option in select.options] == [
-        "倒子彈｜100M~300M",
-        "倒子彈｜500M",
-        "撞車｜500M",
-        "AW 子彈",
+        "倒子彈", "撞車", "AW 子彈",
     ]
+    assert all(option.description is None for option in select.options)
     panel = build_entry_embed(channel_id)
-    assert "2,650T" in panel.description
+    assert panel.title == "🛠️ 內部專用｜洗幣與 AW 子彈"
+    assert "2,650T／3,000T" in panel.description
     assert "2,480T" in panel.description
     assert "4T／發" in panel.description
-    assert "私密表單提交登入帳密" in panel.description
+    assert "+260T" in panel.description
+    assert "請在下方選擇" not in panel.description
+    assert "私密表單" not in panel.description
 
 
 @pytest.mark.parametrize(
     ("group", "rule_key", "expected"),
     [
-        ("倒子彈｜500M", "staff_internal_ammo_dump_500m", 2650),
-        ("撞車｜500M", "staff_internal_car_500m", 2480),
+        ("倒子彈", "staff_internal_ammo_dump_500m", 2650),
+        ("撞車", "staff_internal_car_500m", 2480),
     ],
 )
 def test_internal_500m_coin_wash_is_one_fixed_normal_order(group, rule_key, expected):
     draft = {}
     apply_self_service_category_selection(draft, INTERNAL_CATEGORY)
     detail = apply_self_service_item_group_selection(draft, group)
+    if group == "倒子彈":
+        assert detail is None  # Four selectable M quantities share one group.
+        assert "order_rule_key" not in draft
+        detail = next(
+            entry for entry in orders.get_order_item_details_for_group(INTERNAL_CATEGORY, group)
+            if entry["rule_key"] == rule_key
+        )
+        apply_self_service_detail_selection(draft, detail)
 
     assert detail is not None
     assert draft["order_rule_key"] == rule_key

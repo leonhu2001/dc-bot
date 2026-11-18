@@ -131,14 +131,32 @@ def test_cs_payout_fails_closed_for_wrong_amounts(
     ) == 0
 
 
-def test_internal_discord_catalog_shows_all_three_new_tiers_and_retains_500m():
-    groups = {entry["label"]: entry for entry in SELF_SERVICE_ORDER_CATALOG["staff_internal"]}
-    assert "倒子彈｜500M" in groups
-    assert "倒子彈｜100M～300M" in groups
-    details = groups["倒子彈｜100M～300M"]["details"]
+def test_internal_discord_catalog_groups_four_ammo_tiers_once():
+    from services.orders import get_order_item_details_for_group, get_live_order_item_groups
+
+    category = "staff_internal"
+    assert get_live_order_item_groups(category) == ["倒子彈", "撞車", "AW 子彈"]
+    groups = {entry["label"]: entry for entry in SELF_SERVICE_ORDER_CATALOG[category]}
+    assert list(groups) == ["倒子彈", "撞車", "AW 子彈"]
+    details = get_order_item_details_for_group(category, "倒子彈")
     assert [entry["rule_key"] for entry in details] == [
-        f"staff_internal_ammo_dump_{million}m" for million in (100, 200, 300)
+        f"staff_internal_ammo_dump_{million}m" for million in (100, 200, 300, 500)
     ]
     for entry, (millions, named_price, unnamed_price, *_rest) in zip(details, TIERS):
+        assert f"{millions}M" in entry["label"]
         assert f"{named_price:,}T" in entry["label"]
         assert f"{unnamed_price:,}T" in entry["label"]
+        assert entry["value"] == f"ammo_dump_{millions}m"
+        assert entry["min_quantity"] == entry["max_quantity"] == 1
+
+    # Open tickets from the old split menus must still resolve exactly
+    # their original rule keys (and not silently switch to 100M).
+    assert [item["rule_key"] for item in get_order_item_details_for_group(
+        category, "倒子彈｜100M～300M",
+    )] == [f"staff_internal_ammo_dump_{m}m" for m in (100, 200, 300)]
+    assert [item["rule_key"] for item in get_order_item_details_for_group(
+        category, "倒子彈｜500M",
+    )] == ["staff_internal_ammo_dump_500m"]
+    assert [item["rule_key"] for item in get_order_item_details_for_group(
+        category, "撞車｜500M",
+    )] == ["staff_internal_car_500m"]
