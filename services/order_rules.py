@@ -170,6 +170,9 @@ COIN_WASH_ORDER_RULE_KEYS = frozenset({
     "farm_coin_wash_ammo_dump",
     *PUBLIC_COIN_WASH_PRICE_RULE_KEYS,
     "staff_internal_ammo_dump_500m",
+    "staff_internal_ammo_dump_100m",
+    "staff_internal_ammo_dump_200m",
+    "staff_internal_ammo_dump_300m",
     "staff_internal_car_500m",
 })
 AW_COLLISION_ORDER_RULE_KEYS = frozenset({
@@ -1126,10 +1129,11 @@ for _tier, _price, _guarantee, _weight in _EAT_TO_FAT_PLANS:
     ))
 
 
-# 2026-11-16 趣味單｜我們的愛：固定 2 位護航以上。
+# 2026-11-18 趣味單｜我們的愛：固定 2 位護航以上。
 # 店主確認男護、女護、頂護皆可接；陪玩身分組不可接。
 _OUR_LOVE_PLANS = (
-    ("start_50", 2888, 50, 2088),
+    ("start_75", 2488, 75, 2088),
+    ("start_50", 3688, 50, 3088),
     ("start_0", 4888, 0, 3688),
 )
 for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
@@ -1149,9 +1153,9 @@ for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
         note=(
             f"初始好感度{_start}；保底{_guarantee}W；好感度達100結單。"
             "加分：陪玩擊殺1名幹員+1，摸出小紅+2，大紅/金卡/紫卡+5，"
-            "大大紅/紅卡+8，非洲之心/海洋之淚/復甦呼吸機+35，"
-            "撤離成功+5，千萬撤離額外+5。"
-            "扣分：撤離失敗-15，老闆擊殺1名幹員-3。"
+            "大大紅/紅卡+10，非洲之心/海洋之淚/復甦呼吸機+35，"
+            "撤離成功+5，千萬撤離額外+3。"
+            "扣分：撤離失敗-10，老闆擊殺1名幹員-1。撤離失敗時保險箱內的紅也計分。"
             "物品判定：小紅1-4格、大紅6格、大大紅9-12格，紅修不算。"
             "專屬技術陪玩單；兩位接單者皆須為男護／女護／頂護之一。"
         ),
@@ -1335,6 +1339,20 @@ for key, plan in AW_COLLISION_PRICING_BY_RULE.items():
 
 # 內部員工固定價商品。只由內部下單頻道提供入口，並不加入公開分類選項。
 # 票口沿用正常接單流程；付款成立後觸發帳號密碼私密流程。
+# 100M/200M/300M 倒子彈：有掛名及無掛名暫時同價，500M 原差額規則不變。
+_INTERNAL_AMMO_DUMP_PRICES = ((100, 550), (200, 1080), (300, 1620))
+for _millions, _price in _INTERNAL_AMMO_DUMP_PRICES:
+    _add(OrderRule(
+        category="staff_internal",
+        key=f"staff_internal_ammo_dump_{_millions}m",
+        label=f"內部洗幣｜倒子彈 {_millions}M",
+        pricing_type="fixed", price=_price,
+        allowed_roles=HALFCOIN_RECEIVER_ROLES, required_staff_count=1,
+        min_quantity=1, max_quantity=1, allow_specify=False,
+        vip_discount_allowed=False, point_benefits_allowed=False,
+        loyalty_benefits_enabled=False, required_game_roles=(),
+        note="有掛名／無掛名價格一致；整筆金額歸接單打手，加急另計。",
+    ))
 for key, label, price in (
     ("staff_internal_ammo_dump_500m", "內部洗幣｜倒子彈 500M", 2650),
     ("staff_internal_car_500m", "內部洗幣｜撞車 500M", 2480),
@@ -1999,6 +2017,7 @@ NEW_FUN_PRICE_CARD_RULE_KEYS = frozenset({
 })
 FULL_SOURCE_AUTHORITY_RULE_KEYS = frozenset({
     "fun_read_no_reply", "fun_eat_yourself",
+    *(f"staff_internal_ammo_dump_{millions}m" for millions, _price in _INTERNAL_AMMO_DUMP_PRICES),
     # S12 3×3 latest approved price card: ignore preexisting manager overrides
     # while permitting explicit, newly confirmed changes in the rule manager.
     "farm_season_3x3_normal", "farm_season_3x3_dc_skin",
