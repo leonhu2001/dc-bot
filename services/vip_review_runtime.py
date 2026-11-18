@@ -298,11 +298,13 @@ async def _reconcile_existing_reset_vip_roles(bot: discord.Client) -> int | None
 
         try:
             succeeded = await _sync_member_benefits(bot, int(customer_id), data)
-            if succeeded:
+            # Preserve legacy manual-reset scan semantics. New repair markers
+            # are cleared only after a confirmed member-role sync.
+            if not correction_pending or succeeded:
                 synced += 1
-                if correction_pending:
-                    data.pop("vip_internal_exclusion_role_sync_pending", None)
-                    pending_cleared = True
+            if correction_pending and succeeded:
+                data.pop("vip_internal_exclusion_role_sync_pending", None)
+                pending_cleared = True
         except Exception:
             print(
                 "[vip-review] role reconciliation failed "
