@@ -1,0 +1,123 @@
+{% extends "site_layout.html" %}
+{% block head %}
+<link rel="stylesheet" href="/static/css/affection_games.css?v=20261118-1">
+{% endblock %}
+{% block content %}
+{% set ag = affection %}
+{% set our_love = ag.plan.game == "our_love" %}
+<section class="ag-page {{ 'ag-page--blue' if our_love else 'ag-page--pink' }}" id="affectionGameRoot" data-order-id="{{ ag.order.id }}">
+  <div class="ag-shell">
+    <div class="ag-top">
+      <div class="ag-brand"><span class="ag-brand-mark">{{ '✦' if our_love else '♡' }}</span>
+        <div><small>{{ 'BLUE AFFECTION' if our_love else 'ROMANCE ROUTE' }}</small><h1>{{ ag.plan.title }}</h1></div>
+      </div>
+      <a class="ag-back" href="{{ '/me/orders/' ~ ag.order.id if ag.viewer.role == 'boss' else '/dispatch' }}">返回{{ '訂單' if ag.viewer.role == 'boss' else '接單大廳' }}</a>
+    </div>
+    <div class="ag-subline">
+      <span>訂單 {{ ag.order.no }}</span>
+      <span>{{ '老闆' if ag.viewer.role == 'boss' else '接單者' }}・共同進度已連線</span>
+    </div>
+    <section class="ag-hero">
+      <div class="ag-hero-info">
+        <span class="ag-kicker">{{ ag.plan.label }}方案</span>
+        <strong>好感度達到 <em>100</em> 即可結單</strong>
+        <div class="ag-plan-tags">
+          <span>{{ "{:,}".format(ag.plan.price) }}T</span>
+          <span>起始好感 {{ ag.plan.initial_affection }}</span>
+          {% if ag.plan.guarantee_w %}<span>保底 {{ ag.plan.guarantee_w }}W</span>{% endif %}
+        </div>
+      </div>
+      <div class="ag-affection">
+        <span>目前好感度</span>
+        <div><b id="agScore">{{ ag.state.affection }}</b><small>/ 100</small></div>
+      </div>
+      <div class="ag-progress"><div id="agProgressFill"></div></div>
+      <div class="ag-progress-labels"><span>-80</span><span>0</span><span>100 完成</span></div>
+      <div class="ag-hero-foot">
+        <span>第 <b id="agRound">{{ ag.state.round_no }}</b> 局</span>
+        <span id="agStatus">{{ '已完成' if ag.state.completed else ('進行中' if ag.state.started else '尚未開始') }}</span>
+      </div>
+    </section>
+
+    <div class="ag-columns">
+      <main class="ag-main">
+        <section class="ag-card">
+          <div class="ag-card-heading"><span class="ag-icon">✦</span><div><small>AFFECTION EVENTS</small><h2>本局好感度紀錄</h2></div></div>
+          <p class="ag-description">點選發生的事件即可記分，操作會同步給這張訂單的所有參與者；可撤銷上一筆未結算的操作。</p>
+          <div class="ag-events" id="agEvents">
+            {% for event in ag.rules %}
+            <button type="button" class="ag-event" data-event="{{ event.key }}" {% if ag.viewer.role != 'boss' or ag.read_only or not ag.state.started or ag.state.completed %}disabled{% endif %}>
+              <span>{{ event.label }}</span>
+              <b class="{{ 'positive' if event.points > 0 else 'negative' }}">{{ '+' if event.points > 0 else '' }}{{ event.points }}</b>
+            </button>
+            {% endfor %}
+          </div>
+        </section>
+        <section class="ag-card ag-card--settle">
+          <div class="ag-card-heading"><span class="ag-icon">⌁</span><div><small>EXTRACTION</small><h2>本局撤離結算</h2></div></div>
+          {% if our_love %}
+          <p class="ag-description">撤離成功 +5；撤離失敗 -10。成功且千萬撤離時額外 +3，僅計一次；失敗時保險內的紅色物資同樣可照上方規則計分。</p>
+          {% else %}
+          <p class="ag-description">500W 以上成功撤離額外 +3，同一局不可疊加。撤離失敗時，保險內物資依上方分數照常計算；娛樂單無賠付。</p>
+          {% endif %}
+          <label class="ag-extra"><input id="agExtra" type="checkbox" {% if ag.viewer.role != 'boss' or ag.read_only or not ag.state.started or ag.state.completed %}disabled{% endif %}><span>{{ '本局達千萬撤離（額外 +3）' if our_love else '本局達 500W 撤離（+3，不疊加）' }}</span></label>
+          <div class="ag-settle">
+            <button type="button" id="agSettleSuccess" class="ag-button ag-button--success" {% if ag.viewer.role != 'boss' or ag.read_only or not ag.state.started or ag.state.completed %}disabled{% endif %}>成功撤離</button>
+            <button type="button" id="agSettleFail" class="ag-button ag-button--danger" {% if ag.viewer.role != 'boss' or ag.read_only or not ag.state.started or ag.state.completed %}disabled{% endif %}>撤離失敗</button>
+          </div>
+        </section>
+        <section class="ag-card ag-rules">
+          <div class="ag-card-heading"><span class="ag-icon">!</span><div><small>IMPORTANT</small><h2>玩法與注意事項</h2></div></div>
+          {% if our_love %}
+          <p>小紅 1～4 格，大紅 6 格，大大紅 9～12 格；紅修不算。</p>
+          <p>保底依目前方案，固定兩位護航（男護、女護、頂護皆可）。撤離失敗，保險內的紅也計入本局好感。</p>
+          {% else %}
+          <p>默認機密地圖；娛樂單無賠付。摸到心／淚以 +30 計，不再另外疊加一般大紅 +10。</p>
+          <p>出大紅時須向老闆說「寶寶出貨啦 ❤️」。新圖寫明沒喊要扣分，但<strong>未標註扣幾分</strong>，系統不會擅自扣分，請客服先確認。</p>
+          <p>最終解釋權歸魔丸娛樂所有。</p>
+          {% endif %}
+        </section>
+      </main>
+      <aside class="ag-aside">
+        <section class="ag-card">
+          <div class="ag-card-heading"><span class="ag-icon">≡</span><div><small>LIVE HISTORY</small><h2>即時計分紀錄</h2></div></div>
+          <ol class="ag-history" id="agHistory"></ol>
+          {% if ag.viewer.role == 'boss' %}
+          <button type="button" class="ag-button ag-button--secondary" id="agUndo">撤銷上一筆計分</button>
+          {% endif %}
+        </section>
+      </aside>
+    </div>
+  </div>
+  <div class="ag-intro" id="agIntro" {% if ag.state.started or ag.read_only %}hidden{% endif %}>
+    <div class="ag-intro-card">
+      <span class="ag-intro-icon">{{ '✦' if our_love else '♡' }}</span>
+      <small>SHARED AFFECTION JOURNEY</small>
+      <h2>{{ ag.plan.title }}</h2>
+      <p>{{ ag.plan.label }}方案，起始好感 {{ ag.plan.initial_affection }}。老闆啟動後，這筆訂單的接單人員就能同步查看進度。</p>
+      {% if ag.viewer.role == 'boss' %}
+      <button type="button" id="agStart" class="ag-button ag-button--primary">開始攻略</button>
+      {% else %}
+      <button type="button" class="ag-button ag-button--primary" disabled>等待老闆開始</button>
+      {% endif %}
+    </div>
+  </div>
+  <div class="ag-toast" id="agToast" role="status" aria-live="polite"></div>
+  <dialog class="ag-dialog" id="agConfirm">
+    <div class="ag-dialog-body">
+      <h3>確認本局結算</h3>
+      <p id="agConfirmText"></p>
+      <div class="ag-dialog-buttons">
+        <button type="button" class="ag-button ag-button--secondary" id="agCancel">返回</button>
+        <button type="button" class="ag-button ag-button--primary" id="agConfirmSubmit">確認結算</button>
+      </div>
+    </div>
+  </dialog>
+</section>
+{% endblock %}
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+window.AFFECTION_GAME_BOOTSTRAP = {{ affection|tojson }};
+</script>
+<script src="/static/js/affection_games.js?v=20261118-1" defer></script>
+{% endblock %}
