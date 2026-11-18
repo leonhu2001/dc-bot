@@ -206,27 +206,24 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
     ],
     "staff_internal": [
         {
-            "label": "倒子彈｜100M～300M",
+            "label": "倒子彈",
             "details": [
                 {
-                    "label": f"倒子彈｜{millions}M｜掛名 {price:,}T／沒掛名 {unnamed:,}T",
+                    "label": f"{millions}M｜掛名 {price:,}T／沒掛名 {unnamed:,}T",
                     "value": f"ammo_dump_{millions}m",
                     "rule_key": f"staff_internal_ammo_dump_{millions}m",
                     "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
                 }
-                for millions, price, unnamed in ((100, 550, 620), (200, 1080, 1220), (300, 1620, 1830))
+                for millions, price, unnamed in (
+                    (100, 550, 620), (200, 1080, 1220),
+                    (300, 1620, 1830), (500, 2650, 3000),
+                )
             ],
         },
         {
-            "label": "倒子彈｜500M",
+            "label": "撞車",
             "details": [
-                {"label": "倒子彈｜500M", "value": "ammo_dump_500m", "rule_key": "staff_internal_ammo_dump_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-            ],
-        },
-        {
-            "label": "撞車｜500M",
-            "details": [
-                {"label": "撞車｜500M", "value": "car_500m", "rule_key": "staff_internal_car_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "500M｜2,480T", "value": "car_500m", "rule_key": "staff_internal_car_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
         {
@@ -845,6 +842,23 @@ def get_order_item_details_for_group(category: str | None, group_label: str | No
     target = _normalized_group_key(group_label)
     if not target:
         return []
+    # Preserve open tickets created with the two old ammo groups. They must
+    # still resolve their selected SKU, but never appear in new service menus.
+    if category_text == "staff_internal":
+        old_ammo_groups = {
+            _normalized_group_key("倒子彈｜100M～300M"): {
+                f"staff_internal_ammo_dump_{millions}m" for millions in (100, 200, 300)
+            },
+            _normalized_group_key("倒子彈｜500M"): {"staff_internal_ammo_dump_500m"},
+            _normalized_group_key("撞車｜500M"): {"staff_internal_car_500m"},
+        }
+        old_keys = old_ammo_groups.get(target)
+        if old_keys:
+            new_group = "撞車" if "staff_internal_car_500m" in old_keys else "倒子彈"
+            return [
+                detail for detail in get_order_item_details_for_group(category_text, new_group)
+                if detail.get("rule_key") in old_keys
+            ]
     if category_text == "farm" and target == _normalized_group_key(_FARM_3X3_GROUP_LABEL):
         return _farm_3x3_details()
 
