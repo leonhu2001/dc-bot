@@ -34,7 +34,7 @@ has_active_vip_progress_reset = _VIP_POLICY["has_active_vip_progress_reset"]
 INTERNAL_NO_VIP_REASON = _INTERNAL_POLICY["INTERNAL_NO_VIP_REASON"]
 is_internal_non_vip_order = _INTERNAL_POLICY["is_internal_non_vip_order"]
 
-SERVICE_NAMES = ("dc-bot.service", "dc-bot-dashboard.service")
+SERVICE_NAMES = ("dc-bot.service", "dc-bot-dashboard.service", "dc-bot-market.service")
 TAIPEI = ZoneInfo("Asia/Taipei")
 MARKER = "internal_non_vip_history_repaired_at"
 VIP_ONLY_MARKER = "internal_non_vip_vip_only_repaired_at"
@@ -78,6 +78,7 @@ def build_plan(
     groups: dict[int, dict] = defaultdict(lambda: {"vip": 0, "wallet": 0, "orders": 0})
     blockers: list[str] = []
     scanned = 0
+    wallet_only_skipped = 0
 
     for row in orders:
         channel = str(row["channel_id"])
@@ -116,20 +117,26 @@ def build_plan(
             continue
 
         vip = recorded_vip if counted and not excluded else 0
-        try:
-            wallet = _number(wallet_raw, f"{channel}.wallet_point_amount") if wallet_counted else 0
-        except (ValueError, TypeError):
-            blockers.append(f"票口 {channel} 的錢包點數入帳金額不明")
-            continue
         if vip_only:
-            # Wallet rewards are NOT VIP spend. Some legacy customers have
-            # wallet_point_amount on orders but no corresponding wallet bucket.
-            # Never guess an amount to deduct or change wallet points here.
+            # The wallet-point ledger is a separate unresolved historical
+            # problem. Never deduct it from VIP-only progress or even parse it
+            # as a required numeric input to the VIP correction.
             if order.get(VIP_ONLY_MARKER):
                 if vip:
                     blockers.append(f"票口 {channel} 已標記 VIP 扣回但仍有入帳金額")
                 continue
+            if wallet_counted and wallet_raw not in (None, "", 0, "0"):
+                wallet_only_skipped += 1
+                if vip:
+                    blockers.append(f"票口 {channel} 同時存在 VIP 與錢包點數入帳，需人工核對")
+                    continue
             wallet = 0
+        else:
+            try:
+                wallet = _number(wallet_raw, f"{channel}.wallet_point_amount") if wallet_counted else 0
+            except (ValueError, TypeError):
+                blockers.append(f"票口 {channel} 的錢包點數入帳金額不明")
+                continue
         if not vip and not wallet:
             continue
 
@@ -230,6 +237,7 @@ def build_plan(
         "changes": changes,
         "blockers": blockers,
         "vip_only": vip_only,
+        "wallet_only_skipped": wallet_only_skipped,
     }
 
 
@@ -303,6 +311,11 @@ def repair(
             f"  訂單 {item['order_no'] or item['channel']} | "
             f"rule={item['rule_key'] or 'legacy category'} | "
             f"VIP -{item['vip']}T | wallet point spending -{item['wallet']}T"
+        )
+    if vip_only:
+        print(
+            f"錢包點數另行核對：{plan['wallet_only_skipped']} 筆有錢包入帳紀錄，"
+            "本次完全不變動錢包點數、儲值或薪資分潤。"
         )
     for error in plan["blockers"]:
         print("需人工核對，不可自動扣回：", error)
