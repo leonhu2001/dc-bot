@@ -204,6 +204,10 @@ def _deserialize_customer_data(data: dict) -> dict:
         "last_order_at": data.get("last_order_at"),
         "points": _to_int(data.get("points"), 0) or 0,
         "point_adjustment": _to_int(data.get("point_adjustment"), 0) or 0,
+        # Preserve the running wallet-spend bucket across Bot restarts.
+        # Dropping this field made historic orders appear credited while the
+        # customer bucket was zero, so their points cannot safely be reversed.
+        "wallet_point_spend_total": _to_int(data.get("wallet_point_spend_total"), 0) or 0,
         "point_adjustment_logs": list(data.get("point_adjustment_logs", [])) if isinstance(data.get("point_adjustment_logs", []), list) else [],
         "platinum_channel_id": _to_int(data.get("platinum_channel_id")),
         "manual_purchase_keys": list(data.get("manual_purchase_keys", [])) if isinstance(data.get("manual_purchase_keys", []), list) else [],

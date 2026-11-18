@@ -12,32 +12,19 @@ $SshArgs = @(
 )
 
 if (-not $Apply) {
-    Write-Host "=== READ-ONLY INTERNAL VIP AUDIT ===" -ForegroundColor Yellow
-    & ssh @SshArgs $Vps "cd /opt/dc-bot && ./venv/bin/python scripts/repair_internal_staff_vip_20261119.py"
+    Write-Host "=== READ-ONLY VERIFIED VIP AUDIT (WALLET POINTS UNTOUCHED) ===" -ForegroundColor Yellow
+    & ssh @SshArgs $Vps "cd /opt/dc-bot && ./venv/bin/python scripts/repair_internal_staff_vip_20261119.py --vip-only"
     if ($LASTEXITCODE -ne 0) { throw "Preview failed. Nothing was changed." }
-    Write-Host "Preview complete. Review affected orders, then rerun with -Apply." -ForegroundColor Green
+    Write-Host "Preview complete. No database changes." -ForegroundColor Green
     return
 }
 
-# The explicit -Apply switch is the only path that changes historic VIP data.
-# Stop both writers first; always attempt to restart even if repair fails.
-$RemoteScript = @'
-set -euo pipefail
-cd /opt/dc-bot
-test -f scripts/repair_internal_staff_vip_20261119.py
-restore_services() {
-    systemctl start dc-bot-dashboard.service || echo "WARNING: Web service restart failed" >&2
-    systemctl start dc-bot.service || echo "WARNING: Bot service restart failed" >&2
-}
-trap restore_services EXIT
-systemctl stop dc-bot.service dc-bot-dashboard.service
-./venv/bin/python scripts/repair_internal_staff_vip_20261119.py --apply
-'@
-
-Write-Host "=== APPLY AUDITED VIP REPAIR (backup first) ===" -ForegroundColor Yellow
-$RemoteScript = $RemoteScript -replace "`r`n", "`n"
-$RemoteScript | & ssh @SshArgs $Vps "bash -s"
+# Invoke an already-committed VPS script via SSH; never pipe PowerShell lines
+# through Windows CRLF conversion to bash (can corrupt --apply as --apply\r).
+# The remote runner performs a read-only strict preflight before stopping services.
+Write-Host "=== APPLY VERIFIED VIP-ONLY REVERSAL ===" -ForegroundColor Yellow
+& ssh @SshArgs $Vps "cd /opt/dc-bot && bash scripts/repair_internal_staff_vip_remote.sh"
 if ($LASTEXITCODE -ne 0) {
-    throw "Repair failed; review remote output and service status. Do not retry blindly."
+    throw "Correction aborted; read the remote audit/errors. Do not retry blindly."
 }
-Write-Host "Correction complete. Verify affected VIP progress and service status." -ForegroundColor Green
+Write-Host "VIP-only correction completed. Verify balances and service status." -ForegroundColor Green
