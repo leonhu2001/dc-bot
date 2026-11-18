@@ -37,6 +37,7 @@ is_internal_non_vip_order = _INTERNAL_POLICY["is_internal_non_vip_order"]
 SERVICE_NAMES = ("dc-bot.service", "dc-bot-dashboard.service")
 TAIPEI = ZoneInfo("Asia/Taipei")
 MARKER = "internal_non_vip_history_repaired_at"
+VIP_ONLY_MARKER = "internal_non_vip_vip_only_repaired_at"
 
 
 def _number(value, field: str) -> int:
@@ -68,7 +69,9 @@ def _level(total: int) -> tuple[int, str]:
     return result
 
 
-def build_plan(orders: list[dict], customers: list[dict]) -> dict:
+def build_plan(
+    orders: list[dict], customers: list[dict], *, vip_only: bool = False,
+) -> dict:
     """Pure audit plan: rejects unverifiable amounts, mismatched IDs and balances."""
     customer_map = {int(row["customer_id"]): dict(row) for row in customers}
     candidates: list[dict] = []
@@ -118,6 +121,15 @@ def build_plan(orders: list[dict], customers: list[dict]) -> dict:
         except (ValueError, TypeError):
             blockers.append(f"票口 {channel} 的錢包點數入帳金額不明")
             continue
+        if vip_only:
+            # Wallet rewards are NOT VIP spend. Some legacy customers have
+            # wallet_point_amount on orders but no corresponding wallet bucket.
+            # Never guess an amount to deduct or change wallet points here.
+            if order.get(VIP_ONLY_MARKER):
+                if vip:
+                    blockers.append(f"票口 {channel} 已標記 VIP 扣回但仍有入帳金額")
+                continue
+            wallet = 0
         if not vip and not wallet:
             continue
 
@@ -159,7 +171,7 @@ def build_plan(orders: list[dict], customers: list[dict]) -> dict:
             old_wallet = _number(
                 customer_data.get("wallet_point_spend_total", 0),
                 "customers.wallet_point_spend_total",
-            )
+            ) if not vip_only else 0
         except (ValueError, TypeError) as exc:
             blockers.append(f"會員 {customer_id} 的累積數字異常：{exc}")
             continue
@@ -192,7 +204,8 @@ def build_plan(orders: list[dict], customers: list[dict]) -> dict:
                     continue
 
         customer_data["total_spent"] = new_total
-        customer_data["wallet_point_spend_total"] = new_wallet
+        if not vip_only:
+            customer_data["wallet_point_spend_total"] = new_wallet
         customer_data["point_adjustment"] = new_points - new_total // 100
         customer_data["points"] = new_points
         if not has_active_vip_progress_reset(customer_data):
@@ -216,10 +229,11 @@ def build_plan(orders: list[dict], customers: list[dict]) -> dict:
         "candidates": candidates,
         "changes": changes,
         "blockers": blockers,
+        "vip_only": vip_only,
     }
 
 
-def read_plan(conn: sqlite3.Connection) -> dict:
+def read_plan(conn: sqlite3.Connection, *, vip_only: bool = False) -> dict:
     conn.row_factory = sqlite3.Row
     # Require canonical normalized tables. Old/unknown schemas are manual-review only.
     for table, columns in (
@@ -239,7 +253,7 @@ def read_plan(conn: sqlite3.Connection) -> dict:
             "SELECT customer_id, total_spent, points, level, data_json FROM customers"
         )
     ]
-    return build_plan(orders, customers)
+    return build_plan(orders, customers, vip_only=vip_only)
 
 
 def _services_stopped() -> bool:
@@ -263,13 +277,19 @@ def _backup(db_path: Path) -> Path:
     return backup
 
 
-def repair(db_path: Path, *, apply: bool = False) -> dict:
+def repair(
+    db_path: Path, *, apply: bool = False,
+    vip_only: bool = False, check_apply: bool = False,
+) -> dict:
     if not db_path.is_file():
         raise FileNotFoundError(f"找不到 bot.db: {db_path}")
     with sqlite3.connect(db_path, timeout=30) as conn:
-        plan = read_plan(conn)
-    print(f"內部單掃描 {plan['scanned']} 筆；待更正 {len(plan['candidates'])} 筆；"
-          f"受影響會員 {len(plan['changes'])} 位")
+        plan = read_plan(conn, vip_only=vip_only)
+    print(
+        ("僅修正 VIP 累積（不修改錢包點數）：" if vip_only else "完整內部訂單修正：")
+        + f"內部單掃描 {plan['scanned']} 筆；"
+        + f"待更正 {len(plan['candidates'])} 筆；受影響會員 {len(plan['changes'])} 位"
+    )
     for change in plan["changes"]:
         print(
             f"會員 {change['customer']} | 訂單 {change['count']} | "
@@ -286,11 +306,17 @@ def repair(db_path: Path, *, apply: bool = False) -> dict:
         )
     for error in plan["blockers"]:
         print("需人工核對，不可自動扣回：", error)
+    if plan["blockers"] and (apply or check_apply):
+        raise RuntimeError("存在無法驗證的舊訂單，為避免誤扣，整批未執行")
+    if check_apply:
+        if not plan["candidates"]:
+            print("NO_CHANGES：沒有可扣回的 VIP 誤入帳。")
+            return plan
+        print("READY_FOR_APPLY：僅 VIP 入帳已核對，可在停止服務後安全修正。")
+        return plan
     if not apply:
         print("DRY-RUN：未修改資料。需核對明細後再使用 --apply。")
         return plan
-    if plan["blockers"]:
-        raise RuntimeError("存在無法驗證的舊訂單，為避免誤扣，整批未執行")
     if not _services_stopped():
         raise RuntimeError("Bot/Web 服務未確認全部停止，不可修改上線資料庫")
     if not plan["candidates"]:
@@ -303,20 +329,23 @@ def repair(db_path: Path, *, apply: bool = False) -> dict:
     with sqlite3.connect(db_path, timeout=30) as conn:
         conn.execute("BEGIN IMMEDIATE")
         # Fail closed on any concurrent or between-preview change.
-        current = read_plan(conn)
+        current = read_plan(conn, vip_only=vip_only)
         original_ids = [(x["channel"], x["vip"], x["wallet"]) for x in plan["candidates"]]
         current_ids = [(x["channel"], x["vip"], x["wallet"]) for x in current["candidates"]]
         if current_ids != original_ids or current["blockers"]:
             raise RuntimeError("資料在預覽後已變更，取消扣回")
         for item in plan["candidates"]:
             data = dict(item["data"])
-            data[MARKER] = timestamp
+            if vip_only:
+                data[VIP_ONLY_MARKER] = timestamp
+            else:
+                data[MARKER] = timestamp
             data["vip_internal_exclusion_reversed_amount"] = item["vip"]
             data["vip_internal_exclusion_reversed_wallet_amount"] = item["wallet"]
             data["reward_excluded"] = True
             data["reward_amount"] = 0
             data["reward_excluded_reason"] = INTERNAL_NO_VIP_REASON
-            if item["wallet"]:
+            if item["wallet"] and not vip_only:
                 data["wallet_point_amount"] = 0
                 data["wallet_points_awarded"] = 0
             cur = conn.execute(
@@ -347,9 +376,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, default=ROOT / "bot.db")
     parser.add_argument("--apply", action="store_true", help="Requires Bot and Web stopped")
+    parser.add_argument("--vip-only", action="store_true", help="Correct only recorded VIP amounts; preserve wallet points")
+    parser.add_argument("--check-apply", action="store_true", help="Read-only strict preflight, refuses blockers")
     args = parser.parse_args()
+    if args.apply and args.check_apply:
+        parser.error("--apply and --check-apply cannot be combined")
     try:
-        repair(args.db.resolve(), apply=args.apply)
+        repair(
+            args.db.resolve(), apply=args.apply,
+            vip_only=args.vip_only, check_apply=args.check_apply,
+        )
         return 0
     except (RuntimeError, ValueError, FileNotFoundError, sqlite3.DatabaseError) as exc:
         print(f"FAIL：{exc}", file=sys.stderr)
