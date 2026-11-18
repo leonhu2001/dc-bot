@@ -1,7 +1,7 @@
 {% extends "site_layout.html" %}
 
 {% block head %}
-<link rel="stylesheet" href="/static/css/love_delta.css?v=1">
+<link rel="stylesheet" href="/static/css/love_delta.css?v=20261119">
 {% endblock %}
 
 {% block content %}
@@ -20,7 +20,7 @@
                 <div class="ld-logo">♡</div>
                 <div>
                     <h1>{{ ld.game_title }}</h1>
-                    <small>互動攻略進度</small>
+                    <small>{{ '專屬技術陪玩・雙人護航' if is_our_love else '互動攻略進度' }}</small>
                 </div>
             </div>
             {% if viewer.role == 'boss' %}
@@ -137,7 +137,7 @@
                         <div class="ld-event-grid">
                             <button class="ld-event" type="button" data-ld-event="boss_kill"><strong>老闆擊殺 1 名幹員</strong><span class="ld-points is-minus">-1</span></button>
                         </div>
-                        <div class="ld-helper">撤離成功 +5；撤離失敗 -10 由「本局結束」自動計算。千萬撤離成功額外 +3。</div>
+                        <div class="ld-helper">成功撤離 +5｜撤離失敗 -10｜千萬撤離成功額外 +3，於本局結算時自動計分。</div>
                     </div>
                     <div class="ld-section ld-only-boss ld-love-only">
                         <h3>🎁 摸到物資並送給老闆</h3>
@@ -263,7 +263,9 @@
                     <p>好感度達到 100 即可結單。</p>
                     <p>小紅 1～4 格、大紅 6 格、大大紅 9～12 格；紅修不計。</p>
                     <p>撤離失敗仍計算保險箱內的紅色物資；千萬撤離成功額外 +3。</p>
-                    <p>本單為 2 位護航以上的專屬技術陪玩單。</p>
+                    <p>好感度加分：陪玩擊殺 +1、小紅 +2、大紅／金卡／紫卡 +5、大大紅／紅卡 +10、心／淚／復甦呼吸機 +35。</p>
+                    <p>撤離成功 +5；撤離失敗 -10；老闆擊殺幹員 -1。</p>
+                    <p>本單由 2 位符合資格的護航接單（男護／女護／頂護），不使用戀與三角洲的禁語、猜物資或指定玩法。</p>
                 </section>
                 <section class="ld-card">
                     <h3>最近操作</h3>
@@ -286,7 +288,7 @@
             <div class="ld-intro-plan">{{ plan.label }}・起始好感 {{ plan.initial_affection|int }}</div>
             {% if viewer.role == 'boss' and not ld.read_only %}
                 <button class="ld-start-button" id="ldStart" type="button">開始攻略</button>
-                <div class="ld-intro-note">開始後老闆與本單女陪會共用同一份進度。</div>
+                <div class="ld-intro-note">開始後老闆與本單{{ '護航' if is_our_love else '女陪' }}會共用同一份進度。</div>
             {% elif viewer.role == 'companion' and not ld.read_only %}
                 <button class="ld-start-button" id="ldStart" type="button" disabled>等待老闆開始攻略</button>
                 <div class="ld-intro-note">老闆開始後會自動進入，不用重新整理。</div>
@@ -327,5 +329,5 @@
 <script nonce="{{ request.state.csp_nonce }}">
 window.LOVE_DELTA_BOOTSTRAP = {{ love_delta|tojson }};
 </script>
-<script src="/static/js/love_delta.js?v=1" defer></script>
+<script src="/static/js/love_delta.js?v=20261119" defer></script>
 {% endblock %}

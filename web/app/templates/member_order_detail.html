@@ -159,7 +159,7 @@
         actions.replaceChildren();
         if (data.available) {
             copy.textContent = data.started
-                ? "攻略進度已建立。老闆與本單女陪會共用同一份即時進度。"
+                ? `攻略進度已建立。老闆與本單${data.game_key === "our_love" ? "護航" : "女陪"}會共用同一份即時進度。`
                 : `付款已完成。本單已開放${title}互動攻略。`;
             const link = document.createElement("a");
             link.className = "button button-primary";

@@ -161,7 +161,7 @@ async def love_delta_page(request: Request, order_id: int):
 
     return TEMPLATES.TemplateResponse(
         request=request,
-        name="member_love_delta.html",
+        name="member_our_love.html" if context["game_key"] == "our_love" else "member_love_delta.html",
         context={
             "title": f"{context['game_title']}｜攻略進度",
             "user": user,

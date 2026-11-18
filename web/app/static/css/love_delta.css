@@ -27,7 +27,15 @@ body{
   background:linear-gradient(135deg,#911e2e,#e2a255);
 }
 .ld-page[data-game="our_love"] .ld-hero{
+  border-color:rgba(185,77,72,.55);
   box-shadow:0 17px 49px rgba(120,36,41,.15);
+}
+.ld-page[data-game="our_love"] .ld-eyebrow,
+.ld-page[data-game="our_love"] .ld-plan-meta b{
+  color:#952a33;
+}
+.ld-page[data-game="our_love"] .ld-complete-banner{
+  border-color:rgba(181,64,73,.35);
 }
 
 .ld-page{
