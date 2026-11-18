@@ -986,9 +986,11 @@ def settle_love_delta_round(
         before = _score(data.get("affection"))
         positive = _score(data.get("round_positive"))
         success_bonus = (5.0 if result == "success" else -10.0) if our_love else (5.0 if result == "success" else 0.0)
+        # Existing Love Delta counts the insured safe-box tier even on a
+        # failed extraction. Our Love only has an extra *successful* 1000W bonus.
         extraction_bonus = float(
             (OUR_LOVE_EXTRACTION_TIERS if our_love else EXTRACTION_TIERS)[tier]
-        ) if result == "success" else 0.0
+        ) if (result == "success" or not our_love) else 0.0
         positive_for_multiplier = round(positive + max(0.0, success_bonus) + extraction_bonus, 1)
         boss_answer = str(data.get("boss_answer") or "")
         companion_guess = str(data.get("companion_guess") or "")
