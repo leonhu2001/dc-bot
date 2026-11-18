@@ -37,6 +37,9 @@ LEGACY_DESKTOP_ONE_GUARD_BASES = {
 FULL_WORKER_PAYOUT_RULE_KEYS = frozenset({
     "farm_halfcoin_120m",
     "farm_halfcoin_360m",
+    "staff_internal_ammo_dump_100m",
+    "staff_internal_ammo_dump_200m",
+    "staff_internal_ammo_dump_300m",
     "staff_internal_ammo_dump_500m",
     "staff_internal_car_500m",
     "staff_internal_aw_collision",
