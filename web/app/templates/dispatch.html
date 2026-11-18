@@ -81,6 +81,14 @@
         {% endif %}
 
         {% if order.note %}<p class="dispatch-note">{{ order.note }}</p>{% endif %}
+        {% if user_claimed_this_order and order.status in ['active', 'stored', 'closed'] %}
+            {% set fun_key = order.order_rule_key or '' %}
+            {% if fun_key.startswith('fun_our_love_') %}
+                <a class="button" href="/me/orders/{{ order.id }}/our-love">進入「我們的愛」藍色專屬攻略</a>
+            {% elif fun_key.startswith('fun_mawan_galagame_') %}
+                <a class="button" href="/me/orders/{{ order.id }}/love-delta">進入「戀與三角洲」攻略</a>
+            {% endif %}
+        {% endif %}
 
         {% if support_can_manage %}
             <div class="dispatch-support-tools">
