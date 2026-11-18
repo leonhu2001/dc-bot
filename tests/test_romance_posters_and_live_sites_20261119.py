@@ -183,13 +183,16 @@ def test_love_delta_latest_distinct_scores(tmp_path):
 
 
 def test_two_live_website_routes_are_registered_and_priced_posters_are_current():
-    from web.app.main import app
-    # Other regression tests may inject _IncludedRouter compatibility objects.
-    # Check only actual FastAPI path routes, not these test-only proxies.
+    # Validate the real router itself; other tests inject lightweight
+    # compatibility proxies into the global FastAPI app in this same process.
+    # Confirm main.py mounts it explicitly, without relying on polluted state.
     routes = {
         (route.path, ",".join(sorted(getattr(route, "methods", ()))))
-        for route in app.routes if hasattr(route, "path")
+        for route in romance_router.routes if hasattr(route, "path")
     }
+    source = (Path(__file__).resolve().parents[1] / "web/app/main.py").read_text(encoding="utf-8")
+    assert "from web.app.routers.love_delta import router as romance_live_router" in source
+    assert "app.include_router(romance_live_router)" in source
     for path in (
         "/me/orders/{order_id}/love-delta",
         "/me/orders/{order_id}/our-love",
