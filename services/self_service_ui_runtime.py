@@ -989,14 +989,23 @@ class _BaseSelfServiceOrderView(discord.ui.View):
         panel_message_id = interaction.message.id if interaction.message is not None else None
         if is_internal_ammo_dump_rule(rule):
             from services.staff_internal_ammo_dump_ui import InternalAmmoNamedView
+            from services.staff_internal_ammo_dump_policy import AMMO_DUMP_PRICES
 
+            named_price, unnamed_price, _worker_price = AMMO_DUMP_PRICES[rule.key]
+            plan = rule.key.removeprefix("staff_internal_ammo_dump_").upper()
+            note = (
+                "（差額 350T：客服 88T、店家 262T）"
+                if rule.key == "staff_internal_ammo_dump_500m"
+                else "（兩種掛名狀態同價，不抽成）"
+            )
             await interaction.response.send_message(
-                "送出倒子彈 500M 前，請由客服選擇掛名狀態。"
-                "\n有掛名 2,650T；無掛名 3,000T（差額 350T：客服 88T、店家 262T）。",
+                f"送出倒子彈 {plan} 前，請由客服選擇掛名狀態。"
+                f"\n有掛名 {named_price:,}T；無掛名 {unnamed_price:,}T{note}。",
                 view=InternalAmmoNamedView(
                     customer_id=self.customer_id,
                     channel_id=self.channel_id,
                     panel_message_id=panel_message_id,
+                    rule_key=rule.key,
                 ),
                 ephemeral=True,
             )
