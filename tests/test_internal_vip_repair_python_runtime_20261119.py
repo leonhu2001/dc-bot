@@ -27,7 +27,12 @@ def test_windows_wrapper_uses_production_venv_for_both_paths():
     wrapper = (ROOT / "scripts" / "repair_internal_staff_vip.ps1").read_text(
         encoding="utf-8"
     )
-    assert wrapper.count("./venv/bin/python scripts/repair_internal_staff_vip_20261119.py") == 2
+    assert "./venv/bin/python scripts/repair_internal_staff_vip_20261119.py --vip-only" in wrapper
+    assert "bash scripts/repair_internal_staff_vip_remote.sh" in wrapper
     assert "python3 scripts/repair_internal_staff_vip_20261119.py" not in wrapper
     assert 'if (-not $Apply)' in wrapper
-    assert "trap restore_services EXIT" in wrapper
+    assert "| & ssh" not in wrapper
+    remote = (ROOT / "scripts" / "repair_internal_staff_vip_remote.sh").read_text(encoding="utf-8")
+    assert "--vip-only --check-apply" in remote
+    assert "--vip-only --apply" in remote
+    assert "trap restore EXIT" in remote
