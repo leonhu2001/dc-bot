@@ -78,7 +78,7 @@ def test_correct_guess_multiplies_positive_round_score(tmp_path):
     start(db)
     service.save_boss_guess("boss", 1, answer="非洲之心", hint_category="收藏品", hint_quality="紅色", db_file=db)
     service.save_companion_guess("girl1", 1, guess=" 非洲之心 ", db_file=db)
-    service.apply_love_delta_event("girl1", 1, "item_big_red", db_file=db)
+    service.apply_love_delta_event("boss", 1, "item_big_red", db_file=db)
     ctx = service.settle_love_delta_round(
         "boss", 1, expected_round=1, result="success", extraction_tier=300, db_file=db
     )
@@ -91,9 +91,9 @@ def test_failed_extraction_counts_safe_value_but_does_not_change_theme(tmp_path)
     db = tmp_path / "ld.db"
     make_db(db, rule_key="fun_mawan_galagame_standard")
     start(db)
-    service.apply_love_delta_event("girl1", 1, "item_gold", db_file=db)
+    service.apply_love_delta_event("boss", 1, "item_gold", db_file=db)
     ctx = service.settle_love_delta_round(
-        "girl1", 1, expected_round=1, result="fail", extraction_tier=600, db_file=db
+        "boss", 1, expected_round=1, result="fail", extraction_tier=600, db_file=db
     )
     assert ctx["state"]["affection"] == 11
     assert ctx["state"]["theme_affection"] == 0
@@ -114,7 +114,7 @@ def test_four_same_unlocks_next_round_loadout(tmp_path):
     db = tmp_path / "ld.db"
     make_db(db, rule_key="fun_mawan_galagame_standard")
     start(db)
-    service.apply_love_delta_event("girl1", 1, "four_same", db_file=db)
+    service.apply_love_delta_event("boss", 1, "four_same", db_file=db)
     ctx = service.save_next_loadout("boss", 1, agent="紅狼", weapon="M4A1", db_file=db)
     assert ctx["state"]["next_designation"] == {"round_no": 2, "agent": "紅狼", "weapon": "M4A1"}
     ctx = service.settle_love_delta_round("boss", 1, expected_round=1, result="success", extraction_tier=0, db_file=db)
