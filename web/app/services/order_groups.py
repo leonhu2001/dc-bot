@@ -251,14 +251,15 @@ GROUP_SPECS = [
         "key": "our_love",
         "category": "delta_desktop_fun",
         "label": "我們的愛",
-        "image": "price_lists/delta_fun_our_love.webp",
+        "image": "price_lists/delta_fun_our_love_20261118.svg",
         "selector_label": "初始好感度",
         "description": (
             "兩位護航以上的專屬技術陪玩單（男護／女護／頂護皆可）。好感度達100結單；"
             "摸紅、擊殺與撤離依規則加扣分；紅修不計。"
         ),
         "variants": [
-            ("fun_our_love_start_50", "初始50｜保底2088W"),
+            ("fun_our_love_start_75", "初始75｜保底2088W"),
+            ("fun_our_love_start_50", "初始50｜保底3088W"),
             ("fun_our_love_start_0", "初始0｜保底3688W"),
         ],
     },
@@ -266,9 +267,10 @@ GROUP_SPECS = [
     {
         "key": "galagame",
         "category": "delta_desktop_fun",
-        "label": "魔丸娛樂嘎拉給木",
-        "selector_label": "難度",
-        "description": "依好感度難度選擇本次趣味方案。",
+        "label": "戀與三角洲",
+        "image": "price_lists/delta_fun_love_delta_20261118.svg",
+        "selector_label": "初始好感度",
+        "description": "雙人娛樂陪玩互動單：好感度達100結單，默認機密地圖，娛樂單無賠付；依物資、擊殺、救援及撤離加扣分。",
         "variants": [
             ("fun_mawan_galagame_basic", "基礎"),
             ("fun_mawan_galagame_standard", "標準"),
