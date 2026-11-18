@@ -156,7 +156,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
                     "rule_key": f"fun_our_love_start_{start}",
                     "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
                 }
-                for start, guarantee, price in ((50, 2088, 2888), (0, 3688, 4888))
+                for start, guarantee, price in ((75, 2088, 2488), (50, 3088, 3688), (0, 3688, 4888))
             ],
         },
         {
@@ -206,9 +206,17 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
     ],
     "staff_internal": [
         {
-            "label": "倒子彈｜500M",
+            "label": "倒子彈｜有／無掛名",
             "details": [
-                {"label": "倒子彈｜500M", "value": "ammo_dump_500m", "rule_key": "staff_internal_ammo_dump_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {
+                    "label": f"倒子彈｜{millions}M｜{price:,}T（有／無掛名同價）",
+                    "value": f"ammo_dump_{millions}m",
+                    "rule_key": f"staff_internal_ammo_dump_{millions}m",
+                    "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1,
+                }
+                for millions, price in ((100, 550), (200, 1080), (300, 1620))
+            ] + [
+                {"label": "倒子彈｜500M｜有／無掛名", "value": "ammo_dump_500m", "rule_key": "staff_internal_ammo_dump_500m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
         {
