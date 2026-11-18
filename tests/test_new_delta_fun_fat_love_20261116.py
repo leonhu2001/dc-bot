@@ -31,7 +31,8 @@ FAT = (
 )
 
 LOVE = (
-    ("fun_our_love_start_50", 2888, 50, 2088),
+    ("fun_our_love_start_75", 2488, 75, 2088),
+    ("fun_our_love_start_50", 3688, 50, 3088),
     ("fun_our_love_start_0", 4888, 0, 3688),
 )
 
@@ -78,7 +79,7 @@ def test_our_love_exact_picture_prices_two_any_protectors_and_score(
     assert calculate_price(rule, quantity=1).total_amount == price
     assert f"初始好感度{start}" in rule.note
     assert f"保底{guarantee}W" in rule.note
-    for term in ("達100", "撤離失敗-15", "老闆擊殺1名幹員-3", "復甦呼吸機+35", "紅修不算"):
+    for term in ("達100", "撤離失敗-10", "老闆擊殺1名幹員-1", "復甦呼吸機+35", "紅修不算", "千萬撤離額外+3"):
         assert term in rule.note
     assert key in FULL_SOURCE_AUTHORITY_RULE_KEYS
 
@@ -103,8 +104,8 @@ def test_discord_and_web_have_one_group_per_challenge_with_exact_variants():
     assert web["吃到發胖"]["image_url"] == (
         "/static/price_lists/delta_fun_eat_to_fat.webp"
     )
-    assert web["我們的愛"]["starting_price"] == 2888
-    assert web["我們的愛"]["variant_count"] == 2
+    assert web["我們的愛"]["starting_price"] == 2488
+    assert web["我們的愛"]["variant_count"] == 3
     assert web["我們的愛"]["image_url"] == (
         "/static/price_lists/delta_fun_our_love.webp"
     )
