@@ -3,16 +3,24 @@ from __future__ import annotations
 import discord
 
 from core.permissions import is_customer_staff
-from services.staff_internal_ammo_dump_policy import AMMO_DUMP_RULE_KEY
+from services.staff_internal_ammo_dump_policy import AMMO_DUMP_RULE_KEY, AMMO_DUMP_PRICES
 
 
 class InternalAmmoNamedSelect(discord.ui.Select):
     """Send-order-only choice: selecting an option opens the existing note modal."""
 
-    def __init__(self, *, customer_id: int, channel_id: int, panel_message_id: int | None):
+    def __init__(
+        self, *, customer_id: int, channel_id: int, panel_message_id: int | None,
+        rule_key: str = AMMO_DUMP_RULE_KEY,
+    ):
         self.customer_id = int(customer_id)
         self.channel_id = int(channel_id)
         self.panel_message_id = panel_message_id
+        if rule_key not in AMMO_DUMP_PRICES:
+            raise ValueError("未知倒子彈規格")
+        self.rule_key = rule_key
+        named_price, unnamed_price, worker_price = AMMO_DUMP_PRICES[rule_key]
+        margin = unnamed_price - worker_price
         super().__init__(
             custom_id="staff_internal_ammo_named_select",
             placeholder="送單時選擇：有掛名／無掛名",
@@ -20,14 +28,17 @@ class InternalAmmoNamedSelect(discord.ui.Select):
             max_values=1,
             options=[
                 discord.SelectOption(
-                    label="有掛名｜顧客 2,650T",
+                    label=f"有掛名｜顧客 {named_price:,}T",
                     value="named",
-                    description="代肝 2,650T；店家差額 0T",
+                    description=f"代肝 {worker_price:,}T；店家差額 0T",
                 ),
                 discord.SelectOption(
-                    label="無掛名｜顧客 3,000T",
+                    label=f"無掛名｜顧客 {unnamed_price:,}T",
                     value="unnamed",
-                    description="代肝 2,650T；客服 88T；店家 262T",
+                    description=(
+                        f"代肝 {worker_price:,}T；"
+                        + ("客服 88T；店家 262T" if margin else "差額 0T")
+                    ),
                 ),
             ],
             row=0,
@@ -44,7 +55,7 @@ class InternalAmmoNamedSelect(discord.ui.Select):
         from services import self_service_ui_runtime as ui
 
         data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id)
-        if not isinstance(data, dict) or str(data.get("order_rule_key") or "") != AMMO_DUMP_RULE_KEY:
+        if not isinstance(data, dict) or str(data.get("order_rule_key") or "") != self.rule_key:
             await interaction.response.send_message("訂單商品已變更，請重新按「送出等待接單」。", ephemeral=True)
             return
 
@@ -68,13 +79,17 @@ class InternalAmmoNamedSelect(discord.ui.Select):
 
 
 class InternalAmmoNamedView(discord.ui.View):
-    def __init__(self, *, customer_id: int, channel_id: int, panel_message_id: int | None):
+    def __init__(
+        self, *, customer_id: int, channel_id: int, panel_message_id: int | None,
+        rule_key: str = AMMO_DUMP_RULE_KEY,
+    ):
         super().__init__(timeout=300)
         self.add_item(
             InternalAmmoNamedSelect(
                 customer_id=customer_id,
                 channel_id=channel_id,
                 panel_message_id=panel_message_id,
+                rule_key=rule_key,
             )
         )
 
