@@ -844,6 +844,9 @@ def get_order_item_details_for_group(category: str | None, group_label: str | No
     target = _normalized_group_key(group_label)
     if not target:
         return []
+    # Keep in-flight Discord tickets from the legacy 嘎拉給木 group selectable.
+    if category_text == "delta_desktop_fun" and target == _normalized_group_key("魔丸娛樂嘎拉給木"):
+        return get_order_item_details_for_group(category_text, "戀與三角洲")
     # Preserve open tickets created with the two old ammo groups. They must
     # still resolve their selected SKU, but never appear in new service menus.
     if category_text == "staff_internal":
