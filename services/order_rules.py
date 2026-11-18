@@ -1129,7 +1129,8 @@ for _tier, _price, _guarantee, _weight in _EAT_TO_FAT_PLANS:
 # 2026-11-16 趣味單｜我們的愛：固定 2 位護航以上。
 # 店主確認男護、女護、頂護皆可接；陪玩身分組不可接。
 _OUR_LOVE_PLANS = (
-    ("start_50", 2888, 50, 2088),
+    ("start_75", 2488, 75, 2088),
+    ("start_50", 3688, 50, 3088),
     ("start_0", 4888, 0, 3688),
 )
 for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
@@ -1149,9 +1150,10 @@ for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
         note=(
             f"初始好感度{_start}；保底{_guarantee}W；好感度達100結單。"
             "加分：陪玩擊殺1名幹員+1，摸出小紅+2，大紅/金卡/紫卡+5，"
-            "大大紅/紅卡+8，非洲之心/海洋之淚/復甦呼吸機+35，"
-            "撤離成功+5，千萬撤離額外+5。"
-            "扣分：撤離失敗-15，老闆擊殺1名幹員-3。"
+            "大大紅/紅卡+10，非洲之心/海洋之淚/復甦呼吸機+35，"
+            "撤離成功+5，千萬撤離額外+3。"
+            "扣分：撤離失敗-10，老闆擊殺1名幹員-1。"
+            "撤離失敗時保險內的紅色物資也計分。"
             "物品判定：小紅1-4格、大紅6格、大大紅9-12格，紅修不算。"
             "專屬技術陪玩單；兩位接單者皆須為男護／女護／頂護之一。"
         ),
@@ -1162,10 +1164,10 @@ for _tier, _price, _start, _guarantee in _OUR_LOVE_PLANS:
 # 固定 1 單 / 2 位 / 只允許女陪或女護
 # 可指定女陪 / 女護，指定費 0T；不使用點數福利，客服人工折扣仍走通用折扣功能。
 for key, label, price in [
-    ("fun_mawan_galagame_basic", "魔丸娛樂嘎拉給木｜基礎", 1688),
-    ("fun_mawan_galagame_standard", "魔丸娛樂嘎拉給木｜標準", 2688),
-    ("fun_mawan_galagame_hard", "魔丸娛樂嘎拉給木｜困難", 4688),
-    ("fun_mawan_galagame_hell", "魔丸娛樂嘎拉給木｜地獄", 6688),
+    ("fun_mawan_galagame_basic", "魔丸娛樂嘎拉給木｜基礎", 2200),
+    ("fun_mawan_galagame_standard", "魔丸娛樂嘎拉給木｜標準", 3288),
+    ("fun_mawan_galagame_hard", "魔丸娛樂嘎拉給木｜困難", 4888),
+    ("fun_mawan_galagame_hell", "魔丸娛樂嘎拉給木｜地獄", 5688),
 ]:
     _add(OrderRule(
         "delta_desktop_fun",
@@ -1336,6 +1338,9 @@ for key, plan in AW_COLLISION_PRICING_BY_RULE.items():
 # 內部員工固定價商品。只由內部下單頻道提供入口，並不加入公開分類選項。
 # 票口沿用正常接單流程；付款成立後觸發帳號密碼私密流程。
 for key, label, price in (
+    ("staff_internal_ammo_dump_100m", "內部洗幣｜倒子彈 100M", 550),
+    ("staff_internal_ammo_dump_200m", "內部洗幣｜倒子彈 200M", 1080),
+    ("staff_internal_ammo_dump_300m", "內部洗幣｜倒子彈 300M", 1620),
     ("staff_internal_ammo_dump_500m", "內部洗幣｜倒子彈 500M", 2650),
     ("staff_internal_car_500m", "內部洗幣｜撞車 500M", 2480),
 ):
