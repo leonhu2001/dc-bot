@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+
+_STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 
 from web.app.services.delta_desktop_price_copy import render_delta_desktop_group_copy
 from services.delta_desktop_guarantee_labels import fixed_guarantee_display_label
@@ -251,7 +254,7 @@ GROUP_SPECS = [
         "key": "our_love",
         "category": "delta_desktop_fun",
         "label": "我們的愛",
-        "image": "price_lists/delta_fun_our_love.webp",
+        "image": "price_lists/delta_fun_our_love_20261118.jpg",
         "selector_label": "初始好感度",
         "description": (
             "兩位護航以上的專屬技術陪玩單（男護／女護／頂護皆可）。好感度達100結單；"
@@ -798,6 +801,7 @@ def _group_data(
         **(
             {"image_url": f"/static/{spec['image']}"}
             if str(spec.get("image") or "").startswith(("price_lists/", "order_panels/"))
+            and (_STATIC_DIR / str(spec["image"])).is_file()
             else {}
         ),
         "starting_price":
