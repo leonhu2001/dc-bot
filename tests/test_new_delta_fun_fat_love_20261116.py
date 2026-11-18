@@ -31,8 +31,7 @@ FAT = (
 )
 
 LOVE = (
-    ("fun_our_love_start_75", 2488, 75, 2088),
-    ("fun_our_love_start_50", 3688, 50, 3088),
+    ("fun_our_love_start_50", 2888, 50, 2088),
     ("fun_our_love_start_0", 4888, 0, 3688),
 )
 
@@ -79,7 +78,7 @@ def test_our_love_exact_picture_prices_two_any_protectors_and_score(
     assert calculate_price(rule, quantity=1).total_amount == price
     assert f"初始好感度{start}" in rule.note
     assert f"保底{guarantee}W" in rule.note
-    for term in ("達100", "撤離失敗-10", "老闆擊殺1名幹員-1", "復甦呼吸機+35", "紅修不算"):
+    for term in ("達100", "撤離失敗-15", "老闆擊殺1名幹員-3", "復甦呼吸機+35", "紅修不算"):
         assert term in rule.note
     assert key in FULL_SOURCE_AUTHORITY_RULE_KEYS
 
@@ -104,10 +103,10 @@ def test_discord_and_web_have_one_group_per_challenge_with_exact_variants():
     assert web["吃到發胖"]["image_url"] == (
         "/static/price_lists/delta_fun_eat_to_fat.webp"
     )
-    assert web["我們的愛"]["starting_price"] == 2488
-    assert web["我們的愛"]["variant_count"] == 3
+    assert web["我們的愛"]["starting_price"] == 2888
+    assert web["我們的愛"]["variant_count"] == 2
     assert web["我們的愛"]["image_url"] == (
-        "/static/price_lists/delta_fun_our_love_20261118.svg"
+        "/static/price_lists/delta_fun_our_love.webp"
     )
     assert len([g for g in cards._build_cards("delta_desktop_fun") if g["label"] == "吃到發胖"]) == 1
     assert len([g for g in cards._build_cards("delta_desktop_fun") if g["label"] == "我們的愛"]) == 1
@@ -127,7 +126,7 @@ def test_discord_fun_price_lists_use_canonical_amounts_and_original_artwork():
     fat_list = price_lists.DELTA_FUN_PRICE_LISTS["eat_to_fat"]
     love_list = price_lists.DELTA_FUN_PRICE_LISTS["our_love"]
     assert fat_list["image"] == "price_lists/delta_fun_eat_to_fat.webp"
-    assert "image" not in love_list  # Old poster has obsolete prices and must not reappear in Discord.
+    assert love_list["image"] == "price_lists/delta_fun_our_love.webp"
     for key, amount, _guarantee, _weight in FAT:
         assert f"{amount:,}T" in fat_list["text"]
         assert price_lists._approved_fun_price(key) == f"{amount:,}T"
@@ -135,20 +134,16 @@ def test_discord_fun_price_lists_use_canonical_amounts_and_original_artwork():
         assert f"{amount:,}T" in love_list["text"]
         assert price_lists._approved_fun_price(key) == f"{amount:,}T"
 
-    asset = ROOT / "web" / "app" / "static" / fat_list["image"]
-    assert asset.is_file()
-    assert asset.read_bytes()[:4] == b"RIFF"
-    assert asset.stat().st_size > 100_000
-    new_poster = ROOT / "web/app/static/price_lists/delta_fun_our_love_20261118.svg"
-    assert new_poster.is_file()
-    assert "<svg " in new_poster.read_text(encoding="utf-8")
-    assert "2,488 T" in new_poster.read_text(encoding="utf-8")
+    for plan in (fat_list, love_list):
+        asset = ROOT / "web" / "app" / "static" / plan["image"]
+        assert asset.is_file()
+        assert asset.read_bytes()[:4] == b"RIFF"
+        assert asset.stat().st_size > 100_000
 
-    embed = price_lists._delta_fun_embed("eat_to_fat")
-    assert embed.image.url.startswith("https://mowanentertainment.com/static/price_lists/")
-    assert "?v=missing" not in embed.image.url
-    love_embed = price_lists._delta_fun_embed("our_love")
-    assert not love_embed.image.url  # Do not display archived wrong-price poster.
+    for key in ("eat_to_fat", "our_love"):
+        embed = price_lists._delta_fun_embed(key)
+        assert embed.image.url.startswith("https://mowanentertainment.com/static/price_lists/")
+        assert "?v=missing" not in embed.image.url
 
 
 def test_existing_approved_fun_products_and_prices_are_not_overwritten():
