@@ -83,7 +83,7 @@ def _options(category: str) -> list[discord.SelectOption]:
         discord.SelectOption(
             label=group[:100],
             value=group[:100],
-            description=category_label[:100],
+            description=None if category == "staff_internal" else category_label[:100],
         )
         for group in _groups(category)[:25]
     ]
@@ -145,21 +145,16 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
         )
     elif channel_id == QUICK_ORDER_V2_CHANNELS["staff_internal"]:
         embed = discord.Embed(
-            title="🛠️ 內部專用｜洗幣與 AW 子彈",
+            title="🛠️ 內部專用｜價目表",
             description=(
-                "**倒子彈｜新規格**\n"
-                "• 100M：掛名 **550T**／沒掛名 **620T**\n"
-                "• 200M：掛名 **1,080T**／沒掛名 **1,220T**\n"
-                "• 300M：掛名 **1,620T**／沒掛名 **1,830T**\n"
-                "• 500M：掛名 **2,650T**／沒掛名 **3,000T**\n"
-                "• 掛名狀態由客服在送單時勾選\n"
-                "**其他內部洗幣**\n"
-                "• 撞車：**2,480T／單**\n"
-                "• 洗幣加急：**+260T／單**（100% 歸接單打手，不抽成）\n\n"
-                "**AW 子彈**\n"
-                "• 代撞：**4T／發**（發數自行輸入）\n\n"
-                "請在下方選擇服務，再確認建立私人下單票口。\n"
-                "票口沿用一般接單與付款流程；付款成立後，請在私密表單提交登入帳密。"
+                "**倒子彈｜掛名／沒掛名**\n"
+                "100M｜550T／620T\n"
+                "200M｜1,080T／1,220T\n"
+                "300M｜1,620T／1,830T\n"
+                "500M｜2,650T／3,000T\n\n"
+                "**撞車**｜500M：2,480T\n"
+                "**AW 子彈**｜4T／發\n"
+                "**洗幣加急**｜+260T"
             ),
             color=discord.Color.blue(),
         )
