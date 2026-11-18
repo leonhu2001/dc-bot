@@ -15,6 +15,21 @@ body{
   background:#1d1720 !important;
 }
 
+/* Shared template, but each game exposes only its own actions. */
+.ld-page[data-game="our_love"] .ld-love-only,
+.ld-page[data-game="love_delta"] .ld-our-only{display:none!important}
+
+.ld-page[data-game="our_love"]{
+  --ld-berry:#a52e39;--ld-berry-2:#d05b65;--ld-lav:#c18b4c;
+  --ld-line:rgba(215,165,139,.70);
+}
+.ld-page[data-game="our_love"] .ld-logo{
+  background:linear-gradient(135deg,#911e2e,#e2a255);
+}
+.ld-page[data-game="our_love"] .ld-hero{
+  box-shadow:0 17px 49px rgba(120,36,41,.15);
+}
+
 .ld-page{
   position:relative;
   min-height:calc(100vh - 72px);
