@@ -40,6 +40,7 @@ def test_internal_panel_is_channel_scoped_and_not_in_public_category_picker():
     select = view.children[0]
     assert select.custom_id == "quick_order_v2_service_staff_internal"
     assert [option.label for option in select.options] == [
+        "倒子彈｜100M~300M",
         "倒子彈｜500M",
         "撞車｜500M",
         "AW 子彈",
