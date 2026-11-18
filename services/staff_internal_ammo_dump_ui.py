@@ -3,7 +3,11 @@ from __future__ import annotations
 import discord
 
 from core.permissions import is_customer_staff
-from services.staff_internal_ammo_dump_policy import AMMO_DUMP_RULE_KEY, AMMO_DUMP_PRICES_BY_RULE
+from services.staff_internal_ammo_dump_policy import (
+    AMMO_DUMP_RULE_KEY,
+    AMMO_DUMP_PRICES_BY_RULE,
+    calculate_internal_ammo_dump_cs_payout,
+)
 
 
 class InternalAmmoNamedSelect(discord.ui.Select):
@@ -15,6 +19,7 @@ class InternalAmmoNamedSelect(discord.ui.Select):
         self.rule_key = rule_key
         named_price, unnamed_price, worker_payout = AMMO_DUMP_PRICES_BY_RULE[rule_key]
         margin = unnamed_price - worker_payout
+        cs_payout = calculate_internal_ammo_dump_cs_payout(rule_key, unnamed_price, worker_payout)
         self.customer_id = int(customer_id)
         self.channel_id = int(channel_id)
         self.panel_message_id = panel_message_id
@@ -33,8 +38,7 @@ class InternalAmmoNamedSelect(discord.ui.Select):
                     label=f"無掛名｜顧客 {unnamed_price:,}T",
                     value="unnamed",
                     description=(
-                        "代肝 2,650T；客服 88T；店家 262T" if margin
-                        else f"代肝 {worker_payout:,}T；店家差額 0T"
+                        f"代肝 {worker_payout:,}T；客服 {cs_payout:,}T；店家 {margin - cs_payout:,}T"
                     ),
                 ),
             ],
