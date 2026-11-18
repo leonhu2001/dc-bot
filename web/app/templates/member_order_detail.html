@@ -44,7 +44,7 @@
         <div class="customer-love-delta-head">
             <div class="customer-love-delta-copy">
                 <div class="section-eyebrow">LOVE DELTA</div>
-                <h2>戀與三角洲</h2>
+                <h2 id="customerAffectionTitle">專屬趣味攻略</h2>
                 <p id="customerLoveDeltaCopy">正在確認本單攻略資格…</p>
             </div>
             <div class="customer-love-delta-actions" id="customerLoveDeltaActions"></div>
@@ -141,23 +141,30 @@
     const actions = document.getElementById("customerLoveDeltaActions");
     if (!card || !copy || !actions) return;
 
-    fetch("/me/orders/{{ order.id }}/love-delta/entry", {
-        credentials: "same-origin",
-        cache: "no-store",
-    }).then(async (response) => {
-        if (!response.ok) return null;
-        return response.json();
-    }).then((data) => {
+    Promise.all([
+        "/me/orders/{{ order.id }}/our-love/entry",
+        "/me/orders/{{ order.id }}/love-delta/entry",
+    ].map(async (url) => {
+        try {
+            const response = await fetch(url, {credentials: "same-origin", cache: "no-store"});
+            return response.ok ? await response.json() : null;
+        } catch (_) { return null; }
+    })).then((entries) => {
+        const data = entries.find(entry => entry && entry.eligible);
+        if (!data) return;
         if (!data || !data.eligible) return;
         card.hidden = false;
         const plan = data.plan || {};
+        const title = plan.title || "戀與三角洲";
+        const heading = document.getElementById("customerAffectionTitle");
+        if (heading) heading.textContent = title;
         const planText = `${plan.label || ""}・起始好感 ${plan.initial_affection ?? "-"}`;
 
         actions.replaceChildren();
         if (data.available) {
             copy.textContent = data.started
                 ? "攻略進度已建立。老闆與本單女陪會共用同一份即時進度。"
-                : "付款已完成。本單已開放戀與三角洲互動攻略。";
+                : "付款已完成。本單已開放" + title + "專屬互動攻略。";
             const link = document.createElement("a");
             link.className = "button button-primary";
             link.href = data.href;
