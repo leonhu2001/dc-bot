@@ -13,7 +13,7 @@ $SshArgs = @(
 
 if (-not $Apply) {
     Write-Host "=== READ-ONLY INTERNAL VIP AUDIT ===" -ForegroundColor Yellow
-    & ssh @SshArgs $Vps "cd /opt/dc-bot && python3 scripts/repair_internal_staff_vip_20261119.py"
+    & ssh @SshArgs $Vps "cd /opt/dc-bot && ./venv/bin/python scripts/repair_internal_staff_vip_20261119.py"
     if ($LASTEXITCODE -ne 0) { throw "Preview failed. Nothing was changed." }
     Write-Host "Preview complete. Review affected orders, then rerun with -Apply." -ForegroundColor Green
     return
@@ -31,7 +31,7 @@ restore_services() {
 }
 trap restore_services EXIT
 systemctl stop dc-bot.service dc-bot-dashboard.service
-python3 scripts/repair_internal_staff_vip_20261119.py --apply
+./venv/bin/python scripts/repair_internal_staff_vip_20261119.py --apply
 '@
 
 Write-Host "=== APPLY AUDITED VIP REPAIR (backup first) ===" -ForegroundColor Yellow

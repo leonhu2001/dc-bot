@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import runpy
 import sqlite3
 import subprocess
 import sys
@@ -22,8 +23,16 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.vip_levels import BASE_MEMBER_LEVELS, has_active_vip_progress_reset
-from services.internal_non_vip_policy import INTERNAL_NO_VIP_REASON, is_internal_non_vip_order
+# This is a read-only audit until --apply. Import the two pure policy files
+# directly, rather than importing services/__init__.py (which installs runtime
+# integrations and requires SQLAlchemy, Discord, and live database configuration).
+# Unlike normal Bot code, a one-shot repair must not import startup side effects.
+_VIP_POLICY = runpy.run_path(str(ROOT / "core" / "vip_levels.py"))
+_INTERNAL_POLICY = runpy.run_path(str(ROOT / "services" / "internal_non_vip_policy.py"))
+BASE_MEMBER_LEVELS = _VIP_POLICY["BASE_MEMBER_LEVELS"]
+has_active_vip_progress_reset = _VIP_POLICY["has_active_vip_progress_reset"]
+INTERNAL_NO_VIP_REASON = _INTERNAL_POLICY["INTERNAL_NO_VIP_REASON"]
+is_internal_non_vip_order = _INTERNAL_POLICY["is_internal_non_vip_order"]
 
 SERVICE_NAMES = ("dc-bot.service", "dc-bot-dashboard.service")
 TAIPEI = ZoneInfo("Asia/Taipei")
