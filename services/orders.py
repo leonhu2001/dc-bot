@@ -160,7 +160,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             ],
         },
         {
-            "label": "魔丸娛樂嘎拉給木",
+            "label": "戀與三角洲",
             "details": [
                 {"label": "基礎", "value": "basic", "rule_key": "fun_mawan_galagame_basic", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "標準", "value": "standard", "rule_key": "fun_mawan_galagame_standard", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
