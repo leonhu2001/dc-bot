@@ -326,6 +326,7 @@ DELTA_FUN_PRICE_LISTS = {
     },
     "love_delta": {
         "label": "戀與三角洲",
+        "image": "price_lists/delta_fun_romance_20261118.jpg",
         "text": f"""**戀與三角洲｜娛樂陪玩單**
 {_aligned_code_block((("初始好感度30", f"{_approved_fun_price('fun_mawan_galagame_basic')}"), ("初始好感度0", f"{_approved_fun_price('fun_mawan_galagame_standard')}"), ("初始好感度-30", f"{_approved_fun_price('fun_mawan_galagame_hard')}"), ("初始好感度-80", f"{_approved_fun_price('fun_mawan_galagame_hell')}")))}
 🎯 **結單條件**：好感度達 **100** 即可結單。
@@ -392,7 +393,7 @@ DELTA_FUN_PRICE_LISTS = {
     },
     "our_love": {
         "label": "我們的愛",
-        "image": "price_lists/delta_fun_our_love.webp",
+        "image": "price_lists/delta_fun_our_love_20261118.jpg",
         "text": f"""**我們的愛｜固定 2 位護航以上**
 {_aligned_code_block((("初始好感度75", f"{_approved_fun_price('fun_our_love_start_75')}｜保底2088W"), ("初始好感度50", f"{_approved_fun_price('fun_our_love_start_50')}｜保底3088W"), ("初始好感度0", f"{_approved_fun_price('fun_our_love_start_0')}｜保底3688W")))}
 ❤️ **結單條件**：好感度達 **100**。
@@ -869,10 +870,6 @@ _LIVE_FUN_PRICE_RULES = {
         ("fun_eat_to_fat_50kg", 12888),
         ("fun_eat_to_fat_100kg", 26888),
     ),
-    "our_love": (
-        ("fun_our_love_start_50", 2888),
-        ("fun_our_love_start_0", 4888),
-    ),
 }
 
 
@@ -915,7 +912,7 @@ def _delta_fun_embed(plan_key: str) -> discord.Embed:
         color=discord.Color.blurple(),
     )
     image = str(plan.get("image") or "").strip()
-    if image:
+    if image and (_ROOT_DIR / "web" / "app" / "static" / image).is_file():
         embed.set_image(url=_static_asset_url(image))
     embed.set_footer(
         text="全系列可免費指定符合資格的接單人員｜指定費 0T｜各單原有職位與人數限制不變"
