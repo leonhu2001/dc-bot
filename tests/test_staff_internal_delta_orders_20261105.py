@@ -45,7 +45,7 @@ def test_internal_panel_is_channel_scoped_and_not_in_public_category_picker():
     ]
     assert all(option.description is None for option in select.options)
     panel = build_entry_embed(channel_id)
-    assert panel.title == "🛠️ 內部專用｜價目表"
+    assert panel.title == "🛠️ 內部專用｜洗幣與 AW 子彈"
     assert "2,650T／3,000T" in panel.description
     assert "2,480T" in panel.description
     assert "4T／發" in panel.description
