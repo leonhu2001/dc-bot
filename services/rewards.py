@@ -13,6 +13,10 @@ import discord
 from core.time_utils import get_taipei_now, get_taipei_now_iso
 from core.database import init_database, _db_columns, _json_load_maybe
 from core.vip_levels import VIP_LEVEL_BENEFITS, has_active_vip_progress_reset
+from services.internal_non_vip_policy import (
+    INTERNAL_NO_VIP_REASON,
+    is_internal_non_vip_order,
+)
 
 _MEMBER_LEVELS: list[dict[str, Any]] = [
     {"name": "普通魔丸", "threshold": 0},
@@ -370,7 +374,8 @@ def reverse_cancelled_order_rewards(
     item = str(order_data.get("item") or "").strip()
     is_wallet_order = str(order_data.get("payment_method") or "").strip() == WALLET_PAYMENT_METHOD
     count_was_incremented = is_wallet_order or (
-        item not in NO_VIP_REWARD_ITEMS
+        is_internal_non_vip_order(order_data)
+        or item not in NO_VIP_REWARD_ITEMS
         and item not in VIP_PROGRESS_EXCLUDED_ITEMS
     )
     if count_was_incremented:
@@ -743,6 +748,21 @@ async def add_customer_reward_from_order(
     if order_data.get("reward_counted"):
         return "此訂單已累積過會員消費，未重複累積。"
 
+    if is_internal_non_vip_order(order_data):
+        customer = get_customer_reward_data(customer_id)
+        customer["order_count"] = int(customer.get("order_count", 0) or 0) + 1
+        customer["last_order_at"] = get_taipei_now_iso()
+        customer["points"] = get_current_reward_points(customer)
+        order_data["reward_counted"] = True
+        order_data["reward_excluded"] = True
+        order_data["reward_amount"] = 0
+        order_data["reward_excluded_reason"] = INTERNAL_NO_VIP_REASON
+        order_data["reward_counted_at"] = get_taipei_now_iso()
+        _ORDER_SELECTIONS[order_channel_id] = order_data
+        if _SAVE_BOT_DATA is not None:
+            _SAVE_BOT_DATA()
+        return "會員紀錄已更新：完成訂單 +1；員工內部洗幣／AW 不累積 VIP 消費或消費點數。"
+
     payment_method = str(order_data.get("payment_method") or "").strip()
     if payment_method == WALLET_PAYMENT_METHOD:
         data = get_customer_reward_data(customer_id)
@@ -1052,10 +1072,10 @@ def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_
             cur = conn.cursor()
             cols = _db_columns(cur, "orders")
 
-            if {"customer_id", "amount", "status", "closed_at"}.issubset(cols):
-                row = cur.execute(
+            if {"customer_id", "amount", "status", "closed_at", "category", "data_json"}.issubset(cols):
+                rows = cur.execute(
                     """
-                    SELECT COALESCE(SUM(amount), 0) AS total
+                    SELECT amount, category, data_json
                     FROM orders
                     WHERE customer_id=?
                       AND status='closed'
@@ -1063,8 +1083,18 @@ def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_
                       AND closed_at < ?
                     """,
                     (int(customer_id), start_text, end_text),
-                ).fetchone()
-                return int(row["total"] or 0)
+                ).fetchall()
+                total = 0
+                for row in rows:
+                    data = _json_load_maybe(row["data_json"], {})
+                    if not isinstance(data, dict):
+                        data = {}
+                    if row["category"] is not None:
+                        data["category"] = row["category"]
+                    if is_internal_non_vip_order(data):
+                        continue
+                    total += int(row["amount"] or 0)
+                return total
 
             # 舊 data 欄位資料庫 fallback。
             total = 0
@@ -1074,6 +1104,8 @@ def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_
                     if not isinstance(data, dict):
                         continue
                     if _to_int(data.get("customer_id")) != int(customer_id):
+                        continue
+                    if is_internal_non_vip_order(data):
                         continue
                     if str(data.get("status", "")).lower() != "closed" and not data.get("closed"):
                         continue

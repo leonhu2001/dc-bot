@@ -97,15 +97,17 @@ async def _get_monthly_announcement_channel(bot: discord.Client):
     return channel
 
 
-async def _sync_member_benefits(bot: discord.Client, customer_id: int, data: dict) -> None:
+async def _sync_member_benefits(bot: discord.Client, customer_id: int, data: dict) -> bool:
     guilds = list(getattr(bot, "guilds", []) or [])
     guild = guilds[0] if guilds else None
     if guild is None:
-        return
+        return False
 
     member = await rewards.fetch_member_safely(guild, customer_id)
-    if member is not None:
-        await rewards.ensure_reward_member_benefits(guild, member, data)
+    if member is None:
+        return False
+    await rewards.ensure_reward_member_benefits(guild, member, data)
+    return True
 
 
 def _append_manual_downgrade_log(
@@ -286,15 +288,23 @@ async def _reconcile_existing_reset_vip_roles(bot: discord.Client) -> int | None
         return None
 
     synced = 0
+    pending_cleared = False
     for customer_id, data in items:
         if not isinstance(data, dict):
             continue
-        if not bool(data.get("vip_progress_reset_active")):
+        correction_pending = bool(data.get("vip_internal_exclusion_role_sync_pending"))
+        if not bool(data.get("vip_progress_reset_active")) and not correction_pending:
             continue
 
         try:
-            await _sync_member_benefits(bot, int(customer_id), data)
-            synced += 1
+            succeeded = await _sync_member_benefits(bot, int(customer_id), data)
+            # Preserve legacy manual-reset scan semantics. New repair markers
+            # are cleared only after a confirmed member-role sync.
+            if not correction_pending or succeeded:
+                synced += 1
+            if correction_pending and succeeded:
+                data.pop("vip_internal_exclusion_role_sync_pending", None)
+                pending_cleared = True
         except Exception:
             print(
                 "[vip-review] role reconciliation failed "
@@ -302,6 +312,8 @@ async def _reconcile_existing_reset_vip_roles(bot: discord.Client) -> int | None
                 flush=True,
             )
 
+    if pending_cleared and rewards._SAVE_BOT_DATA is not None:
+        rewards._SAVE_BOT_DATA()
     return synced
 
 
