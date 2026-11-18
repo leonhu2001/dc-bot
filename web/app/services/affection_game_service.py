@@ -248,7 +248,7 @@ def mutate(actor_id, order_id, operation, *, event_key=None,
         else:
             if not row["started_at"]:
                 raise PermissionError("請先開始攻略。")
-            if row["completed_at"]:
+            if row["completed_at"] and operation != "undo":
                 raise PermissionError("好感度已滿，請勿再重複計分。")
             current_round = int(row["round_no"])
             if expected_round is not None and int(expected_round) != current_round:
@@ -281,7 +281,8 @@ def mutate(actor_id, order_id, operation, *, event_key=None,
             elif operation == "undo":
                 event = conn.execute(
                     """SELECT * FROM affection_game_events
-                       WHERE order_id=? AND undone=0 ORDER BY id DESC LIMIT 1""",
+                       WHERE order_id=? AND undone=0 AND event_key!='undo'
+                       ORDER BY id DESC LIMIT 1""",
                     (int(order_id),),
                 ).fetchone()
                 if event is None or event["event_key"] == "settle" or int(event["round_no"]) != current_round:
