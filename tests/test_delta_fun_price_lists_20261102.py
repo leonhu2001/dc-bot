@@ -36,13 +36,13 @@ def test_delta_fun_russian_roulette_copy_and_image() -> None:
 def test_delta_fun_love_delta_copy() -> None:
     text = str(price_lists.DELTA_FUN_PRICE_LISTS["love_delta"]["text"])
     for fragment in (
-        "1688T",
-        "2688T",
-        "4688T",
-        "6688T",
+        "2,288T",
+        "3,288T",
+        "4,888T",
+        "5,688T",
         "好感度達 **100** 結單",
         "金色物資／紫卡",
-        "300W以上撤離",
+        "600W 以上",
         "好感度 **30**",
         "好感度 **60**",
     ):
