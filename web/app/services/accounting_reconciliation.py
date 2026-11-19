@@ -12,6 +12,8 @@ from shared.payout import (
 )
 from services.one_companion_one_guard_payout import (
     calculate_one_companion_one_guard_order_payout,
+    resolve_legacy_topsecret_payout,
+    resolve_one_guard_unit_price,
 )
 
 
@@ -779,6 +781,12 @@ def _check_payouts(
         "rule_snapshot_json" if "rule_snapshot_json" in web_order_columns
         else "NULL AS rule_snapshot_json"
     )
+    assignment_columns = {
+        str(row["name"])
+        for row in web.execute("PRAGMA table_info(order_assignments)").fetchall()
+    }
+    role_column = "role_type" if "role_type" in assignment_columns else "'booster' AS role_type"
+    assignment_order = "assigned_at ASC, id ASC" if "assigned_at" in assignment_columns else "id ASC"
     orders = web.execute(
         f"""
         SELECT
@@ -829,12 +837,12 @@ def _check_payouts(
         assignments = [
             dict(row)
             for row in web.execute(
-                """
-                SELECT worker_discord_id, has_named_bonus
+                f"""
+                SELECT worker_discord_id, has_named_bonus, {role_column}
                 FROM order_assignments
                 WHERE order_id = ?
                   AND COALESCE(is_active, 1) = 1
-                ORDER BY id ASC
+                ORDER BY {assignment_order}
                 """,
                 (order_id,),
             ).fetchall()
@@ -946,11 +954,12 @@ def _check_payouts(
         if stored_was_prepay:
             continue
 
-        worker_ids = [
-            _normalize(row["worker_discord_id"])
+        worker_roles = [
+            (_normalize(row["worker_discord_id"]), _normalize(row["role_type"]) or "booster")
             for row in assignments
             if _normalize(row["worker_discord_id"])
         ]
+        worker_ids = [worker_id for worker_id, _ in worker_roles]
         named_bonus_ids = [
             _normalize(row["worker_discord_id"])
             for row in assignments
@@ -1005,14 +1014,14 @@ def _check_payouts(
         )
         # Reconciliation must use the same business-rule payout policy as Web
         # settlement, or it will wrongly flag/repair 100%-worker orders as 80%.
-        from services.one_companion_one_guard_payout import resolve_one_guard_unit_price
+        rule_key = order.get("order_rule_key")
+        rule_snapshot = order.get("rule_snapshot_json")
         expected = calculate_one_companion_one_guard_order_payout(
-            rule_key=order.get("order_rule_key"),
-            unit_price=resolve_one_guard_unit_price(
-                order.get("order_rule_key"), order.get("rule_snapshot_json")
-            ),
+            rule_key=rule_key,
+            unit_price=resolve_one_guard_unit_price(rule_key, rule_snapshot),
+            legacy_topsecret_payout=resolve_legacy_topsecret_payout(rule_key, rule_snapshot),
             total_amount=payout_base,
-            worker_roles=[(person_id, "booster") for person_id in worker_ids],
+            worker_roles=worker_roles,
             named_bonus_worker_ids=named_bonus_ids,
             customer_service_total_amount=cs_base,
         )

@@ -293,17 +293,14 @@ def _order_payout_base_amount(order: WebOrder) -> int:
 def _recalculate_web_order_payouts(db, order: WebOrder) -> None:
     """Recalculate dashboard payouts from active order_assignments.
 
-    Payout rule:
-    - Split total amount by active workers/companions first.
-    - Normal worker share = gross_share * 80%.
-    - Named bonus worker share = gross_share * 85%.
+    Apply the order's payout policy to its active assignments.
     """
     assignments = list(
         db.scalars(
             select(OrderAssignment)
             .where(OrderAssignment.order_id == order.id)
             .where(OrderAssignment.is_active.is_(True))
-            .order_by(OrderAssignment.assigned_at.asc())
+            .order_by(OrderAssignment.assigned_at.asc(), OrderAssignment.id.asc())
         ).all()
     )
 
@@ -318,6 +315,7 @@ def _recalculate_web_order_payouts(db, order: WebOrder) -> None:
     from services.one_companion_one_guard_payout import (
         calculate_one_companion_one_guard_order_payout,
         is_full_worker_payout_rule,
+        resolve_legacy_topsecret_payout,
         resolve_one_guard_unit_price,
     )
 
@@ -331,12 +329,12 @@ def _recalculate_web_order_payouts(db, order: WebOrder) -> None:
             customer_paid = order.amount
         customer_service_base = max(0, int(customer_paid or 0) - urgent_fee_amount)
 
+    rule_key = getattr(order, "order_rule_key", None)
+    rule_snapshot = getattr(order, "rule_snapshot_json", None)
     payout_result = calculate_one_companion_one_guard_order_payout(
-        rule_key=getattr(order, "order_rule_key", None),
-        unit_price=resolve_one_guard_unit_price(
-            getattr(order, "order_rule_key", None),
-            getattr(order, "rule_snapshot_json", None),
-        ),
+        rule_key=rule_key,
+        unit_price=resolve_one_guard_unit_price(rule_key, rule_snapshot),
+        legacy_topsecret_payout=resolve_legacy_topsecret_payout(rule_key, rule_snapshot),
         total_amount=_order_payout_base_amount(order),
         worker_roles=[
             (str(assignment.worker_discord_id), str(assignment.role_type))

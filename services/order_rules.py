@@ -2452,12 +2452,15 @@ def build_order_rule_snapshot(
     """保存建立訂單當下的規則快照，避免之後改價/改人數影響既有訂單。"""
     from dataclasses import asdict, is_dataclass
 
+    from services.one_companion_one_guard_payout import snapshot_topsecret_companion_basis
+
     if is_dataclass(rule):
         raw_rule = asdict(rule)
     else:
         raw_rule = dict(getattr(rule, "__dict__", {}) or {})
 
     snapshot = {
+        **snapshot_topsecret_companion_basis(getattr(rule, "key", None)),
         "version": ORDER_RULE_SNAPSHOT_VERSION,
         "rule": _order_rule_snapshot_safe(raw_rule),
         "resolved": {

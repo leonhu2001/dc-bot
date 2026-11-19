@@ -405,6 +405,65 @@ def test_worker_payout_mismatch_is_detected(tmp_path):
     assert snapshot["repairable_count"] >= 1
 
 
+def test_topsecret_payout_audit_uses_saved_basis_roles_and_assignment_order(tmp_path):
+    from services.order_rules import build_order_rule_snapshot, get_base_rule
+    from web.app.services.public_order_create import _rule_snapshot
+
+    root = _healthy_root(tmp_path)
+    rule = get_base_rule("basic_one_companion_one_guard_topsecret")
+    old_snapshot = build_order_rule_snapshot(rule)
+    old_snapshot.pop("topsecret_companion_basis")
+    new_snapshot = _rule_snapshot(rule)
+
+    with sqlite3.connect(root / "web_dashboard.db") as conn:
+        conn.executescript(
+            """
+            ALTER TABLE web_orders ADD COLUMN order_rule_key TEXT;
+            ALTER TABLE web_orders ADD COLUMN rule_snapshot_json TEXT;
+            ALTER TABLE order_assignments ADD COLUMN role_type TEXT DEFAULT 'booster';
+            ALTER TABLE order_assignments ADD COLUMN assigned_at TEXT;
+            """
+        )
+
+        for order_id, rule_snapshot, companion_role, companion_time, companion_pay, cs_pay in (
+            (2, old_snapshot, "companion", "00:00:00", 280, 55),
+            (3, new_snapshot, "companion", "00:00:00", 320, 45),
+            (4, new_snapshot, "booster", "00:02:00", 320, 45),
+        ):
+            conn.execute(
+                """
+                INSERT INTO web_orders(
+                    id, customer_discord_id, amount, customer_pay_amount,
+                    payout_base_amount, payment_method, customer_service_discord_id,
+                    status, order_rule_key, rule_snapshot_json
+                ) VALUES(?, 'customer-1', 900, 900, 900, '轉帳', 'cs-1', 'closed', ?, ?)
+                """,
+                (order_id, rule.key, json.dumps(rule_snapshot)),
+            )
+            conn.executemany(
+                """
+                INSERT INTO order_assignments(order_id, worker_discord_id, role_type, assigned_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                [
+                    (order_id, "companion-slot", companion_role, companion_time),
+                    (order_id, "guard-slot", "booster", "00:01:00"),
+                ],
+            )
+            conn.executemany(
+                "INSERT INTO worker_payouts(order_id, worker_discord_id, final_payout) VALUES(?, ?, ?)",
+                [(order_id, "guard-slot", 400), (order_id, "companion-slot", companion_pay)],
+            )
+            conn.execute(
+                "INSERT INTO customer_service_payouts(order_id, customer_service_discord_id, payout_amount) "
+                "VALUES(?, 'cs-1', ?)",
+                (order_id, cs_pay),
+            )
+
+    snapshot = build_accounting_reconciliation_snapshot(root)
+    assert snapshot["issues"] == []
+
+
 def test_wallet_order_missing_payment_transaction_is_detected(tmp_path):
     root = _healthy_root(tmp_path)
 

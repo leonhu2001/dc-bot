@@ -5,8 +5,10 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
+from sqlalchemy.exc import OperationalError
 
+from services.one_companion_one_guard_payout import snapshot_topsecret_companion_basis
 from services.order_product_status import is_order_product_active
 from services.order_rules import CATEGORY_LABELS, ORDER_RULES
 from shared.db import SessionLocal
@@ -79,6 +81,7 @@ def ensure_vip_timer_tables(db=None) -> None:
                 rule_label TEXT NOT NULL,
                 category_label TEXT NOT NULL,
                 hourly_rate INTEGER NOT NULL,
+                topsecret_companion_basis INTEGER,
                 started_at TEXT NOT NULL,
                 active_started_at TEXT,
                 ended_at TEXT,
@@ -90,6 +93,20 @@ def ensure_vip_timer_tables(db=None) -> None:
                 UNIQUE(order_id, seq)
             )
         """))
+        connection = db.connection()
+        if not any(
+            column["name"] == "topsecret_companion_basis"
+            for column in inspect(connection).get_columns("vip_timer_segments")
+        ):
+            try:
+                db.execute(text("ALTER TABLE vip_timer_segments ADD COLUMN topsecret_companion_basis INTEGER"))
+            except OperationalError:
+                # Bot and Web can both initialize the same old SQLite database.
+                if not any(
+                    column["name"] == "topsecret_companion_basis"
+                    for column in inspect(connection).get_columns("vip_timer_segments")
+                ):
+                    raise
         db.execute(text("""
             CREATE TABLE IF NOT EXISTS vip_timer_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -322,15 +339,19 @@ def start_timer(order_id: int, actor_id: Any, staff_ids: list[str] | None = None
             raise ValueError("這張計時單目前不能開始計時。")
         now = utc_now(); now_text = utc_iso(now)
         seq = int(db.execute(text("SELECT COALESCE(MAX(seq),0)+1 FROM vip_timer_segments WHERE order_id=:order_id"), {"order_id": int(order_id)}).scalar_one())
+        payout_snapshot = snapshot_topsecret_companion_basis(session["current_rule_key"])
         db.execute(text("""
             INSERT INTO vip_timer_segments(order_id, seq, rule_key, rule_label, category_label, hourly_rate,
-                started_at, active_started_at, billable_seconds, actor_discord_id, staff_ids_json, created_at, updated_at)
-            VALUES (:order_id,:seq,:rule_key,:rule_label,:category_label,:rate,:now,:now,0,:actor,:staff,:now,:now)
+                topsecret_companion_basis, started_at, active_started_at, billable_seconds,
+                actor_discord_id, staff_ids_json, created_at, updated_at)
+            VALUES (:order_id,:seq,:rule_key,:rule_label,:category_label,:rate,:topsecret_companion_basis,
+                :now,:now,0,:actor,:staff,:now,:now)
         """), {
             "order_id": int(order_id), "seq": seq, "rule_key": session["current_rule_key"],
             "rule_label": session["current_rule_label"], "category_label": session["current_category_label"],
             "rate": int(session["current_hourly_rate"]), "now": now_text, "actor": str(actor_id or ""),
             "staff": json.dumps(staff_ids or [], ensure_ascii=False),
+            "topsecret_companion_basis": payout_snapshot.get("topsecret_companion_basis"),
         })
         db.execute(text("UPDATE vip_timer_sessions SET status='running', started_at=COALESCE(started_at,:now), paused_at=NULL, updated_at=:now WHERE order_id=:order_id"), {"now": now_text, "order_id": int(order_id)})
         _event(db, order_id, "start", actor_id, {"rule_key": session["current_rule_key"]})
@@ -390,14 +411,18 @@ def switch_rule(order_id: int, new_rule_key: str, actor_id: Any, staff_ids: list
             db.execute(text("UPDATE vip_timer_segments SET ended_at=:now, updated_at=:now WHERE id=:id"), {"now": now_text, "id": int(segment["id"])})
         seq = int(db.execute(text("SELECT COALESCE(MAX(seq),0)+1 FROM vip_timer_segments WHERE order_id=:order_id"), {"order_id": int(order_id)}).scalar_one())
         active_started_at = now_text if session["status"] == "running" else None
+        payout_snapshot = snapshot_topsecret_companion_basis(snap["rule_key"])
         db.execute(text("""
             INSERT INTO vip_timer_segments(order_id, seq, rule_key, rule_label, category_label, hourly_rate,
-                started_at, active_started_at, billable_seconds, actor_discord_id, staff_ids_json, created_at, updated_at)
-            VALUES (:order_id,:seq,:rule_key,:rule_label,:category_label,:rate,:now,:active,0,:actor,:staff,:now,:now)
+                topsecret_companion_basis, started_at, active_started_at, billable_seconds,
+                actor_discord_id, staff_ids_json, created_at, updated_at)
+            VALUES (:order_id,:seq,:rule_key,:rule_label,:category_label,:rate,:topsecret_companion_basis,
+                :now,:active,0,:actor,:staff,:now,:now)
         """), {
             "order_id": int(order_id), "seq": seq, "rule_key": snap["rule_key"], "rule_label": snap["rule_label"],
             "category_label": snap["category_label"], "rate": snap["hourly_rate"], "now": now_text,
             "active": active_started_at, "actor": str(actor_id or ""), "staff": json.dumps(staff_ids or [], ensure_ascii=False),
+            "topsecret_companion_basis": payout_snapshot.get("topsecret_companion_basis"),
         })
         db.execute(text("""
             UPDATE vip_timer_sessions SET current_rule_key=:rule_key, current_rule_label=:rule_label,

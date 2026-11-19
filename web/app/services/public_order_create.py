@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from services.one_companion_one_guard_payout import snapshot_topsecret_companion_basis
 from services.order_rules import (
     CATEGORY_LABELS,
     ORDER_RULES,
@@ -602,9 +603,8 @@ def _rule_snapshot(
     )
 
 
-    return _json_safe(
-        snapshot
-    )
+    snapshot.update(snapshot_topsecret_companion_basis(getattr(rule, "key", None)))
+    return _json_safe(snapshot)
 
 
 # ============================================================

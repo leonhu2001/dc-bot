@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy import text
 
+from services.one_companion_one_guard_payout import snapshot_topsecret_companion_basis
 from services.order_rules import (
     ORDER_RULES,
     get_allowed_role_ids,
@@ -296,6 +297,8 @@ def resume_with_new_roster_segment(
                 f"陪玩名單尚未補滿（{state.accepted_count}/{state.required_staff_count}），不能繼續計時。"
             )
 
+        rule_key = str(session.get("current_rule_key") or pricing_snapshot.get("rule_key") or "")
+        payout_snapshot = snapshot_topsecret_companion_basis(rule_key)
         now_text = utc_iso()
         seq = int(
             db.execute(
@@ -308,12 +311,12 @@ def resume_with_new_roster_segment(
                 """
                 INSERT INTO vip_timer_segments(
                     order_id, seq, rule_key, rule_label, category_label, hourly_rate,
-                    started_at, active_started_at, ended_at, billable_seconds,
+                    topsecret_companion_basis, started_at, active_started_at, ended_at, billable_seconds,
                     actor_discord_id, staff_ids_json, player_count, required_staff_count,
                     created_at, updated_at
                 ) VALUES (
                     :order_id, :seq, :rule_key, :rule_label, :category_label, :rate,
-                    :now, :now, NULL, 0, :actor, :staff, :player_count,
+                    :topsecret_companion_basis, :now, :now, NULL, 0, :actor, :staff, :player_count,
                     :required_staff_count, :now, :now
                 )
                 """
@@ -321,10 +324,11 @@ def resume_with_new_roster_segment(
             {
                 "order_id": int(order_id),
                 "seq": seq,
-                "rule_key": str(session.get("current_rule_key") or pricing_snapshot.get("rule_key") or ""),
+                "rule_key": rule_key,
                 "rule_label": str(session.get("current_rule_label") or ""),
                 "category_label": str(session.get("current_category_label") or ""),
                 "rate": int(pricing_snapshot.get("hourly_rate") or 0),
+                "topsecret_companion_basis": payout_snapshot.get("topsecret_companion_basis"),
                 "now": now_text,
                 "actor": str(actor_id or ""),
                 "staff": json.dumps(staff_ids, ensure_ascii=False),

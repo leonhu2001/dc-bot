@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from services import vip_timer_roster_payout
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+
+from services import vip_timer, vip_timer_roster, vip_timer_roster_payout, vip_timer_runtime_guard
 from shared import order_acceptance
+from shared.db import Base
 from web.app.services import order_service
 
 
@@ -95,3 +100,68 @@ def test_payment_promotion_does_not_launch_second_timer_recalculation(monkeypatc
         order_service.recalculate_order_payouts = original_recalculate
         order_acceptance.promote_acceptance_claims_to_assignments = original_promote
         vip_timer_roster_payout._INSTALLED = False
+
+
+def test_topsecret_timer_payout_keeps_the_basis_of_each_segment(tmp_path, monkeypatch):
+    engine = create_engine(f"sqlite:///{tmp_path / 'timer-payout.db'}")
+    sessions = sessionmaker(bind=engine)
+    Base.metadata.create_all(engine)
+    for module in (vip_timer, vip_timer_roster, vip_timer_runtime_guard):
+        monkeypatch.setattr(module, "SessionLocal", sessions)
+    monkeypatch.setattr(
+        vip_timer_roster, "get_acceptance_state", lambda order_id: SimpleNamespace(is_full=True),
+    )
+    monkeypatch.setattr(
+        vip_timer_roster_payout, "_staff_role_types",
+        lambda order_id, db: {"guard": "booster", "companion": "companion"},
+    )
+    now = datetime(2026, 11, 19, 12, tzinfo=timezone.utc)
+    monkeypatch.setattr(vip_timer, "utc_now", lambda: now)
+    order_id = 270
+    rule_key = "basic_one_companion_one_guard_topsecret"
+    staff_ids = ["guard", "companion"]
+
+    def worker_payouts(amount):
+        with sessions() as db:
+            plan = vip_timer_roster_payout._worker_payout_plan(
+                db, SimpleNamespace(id=order_id, payout_base_amount=amount),
+            )
+        return {
+            worker: (payout["gross_share"], payout["final_payout"])
+            for worker, payout in plan.items()
+        }
+
+    with sessions.begin() as db:
+        vip_timer.create_vip_timer_session(
+            db, order_id=order_id, customer_id="customer", initial_rule_key=rule_key,
+        )
+    vip_timer.start_timer(order_id, "guard", staff_ids)
+    now += timedelta(hours=1)
+    vip_timer.pause_timer(order_id, "guard")
+    assert vip_timer.list_segments(order_id)[0]["topsecret_companion_basis"] == 400
+    assert worker_payouts(900) == {"guard": (500, 400), "companion": (400, 320)}
+
+    # Simulate the same 900T segment written by the prior schema before migration.
+    with sessions.begin() as db:
+        db.execute(text("ALTER TABLE vip_timer_segments DROP COLUMN topsecret_companion_basis"))
+    assert worker_payouts(900) == {"guard": (500, 400), "companion": (350, 280)}
+
+    vip_timer.switch_rule(order_id, rule_key, "guard", staff_ids)
+    vip_timer.resume_timer(order_id, "guard")
+    now += timedelta(hours=1)
+    with sessions.begin() as db:
+        vip_timer_roster._close_live_segment(db, order_id, "running", now)
+
+    vip_timer_runtime_guard._ensure_segment_snapshot_columns()
+    vip_timer_roster.resume_with_new_roster_segment(
+        order_id, actor_id="guard", pricing_snapshot=vip_timer.rule_snapshot(rule_key),
+        staff_ids=staff_ids,
+    )
+    now += timedelta(hours=1)
+    vip_timer.pause_timer(order_id, "guard")
+
+    assert [
+        (segment["hourly_rate"], segment["topsecret_companion_basis"])
+        for segment in vip_timer.list_segments(order_id)
+    ] == [(900, None), (900, 400), (900, 400)]
+    assert worker_payouts(2700) == {"guard": (1500, 1200), "companion": (1150, 920)}

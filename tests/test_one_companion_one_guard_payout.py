@@ -2,6 +2,8 @@ from services.one_companion_one_guard_payout import (
     ONE_COMPANION_ONE_GUARD_PAYOUT_BASES,
     allocate_integer_gross_shares,
     calculate_one_companion_one_guard_order_payout,
+    resolve_legacy_topsecret_payout,
+    snapshot_topsecret_companion_basis,
     worker_basis_weights,
 )
 
@@ -15,7 +17,7 @@ MOBILE_TOPSECRET = "basic_mobile_one_companion_one_guard_topsecret"
 def test_one_companion_one_guard_payout_bases_match_prices():
     assert ONE_COMPANION_ONE_GUARD_PAYOUT_BASES == {
         DESKTOP_SECRET: (450, 350),
-        DESKTOP_TOPSECRET: (500, 350),
+        DESKTOP_TOPSECRET: (500, 400),
         MOBILE_SECRET: (380, 320),
         MOBILE_TOPSECRET: (420, 320),
     }
@@ -83,7 +85,7 @@ def test_discounted_payout_base_scales_both_slots_proportionally():
     assert sum(shares.values()) == 686
 
 
-def test_topsecret_900_invoice_uses_exact_500_plus_350_staff_bases():
+def test_topsecret_900_invoice_uses_exact_500_plus_400_staff_bases():
     from services.one_companion_one_guard_payout import worker_basis_total
     result = calculate_one_companion_one_guard_order_payout(
         rule_key=DESKTOP_TOPSECRET,
@@ -93,14 +95,48 @@ def test_topsecret_900_invoice_uses_exact_500_plus_350_staff_bases():
     )
     assert result is not None
     workers = {row.worker_discord_id: row for row in result.worker_payouts}
-    assert worker_basis_total(DESKTOP_TOPSECRET, 900) == 850
+    assert worker_basis_total(DESKTOP_TOPSECRET, 900) == 900
     assert workers["tech"].gross_share == 500
-    assert workers["entertain"].gross_share == 350
+    assert workers["entertain"].gross_share == 400
     assert workers["tech"].final_payout == 400
-    assert workers["entertain"].final_payout == 280
+    assert workers["entertain"].final_payout == 320
+    assert result.customer_service_payout == 45
+    assert 900 - result.total_payout == 135
+
+
+def test_topsecret_named_companion_uses_increased_basis():
+    result = calculate_one_companion_one_guard_order_payout(
+        rule_key=DESKTOP_TOPSECRET,
+        total_amount=900,
+        worker_roles=[("tech", "booster"), ("entertain", "companion")],
+        named_bonus_worker_ids=["entertain"],
+    )
+    assert result is not None
+    workers = {row.worker_discord_id: row for row in result.worker_payouts}
+    assert workers["tech"].final_payout == 400
+    assert workers["entertain"].final_payout == 332
+
+
+def test_historical_900_topsecret_quote_keeps_the_old_split():
+    import json
+
+    old_snapshot = {"rule": {"price": 900}}
+    new_snapshot = {**old_snapshot, **snapshot_topsecret_companion_basis(DESKTOP_TOPSECRET)}
+    assert new_snapshot["topsecret_companion_basis"] == 400
+    assert resolve_legacy_topsecret_payout(DESKTOP_TOPSECRET, json.dumps(old_snapshot))
+    assert not resolve_legacy_topsecret_payout(DESKTOP_TOPSECRET, json.dumps(new_snapshot))
+    assert not resolve_legacy_topsecret_payout(DESKTOP_SECRET, None)
+
+    result = calculate_one_companion_one_guard_order_payout(
+        rule_key=DESKTOP_TOPSECRET,
+        total_amount=900,
+        worker_roles=[("tech", "booster"), ("entertain", "companion")],
+        unit_price=900,
+        legacy_topsecret_payout=True,
+    )
+    assert result is not None
+    assert result.total_worker_payout == 680
     assert result.customer_service_payout == 55
-    # Store retains 165T after both worker payouts and the 25%-margin CS payout.
-    assert 900 - sum(row.final_payout for row in workers.values()) - result.customer_service_payout == 165
 
 
 def test_historical_770_topsecret_snapshot_keeps_old_450_plus_320_bases():
@@ -123,7 +159,7 @@ def test_historical_770_topsecret_snapshot_keeps_old_450_plus_320_bases():
     assert result.customer_service_payout == 38.5
 
 
-def test_timer_decimal_allocation_keeps_50t_per_hour_outside_staff_basis():
+def test_timer_decimal_allocation_preserves_current_and_historical_bases():
     from decimal import Decimal
     from services.one_companion_one_guard_payout import allocate_decimal_gross_shares
 
@@ -131,7 +167,7 @@ def test_timer_decimal_allocation_keeps_50t_per_hour_outside_staff_basis():
         DESKTOP_TOPSECRET, [("guard", "booster"), ("companion", "companion")],
         Decimal(900), unit_price=900, scale_to_worker_basis=True,
     )
-    assert current == {"guard": Decimal(500), "companion": Decimal(350)}
+    assert current == {"guard": Decimal(500), "companion": Decimal(400)}
 
     historical = allocate_decimal_gross_shares(
         DESKTOP_TOPSECRET, [("guard", "booster"), ("companion", "companion")],
