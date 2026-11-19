@@ -98,7 +98,7 @@ def _legacy_static_roster_staff_ids(order_id: int, db) -> list[str]:
     try:
         claim_columns = {
             str(column.get("name") or "")
-            for column in inspect(db.get_bind()).get_columns("order_acceptance_claims")
+            for column in inspect(db.connection()).get_columns("order_acceptance_claims")
         }
     except Exception:
         return []
