@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from services import vip_timer, vip_timer_roster, vip_timer_roster_payout, vip_timer_runtime_guard
+from services import vip_timer, vip_timer_ops, vip_timer_roster, vip_timer_roster_payout, vip_timer_runtime_guard
 from shared import order_acceptance
 from shared.db import Base
 from web.app.services import order_service
@@ -109,6 +109,9 @@ def test_topsecret_timer_payout_keeps_the_basis_of_each_segment(tmp_path, monkey
     for module in (vip_timer, vip_timer_roster, vip_timer_runtime_guard):
         monkeypatch.setattr(module, "SessionLocal", sessions)
     monkeypatch.setattr(
+        vip_timer_ops, "_current_vip_level_and_rate", lambda customer_id: ("普通魔丸", 100),
+    )
+    monkeypatch.setattr(
         vip_timer_roster, "get_acceptance_state", lambda order_id: SimpleNamespace(is_full=True),
     )
     monkeypatch.setattr(
@@ -133,7 +136,7 @@ def test_topsecret_timer_payout_keeps_the_basis_of_each_segment(tmp_path, monkey
 
     with sessions.begin() as db:
         vip_timer.create_vip_timer_session(
-            db, order_id=order_id, customer_id="customer", initial_rule_key=rule_key,
+            db, order_id=order_id, customer_id="123456", initial_rule_key=rule_key,
         )
     vip_timer.start_timer(order_id, "guard", staff_ids)
     now += timedelta(hours=1)
