@@ -98,7 +98,7 @@ def _legacy_static_roster_staff_ids(order_id: int, db) -> list[str]:
     try:
         claim_columns = {
             str(column.get("name") or "")
-            for column in inspect(db.get_bind()).get_columns("order_acceptance_claims")
+            for column in inspect(db.connection()).get_columns("order_acceptance_claims")
         }
     except Exception:
         return []
@@ -154,16 +154,22 @@ def _raw_worker_shares(
     try:
         segment_columns = {
             str(column.get("name") or "")
-            for column in inspect(db.get_bind()).get_columns("vip_timer_segments")
+            for column in inspect(db.connection()).get_columns("vip_timer_segments")
         }
     except Exception:
         segment_columns = set()
     rule_key_select = "rule_key" if "rule_key" in segment_columns else "'' AS rule_key"
+    companion_basis_select = (
+        "topsecret_companion_basis"
+        if "topsecret_companion_basis" in segment_columns
+        else "NULL AS topsecret_companion_basis"
+    )
 
     rows = db.execute(
         text(
             f"""
-            SELECT {rule_key_select}, hourly_rate, billable_seconds, staff_ids_json
+            SELECT {rule_key_select}, hourly_rate, billable_seconds, staff_ids_json,
+                   {companion_basis_select}
             FROM vip_timer_segments
             WHERE order_id=:order_id
               AND billable_seconds > 0
@@ -211,6 +217,7 @@ def _raw_worker_shares(
             segment_gross,
             unit_price=rate,
             scale_to_worker_basis=True,
+            legacy_topsecret_payout=row["topsecret_companion_basis"] is None,
         )
         if weighted is not None:
             for worker_id, amount in weighted.items():
@@ -260,9 +267,8 @@ def _worker_payout_plan(db, order: WebOrder) -> dict[str, dict[str, int | float 
     raw, billed_total = _raw_worker_shares(
         int(order.id), db, include_billed_total=True
     )
-    # Do not force the entire invoice (900T/H) back into staff payouts on
-    # top-secret one-guard segments (500+350=850T/H). Mixed VIP segments and
-    # existing discounts remain proportional to their recorded billed basis.
+    # Preserve each segment's basis, including historical 900T/H segments with
+    # an 850T/H staff basis, when scaling to the order's final payout amount.
     worker_basis_total = (
         int(round(Decimal(payout_base) * sum(raw.values(), Decimal(0)) / billed_total))
         if billed_total > 0 else payout_base

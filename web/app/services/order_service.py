@@ -547,7 +547,7 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
             select(OrderAssignment)
             .where(OrderAssignment.order_id == order_id)
             .where(OrderAssignment.is_active.is_(True))
-            .order_by(OrderAssignment.assigned_at.asc())
+            .order_by(OrderAssignment.assigned_at.asc(), OrderAssignment.id.asc())
         ).all()
     )
 
@@ -571,6 +571,7 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
 
     from services.one_companion_one_guard_payout import (
         calculate_one_companion_one_guard_order_payout,
+        resolve_legacy_topsecret_payout,
         resolve_one_guard_unit_price,
     )
 
@@ -591,6 +592,9 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
     payout_result = calculate_one_companion_one_guard_order_payout(
         rule_key=getattr(order, "order_rule_key", None),
         unit_price=resolve_one_guard_unit_price(
+            order.order_rule_key, order.rule_snapshot_json,
+        ),
+        legacy_topsecret_payout=resolve_legacy_topsecret_payout(
             order.order_rule_key, order.rule_snapshot_json,
         ),
         total_amount=payout_base_amount,

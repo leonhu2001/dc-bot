@@ -11,27 +11,28 @@ from shared.payout import (CUSTOMER_SERVICE_PAYOUT_RATE, OrderPayoutResult,
     calculate_customer_service_payout, calculate_order_payout)
 
 
-# Gross shares are one technical single + one entertainment single.
-# Staff bonuses are applied afterward by shared.payout.
+DESKTOP_TOPSECRET_ONE_GUARD = "basic_one_companion_one_guard_topsecret"
+TOPSECRET_COMPANION_BASIS_FIELD = "topsecret_companion_basis"
+LEGACY_TOPSECRET_900_BASES = (500, 350)
+
+# Staff bonuses are applied to the individual slot basis by shared.payout.
 ONE_COMPANION_ONE_GUARD_PAYOUT_BASES: dict[str, tuple[int, int]] = {
     "basic_one_companion_one_guard_secret": (450, 350),
-    "basic_one_companion_one_guard_topsecret": (500, 350),
+    DESKTOP_TOPSECRET_ONE_GUARD: (500, 400),
     "basic_mobile_one_companion_one_guard_secret": (380, 320),
     "basic_mobile_one_companion_one_guard_topsecret": (420, 320),
 }
-# New top-secret is sold for 900T/H, but only 500+350=850T/H is
-# the worker gross basis. Retain the 50T/H difference in the margin pool.
 DESKTOP_ONE_GUARD_RETAIL_PRICES = {
     "basic_one_companion_one_guard_secret": 800,
-    "basic_one_companion_one_guard_topsecret": 900,
+    DESKTOP_TOPSECRET_ONE_GUARD: 900,
 }
 LEGACY_DESKTOP_ONE_GUARD_RETAIL_PRICES = {
     "basic_one_companion_one_guard_secret": 720,
-    "basic_one_companion_one_guard_topsecret": 770,
+    DESKTOP_TOPSECRET_ONE_GUARD: 770,
 }
 LEGACY_DESKTOP_ONE_GUARD_BASES = {
     "basic_one_companion_one_guard_secret": (400, 320),
-    "basic_one_companion_one_guard_topsecret": (450, 320),
+    DESKTOP_TOPSECRET_ONE_GUARD: (450, 320),
 }
 
 FULL_WORKER_PAYOUT_RULE_KEYS = frozenset({
@@ -52,17 +53,39 @@ def is_full_worker_payout_rule(rule_key: str | None) -> bool:
     return key in FULL_WORKER_PAYOUT_RULE_KEYS or key.startswith(FULL_WORKER_PAYOUT_RULE_PREFIXES)
 
 
+def _load_rule_snapshot(snapshot_json: str | None) -> dict:
+    try:
+        snapshot = json.loads(str(snapshot_json or "{}"))
+    except (TypeError, ValueError):
+        return {}
+    return snapshot if isinstance(snapshot, dict) else {}
+
+
+def snapshot_topsecret_companion_basis(rule_key: str | None) -> dict[str, int]:
+    if str(rule_key or "").strip() != DESKTOP_TOPSECRET_ONE_GUARD:
+        return {}
+    return {
+        TOPSECRET_COMPANION_BASIS_FIELD: ONE_COMPANION_ONE_GUARD_PAYOUT_BASES[
+            DESKTOP_TOPSECRET_ONE_GUARD
+        ][1],
+    }
+
+
+def resolve_legacy_topsecret_payout(rule_key: str | None, snapshot_json: str | None) -> bool:
+    current_basis = snapshot_topsecret_companion_basis(rule_key)
+    if not current_basis:
+        return False
+    snapshot = _load_rule_snapshot(snapshot_json)
+    # Both policies use the same 900T retail price. Older orders lack this field.
+    return snapshot.get(TOPSECRET_COMPANION_BASIS_FIELD) != current_basis[TOPSECRET_COMPANION_BASIS_FIELD]
+
+
 def resolve_one_guard_unit_price(rule_key: str | None, snapshot_json: str | None) -> int | None:
     """Honor historical quote prices frozen with the order."""
     key = str(rule_key or "").strip()
     if key not in DESKTOP_ONE_GUARD_RETAIL_PRICES:
         return None
-    try:
-        snapshot = json.loads(str(snapshot_json or "{}"))
-    except (TypeError, ValueError):
-        snapshot = {}
-    if not isinstance(snapshot, dict):
-        return None
+    snapshot = _load_rule_snapshot(snapshot_json)
     rule = snapshot.get("rule") if isinstance(snapshot.get("rule"), dict) else snapshot
     try:
         price = int(rule.get("price") or 0)
@@ -75,24 +98,32 @@ def resolve_one_guard_unit_price(rule_key: str | None, snapshot_json: str | None
 
 
 def payout_bases_for_rule(
-    rule_key: str | None, *, unit_price: int | None = None
+    rule_key: str | None, *, unit_price: int | None = None, legacy_topsecret_payout: bool = False
 ) -> tuple[int, int] | None:
     key = str(rule_key or "").strip()
     if (key in LEGACY_DESKTOP_ONE_GUARD_RETAIL_PRICES
             and unit_price == LEGACY_DESKTOP_ONE_GUARD_RETAIL_PRICES[key]):
         return LEGACY_DESKTOP_ONE_GUARD_BASES[key]
+    if key == DESKTOP_TOPSECRET_ONE_GUARD and legacy_topsecret_payout:
+        return LEGACY_TOPSECRET_900_BASES
     return ONE_COMPANION_ONE_GUARD_PAYOUT_BASES.get(key)
 
 
 def worker_basis_total(
-    rule_key: str | None, invoice_basis: int | Decimal, *, unit_price: int | None = None
+    rule_key: str | None,
+    invoice_basis: int | Decimal,
+    *,
+    unit_price: int | None = None,
+    legacy_topsecret_payout: bool = False,
 ) -> Decimal:
     """Proportionally scale the worker-basis ceiling; preserves discounts."""
     key = str(rule_key or "").strip()
     total = max(Decimal(0), Decimal(str(invoice_basis or 0)))
     if key not in DESKTOP_ONE_GUARD_RETAIL_PRICES:
         return total
-    bases = payout_bases_for_rule(key, unit_price=unit_price)
+    bases = payout_bases_for_rule(
+        key, unit_price=unit_price, legacy_topsecret_payout=legacy_topsecret_payout,
+    )
     if bases is None:
         return total
     retail = (LEGACY_DESKTOP_ONE_GUARD_RETAIL_PRICES[key]
@@ -118,7 +149,9 @@ def _unique_worker_roles(
 def worker_basis_weights(
     rule_key: str | None,
     worker_roles: Iterable[tuple[str, str]],
-    *, unit_price: int | None = None,
+    *,
+    unit_price: int | None = None,
+    legacy_topsecret_payout: bool = False,
 ) -> dict[str, int] | None:
     """Return protector/companion gross-basis weights for the two staff slots.
 
@@ -128,7 +161,9 @@ def worker_basis_weights(
     A protector + companion roster maps naturally by role. Two companion-only
     workers are invalid for this product and return ``None``.
     """
-    bases = payout_bases_for_rule(rule_key, unit_price=unit_price)
+    bases = payout_bases_for_rule(
+        rule_key, unit_price=unit_price, legacy_topsecret_payout=legacy_topsecret_payout,
+    )
     if bases is None:
         return None
 
@@ -162,9 +197,13 @@ def allocate_integer_gross_shares(
     rule_key: str | None,
     worker_roles: Iterable[tuple[str, str]],
     target_total: int,
-    *, unit_price: int | None = None,
+    *,
+    unit_price: int | None = None,
+    legacy_topsecret_payout: bool = False,
 ) -> dict[str, int] | None:
-    weights = worker_basis_weights(rule_key, worker_roles, unit_price=unit_price)
+    weights = worker_basis_weights(
+        rule_key, worker_roles, unit_price=unit_price, legacy_topsecret_payout=legacy_topsecret_payout,
+    )
     if weights is None:
         return None
 
@@ -198,15 +237,22 @@ def allocate_decimal_gross_shares(
     rule_key: str | None,
     worker_roles: Iterable[tuple[str, str]],
     target_total: Decimal,
-    *, unit_price: int | None = None, scale_to_worker_basis: bool = False,
+    *,
+    unit_price: int | None = None,
+    scale_to_worker_basis: bool = False,
+    legacy_topsecret_payout: bool = False,
 ) -> dict[str, Decimal] | None:
-    weights = worker_basis_weights(rule_key, worker_roles, unit_price=unit_price)
+    weights = worker_basis_weights(
+        rule_key, worker_roles, unit_price=unit_price, legacy_topsecret_payout=legacy_topsecret_payout,
+    )
     if weights is None:
         return None
 
     target = max(Decimal(0), Decimal(target_total))
     if scale_to_worker_basis:
-        target = worker_basis_total(rule_key, target, unit_price=unit_price)
+        target = worker_basis_total(
+            rule_key, target, unit_price=unit_price, legacy_topsecret_payout=legacy_topsecret_payout,
+        )
     weight_total = sum(Decimal(max(0, int(value))) for value in weights.values())
     if weight_total <= 0:
         return {worker_id: Decimal(0) for worker_id in weights}
@@ -225,11 +271,11 @@ def calculate_one_companion_one_guard_order_payout(
     named_bonus_worker_ids: list[str] | set[str] | None = None,
     customer_service_total_amount: int | None = None,
     unit_price: int | None = None,
+    legacy_topsecret_payout: bool = False,
 ) -> OrderPayoutResult | None:
     """Calculate normal-order payout using the product's two slot bases.
 
-    New top-secret 900T is sold with only 850T in staff bases. Discounts
-    scale each worker basis proportionally. Legacy quotes keep their old bases.
+    Discounts scale each worker basis proportionally. Legacy quotes keep their old bases.
     """
     workers = _unique_worker_roles(worker_roles)
 
@@ -262,10 +308,10 @@ def calculate_one_companion_one_guard_order_payout(
         return payout
 
     staff_basis = int(round(worker_basis_total(
-        rule_key, total_amount, unit_price=unit_price
+        rule_key, total_amount, unit_price=unit_price, legacy_topsecret_payout=legacy_topsecret_payout,
     )))
     shares = allocate_integer_gross_shares(
-        rule_key, workers, staff_basis, unit_price=unit_price
+        rule_key, workers, staff_basis, unit_price=unit_price, legacy_topsecret_payout=legacy_topsecret_payout,
     )
     if shares is None:
         return None
@@ -280,6 +326,7 @@ def calculate_one_companion_one_guard_order_payout(
         workers,
         customer_service_amount,
         unit_price=unit_price,
+        legacy_topsecret_payout=legacy_topsecret_payout,
     )
     if customer_service_shares is None:
         return None
@@ -310,10 +357,9 @@ def calculate_one_companion_one_guard_order_payout(
         named_bonus_rate = float(single.named_bonus_rate or 0)
 
     total_worker_payout = sum(float(worker.final_payout or 0) for worker in worker_payouts)
-    if (str(rule_key or "") == "basic_one_companion_one_guard_topsecret"
-            and unit_price != LEGACY_DESKTOP_ONE_GUARD_RETAIL_PRICES["basic_one_companion_one_guard_topsecret"]):
-        # CS receives 25% of the whole actual post-worker margin, including
-        # the extra 50T/H on this product. Historical gross 5% is frozen.
+    if (str(rule_key or "") == DESKTOP_TOPSECRET_ONE_GUARD
+            and unit_price != LEGACY_DESKTOP_ONE_GUARD_RETAIL_PRICES[DESKTOP_TOPSECRET_ONE_GUARD]):
+        # Use the actual post-worker margin, including the 50T/H retained on old 900T quotes.
         if legacy_rate is not None:
             total_customer_service_payout = round(customer_service_amount * float(legacy_rate), 2)
         else:
@@ -347,6 +393,8 @@ def calculate_one_companion_one_guard_order_payout(
 __all__ = [
     "ONE_COMPANION_ONE_GUARD_PAYOUT_BASES",
     "resolve_one_guard_unit_price",
+    "resolve_legacy_topsecret_payout",
+    "snapshot_topsecret_companion_basis",
     "worker_basis_total",
     "FULL_WORKER_PAYOUT_RULE_KEYS",
     "FULL_WORKER_PAYOUT_RULE_PREFIXES",
